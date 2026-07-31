@@ -1,0 +1,143 @@
+import React from 'react';
+import { Key, Calculator, Download, Upload, RefreshCw, Layers, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { DhanApiCredentials } from '../types';
+
+interface HeaderProps {
+  credentials: DhanApiCredentials;
+  onOpenSettings: () => void;
+  onOpenManualCalc: () => void;
+  onOpenCsvImport: () => void;
+  onExportCsv: () => void;
+  totalStocks: number;
+  calculatedCount: number;
+  onSimulateAll: () => void;
+  isBulkLoading: boolean;
+  onFetchAll: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({
+  credentials,
+  onOpenSettings,
+  onOpenManualCalc,
+  onOpenCsvImport,
+  onExportCsv,
+  totalStocks,
+  calculatedCount,
+  onSimulateAll,
+  isBulkLoading,
+  onFetchAll
+}) => {
+  return (
+    <header className="bg-white border-b border-slate-200/80 text-slate-800 sticky top-0 z-30 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          
+          {/* Logo & Title */}
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/20 flex items-center justify-center font-bold text-lg">
+              𝒢
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-xl font-bold tracking-tight text-slate-900">
+                  Gann 15-Min Price Calculator
+                </h1>
+                <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-semibold border border-blue-200/60">
+                  Nifty Futures F&O
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                15-Min Open & Close Gann Square Root Calculator with Dhan HQ Data API
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons & Status */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Dhan Credentials Status Badge */}
+            <button
+              onClick={onOpenSettings}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                credentials.isConfigured
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+              }`}
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>Dhan API: {credentials.isConfigured ? 'Connected' : 'Setup Required'}</span>
+              {credentials.isConfigured ? (
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+              )}
+            </button>
+
+            {/* Quick Manual Calculator */}
+            <button
+              onClick={onOpenManualCalc}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-medium shadow-sm transition-colors"
+            >
+              <Calculator className="w-3.5 h-3.5 text-blue-600" />
+              <span>Manual Entry</span>
+            </button>
+
+            {/* Simulated Data */}
+            <button
+              onClick={onSimulateAll}
+              disabled={isBulkLoading}
+              title="Populate test 15-min open and close prices for all stocks"
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              <Layers className="w-3.5 h-3.5 text-blue-600" />
+              <span>Sample Prices</span>
+            </button>
+
+            {/* Bulk Dhan Fetch */}
+            {credentials.isConfigured && (
+              <button
+                onClick={onFetchAll}
+                disabled={isBulkLoading}
+                className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isBulkLoading ? 'animate-spin' : ''}`} />
+                <span>Fetch Dhan Data</span>
+              </button>
+            )}
+
+            {/* CSV Import / Export */}
+            <div className="flex items-center space-x-1 border-l border-slate-200 pl-2">
+              <button
+                onClick={onOpenCsvImport}
+                title="Import Custom CSV stock list"
+                className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 text-xs shadow-sm transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onExportCsv}
+                title="Export calculations to CSV"
+                className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 text-xs shadow-sm transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Stats Strip */}
+        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="flex items-center space-x-4">
+            <span>Total F&O Stocks: <strong className="text-slate-900">{totalStocks}</strong></span>
+            <span>Calculated: <strong className="text-blue-600">{calculatedCount} / {totalStocks}</strong></span>
+            <span>Date: <strong className="text-slate-700">{credentials.date}</strong></span>
+          </div>
+          <div className="hidden sm:block text-slate-400 italic">
+            Formula: ((√P × 15) - 15) % 15
+          </div>
+        </div>
+
+      </div>
+    </header>
+  );
+};
