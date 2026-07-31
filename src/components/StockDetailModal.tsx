@@ -59,32 +59,39 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center mb-4">
-            <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">
-              <div className="text-[10px] text-slate-500 uppercase">15-Min Open</div>
-              <div className="text-base font-mono font-bold text-slate-900">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center mb-4">
+            <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+              <div className="text-[10px] text-slate-500 uppercase font-semibold">15-Min Open</div>
+              <div className="text-sm font-mono font-bold text-slate-900 mt-0.5">
                 {stock.openPrice ? `₹${stock.openPrice.toFixed(2)}` : 'N/A'}
               </div>
             </div>
 
-            <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200/80">
-              <div className="text-[10px] text-blue-700 font-bold uppercase">Open Calculation</div>
-              <div className="text-base font-mono font-extrabold text-blue-700">
+            <div className="bg-blue-50/70 p-2 rounded-lg border border-blue-200/80">
+              <div className="text-[10px] text-blue-700 font-bold uppercase">Open Calc</div>
+              <div className="text-sm font-mono font-extrabold text-blue-700 mt-0.5">
                 {stock.openCalc !== undefined && stock.openCalc !== null ? stock.openCalc.toFixed(4) : 'N/A'}
               </div>
             </div>
 
-            <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">
-              <div className="text-[10px] text-slate-500 uppercase">15-Min Close</div>
-              <div className="text-base font-mono font-bold text-slate-900">
+            <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
+              <div className="text-[10px] text-slate-500 uppercase font-semibold">15-Min Close</div>
+              <div className="text-sm font-mono font-bold text-slate-900 mt-0.5">
                 {stock.closePrice ? `₹${stock.closePrice.toFixed(2)}` : 'N/A'}
               </div>
             </div>
 
-            <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200/80">
-              <div className="text-[10px] text-blue-700 font-bold uppercase">Close Calculation</div>
-              <div className="text-base font-mono font-extrabold text-blue-700">
+            <div className="bg-blue-50/70 p-2 rounded-lg border border-blue-200/80">
+              <div className="text-[10px] text-blue-700 font-bold uppercase">Close Calc</div>
+              <div className="text-sm font-mono font-extrabold text-blue-700 mt-0.5">
                 {stock.closeCalc !== undefined && stock.closeCalc !== null ? stock.closeCalc.toFixed(4) : 'N/A'}
+              </div>
+            </div>
+
+            <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs col-span-2 sm:col-span-1">
+              <div className="text-[10px] text-slate-500 uppercase font-semibold">15-Min Volume</div>
+              <div className="text-sm font-mono font-bold text-slate-900 mt-0.5">
+                {stock.volume ? stock.volume.toLocaleString('en-IN') : 'N/A'}
               </div>
             </div>
           </div>

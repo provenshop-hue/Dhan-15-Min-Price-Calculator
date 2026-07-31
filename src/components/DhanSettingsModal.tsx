@@ -153,8 +153,7 @@ export const DhanSettingsModal: React.FC<DhanSettingsModalProps> = ({
                 onChange={(e) => setSegment(e.target.value as 'NSE_EQ' | 'NSE_FNO')}
                 className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-slate-900 outline-none font-medium shadow-2xs"
               >
-                <option value="NSE_EQ">NSE Equity (NSE_EQ)</option>
-                <option value="NSE_FNO">NSE Futures & Options (NSE_FNO)</option>
+                <option value="NSE_EQ">NSE Spot Equity (Spot F&O Stocks)</option>
               </select>
             </div>
 

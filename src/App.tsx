@@ -7,6 +7,7 @@ import { ManualCalculatorModal } from './components/ManualCalculatorModal';
 import { StockDetailModal } from './components/StockDetailModal';
 import { CsvImportModal } from './components/CsvImportModal';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
+import { getDhanSecurityId } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials } from './types';
 import { calculateGann15Min } from './utils/gann';
 import { Download, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
@@ -111,133 +112,38 @@ export default function App() {
     );
   };
 
-  // Populate realistic sample 15-min open & close prices for testing across all stocks
-  const handleSimulateAllPrices = () => {
+  // Clear all loaded prices
+  const handleClearAllPrices = () => {
     setStocks((prev) =>
-      prev.map((s, idx) => {
-        // Base price generated deterministically per stock symbol length and index
-        const base = 250 + ((s.symbol.charCodeAt(0) * 17 + idx * 37) % 3500);
-        const randomVar = ((idx * 13) % 40) - 20;
-        const openPrice = Math.round((base + randomVar) * 100) / 100;
-        const closePrice = Math.round((openPrice + (((idx % 2 === 0 ? 1 : -1) * ((idx * 7) % 35)) + 2.5)) * 100) / 100;
-
-        const calc = calculateGann15Min(openPrice, closePrice);
-
-        return {
-          ...s,
-          openPrice,
-          closePrice,
-          openCalc: calc.openCalc,
-          closeCalc: calc.closeCalc,
-          buyAbove: calc.buyAbove,
-          sellBelow: calc.sellBelow,
-          targetsUp: calc.targetsUp,
-          targetsDown: calc.targetsDown,
-          trend: calc.trend,
-          isFetched: true,
-          candleTimestamp: '15-min Candle (Sample)'
-        };
-      })
+      prev.map((s) => ({
+        ...s,
+        openPrice: null,
+        closePrice: null,
+        openCalc: null,
+        closeCalc: null,
+        buyAbove: null,
+        sellBelow: null,
+        targetsUp: [],
+        targetsDown: [],
+        trend: null,
+        volume: null,
+        candleTimestamp: null,
+        isFetched: false,
+        isLoading: false,
+        error: null
+      }))
     );
-
     setNotification({
       type: 'info',
-      message: 'Sample 15-minute Open & Close prices populated for all stocks!'
+      message: 'Cleared all stock candle prices.'
     });
   };
 
-  // Fetch single stock candle from Dhan API
-  const handleFetchSingleDhan = async (stock: StockCalculated) => {
-    if (!credentials.isConfigured) {
-      setIsSettingsOpen(true);
-      return;
-    }
+  // Helper function to fetch single stock candle with retries
+  const fetchSingleStockCandle = async (stock: StockCalculated) => {
+    const secId = stock.securityId || getDhanSecurityId(stock.symbol);
 
-    setStocks((prev) =>
-      prev.map((s) => (s.id === stock.id ? { ...s, isLoading: true, error: null } : s))
-    );
-
-    try {
-      const res = await fetch('/api/dhan/intraday-15m', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: credentials.clientId,
-          accessToken: credentials.accessToken,
-          securityId: stock.securityId || '1333',
-          exchangeSegment: credentials.segment,
-          symbol: stock.symbol,
-          date: credentials.date
-        })
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        const openPrice = data.open;
-        const closePrice = data.close;
-        const calc = calculateGann15Min(openPrice, closePrice);
-
-        setStocks((prev) =>
-          prev.map((s) =>
-            s.id === stock.id
-              ? {
-                  ...s,
-                  openPrice,
-                  closePrice,
-                  highPrice: data.high,
-                  lowPrice: data.low,
-                  volume: data.volume,
-                  candleTimestamp: data.candleTimestamp,
-                  openCalc: calc.openCalc,
-                  closeCalc: calc.closeCalc,
-                  buyAbove: calc.buyAbove,
-                  sellBelow: calc.sellBelow,
-                  targetsUp: calc.targetsUp,
-                  targetsDown: calc.targetsDown,
-                  trend: calc.trend,
-                  isFetched: true,
-                  isLoading: false,
-                  error: null
-                }
-              : s
-          )
-        );
-
-        setNotification({
-          type: 'success',
-          message: `Fetched 15-min candle for ${stock.symbol}!`
-        });
-      } else {
-        throw new Error(data.error || 'Failed to fetch candle data');
-      }
-    } catch (err: any) {
-      setStocks((prev) =>
-        prev.map((s) =>
-          s.id === stock.id ? { ...s, isLoading: false, error: err.message } : s
-        )
-      );
-      setNotification({
-        type: 'error',
-        message: `Error fetching ${stock.symbol}: ${err.message}`
-      });
-    }
-  };
-
-  // Fetch all stocks via Dhan API
-  const handleFetchAllDhan = async () => {
-    if (!credentials.isConfigured) {
-      setIsSettingsOpen(true);
-      return;
-    }
-
-    setIsBulkLoading(true);
-    setBulkProgress({ current: 0, total: stocks.length });
-
-    for (let i = 0; i < stocks.length; i++) {
-      const stock = stocks[i];
-      setBulkProgress({ current: i + 1, total: stocks.length });
-
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const res = await fetch('/api/dhan/intraday-15m', {
           method: 'POST',
@@ -245,8 +151,8 @@ export default function App() {
           body: JSON.stringify({
             clientId: credentials.clientId,
             accessToken: credentials.accessToken,
-            securityId: stock.securityId || '1333',
-            exchangeSegment: credentials.segment,
+            securityId: secId,
+            exchangeSegment: stock.exchangeSegment || credentials.segment || 'NSE_EQ',
             symbol: stock.symbol,
             date: credentials.date
           })
@@ -254,39 +160,181 @@ export default function App() {
 
         const data = await res.json();
         if (res.ok && data.success) {
-          const calc = calculateGann15Min(data.open, data.close);
-          setStocks((prev) =>
-            prev.map((s) =>
-              s.id === stock.id
-                ? {
-                    ...s,
-                    openPrice: data.open,
-                    closePrice: data.close,
-                    openCalc: calc.openCalc,
-                    closeCalc: calc.closeCalc,
-                    buyAbove: calc.buyAbove,
-                    sellBelow: calc.sellBelow,
-                    targetsUp: calc.targetsUp,
-                    targetsDown: calc.targetsDown,
-                    trend: calc.trend,
-                    isFetched: true
-                  }
-                : s
-            )
-          );
+          return { success: true, data, secId };
         }
-      } catch (err) {
-        console.error(`Error fetching ${stock.symbol}:`, err);
-      }
 
-      // Small delay between requests
-      await new Promise((resolve) => setTimeout(resolve, 150));
+        if (attempt < 2 && (res.status >= 500 || res.status === 429)) {
+          await new Promise((r) => setTimeout(r, 400));
+          continue;
+        }
+
+        return { success: false, error: data.error || 'Failed to fetch candle data', secId };
+      } catch (err: any) {
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+        return { success: false, error: err.message || 'Network request failed', secId };
+      }
+    }
+    return { success: false, error: 'Network request failed', secId };
+  };
+
+  // Fetch single stock candle from Dhan API
+  const handleFetchSingleDhan = async (stock: StockCalculated) => {
+    if (!credentials.isConfigured || !credentials.clientId || !credentials.accessToken) {
+      setIsSettingsOpen(true);
+      setNotification({
+        type: 'error',
+        message: 'Dhan API Credentials required! Please enter your Client ID and Access Token in Dhan Settings.'
+      });
+      return;
+    }
+
+    setStocks((prev) =>
+      prev.map((s) => (s.id === stock.id ? { ...s, isLoading: true, error: null } : s))
+    );
+
+    const result = await fetchSingleStockCandle(stock);
+
+    if (result.success && result.data) {
+      const data = result.data;
+      const openPrice = data.open;
+      const closePrice = data.close;
+      const calc = calculateGann15Min(openPrice, closePrice);
+
+      setStocks((prev) =>
+        prev.map((s) =>
+          s.id === stock.id
+            ? {
+                ...s,
+                securityId: data.securityId || result.secId,
+                openPrice,
+                closePrice,
+                highPrice: data.high,
+                lowPrice: data.low,
+                volume: data.volume,
+                candleTimestamp: data.candleTimestamp,
+                openCalc: calc.openCalc,
+                closeCalc: calc.closeCalc,
+                buyAbove: calc.buyAbove,
+                sellBelow: calc.sellBelow,
+                targetsUp: calc.targetsUp,
+                targetsDown: calc.targetsDown,
+                trend: calc.trend,
+                isFetched: true,
+                isLoading: false,
+                error: null
+              }
+            : s
+        )
+      );
+
+      setNotification({
+        type: 'success',
+        message: `Fetched 15-min candle for ${stock.symbol}! Open: ₹${openPrice}, Close: ₹${closePrice}`
+      });
+    } else {
+      setStocks((prev) =>
+        prev.map((s) =>
+          s.id === stock.id ? { ...s, isLoading: false, error: result.error || 'Fetch failed' } : s
+        )
+      );
+      setNotification({
+        type: 'error',
+        message: `Error fetching ${stock.symbol}: ${result.error}`
+      });
+    }
+  };
+
+  // Fetch all stocks via Dhan API
+  const handleFetchAllDhan = async () => {
+    if (!credentials.isConfigured || !credentials.clientId || !credentials.accessToken) {
+      setIsSettingsOpen(true);
+      setNotification({
+        type: 'error',
+        message: 'Dhan API credentials required! Please enter your Client ID and Access Token to fetch real live market candles.'
+      });
+      return;
+    }
+
+    setIsBulkLoading(true);
+    setBulkProgress({ current: 0, total: stocks.length });
+
+    // Reset errors
+    setStocks((prev) =>
+      prev.map((s) => ({ ...s, error: null }))
+    );
+
+    const CONCURRENCY = 3;
+    let completed = 0;
+
+    for (let i = 0; i < stocks.length; i += CONCURRENCY) {
+      const chunk = stocks.slice(i, i + CONCURRENCY);
+
+      const chunkIds = new Set(chunk.map((c) => c.id));
+      setStocks((prev) =>
+        prev.map((s) => (chunkIds.has(s.id) ? { ...s, isLoading: true, error: null } : s))
+      );
+
+      await Promise.all(
+        chunk.map(async (stock) => {
+          const result = await fetchSingleStockCandle(stock);
+
+          if (result.success && result.data) {
+            const data = result.data;
+            const openPrice = data.open;
+            const closePrice = data.close;
+            const calc = calculateGann15Min(openPrice, closePrice);
+
+            setStocks((prev) =>
+              prev.map((s) =>
+                s.id === stock.id
+                  ? {
+                      ...s,
+                      securityId: data.securityId || result.secId,
+                      openPrice,
+                      closePrice,
+                      highPrice: data.high,
+                      lowPrice: data.low,
+                      volume: data.volume,
+                      candleTimestamp: data.candleTimestamp,
+                      openCalc: calc.openCalc,
+                      closeCalc: calc.closeCalc,
+                      buyAbove: calc.buyAbove,
+                      sellBelow: calc.sellBelow,
+                      targetsUp: calc.targetsUp,
+                      targetsDown: calc.targetsDown,
+                      trend: calc.trend,
+                      isFetched: true,
+                      isLoading: false,
+                      error: null
+                    }
+                  : s
+              )
+            );
+          } else {
+            setStocks((prev) =>
+              prev.map((s) =>
+                s.id === stock.id
+                  ? { ...s, isLoading: false, error: result.error || 'Fetch failed' }
+                  : s
+              )
+            );
+          }
+
+          completed++;
+          setBulkProgress({ current: completed, total: stocks.length });
+        })
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 80));
     }
 
     setIsBulkLoading(false);
     setNotification({
       type: 'success',
-      message: 'Batch Dhan API fetch complete!'
+      message: 'Completed fetching 15-minute candles for all stocks from Dhan API!'
     });
   };
 
@@ -327,11 +375,29 @@ export default function App() {
   // Import custom stock list
   const handleImportStocks = (imported: StockItem[]) => {
     setStocks(
-      imported.map((item) => ({
-        ...item,
-        isFetched: false,
-        isLoading: false
-      }))
+      imported.map((item) => {
+        if (item.openPrice && item.closePrice) {
+          const calc = calculateGann15Min(item.openPrice, item.closePrice);
+          return {
+            ...item,
+            openCalc: calc.openCalc,
+            closeCalc: calc.closeCalc,
+            buyAbove: calc.buyAbove,
+            sellBelow: calc.sellBelow,
+            targetsUp: calc.targetsUp,
+            targetsDown: calc.targetsDown,
+            trend: calc.trend,
+            isFetched: true,
+            isLoading: false,
+            candleTimestamp: 'CSV Imported'
+          };
+        }
+        return {
+          ...item,
+          isFetched: false,
+          isLoading: false
+        };
+      })
     );
     setNotification({
       type: 'success',
@@ -347,6 +413,7 @@ export default function App() {
       'Lot Size (Jun 2026)',
       '15m Open Price',
       '15m Close Price',
+      '15m Volume',
       'Open Gann Calculation',
       'Close Gann Calculation',
       'Buy Above (45°)',
@@ -360,6 +427,7 @@ export default function App() {
       s.lotSizeJun2026 ?? '',
       s.openPrice !== undefined && s.openPrice !== null ? s.openPrice.toFixed(2) : '',
       s.closePrice !== undefined && s.closePrice !== null ? s.closePrice.toFixed(2) : '',
+      s.volume !== undefined && s.volume !== null ? s.volume : '',
       s.openCalc !== undefined && s.openCalc !== null ? s.openCalc.toFixed(4) : '',
       s.closeCalc !== undefined && s.closeCalc !== null ? s.closeCalc.toFixed(4) : '',
       s.buyAbove !== undefined && s.buyAbove !== null ? s.buyAbove.toFixed(2) : '',
@@ -403,13 +471,47 @@ export default function App() {
         onExportCsv={handleExportCsv}
         totalStocks={stocks.length}
         calculatedCount={calculatedCount}
-        onSimulateAll={handleSimulateAllPrices}
+        onSimulateAll={handleClearAllPrices}
         isBulkLoading={isBulkLoading}
         onFetchAll={handleFetchAllDhan}
       />
 
       {/* Main Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        {/* Dhan Setup Guidance Banner when not configured */}
+        {!credentials.isConfigured && (
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start space-x-3">
+              <div className="p-2 bg-blue-600 text-white rounded-xl shadow-2xs mt-0.5">
+                <RefreshCw className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>Connect Dhan HQ Data API for Real 15-Minute Candles</span>
+                  <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Official API</span>
+                </h4>
+                <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
+                  To fetch actual 15-minute <strong>Open, Close, and Volume</strong> data directly from Dhan HQ for all 180+ Nifty F&O stocks, enter your <strong>Dhan Client ID</strong> &amp; <strong>Access Token</strong> in settings. You can also import real market CSV files directly.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 shrink-0">
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center space-x-1.5"
+              >
+                <span>Setup Dhan Credentials</span>
+              </button>
+              <button
+                onClick={() => setIsCsvImportOpen(true)}
+                className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-xs rounded-xl shadow-2xs transition-colors"
+              >
+                <span>Import CSV</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Bulk Loading Banner */}
         {isBulkLoading && (

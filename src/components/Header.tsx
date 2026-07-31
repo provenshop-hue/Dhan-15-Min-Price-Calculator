@@ -72,55 +72,46 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            {/* Quick Manual Calculator */}
+            {/* Quick Manual Entry */}
             <button
               onClick={onOpenManualCalc}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-medium shadow-sm transition-colors"
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-medium shadow-2xs transition-colors"
             >
               <Calculator className="w-3.5 h-3.5 text-blue-600" />
               <span>Manual Entry</span>
             </button>
 
-            {/* Simulated Data */}
+            {/* CSV Import / OHLC Data */}
             <button
-              onClick={onSimulateAll}
-              disabled={isBulkLoading}
-              title="Populate test 15-min open and close prices for all stocks"
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+              onClick={onOpenCsvImport}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-medium shadow-2xs transition-colors"
             >
-              <Layers className="w-3.5 h-3.5 text-blue-600" />
-              <span>Sample Prices</span>
+              <Upload className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Import CSV Data</span>
             </button>
 
-            {/* Bulk Dhan Fetch */}
-            {credentials.isConfigured && (
-              <button
-                onClick={onFetchAll}
-                disabled={isBulkLoading}
-                className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isBulkLoading ? 'animate-spin' : ''}`} />
-                <span>Fetch Dhan Data</span>
-              </button>
-            )}
+            {/* Primary Action: Fetch All 15m Candles from Dhan API */}
+            <button
+              onClick={onFetchAll}
+              disabled={isBulkLoading}
+              className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50 ${
+                credentials.isConfigured
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isBulkLoading ? 'animate-spin' : ''}`} />
+              <span>{isBulkLoading ? 'Fetching Dhan Data...' : 'Fetch All 15m Candles'}</span>
+            </button>
 
-            {/* CSV Import / Export */}
-            <div className="flex items-center space-x-1 border-l border-slate-200 pl-2">
-              <button
-                onClick={onOpenCsvImport}
-                title="Import Custom CSV stock list"
-                className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 text-xs shadow-sm transition-colors"
-              >
-                <Upload className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={onExportCsv}
-                title="Export calculations to CSV"
-                className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 text-xs shadow-sm transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            {/* Export Report */}
+            <button
+              onClick={onExportCsv}
+              title="Export calculations to CSV"
+              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 text-xs shadow-2xs transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
           </div>
 
         </div>

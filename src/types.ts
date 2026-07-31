@@ -7,6 +7,7 @@ export interface StockCalculated {
   lotSizeJul2026: number | null;
   lotSizeAug2026: number | null;
   securityId?: string;
+  exchangeSegment?: 'NSE_EQ' | 'NSE_FNO';
   
   // 15-min Candle Data
   openPrice?: number | null;

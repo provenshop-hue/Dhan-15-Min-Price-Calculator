@@ -1,3 +1,5 @@
+import { getDhanSecurityId } from './dhanSecurityMap';
+
 export interface StockItem {
   id: string;
   companyName: string;
@@ -8,6 +10,9 @@ export interface StockItem {
   lotSizeAug2026: number | null;
   securityId?: string;
   exchangeSegment?: 'NSE_EQ' | 'NSE_FNO';
+  openPrice?: number | null;
+  closePrice?: number | null;
+  volume?: number | null;
 }
 
 export const RAW_NIFTY_FUTURES_CSV = `All Companies,Screener,Symbol,Lot Size (Jun 2026),Lot Size (Jul 2026),Lot Size (Aug 2026)
@@ -227,37 +232,59 @@ export function parseCSVToStocks(csvText: string): StockItem[] {
   if (lines.length < 2) return [];
 
   const stocks: StockItem[] = [];
+  const headerLine = lines[0].toLowerCase();
+  const headers = headerLine.split(',').map((h) => h.trim().replace(/^["']|["']$/g, ''));
+
+  // Detect column indexes from header
+  const companyIdx = headers.findIndex((h) => h.includes('company') || h.includes('name'));
+  const symbolIdx = headers.findIndex((h) => h.includes('symbol') || h.includes('ticker') || h.includes('script'));
+  const screenerIdx = headers.findIndex((h) => h.includes('screener') || h.includes('url'));
   
-  // Skip header line
+  const openIdx = headers.findIndex((h) => h.includes('open'));
+  const closeIdx = headers.findIndex((h) => h.includes('close'));
+  const volumeIdx = headers.findIndex((h) => h.includes('volume') || h.includes('qty'));
+
+  const junIdx = headers.findIndex((h) => h.includes('jun'));
+  const julIdx = headers.findIndex((h) => h.includes('jul'));
+  const augIdx = headers.findIndex((h) => h.includes('aug'));
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    
-    // Parse line taking care of quotes or commas
-    const cols = line.split(',');
-    if (cols.length >= 3) {
-      const companyName = cols[0]?.trim() || '';
-      const screenerUrl = cols[1]?.trim() || '';
-      const symbol = cols[2]?.trim() || '';
-      
+
+    const cols = line.split(',').map((c) => c.trim().replace(/^["']|["']$/g, ''));
+    if (cols.length >= 2) {
+      const companyName = (companyIdx !== -1 ? cols[companyIdx] : cols[0]) || '';
+      const screenerUrl = (screenerIdx !== -1 ? cols[screenerIdx] : cols[1]) || '';
+      const symbol = (symbolIdx !== -1 ? cols[symbolIdx] : cols[2]) || cols[0] || '';
+
       const parseNum = (val?: string) => {
-        if (!val || val === '-') return null;
-        const num = parseInt(val.trim(), 10);
+        if (!val || val === '-' || val === 'null' || val === 'undefined') return null;
+        const cleaned = val.replace(/[^0-9.-]/g, '');
+        const num = parseFloat(cleaned);
         return isNaN(num) ? null : num;
       };
 
-      const lotSizeJun2026 = parseNum(cols[3]);
-      const lotSizeJul2026 = parseNum(cols[4]);
-      const lotSizeAug2026 = parseNum(cols[5]);
+      const openPrice = openIdx !== -1 ? parseNum(cols[openIdx]) : null;
+      const closePrice = closeIdx !== -1 ? parseNum(cols[closeIdx]) : null;
+      const volume = volumeIdx !== -1 ? parseNum(cols[volumeIdx]) : null;
+
+      const lotSizeJun2026 = junIdx !== -1 ? parseNum(cols[junIdx]) : parseNum(cols[3]);
+      const lotSizeJul2026 = julIdx !== -1 ? parseNum(cols[julIdx]) : parseNum(cols[4]);
+      const lotSizeAug2026 = augIdx !== -1 ? parseNum(cols[augIdx]) : parseNum(cols[5]);
 
       stocks.push({
         id: `stock_${symbol}_${i}`,
-        companyName,
+        companyName: companyName || symbol,
         screenerUrl,
         symbol,
         lotSizeJun2026,
         lotSizeJul2026,
         lotSizeAug2026,
+        securityId: getDhanSecurityId(symbol),
+        openPrice,
+        closePrice,
+        volume
       });
     }
   }

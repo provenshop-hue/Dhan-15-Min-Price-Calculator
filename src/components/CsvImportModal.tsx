@@ -79,7 +79,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({
           <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
             <div>
               <div className="text-xs font-semibold text-slate-800">Upload CSV File</div>
-              <div className="text-[11px] text-slate-500">Expected headers: Company, Screener, Symbol, Lot Sizes</div>
+              <div className="text-[11px] text-slate-500">Supported headers: Company, Symbol, Open, Close, Volume, Lot Sizes</div>
             </div>
             <label className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-2xs">
               <Upload className="w-3.5 h-3.5" />

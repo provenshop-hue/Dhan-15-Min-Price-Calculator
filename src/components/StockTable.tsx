@@ -29,7 +29,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   const itemsPerPage = 25;
 
   // Sorting
-  const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'companyName'>('symbol');
+  const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'companyName' | 'volume'>('symbol');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Filter stocks
@@ -68,7 +68,7 @@ export const StockTable: React.FC<StockTableProps> = ({
     currentPage * itemsPerPage
   );
 
-  const toggleSort = (field: 'symbol' | 'openCalc' | 'closeCalc' | 'companyName') => {
+  const toggleSort = (field: 'symbol' | 'openCalc' | 'closeCalc' | 'companyName' | 'volume') => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -177,6 +177,14 @@ export const StockTable: React.FC<StockTableProps> = ({
               <th className="py-3 px-3 text-right">15-Min Close (₹)</th>
               <th className="py-3 px-3 text-right">
                 <button
+                  onClick={() => toggleSort('volume')}
+                  className="flex items-center justify-end gap-1 hover:text-slate-900 transition-colors"
+                >
+                  Volume <ArrowUpDown className="w-3 h-3" />
+                </button>
+              </th>
+              <th className="py-3 px-3 text-right">
+                <button
                   onClick={() => toggleSort('openCalc')}
                   className="flex items-center justify-end gap-1 hover:text-blue-800 transition-colors text-blue-700 font-bold"
                 >
@@ -198,7 +206,7 @@ export const StockTable: React.FC<StockTableProps> = ({
           <tbody className="divide-y divide-slate-100 text-slate-800">
             {paginatedStocks.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-slate-400">
+                <td colSpan={9} className="text-center py-12 text-slate-400">
                   No stocks match the selected search or filter criteria.
                 </td>
               </tr>
@@ -231,6 +239,22 @@ export const StockTable: React.FC<StockTableProps> = ({
                         >
                           <ExternalLink className="w-3 h-3" />
                         </a>
+                        {stock.error && (
+                          <span
+                            title={stock.error}
+                            className="text-[10px] font-medium text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded cursor-help truncate max-w-[90px]"
+                          >
+                            Failed
+                          </span>
+                        )}
+                        {stock.isFetched && !stock.error && (
+                          <span
+                            title={stock.candleTimestamp ? `Candle: ${stock.candleTimestamp}` : 'Fetched'}
+                            className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded"
+                          >
+                            Live
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-slate-500 truncate max-w-[180px]">
                         {stock.companyName}
@@ -270,6 +294,15 @@ export const StockTable: React.FC<StockTableProps> = ({
                         }}
                         className="w-24 bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded px-2 py-1 text-right font-mono text-slate-900 text-xs outline-none shadow-2xs"
                       />
+                    </td>
+
+                    {/* 15-Min Volume */}
+                    <td className="py-2.5 px-3 text-right font-mono font-medium text-slate-700">
+                      {stock.volume !== undefined && stock.volume !== null && stock.volume > 0 ? (
+                        <span className="font-semibold text-slate-800">{stock.volume.toLocaleString('en-IN')}</span>
+                      ) : (
+                        <span className="text-slate-400 font-normal text-xs">-</span>
+                      )}
                     </td>
 
                     {/* Open Calculation Output */}
