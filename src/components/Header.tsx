@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, Layers, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, ShieldAlert, Calendar } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -13,6 +13,7 @@ interface HeaderProps {
   onSimulateAll: () => void;
   isBulkLoading: boolean;
   onFetchAll: () => void;
+  onDateChange: (newDate: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,7 +26,8 @@ export const Header: React.FC<HeaderProps> = ({
   calculatedCount,
   onSimulateAll,
   isBulkLoading,
-  onFetchAll
+  onFetchAll,
+  onDateChange
 }) => {
   return (
     <header className="bg-white border-b border-slate-200/80 text-slate-800 sticky top-0 z-30 shadow-sm">
@@ -117,11 +119,22 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Stats Strip */}
-        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center space-x-4">
+        <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+          <div className="flex flex-wrap items-center gap-3">
             <span>Total F&O Stocks: <strong className="text-slate-900">{totalStocks}</strong></span>
             <span>Calculated: <strong className="text-blue-600">{calculatedCount} / {totalStocks}</strong></span>
-            <span>Date: <strong className="text-slate-700">{credentials.date}</strong></span>
+            
+            {/* Interactive Date Selector */}
+            <div className="flex items-center space-x-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-md px-2 py-0.5 transition-colors">
+              <Calendar className="w-3 h-3 text-blue-600 shrink-0" />
+              <span className="text-slate-600 font-medium">Trading Date:</span>
+              <input
+                type="date"
+                value={credentials.date || new Date().toISOString().split('T')[0]}
+                onChange={(e) => onDateChange(e.target.value)}
+                className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer text-[11px]"
+              />
+            </div>
           </div>
           <div className="hidden sm:block text-slate-400 italic">
             Formula: ((√P × 15) - 15) % 15

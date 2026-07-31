@@ -72,6 +72,17 @@ export default function App() {
     });
   };
 
+  // Handle Date Change directly from Header bar or Settings
+  const handleDateChange = (newDate: string) => {
+    const updated = { ...credentials, date: newDate };
+    setCredentials(updated);
+    localStorage.setItem('dhan_gann_creds', JSON.stringify(updated));
+    setNotification({
+      type: 'info',
+      message: `Date updated to ${newDate}. Click "Fetch All 15m Candles" to load candles for this date.`
+    });
+  };
+
   // Update stock prices inline & recalculate Gann values
   const handleUpdateStockPrices = (stockId: string, openPrice: number, closePrice: number) => {
     setStocks((prev) =>
@@ -474,6 +485,7 @@ export default function App() {
         onSimulateAll={handleClearAllPrices}
         isBulkLoading={isBulkLoading}
         onFetchAll={handleFetchAllDhan}
+        onDateChange={handleDateChange}
       />
 
       {/* Main Body */}

@@ -161,93 +161,122 @@ export function createExpressApp() {
         const timestamps = data.start_time || data.timestamp || data.t || data.time;
         let candleIdx = 0;
 
-        // Helper to parse IST hours & minutes from Epoch / Unix timestamp or formatted string using Asia/Kolkata timezone
-        const getISTTime = (tsVal: any): { hours: number; minutes: number } | null => {
+        // Helper to parse IST Date (YYYY-MM-DD) and hours & minutes from Epoch / Unix timestamp or formatted string using Asia/Kolkata timezone
+        const getISTDateTime = (tsVal: any): { dateStr: string; hours: number; minutes: number } | null => {
           if (tsVal === undefined || tsVal === null) return null;
 
           const num = Number(tsVal);
           if (!isNaN(num) && num > 0) {
             const sec = num > 1e11 ? Math.floor(num / 1000) : num;
-            const date = new Date(sec * 1000);
+            const dateObj = new Date(sec * 1000);
             try {
-              const formatter = new Intl.DateTimeFormat('en-GB', {
+              const formatter = new Intl.DateTimeFormat('en-CA', {
                 timeZone: 'Asia/Kolkata',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
                 hour: 'numeric',
                 minute: 'numeric',
                 hour12: false
               });
-              const parts = formatter.formatToParts(date);
-              let hours = -1, minutes = -1;
-              for (const p of parts) {
-                if (p.type === 'hour') hours = parseInt(p.value, 10);
-                if (p.type === 'minute') minutes = parseInt(p.value, 10);
+              const formatted = formatter.format(dateObj); // e.g. "2026-07-31, 09:15"
+              const parts = formatted.split(', ');
+              if (parts.length >= 2) {
+                const [dPart, tPart] = parts;
+                const [h, m] = tPart.split(':').map((n) => parseInt(n, 10));
+                return { dateStr: dPart.trim(), hours: h, minutes: m };
               }
-              if (hours !== -1 && minutes !== -1) return { hours, minutes };
             } catch (e) {
               const utcDate = new Date(sec * 1000);
               const istDate = new Date(utcDate.getTime() + 19800 * 1000);
-              return { hours: istDate.getUTCHours(), minutes: istDate.getUTCMinutes() };
+              const y = istDate.getUTCFullYear();
+              const m = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+              const d = String(istDate.getUTCDate()).padStart(2, '0');
+              return {
+                dateStr: `${y}-${m}-${d}`,
+                hours: istDate.getUTCHours(),
+                minutes: istDate.getUTCMinutes()
+              };
             }
           }
 
           if (typeof tsVal === 'string') {
+            const dateMatch = tsVal.match(/(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})/);
+            if (dateMatch) {
+              return {
+                dateStr: dateMatch[1],
+                hours: parseInt(dateMatch[2], 10),
+                minutes: parseInt(dateMatch[3], 10)
+              };
+            }
             const timeMatch = tsVal.match(/(\d{1,2}):(\d{2})/);
             if (timeMatch) {
               const h = parseInt(timeMatch[1], 10);
               const m = parseInt(timeMatch[2], 10);
-              if (!isNaN(h) && !isNaN(m)) return { hours: h, minutes: m };
+              if (!isNaN(h) && !isNaN(m)) return { dateStr: '', hours: h, minutes: m };
             }
           }
 
           return null;
         };
 
-        // Find exact first 15-minute candle (09:15 AM IST start time)
+        // Find exact first 15-minute candle (09:15 AM IST) for the target foundDate
         if (timestamps && Array.isArray(timestamps) && timestamps.length > 0) {
-          let exact915Idx = -1;
-          let exact930Idx = -1;
-          let earliestMorningIdx = -1;
-          let minDiffFrom915 = Infinity;
+          let exactTargetDate915Idx = -1;
+          let targetDate930Idx = -1;
+          let targetDateEarliestIdx = -1;
+          let targetDateMinDiff = Infinity;
+
+          let fallback915Idx = -1;
+          let fallbackEarliestIdx = -1;
 
           for (let i = 0; i < timestamps.length; i++) {
-            const parsed = getISTTime(timestamps[i]);
+            const parsed = getISTDateTime(timestamps[i]);
             if (parsed) {
-              const { hours, minutes } = parsed;
+              const { dateStr, hours, minutes } = parsed;
 
-              // Exact 09:15 AM IST start time
-              if (hours === 9 && minutes === 15) {
-                exact915Idx = i;
-                break;
-              }
+              // Check if date matches target foundDate
+              const isTargetDate = !dateStr || dateStr === foundDate;
 
-              if (hours === 9 && minutes === 30 && exact930Idx === -1) {
-                exact930Idx = i;
-              }
-
-              if (hours === 9 && minutes >= 15 && minutes <= 45) {
-                const diff = Math.abs(minutes - 15);
-                if (diff < minDiffFrom915) {
-                  minDiffFrom915 = diff;
-                  earliestMorningIdx = i;
+              if (isTargetDate) {
+                if (hours === 9 && minutes === 15) {
+                  exactTargetDate915Idx = i;
+                  break; // Found exact 09:15 AM on target date!
                 }
+                if (hours === 9 && minutes === 30 && targetDate930Idx === -1) {
+                  targetDate930Idx = i;
+                }
+                if (hours === 9 && minutes >= 15 && minutes <= 45) {
+                  const diff = Math.abs(minutes - 15);
+                  if (diff < targetDateMinDiff) {
+                    targetDateMinDiff = diff;
+                    targetDateEarliestIdx = i;
+                  }
+                }
+              }
+
+              // General fallbacks across entire timestamp array if target date isn't explicitly matched
+              if (hours === 9 && minutes === 15 && fallback915Idx === -1) {
+                fallback915Idx = i;
+              }
+              if (hours === 9 && minutes >= 15 && minutes <= 45 && fallbackEarliestIdx === -1) {
+                fallbackEarliestIdx = i;
               }
             }
           }
 
-          if (exact915Idx !== -1) {
-            candleIdx = exact915Idx;
-          } else if (earliestMorningIdx !== -1) {
-            candleIdx = earliestMorningIdx;
-          } else if (exact930Idx !== -1) {
-            candleIdx = exact930Idx;
+          if (exactTargetDate915Idx !== -1) {
+            candleIdx = exactTargetDate915Idx;
+          } else if (targetDateEarliestIdx !== -1) {
+            candleIdx = targetDateEarliestIdx;
+          } else if (targetDate930Idx !== -1) {
+            candleIdx = targetDate930Idx;
+          } else if (fallback915Idx !== -1) {
+            candleIdx = fallback915Idx;
+          } else if (fallbackEarliestIdx !== -1) {
+            candleIdx = fallbackEarliestIdx;
           } else {
-            const firstTs = Number(timestamps[0]);
-            const lastTs = Number(timestamps[timestamps.length - 1]);
-            if (!isNaN(firstTs) && !isNaN(lastTs) && firstTs > lastTs) {
-              candleIdx = timestamps.length - 1;
-            } else {
-              candleIdx = 0;
-            }
+            candleIdx = 0;
           }
         }
 
