@@ -219,6 +219,7 @@ export function createExpressApp() {
 
           return null;
         };
+        const getISTTime = getISTDateTime;
 
         // Find exact first 15-minute candle (09:15 AM IST) for the target foundDate
         if (timestamps && Array.isArray(timestamps) && timestamps.length > 0) {
