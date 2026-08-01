@@ -117,6 +117,8 @@ export default function App() {
           targetsUp: calc.targetsUp,
           targetsDown: calc.targetsDown,
           trend: calc.trend,
+          pctChange: calc.pctChange,
+          gannScore: calc.gannScore,
           isFetched: true
         };
       })
@@ -233,6 +235,8 @@ export default function App() {
                 targetsUp: calc.targetsUp,
                 targetsDown: calc.targetsDown,
                 trend: calc.trend,
+                pctChange: calc.pctChange,
+                gannScore: calc.gannScore,
                 isFetched: true,
                 isLoading: false,
                 error: null
@@ -317,6 +321,8 @@ export default function App() {
                       targetsUp: calc.targetsUp,
                       targetsDown: calc.targetsDown,
                       trend: calc.trend,
+                      pctChange: calc.pctChange,
+                      gannScore: calc.gannScore,
                       isFetched: true,
                       isLoading: false,
                       error: null

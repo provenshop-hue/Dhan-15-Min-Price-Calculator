@@ -18,11 +18,11 @@ export function calculateGann15Min(openPrice: number, closePrice: number): GannC
   const openCalc = ((rawOpenCalc % 15) + 15) % 15;
   const closeCalc = ((rawCloseCalc % 15) + 15) % 15;
 
-  // Gann Square of 9 levels based on the 15-min Candle base price
+  // Gann Square of 9 levels based on the 15-min Candle open price
   // 1 Degree in Square of 9 = 0.0027778 in sqrt domain
   // 45 Deg = 0.125 | 90 Deg = 0.25 | 135 Deg = 0.375 | 180 Deg = 0.5 | 360 Deg = 1.0
-  const basePrice = closePrice > 0 ? closePrice : openPrice;
-  const sqrtBase = Math.sqrt(basePrice);
+  const basePrice = openPrice > 0 ? openPrice : closePrice;
+  const sqrtBase = Math.sqrt(Math.max(0, basePrice));
 
   const factor45 = 0.125;
   const factor90 = 0.25;
@@ -33,7 +33,7 @@ export function calculateGann15Min(openPrice: number, closePrice: number): GannC
   const factor360 = 1.0;
 
   const buyAbove = Math.pow(sqrtBase + factor45, 2);
-  const sellBelow = Math.pow(sqrtBase - factor45, 2);
+  const sellBelow = Math.pow(Math.max(0, sqrtBase - factor45), 2);
 
   const targetsUp = [
     Math.pow(sqrtBase + factor90, 2),
@@ -45,15 +45,36 @@ export function calculateGann15Min(openPrice: number, closePrice: number): GannC
   ];
 
   const targetsDown = [
-    Math.pow(sqrtBase - factor90, 2),
-    Math.pow(sqrtBase - factor135, 2),
-    Math.pow(sqrtBase - factor180, 2),
-    Math.pow(sqrtBase - factor225, 2),
-    Math.pow(sqrtBase - factor270, 2),
-    Math.pow(sqrtBase - factor360, 2),
+    Math.pow(Math.max(0, sqrtBase - factor90), 2),
+    Math.pow(Math.max(0, sqrtBase - factor135), 2),
+    Math.pow(Math.max(0, sqrtBase - factor180), 2),
+    Math.pow(Math.max(0, sqrtBase - factor225), 2),
+    Math.pow(Math.max(0, sqrtBase - factor270), 2),
+    Math.pow(Math.max(0, sqrtBase - factor360), 2),
   ];
 
-  const trend = closePrice > openPrice ? 'Bullish' : closePrice < openPrice ? 'Bearish' : 'Neutral';
+  const pctChange = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
+  let trend: 'Very Bullish' | 'Bullish' | 'Very Bearish' | 'Bearish' | 'Neutral' = 'Neutral';
+
+  // Gann Strength classification:
+  // Very Bullish: Candle Close > Open AND (Close >= Buy Above (45° level) OR gain >= 0.35%)
+  // Very Bearish: Candle Close < Open AND (Close <= Sell Below (45° level) OR drop <= -0.35%)
+  if (closePrice > openPrice) {
+    if (closePrice >= buyAbove || pctChange >= 0.35 || (closePrice >= targetsUp[0] * 0.998)) {
+      trend = 'Very Bullish';
+    } else {
+      trend = 'Bullish';
+    }
+  } else if (closePrice < openPrice) {
+    if (closePrice <= sellBelow || pctChange <= -0.35 || (closePrice <= targetsDown[0] * 1.002)) {
+      trend = 'Very Bearish';
+    } else {
+      trend = 'Bearish';
+    }
+  }
+
+  // Gann score: percentage move + distance relative to buyAbove/sellBelow
+  const gannScore = pctChange;
 
   return {
     matchOpenPrice: openPrice,
@@ -64,6 +85,8 @@ export function calculateGann15Min(openPrice: number, closePrice: number): GannC
     sellBelow,
     targetsUp,
     targetsDown,
-    trend
+    trend,
+    pctChange,
+    gannScore
   };
 }

@@ -10,6 +10,8 @@ interface StockTableProps {
   onSelectStockDetail: (stock: StockCalculated) => void;
   onEditStockManual: (stock: StockCalculated) => void;
   credentials: DhanApiCredentials;
+  activeTrendFilter?: 'ALL' | 'VERY_BULLISH' | 'BULLISH' | 'VERY_BEARISH' | 'BEARISH' | 'CALCULATED';
+  onTrendFilterChange?: (filter: 'ALL' | 'VERY_BULLISH' | 'BULLISH' | 'VERY_BEARISH' | 'BEARISH' | 'CALCULATED') => void;
 }
 
 export const StockTable: React.FC<StockTableProps> = ({
@@ -18,10 +20,23 @@ export const StockTable: React.FC<StockTableProps> = ({
   onFetchSingleStock,
   onSelectStockDetail,
   onEditStockManual,
-  credentials
+  credentials,
+  activeTrendFilter,
+  onTrendFilterChange
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [trendFilter, setTrendFilter] = useState<'ALL' | 'BULLISH' | 'BEARISH' | 'CALCULATED'>('ALL');
+  const [internalTrendFilter, setInternalTrendFilter] = useState<'ALL' | 'VERY_BULLISH' | 'BULLISH' | 'VERY_BEARISH' | 'BEARISH' | 'CALCULATED'>('ALL');
+  
+  const trendFilter = activeTrendFilter !== undefined ? activeTrendFilter : internalTrendFilter;
+
+  const setTrendFilter = (filter: 'ALL' | 'VERY_BULLISH' | 'BULLISH' | 'VERY_BEARISH' | 'BEARISH' | 'CALCULATED') => {
+    if (onTrendFilterChange) {
+      onTrendFilterChange(filter);
+    } else {
+      setInternalTrendFilter(filter);
+    }
+  };
+
   const [lotMonth, setLotMonth] = useState<'Jun' | 'Jul' | 'Aug'>('Jun');
 
   // Pagination
@@ -29,8 +44,14 @@ export const StockTable: React.FC<StockTableProps> = ({
   const itemsPerPage = 25;
 
   // Sorting
-  const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'companyName' | 'volume'>('symbol');
+  const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'companyName' | 'volume' | 'pctChange'>('symbol');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Count metrics
+  const veryBullishCount = stocks.filter((s) => s.trend === 'Very Bullish').length;
+  const bullishCount = stocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish').length;
+  const veryBearishCount = stocks.filter((s) => s.trend === 'Very Bearish').length;
+  const bearishCount = stocks.filter((s) => s.trend === 'Bearish' || s.trend === 'Very Bearish').length;
 
   // Filter stocks
   const filteredStocks = stocks.filter((s) => {
@@ -40,9 +61,11 @@ export const StockTable: React.FC<StockTableProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (trendFilter === 'BULLISH') return s.trend === 'Bullish';
-    if (trendFilter === 'BEARISH') return s.trend === 'Bearish';
-    if (trendFilter === 'CALCULATED') return s.isFetched || s.openPrice !== undefined;
+    if (trendFilter === 'VERY_BULLISH') return s.trend === 'Very Bullish';
+    if (trendFilter === 'BULLISH') return s.trend === 'Bullish' || s.trend === 'Very Bullish';
+    if (trendFilter === 'VERY_BEARISH') return s.trend === 'Very Bearish';
+    if (trendFilter === 'BEARISH') return s.trend === 'Bearish' || s.trend === 'Very Bearish';
+    if (trendFilter === 'CALCULATED') return s.isFetched || (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0);
 
     return true;
   });
@@ -102,7 +125,7 @@ export const StockTable: React.FC<StockTableProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           
           {/* Trend filter buttons */}
-          <div className="flex items-center bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-xs">
+          <div className="flex flex-wrap items-center bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-xs gap-1">
             <button
               onClick={() => { setTrendFilter('ALL'); setCurrentPage(1); }}
               className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
@@ -112,28 +135,44 @@ export const StockTable: React.FC<StockTableProps> = ({
               All ({stocks.length})
             </button>
             <button
+              onClick={() => { setTrendFilter('VERY_BULLISH'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
+                trendFilter === 'VERY_BULLISH' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:bg-emerald-100'
+              }`}
+            >
+              🚀 Very Bullish ({veryBullishCount})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('BULLISH'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
+                trendFilter === 'BULLISH' ? 'bg-emerald-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Bullish ({bullishCount})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('VERY_BEARISH'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
+                trendFilter === 'VERY_BEARISH' ? 'bg-rose-600 text-white shadow-2xs' : 'text-rose-700 hover:bg-rose-100'
+              }`}
+            >
+              📉 Very Bearish ({veryBearishCount})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('BEARISH'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
+                trendFilter === 'BEARISH' ? 'bg-rose-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Bearish ({bearishCount})
+            </button>
+            <button
               onClick={() => { setTrendFilter('CALCULATED'); setCurrentPage(1); }}
               className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
                 trendFilter === 'CALCULATED' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Calculated
-            </button>
-            <button
-              onClick={() => { setTrendFilter('BULLISH'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
-                trendFilter === 'BULLISH' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Bullish
-            </button>
-            <button
-              onClick={() => { setTrendFilter('BEARISH'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
-                trendFilter === 'BEARISH' ? 'bg-rose-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Bearish
             </button>
           </div>
 
@@ -326,15 +365,19 @@ export const StockTable: React.FC<StockTableProps> = ({
                     {/* Trend Indicator */}
                     <td className="py-2.5 px-3 text-center">
                       {stock.trend ? (
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          stock.trend === 'Bullish'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] ${
+                          stock.trend === 'Very Bullish'
+                            ? 'bg-emerald-600 text-white font-extrabold shadow-2xs ring-2 ring-emerald-300/60'
+                            : stock.trend === 'Bullish'
+                            ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200'
+                            : stock.trend === 'Very Bearish'
+                            ? 'bg-rose-600 text-white font-extrabold shadow-2xs ring-2 ring-rose-300/60'
                             : stock.trend === 'Bearish'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                            ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200'
+                            : 'bg-slate-100 text-slate-600 font-medium border border-slate-200'
                         }`}>
-                          {stock.trend === 'Bullish' && <TrendingUp className="w-3 h-3" />}
-                          {stock.trend === 'Bearish' && <TrendingDown className="w-3 h-3" />}
+                          {(stock.trend === 'Very Bullish' || stock.trend === 'Bullish') && <TrendingUp className="w-3 h-3" />}
+                          {(stock.trend === 'Very Bearish' || stock.trend === 'Bearish') && <TrendingDown className="w-3 h-3" />}
                           <span>{stock.trend}</span>
                         </span>
                       ) : (
