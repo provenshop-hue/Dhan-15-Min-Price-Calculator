@@ -95,11 +95,6 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
               </div>
             </div>
           </div>
-
-          <div className="text-[11px] text-slate-600 bg-white p-2.5 rounded border border-slate-200 text-center font-mono shadow-2xs">
-            Open Formula: ((√{stock.openPrice ?? 0} × 15) - 15) % 15 = <span className="text-blue-700 font-bold">{stock.openCalc?.toFixed(4)}</span> | 
-            Close Formula: ((√{stock.closePrice ?? 0} × 15) - 15) % 15 = <span className="text-blue-700 font-bold">{stock.closeCalc?.toFixed(4)}</span>
-          </div>
         </div>
 
         {/* Gann Square of 9 Trade Signals */}

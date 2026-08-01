@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
-import { GannFormulaCard } from './components/GannFormulaCard';
+import { AccessCodeGate } from './components/AccessCodeGate';
 import { StockTable } from './components/StockTable';
 import { DhanSettingsModal } from './components/DhanSettingsModal';
 import { ManualCalculatorModal } from './components/ManualCalculatorModal';
@@ -40,6 +40,12 @@ export default function App() {
       isFetched: false,
       isLoading: false
     }));
+  });
+
+  // Access Code State (7774)
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
+    return localStorage.getItem('gann_app_access_code_unlocked') === 'true' ||
+           sessionStorage.getItem('gann_app_access_code_unlocked') === 'true';
   });
 
   // Modal visibility states
@@ -469,6 +475,10 @@ export default function App() {
 
   const calculatedCount = stocks.filter((s) => s.openCalc !== undefined && s.openCalc !== null).length;
 
+  if (!isUnlocked) {
+    return <AccessCodeGate onUnlock={() => setIsUnlocked(true)} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-blue-600 selection:text-white antialiased">
       
@@ -496,6 +506,11 @@ export default function App() {
         isBulkLoading={isBulkLoading}
         onFetchAll={handleFetchAllDhan}
         onDateChange={handleDateChange}
+        onLock={() => {
+          localStorage.removeItem('gann_app_access_code_unlocked');
+          sessionStorage.removeItem('gann_app_access_code_unlocked');
+          setIsUnlocked(false);
+        }}
       />
 
       {/* Main Body */}
@@ -556,9 +571,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Gann Formula Reference Banner */}
-        <GannFormulaCard />
-
         {/* Stock Table */}
         <StockTable
           stocks={stocks}
@@ -578,10 +590,10 @@ export default function App() {
       <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            Gann 15-Minute Price Finder & Calculator &bull; Powered by Dhan HQ Data API & Nifty F&O Master List
+            Gannformula-app &bull; Powered by Dhan HQ Data API & Nifty F&O Master List
           </div>
-          <div className="text-slate-500">
-            Formula: <code className="text-blue-700 font-mono bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">((sqrt(P) * 15) - 15) % 15</code>
+          <div className="text-slate-400 font-mono text-[11px]">
+            Protected Access System
           </div>
         </div>
       </footer>

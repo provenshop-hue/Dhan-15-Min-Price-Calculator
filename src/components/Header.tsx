@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, ShieldAlert, Calendar } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, ShieldAlert, Calendar, Lock } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -14,6 +14,7 @@ interface HeaderProps {
   isBulkLoading: boolean;
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
+  onLock?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -27,7 +28,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSimulateAll,
   isBulkLoading,
   onFetchAll,
-  onDateChange
+  onDateChange,
+  onLock
 }) => {
   return (
     <header className="bg-white border-b border-slate-200/80 text-slate-800 sticky top-0 z-30 shadow-sm">
@@ -42,14 +44,14 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                  Gann 15-Min Price Calculator
+                  Gannformula-app
                 </h1>
                 <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-semibold border border-blue-200/60">
                   Nifty Futures F&O
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                15-Min Open & Close Gann Square Root Calculator with Dhan HQ Data API
+                15-Min Candle Analysis &amp; Dhan HQ Data API
               </p>
             </div>
           </div>
@@ -114,6 +116,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Download className="w-3.5 h-3.5" />
             </button>
+
+            {/* Lock App Button */}
+            {onLock && (
+              <button
+                onClick={onLock}
+                title="Lock App"
+                className="p-1.5 text-slate-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg border border-slate-200 text-xs shadow-2xs transition-colors"
+              >
+                <Lock className="w-3.5 h-3.5 text-slate-600" />
+              </button>
+            )}
           </div>
 
         </div>
@@ -135,9 +148,6 @@ export const Header: React.FC<HeaderProps> = ({
                 className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer text-[11px]"
               />
             </div>
-          </div>
-          <div className="hidden sm:block text-slate-400 italic">
-            Formula: ((√P × 15) - 15) % 15
           </div>
         </div>
 

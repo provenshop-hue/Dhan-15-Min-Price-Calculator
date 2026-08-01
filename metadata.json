@@ -1,5 +1,5 @@
 {
-  "name": "Gann 15-Min Calculator & Nifty Stock Finder",
+  "name": "Gannformula-app",
   "description": "Gann 15-minute open and close price calculator with Dhan HQ Data API integration and built-in Nifty Futures stock list.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
