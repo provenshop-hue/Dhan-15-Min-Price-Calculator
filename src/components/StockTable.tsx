@@ -364,25 +364,39 @@ export const StockTable: React.FC<StockTableProps> = ({
 
                     {/* Trend Indicator */}
                     <td className="py-2.5 px-3 text-center">
-                      {stock.trend ? (
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] ${
-                          stock.trend === 'Very Bullish'
-                            ? 'bg-emerald-600 text-white font-extrabold shadow-2xs ring-2 ring-emerald-300/60'
-                            : stock.trend === 'Bullish'
-                            ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200'
-                            : stock.trend === 'Very Bearish'
-                            ? 'bg-rose-600 text-white font-extrabold shadow-2xs ring-2 ring-rose-300/60'
-                            : stock.trend === 'Bearish'
-                            ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200'
-                            : 'bg-slate-100 text-slate-600 font-medium border border-slate-200'
-                        }`}>
-                          {(stock.trend === 'Very Bullish' || stock.trend === 'Bullish') && <TrendingUp className="w-3 h-3" />}
-                          {(stock.trend === 'Very Bearish' || stock.trend === 'Bearish') && <TrendingDown className="w-3 h-3" />}
-                          <span>{stock.trend}</span>
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
+                      <div className="flex flex-col items-center gap-1">
+                        {stock.trend ? (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] ${
+                            stock.trend === 'Very Bullish'
+                              ? 'bg-emerald-600 text-white font-extrabold shadow-2xs ring-2 ring-emerald-300/60'
+                              : stock.trend === 'Bullish'
+                              ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-200'
+                              : stock.trend === 'Very Bearish'
+                              ? 'bg-rose-600 text-white font-extrabold shadow-2xs ring-2 ring-rose-300/60'
+                              : stock.trend === 'Bearish'
+                              ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200'
+                              : 'bg-slate-100 text-slate-600 font-medium border border-slate-200'
+                          }`}>
+                            {(stock.trend === 'Very Bullish' || stock.trend === 'Bullish') && <TrendingUp className="w-3 h-3" />}
+                            {(stock.trend === 'Very Bearish' || stock.trend === 'Bearish') && <TrendingDown className="w-3 h-3" />}
+                            <span>{stock.trend}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+
+                        {stock.rsi !== undefined && stock.rsi !== null && (
+                          <span className={`text-[10px] font-black px-2 py-0.2 rounded border ${
+                            stock.rsi > 55
+                              ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                              : stock.rsi < 40
+                              ? 'bg-rose-100 text-rose-900 border-rose-300'
+                              : 'bg-slate-100 text-slate-700 border-slate-300'
+                          }`}>
+                            RSI: {stock.rsi.toFixed(1)}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Actions */}

@@ -1,12 +1,45 @@
 import { GannCalcResult } from '../types';
 
 /**
- * Calculates Gann 15-minute open & close modulo values
- * Formula given:
- * Open calculation = ((sqrt(matchOpenPrice) * 15) - 15) % 15
- * Close calculation = ((sqrt(matchClosePrice) * 15) - 15) % 15
+ * Calculates Relative Strength Index (RSI) for a array of closing prices
  */
-export function calculateGann15Min(openPrice: number, closePrice: number): GannCalcResult {
+export function calculateRSI(closes: number[], period: number = 14): number | null {
+  if (!closes || !Array.isArray(closes) || closes.length < 2) return null;
+  const numCloses = closes.map(Number).filter((n) => !isNaN(n) && n > 0);
+  if (numCloses.length < 2) return null;
+
+  const N = Math.min(period, numCloses.length - 1);
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = 1; i <= N; i++) {
+    const diff = numCloses[i] - numCloses[i - 1];
+    if (diff >= 0) gains += diff;
+    else losses += Math.abs(diff);
+  }
+
+  let avgGain = gains / N;
+  let avgLoss = losses / N;
+
+  for (let i = N + 1; i < numCloses.length; i++) {
+    const diff = numCloses[i] - numCloses[i - 1];
+    const gain = diff >= 0 ? diff : 0;
+    const loss = diff < 0 ? Math.abs(diff) : 0;
+
+    avgGain = (avgGain * (N - 1) + gain) / N;
+    avgLoss = (avgLoss * (N - 1) + loss) / N;
+  }
+
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+  return Math.round(rsi * 100) / 100;
+}
+
+/**
+ * Calculates Gann 15-minute open & close modulo values and trend with RSI confluence
+ */
+export function calculateGann15Min(openPrice: number, closePrice: number, rsiVal?: number | null): GannCalcResult {
   const sqrtOpen = Math.sqrt(Math.max(0, openPrice));
   const sqrtClose = Math.sqrt(Math.max(0, closePrice));
 
@@ -19,8 +52,6 @@ export function calculateGann15Min(openPrice: number, closePrice: number): GannC
   const closeCalc = ((rawCloseCalc % 15) + 15) % 15;
 
   // Gann Square of 9 levels based on the 15-min Candle open price
-  // 1 Degree in Square of 9 = 0.0027778 in sqrt domain
-  // 45 Deg = 0.125 | 90 Deg = 0.25 | 135 Deg = 0.375 | 180 Deg = 0.5 | 360 Deg = 1.0
   const basePrice = openPrice > 0 ? openPrice : closePrice;
   const sqrtBase = Math.sqrt(Math.max(0, basePrice));
 
@@ -56,24 +87,44 @@ export function calculateGann15Min(openPrice: number, closePrice: number): GannC
   const pctChange = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
   let trend: 'Very Bullish' | 'Bullish' | 'Very Bearish' | 'Bearish' | 'Neutral' = 'Neutral';
 
-  // Gann Strength classification:
-  // Very Bullish: Candle Close > Open AND (Close >= Buy Above (45° level) OR gain >= 0.35%)
-  // Very Bearish: Candle Close < Open AND (Close <= Sell Below (45° level) OR drop <= -0.35%)
-  if (closePrice > openPrice) {
-    if (closePrice >= buyAbove || pctChange >= 0.35 || (closePrice >= targetsUp[0] * 0.998)) {
-      trend = 'Very Bullish';
+  const isBullishCandle = closePrice > openPrice;
+  const isBearishCandle = closePrice < openPrice;
+  const gannBreakout = closePrice >= buyAbove || pctChange >= 0.35 || (closePrice >= targetsUp[0] * 0.998);
+  const gannBreakdown = closePrice <= sellBelow || pctChange <= -0.35 || (closePrice <= targetsDown[0] * 1.002);
+
+  // Confluence rules:
+  // Very Bullish requires: Bullish Candle + Gann Breakout + RSI > 55 (if RSI present)
+  // Very Bearish requires: Bearish Candle + Gann Breakdown + RSI < 40 (if RSI present)
+  if (isBullishCandle) {
+    if (rsiVal !== undefined && rsiVal !== null) {
+      if (gannBreakout && rsiVal > 55) {
+        trend = 'Very Bullish';
+      } else {
+        trend = 'Bullish';
+      }
     } else {
-      trend = 'Bullish';
+      if (gannBreakout) {
+        trend = 'Very Bullish';
+      } else {
+        trend = 'Bullish';
+      }
     }
-  } else if (closePrice < openPrice) {
-    if (closePrice <= sellBelow || pctChange <= -0.35 || (closePrice <= targetsDown[0] * 1.002)) {
-      trend = 'Very Bearish';
+  } else if (isBearishCandle) {
+    if (rsiVal !== undefined && rsiVal !== null) {
+      if (gannBreakdown && rsiVal < 40) {
+        trend = 'Very Bearish';
+      } else {
+        trend = 'Bearish';
+      }
     } else {
-      trend = 'Bearish';
+      if (gannBreakdown) {
+        trend = 'Very Bearish';
+      } else {
+        trend = 'Bearish';
+      }
     }
   }
 
-  // Gann score: percentage move + distance relative to buyAbove/sellBelow
   const gannScore = pctChange;
 
   return {
@@ -87,6 +138,7 @@ export function calculateGann15Min(openPrice: number, closePrice: number): GannC
     targetsDown,
     trend,
     pctChange,
-    gannScore
+    gannScore,
+    rsi: rsiVal
   };
 }

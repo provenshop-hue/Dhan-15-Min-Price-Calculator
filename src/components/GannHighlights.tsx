@@ -136,6 +136,11 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
                             <span className="text-[10px] font-bold bg-emerald-600 text-white px-1.5 py-0.2 rounded">
                               {stock.trend}
                             </span>
+                            {stock.rsi !== undefined && stock.rsi !== null && (
+                              <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-900 px-1.5 py-0.2 rounded border border-emerald-300">
+                                RSI {stock.rsi.toFixed(1)}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[10px] text-slate-500 truncate max-w-[160px]">{stock.companyName}</div>
                         </div>
@@ -216,6 +221,11 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
                             <span className="text-[10px] font-bold bg-rose-600 text-white px-1.5 py-0.2 rounded">
                               {stock.trend}
                             </span>
+                            {stock.rsi !== undefined && stock.rsi !== null && (
+                              <span className="text-[10px] font-extrabold bg-rose-100 text-rose-900 px-1.5 py-0.2 rounded border border-rose-300">
+                                RSI {stock.rsi.toFixed(1)}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[10px] text-slate-500 truncate max-w-[160px]">{stock.companyName}</div>
                         </div>

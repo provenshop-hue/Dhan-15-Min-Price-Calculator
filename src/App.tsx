@@ -214,7 +214,8 @@ export default function App() {
       const data = result.data;
       const openPrice = data.open;
       const closePrice = data.close;
-      const calc = calculateGann15Min(openPrice, closePrice);
+      const rsi = data.rsi;
+      const calc = calculateGann15Min(openPrice, closePrice, rsi);
 
       setStocks((prev) =>
         prev.map((s) =>
@@ -227,6 +228,7 @@ export default function App() {
                 highPrice: data.high,
                 lowPrice: data.low,
                 volume: data.volume,
+                rsi: rsi !== undefined ? rsi : s.rsi,
                 candleTimestamp: data.candleTimestamp,
                 openCalc: calc.openCalc,
                 closeCalc: calc.closeCalc,
@@ -300,7 +302,8 @@ export default function App() {
             const data = result.data;
             const openPrice = data.open;
             const closePrice = data.close;
-            const calc = calculateGann15Min(openPrice, closePrice);
+            const rsi = data.rsi;
+            const calc = calculateGann15Min(openPrice, closePrice, rsi);
 
             setStocks((prev) =>
               prev.map((s) =>
@@ -313,6 +316,7 @@ export default function App() {
                       highPrice: data.high,
                       lowPrice: data.low,
                       volume: data.volume,
+                      rsi: rsi !== undefined ? rsi : s.rsi,
                       candleTimestamp: data.candleTimestamp,
                       openCalc: calc.openCalc,
                       closeCalc: calc.closeCalc,

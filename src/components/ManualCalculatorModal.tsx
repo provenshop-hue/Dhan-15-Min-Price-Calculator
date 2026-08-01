@@ -24,13 +24,17 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
   const [closePrice, setClosePrice] = useState<string>(
     existingStock && existingStock.closePrice ? String(existingStock.closePrice) : '2978.50'
   );
+  const [rsiVal, setRsiVal] = useState<string>(
+    existingStock && existingStock.rsi !== undefined && existingStock.rsi !== null ? String(existingStock.rsi) : ''
+  );
 
   if (!isOpen) return null;
 
   const numOpen = parseFloat(openPrice) || 0;
   const numClose = parseFloat(closePrice) || 0;
+  const numRsi = rsiVal ? parseFloat(rsiVal) : null;
 
-  const calc = calculateGann15Min(numOpen, numClose);
+  const calc = calculateGann15Min(numOpen, numClose, numRsi);
 
   const handleSave = () => {
     if (numOpen <= 0 || numClose <= 0) return;
@@ -52,6 +56,9 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
       targetsUp: calc.targetsUp,
       targetsDown: calc.targetsDown,
       trend: calc.trend,
+      pctChange: calc.pctChange,
+      gannScore: calc.gannScore,
+      rsi: numRsi,
       isFetched: true,
       isManual: true,
       candleTimestamp: '15-min Candle (Manual)'
@@ -113,10 +120,10 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-3 gap-3 pt-1">
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
               <label className="block text-xs font-bold text-blue-700 mb-1">
-                15-Min Candle Open Price (₹)
+                15-Min Open (₹)
               </label>
               <input
                 type="number"
@@ -124,13 +131,13 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
                 value={openPrice}
                 onChange={(e) => setOpenPrice(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-lg px-3 py-2 text-base font-mono font-bold text-slate-900 outline-none shadow-2xs"
+                className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-900 outline-none shadow-2xs"
               />
             </div>
 
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
               <label className="block text-xs font-bold text-blue-700 mb-1">
-                15-Min Candle Close Price (₹)
+                15-Min Close (₹)
               </label>
               <input
                 type="number"
@@ -138,7 +145,21 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
                 value={closePrice}
                 onChange={(e) => setClosePrice(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-lg px-3 py-2 text-base font-mono font-bold text-slate-900 outline-none shadow-2xs"
+                className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-900 outline-none shadow-2xs"
+              />
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <label className="block text-xs font-bold text-purple-700 mb-1">
+                RSI (Optional)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                value={rsiVal}
+                onChange={(e) => setRsiVal(e.target.value)}
+                placeholder="e.g. 58.5"
+                className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-900 outline-none shadow-2xs"
               />
             </div>
           </div>

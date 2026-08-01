@@ -29,6 +29,7 @@ export interface StockCalculated {
   trend?: 'Very Bullish' | 'Bullish' | 'Very Bearish' | 'Bearish' | 'Neutral' | null;
   pctChange?: number | null;
   gannScore?: number | null;
+  rsi?: number | null;
 
   // Fetch status
   isFetched?: boolean;
@@ -57,4 +58,5 @@ export interface GannCalcResult {
   trend: 'Very Bullish' | 'Bullish' | 'Very Bearish' | 'Bearish' | 'Neutral';
   pctChange: number;
   gannScore: number;
+  rsi?: number | null;
 }

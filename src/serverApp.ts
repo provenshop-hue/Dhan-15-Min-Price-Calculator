@@ -308,6 +308,32 @@ export function createExpressApp() {
 
         const candleTimestamp = `${foundDate} ${timeStr} (15m)`;
 
+        // Calculate 14-period RSI from the historical candle close prices
+        let rsi: number | null = null;
+        if (data.close && Array.isArray(data.close) && data.close.length >= 2) {
+          const numCloses = data.close.map(Number).filter((n: any) => !isNaN(Number(n)) && Number(n) > 0);
+          if (numCloses.length >= 2) {
+            const period = Math.min(14, numCloses.length - 1);
+            let gains = 0, losses = 0;
+            for (let i = 1; i <= period; i++) {
+              const diff = numCloses[i] - numCloses[i - 1];
+              if (diff >= 0) gains += diff;
+              else losses += Math.abs(diff);
+            }
+            let avgGain = gains / period;
+            let avgLoss = losses / period;
+            for (let i = period + 1; i < numCloses.length; i++) {
+              const diff = numCloses[i] - numCloses[i - 1];
+              const gain = diff >= 0 ? diff : 0;
+              const loss = diff < 0 ? Math.abs(diff) : 0;
+              avgGain = (avgGain * (period - 1) + gain) / period;
+              avgLoss = (avgLoss * (period - 1) + loss) / period;
+            }
+            if (avgLoss === 0) rsi = 100;
+            else rsi = Math.round((100 - (100 / (1 + (avgGain / avgLoss)))) * 100) / 100;
+          }
+        }
+
         return res.json({
           success: true,
           symbol,
@@ -319,6 +345,7 @@ export function createExpressApp() {
           high: first15MinHigh,
           low: first15MinLow,
           volume: first15MinVol,
+          rsi,
           totalCandles: openCandles.length
         });
       } else {
