@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { AccessCodeGate } from './components/AccessCodeGate';
+import { DhanApiGateModal } from './components/DhanApiGateModal';
 import { StockTable } from './components/StockTable';
 import { DhanSettingsModal } from './components/DhanSettingsModal';
 import { ManualCalculatorModal } from './components/ManualCalculatorModal';
@@ -49,6 +50,7 @@ export default function App() {
   });
 
   // Modal visibility states
+  const [isDhanGateOpen, setIsDhanGateOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isManualCalcOpen, setIsManualCalcOpen] = useState(false);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
@@ -493,7 +495,7 @@ export default function App() {
       {/* Main Header */}
       <Header
         credentials={credentials}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => setIsDhanGateOpen(true)}
         onOpenManualCalc={() => {
           setEditingStockManual(null);
           setIsManualCalcOpen(true);
@@ -516,29 +518,29 @@ export default function App() {
       {/* Main Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-        {/* Dhan Setup Guidance Banner when not configured */}
+        {/* Protected Dhan Setup Banner when not configured */}
         {!credentials.isConfigured && (
-          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="p-4 bg-slate-100 border border-slate-200/80 rounded-2xl shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-start space-x-3">
-              <div className="p-2 bg-blue-600 text-white rounded-xl shadow-2xs mt-0.5">
+              <div className="p-2 bg-slate-800 text-white rounded-xl shadow-2xs mt-0.5">
                 <RefreshCw className="w-5 h-5" />
               </div>
               <div>
                 <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <span>Connect Dhan HQ Data API for Real 15-Minute Candles</span>
-                  <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Official API</span>
+                  <span>Dhan Data API Integration</span>
+                  <span className="bg-slate-200 text-slate-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Protected</span>
                 </h4>
                 <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
-                  To fetch actual 15-minute <strong>Open, Close, and Volume</strong> data directly from Dhan HQ for all 180+ Nifty F&O stocks, enter your <strong>Dhan Client ID</strong> &amp; <strong>Access Token</strong> in settings. You can also import real market CSV files directly.
+                  Live 15-minute market candle fetching via Dhan HQ. Access code required for setup.
                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-2 shrink-0">
               <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center space-x-1.5"
+                onClick={() => setIsDhanGateOpen(true)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors flex items-center space-x-1.5"
               >
-                <span>Setup Dhan Credentials</span>
+                <span>Setup API Credentials (1212)</span>
               </button>
               <button
                 onClick={() => setIsCsvImportOpen(true)}
@@ -599,6 +601,15 @@ export default function App() {
       </footer>
 
       {/* Modals */}
+      <DhanApiGateModal
+        isOpen={isDhanGateOpen}
+        onClose={() => setIsDhanGateOpen(false)}
+        onSuccess={() => {
+          setIsDhanGateOpen(false);
+          setIsSettingsOpen(true);
+        }}
+      />
+
       <DhanSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

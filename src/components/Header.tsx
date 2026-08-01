@@ -58,21 +58,19 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action Buttons & Status */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Dhan Credentials Status Badge */}
+            {/* Dhan API Settings Button (Protected by Code 1212) */}
             <button
               onClick={onOpenSettings}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                 credentials.isConfigured
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                  : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
               }`}
             >
               <Key className="w-3.5 h-3.5" />
-              <span>Dhan API: {credentials.isConfigured ? 'Connected' : 'Setup Required'}</span>
-              {credentials.isConfigured ? (
+              <span>Dhan API Settings</span>
+              {credentials.isConfigured && (
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              ) : (
-                <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
               )}
             </button>
 
