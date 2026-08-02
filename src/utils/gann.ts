@@ -184,3 +184,54 @@ export function calculateGann15Min(
     openHighDiffPct
   };
 }
+
+export interface AtmOptionStrikes {
+  step: number;
+  atmStrike: number;
+  ceStrikes: [number, number];
+  peStrikes: [number, number];
+}
+
+/**
+ * Calculates 2 CE and 2 PE strike prices At-The-Money (ATM) for a stock or index based on CMP
+ */
+export function getAtmOptionStrikes(price?: number | null, symbol?: string): AtmOptionStrikes | null {
+  if (!price || price <= 0) return null;
+  const sym = (symbol || '').toUpperCase();
+
+  let step = 10;
+  if (sym.includes('BANKNIFTY')) {
+    step = 100;
+  } else if (sym.includes('NIFTY') || sym.includes('FINNIFTY')) {
+    step = 50;
+  } else if (sym.includes('SENSEX')) {
+    step = 100;
+  } else {
+    if (price < 50) step = 1;
+    else if (price < 100) step = 2.5;
+    else if (price < 250) step = 5;
+    else if (price < 500) step = 10;
+    else if (price < 1000) step = 20;
+    else if (price < 2500) step = 25;
+    else if (price < 5000) step = 50;
+    else step = 100;
+  }
+
+  const atmStrike = Math.round(price / step) * step;
+
+  // 2 CE strikes At-The-Money: ATM CE & ATM+1 CE
+  const ce1 = atmStrike;
+  const ce2 = atmStrike + step;
+
+  // 2 PE strikes At-The-Money: ATM PE & ATM-1 PE
+  const pe1 = atmStrike;
+  const pe2 = atmStrike - step;
+
+  return {
+    step,
+    atmStrike,
+    ceStrikes: [ce1, ce2],
+    peStrikes: [pe1, pe2],
+  };
+}
+

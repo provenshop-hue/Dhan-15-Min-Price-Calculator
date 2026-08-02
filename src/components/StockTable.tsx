@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
-import { calculateGann15Min } from '../utils/gann';
+import { calculateGann15Min, getAtmOptionStrikes } from '../utils/gann';
 
 interface StockTableProps {
   stocks: StockCalculated[];
@@ -281,6 +281,9 @@ export const StockTable: React.FC<StockTableProps> = ({
                   Close Calc <ArrowUpDown className="w-3 h-3" />
                 </button>
               </th>
+              <th className="py-3 px-3 text-center bg-purple-50/80 text-purple-900 font-extrabold border-x border-purple-200/80">
+                ATM Option Strikes (CE & PE)
+              </th>
               <th className="py-3 px-3 text-center">Trend / Signal</th>
               <th className="py-3 px-4 text-center">Actions</th>
             </tr>
@@ -288,7 +291,7 @@ export const StockTable: React.FC<StockTableProps> = ({
           <tbody className="divide-y divide-slate-100 text-slate-800">
             {paginatedStocks.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-slate-400">
+                <td colSpan={10} className="text-center py-12 text-slate-400">
                   No stocks match the selected search or filter criteria.
                 </td>
               </tr>
@@ -422,6 +425,40 @@ export const StockTable: React.FC<StockTableProps> = ({
                         <span className="text-slate-400 font-normal text-xs">-</span>
                       )}
                     </td>
+
+                    {/* ATM CE & PE Strike Prices */}
+                    {(() => {
+                      const cmp = stock.closePrice || stock.openPrice || 0;
+                      const strikes = getAtmOptionStrikes(cmp, stock.symbol);
+                      return (
+                        <td className="py-2 px-3 text-center bg-purple-50/40 border-x border-purple-100/80">
+                          {strikes ? (
+                            <div className="flex flex-col items-center gap-1.5 min-w-[135px]">
+                              {/* 2 CE Strikes */}
+                              <div className="flex items-center justify-center space-x-1" title={`2 At-The-Money Call Option Strikes for ${stock.symbol}`}>
+                                <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded font-mono shadow-2xs">
+                                  {strikes.ceStrikes[0]} CE
+                                </span>
+                                <span className="text-[10px] font-bold text-emerald-700 bg-white border border-emerald-200 px-1.5 py-0.5 rounded font-mono">
+                                  {strikes.ceStrikes[1]} CE
+                                </span>
+                              </div>
+                              {/* 2 PE Strikes */}
+                              <div className="flex items-center justify-center space-x-1" title={`2 At-The-Money Put Option Strikes for ${stock.symbol}`}>
+                                <span className="text-[10px] font-black text-rose-800 bg-rose-100 border border-rose-300 px-1.5 py-0.5 rounded font-mono shadow-2xs">
+                                  {strikes.peStrikes[0]} PE
+                                </span>
+                                <span className="text-[10px] font-bold text-rose-700 bg-white border border-rose-200 px-1.5 py-0.5 rounded font-mono">
+                                  {strikes.peStrikes[1]} PE
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-xs">-</span>
+                          )}
+                        </td>
+                      );
+                    })()}
 
                     {/* Trend Indicator */}
                     <td className="py-2.5 px-3 text-center">

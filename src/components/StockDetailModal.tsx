@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator } from 'lucide-react';
 import { StockCalculated } from '../types';
+import { getAtmOptionStrikes } from '../utils/gann';
 
 interface StockDetailModalProps {
   stock: StockCalculated | null;
@@ -22,6 +23,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
 
   const activePrice = stock.closePrice || stock.openPrice || 0;
   const contractValue = lotSize && activePrice ? lotSize * activePrice : 0;
+  const optionStrikes = getAtmOptionStrikes(activePrice, stock.symbol);
 
   const isOpenLow = stock.isOpenEqualLow || (stock.openPrice && stock.lowPrice && Math.abs(stock.openPrice - stock.lowPrice) / stock.openPrice <= 0.001);
   const isOpenHigh = stock.isOpenEqualHigh || (stock.openPrice && stock.highPrice && Math.abs(stock.openPrice - stock.highPrice) / stock.openPrice <= 0.001);
@@ -296,6 +298,58 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
           </div>
 
         </div>
+
+        {/* At-The-Money (ATM) Option Strikes */}
+        {optionStrikes && (
+          <div className="mt-4 p-3.5 bg-purple-50/70 rounded-xl border border-purple-200">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="text-xs font-extrabold uppercase text-purple-900 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-purple-700" /> At-The-Money (ATM) Option Strikes
+              </div>
+              <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-200">
+                Strike Interval: {optionStrikes.step} Points
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Call Options (CE) */}
+              <div className="bg-white p-3 rounded-lg border border-emerald-200/80 shadow-2xs">
+                <div className="text-[11px] font-bold text-emerald-800 uppercase flex items-center justify-between mb-1.5">
+                  <span>2 Call Option (CE) Strikes</span>
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-mono font-bold">BULLISH</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1 bg-emerald-50 border border-emerald-200 p-2 rounded-lg text-center">
+                    <span className="block text-[9px] text-emerald-700 font-extrabold uppercase">ATM CE Strike</span>
+                    <span className="text-sm font-mono font-black text-emerald-900">{optionStrikes.ceStrikes[0]} CE</span>
+                  </div>
+                  <div className="flex-1 bg-emerald-50/50 border border-emerald-200/70 p-2 rounded-lg text-center">
+                    <span className="block text-[9px] text-emerald-600 font-bold uppercase">ATM+1 CE Strike</span>
+                    <span className="text-sm font-mono font-bold text-emerald-800">{optionStrikes.ceStrikes[1]} CE</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Put Options (PE) */}
+              <div className="bg-white p-3 rounded-lg border border-rose-200/80 shadow-2xs">
+                <div className="text-[11px] font-bold text-rose-800 uppercase flex items-center justify-between mb-1.5">
+                  <span>2 Put Option (PE) Strikes</span>
+                  <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.2 rounded font-mono font-bold">BEARISH</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1 bg-rose-50 border border-rose-200 p-2 rounded-lg text-center">
+                    <span className="block text-[9px] text-rose-700 font-extrabold uppercase">ATM PE Strike</span>
+                    <span className="text-sm font-mono font-black text-rose-900">{optionStrikes.peStrikes[0]} PE</span>
+                  </div>
+                  <div className="flex-1 bg-rose-50/50 border border-rose-200/70 p-2 rounded-lg text-center">
+                    <span className="block text-[9px] text-rose-600 font-bold uppercase">ATM-1 PE Strike</span>
+                    <span className="text-sm font-mono font-bold text-rose-800">{optionStrikes.peStrikes[1]} PE</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* F&O Lot Size & Contract Value Box */}
         <div className="mt-4 p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
