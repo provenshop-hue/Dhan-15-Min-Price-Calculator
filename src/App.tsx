@@ -3,13 +3,15 @@ import { Header } from './components/Header';
 import { AccessCodeGate } from './components/AccessCodeGate';
 import { DhanApiGateModal } from './components/DhanApiGateModal';
 import { StockTable } from './components/StockTable';
+import { GannHighlights } from './components/GannHighlights';
 import { DhanSettingsModal } from './components/DhanSettingsModal';
 import { ManualCalculatorModal } from './components/ManualCalculatorModal';
 import { StockDetailModal } from './components/StockDetailModal';
 import { CsvImportModal } from './components/CsvImportModal';
+import { PositionSizingModal } from './components/PositionSizingModal';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
-import { StockCalculated, DhanApiCredentials } from './types';
+import { StockCalculated, DhanApiCredentials, TrendFilterType } from './types';
 import { calculateGann15Min } from './utils/gann';
 import { Download, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
 
@@ -48,6 +50,9 @@ export default function App() {
     }));
   });
 
+  // Active filter state
+  const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
+
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
     return localStorage.getItem('gann_app_access_code_unlocked') === 'true' ||
@@ -59,8 +64,15 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isManualCalcOpen, setIsManualCalcOpen] = useState(false);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
+  const [isPositionSizerOpen, setIsPositionSizerOpen] = useState(false);
+  const [positionSizerStock, setPositionSizerStock] = useState<StockCalculated | null>(null);
   const [selectedDetailStock, setSelectedDetailStock] = useState<StockCalculated | null>(null);
   const [editingStockManual, setEditingStockManual] = useState<StockCalculated | null>(null);
+
+  const handleOpenPositionSizer = (stock?: StockCalculated | null) => {
+    setPositionSizerStock(stock || null);
+    setIsPositionSizerOpen(true);
+  };
 
   // Bulk Loading State
   const [isBulkLoading, setIsBulkLoading] = useState(false);
@@ -97,7 +109,13 @@ export default function App() {
   };
 
   // Update stock prices inline & recalculate Gann values
-  const handleUpdateStockPrices = (stockId: string, openPrice: number, closePrice: number) => {
+  const handleUpdateStockPrices = (
+    stockId: string,
+    openPrice: number,
+    closePrice: number,
+    highPriceInput?: number | null,
+    lowPriceInput?: number | null
+  ) => {
     setStocks((prev) =>
       prev.map((s) => {
         if (s.id !== stockId) return s;
@@ -107,6 +125,8 @@ export default function App() {
             ...s,
             openPrice: null,
             closePrice: null,
+            highPrice: null,
+            lowPrice: null,
             openCalc: null,
             closeCalc: null,
             buyAbove: null,
@@ -114,15 +134,24 @@ export default function App() {
             targetsUp: [],
             targetsDown: [],
             trend: null,
+            isOpenEqualLow: false,
+            isOpenEqualHigh: false,
+            openLowDiffPct: null,
+            openHighDiffPct: null,
             isFetched: false
           };
         }
 
-        const calc = calculateGann15Min(openPrice, closePrice);
+        const highPrice = highPriceInput !== undefined && highPriceInput !== null ? highPriceInput : (s.highPrice || Math.max(openPrice, closePrice));
+        const lowPrice = lowPriceInput !== undefined && lowPriceInput !== null ? lowPriceInput : (s.lowPrice || Math.min(openPrice, closePrice));
+
+        const calc = calculateGann15Min(openPrice, closePrice, s.rsi, s.vwap, highPrice, lowPrice);
         return {
           ...s,
           openPrice,
           closePrice,
+          highPrice,
+          lowPrice,
           openCalc: calc.openCalc,
           closeCalc: calc.closeCalc,
           buyAbove: calc.buyAbove,
@@ -132,6 +161,10 @@ export default function App() {
           trend: calc.trend,
           pctChange: calc.pctChange,
           gannScore: calc.gannScore,
+          isOpenEqualLow: calc.isOpenEqualLow,
+          isOpenEqualHigh: calc.isOpenEqualHigh,
+          openLowDiffPct: calc.openLowDiffPct,
+          openHighDiffPct: calc.openHighDiffPct,
           isFetched: true
         };
       })
@@ -229,7 +262,7 @@ export default function App() {
       const closePrice = data.close;
       const rsi = data.rsi;
       const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap);
+      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low);
 
       setStocks((prev) =>
         prev.map((s) =>
@@ -255,6 +288,10 @@ export default function App() {
                 trend: calc.trend,
                 pctChange: calc.pctChange,
                 gannScore: calc.gannScore,
+                isOpenEqualLow: calc.isOpenEqualLow,
+                isOpenEqualHigh: calc.isOpenEqualHigh,
+                openLowDiffPct: calc.openLowDiffPct,
+                openHighDiffPct: calc.openHighDiffPct,
                 isFetched: true,
                 isLoading: false,
                 error: null
@@ -320,7 +357,7 @@ export default function App() {
             const closePrice = data.close;
             const rsi = data.rsi;
             const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap);
+            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low);
 
             setStocks((prev) =>
               prev.map((s) =>
@@ -346,6 +383,10 @@ export default function App() {
                       trend: calc.trend,
                       pctChange: calc.pctChange,
                       gannScore: calc.gannScore,
+                      isOpenEqualLow: calc.isOpenEqualLow,
+                      isOpenEqualHigh: calc.isOpenEqualHigh,
+                      openLowDiffPct: calc.openLowDiffPct,
+                      openHighDiffPct: calc.openHighDiffPct,
                       isFetched: true,
                       isLoading: false,
                       error: null
@@ -511,6 +552,7 @@ export default function App() {
           setEditingStockManual(null);
           setIsManualCalcOpen(true);
         }}
+        onOpenPositionSizer={() => handleOpenPositionSizer(null)}
         onOpenCsvImport={() => setIsCsvImportOpen(true)}
         onExportCsv={handleExportCsv}
         totalStocks={stocks.length}
@@ -584,6 +626,13 @@ export default function App() {
           </div>
         )}
 
+        {/* Gann Pro Signals & Open=Low/High Highlights Banner */}
+        <GannHighlights
+          stocks={stocks}
+          onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+          onSelectTrendFilter={(f) => setActiveTrendFilter(f)}
+        />
+
         {/* Stock Table */}
         <StockTable
           stocks={stocks}
@@ -594,7 +643,10 @@ export default function App() {
             setEditingStockManual(s);
             setIsManualCalcOpen(true);
           }}
+          onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
           credentials={credentials}
+          activeTrendFilter={activeTrendFilter}
+          onTrendFilterChange={(f) => setActiveTrendFilter(f)}
         />
 
       </main>
@@ -638,6 +690,14 @@ export default function App() {
       <StockDetailModal
         stock={selectedDetailStock}
         onClose={() => setSelectedDetailStock(null)}
+        onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+      />
+
+      <PositionSizingModal
+        isOpen={isPositionSizerOpen}
+        onClose={() => setIsPositionSizerOpen(false)}
+        selectedStock={positionSizerStock}
+        allStocks={stocks}
       />
 
       <CsvImportModal

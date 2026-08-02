@@ -33,12 +33,28 @@ export interface StockCalculated {
   vwap?: number | null;
   vwapStatus?: 'Above' | 'Below' | 'At' | null;
 
+  // Open = Low / Open = High Intraday Pattern Flags
+  isOpenEqualLow?: boolean;
+  isOpenEqualHigh?: boolean;
+  openLowDiffPct?: number | null;
+  openHighDiffPct?: number | null;
+
   // Fetch status
   isFetched?: boolean;
   isLoading?: boolean;
   error?: string | null;
   isManual?: boolean;
 }
+
+export type TrendFilterType =
+  | 'ALL'
+  | 'VERY_BULLISH'
+  | 'BULLISH'
+  | 'VERY_BEARISH'
+  | 'BEARISH'
+  | 'OPEN_LOW'
+  | 'OPEN_HIGH'
+  | 'CALCULATED';
 
 export interface DhanApiCredentials {
   clientId: string;
@@ -63,4 +79,8 @@ export interface GannCalcResult {
   rsi?: number | null;
   vwap?: number | null;
   vwapStatus?: 'Above' | 'Below' | 'At' | null;
+  isOpenEqualLow?: boolean;
+  isOpenEqualHigh?: boolean;
+  openLowDiffPct?: number | null;
+  openHighDiffPct?: number | null;
 }

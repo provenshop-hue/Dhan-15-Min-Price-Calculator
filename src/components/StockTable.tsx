@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
-import { StockCalculated, DhanApiCredentials } from '../types';
+import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator } from 'lucide-react';
+import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
 import { calculateGann15Min } from '../utils/gann';
 
 interface StockTableProps {
   stocks: StockCalculated[];
-  onUpdateStockPrices: (stockId: string, openPrice: number, closePrice: number) => void;
+  onUpdateStockPrices: (stockId: string, openPrice: number, closePrice: number, highPrice?: number | null, lowPrice?: number | null) => void;
   onFetchSingleStock: (stock: StockCalculated) => void;
   onSelectStockDetail: (stock: StockCalculated) => void;
   onEditStockManual: (stock: StockCalculated) => void;
+  onOpenPositionSizer?: (stock?: StockCalculated) => void;
   credentials: DhanApiCredentials;
-  activeTrendFilter?: 'ALL' | 'VERY_BULLISH' | 'BULLISH' | 'VERY_BEARISH' | 'BEARISH' | 'CALCULATED';
-  onTrendFilterChange?: (filter: 'ALL' | 'VERY_BULLISH' | 'BULLISH' | 'VERY_BEARISH' | 'BEARISH' | 'CALCULATED') => void;
+  activeTrendFilter?: TrendFilterType;
+  onTrendFilterChange?: (filter: TrendFilterType) => void;
 }
 
 export const StockTable: React.FC<StockTableProps> = ({
@@ -20,16 +21,17 @@ export const StockTable: React.FC<StockTableProps> = ({
   onFetchSingleStock,
   onSelectStockDetail,
   onEditStockManual,
+  onOpenPositionSizer,
   credentials,
   activeTrendFilter,
   onTrendFilterChange
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [internalTrendFilter, setInternalTrendFilter] = useState<'ALL' | 'VERY_BULLISH' | 'BULLISH' | 'VERY_BEARISH' | 'BEARISH' | 'CALCULATED'>('ALL');
+  const [internalTrendFilter, setInternalTrendFilter] = useState<TrendFilterType>('ALL');
   
   const trendFilter = activeTrendFilter !== undefined ? activeTrendFilter : internalTrendFilter;
 
-  const setTrendFilter = (filter: 'ALL' | 'VERY_BULLISH' | 'BULLISH' | 'VERY_BEARISH' | 'BEARISH' | 'CALCULATED') => {
+  const setTrendFilter = (filter: TrendFilterType) => {
     if (onTrendFilterChange) {
       onTrendFilterChange(filter);
     } else {
@@ -47,7 +49,24 @@ export const StockTable: React.FC<StockTableProps> = ({
   const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'companyName' | 'volume' | 'pctChange'>('symbol');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  // Helper check for O=L / O=H with tight tolerance
+  const isStockOpenEqualLow = (s: StockCalculated) => {
+    if (s.isOpenEqualLow) return true;
+    if (!s.openPrice || s.openPrice <= 0) return false;
+    const low = s.lowPrice !== undefined && s.lowPrice !== null ? s.lowPrice : Math.min(s.openPrice, s.closePrice || s.openPrice);
+    return Math.abs(s.openPrice - low) / s.openPrice <= 0.001;
+  };
+
+  const isStockOpenEqualHigh = (s: StockCalculated) => {
+    if (s.isOpenEqualHigh) return true;
+    if (!s.openPrice || s.openPrice <= 0) return false;
+    const high = s.highPrice !== undefined && s.highPrice !== null ? s.highPrice : Math.max(s.openPrice, s.closePrice || s.openPrice);
+    return Math.abs(s.openPrice - high) / s.openPrice <= 0.001;
+  };
+
   // Count metrics
+  const openLowCount = stocks.filter(isStockOpenEqualLow).length;
+  const openHighCount = stocks.filter(isStockOpenEqualHigh).length;
   const veryBullishCount = stocks.filter((s) => s.trend === 'Very Bullish').length;
   const bullishCount = stocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish').length;
   const veryBearishCount = stocks.filter((s) => s.trend === 'Very Bearish').length;
@@ -61,6 +80,8 @@ export const StockTable: React.FC<StockTableProps> = ({
 
     if (!matchesSearch) return false;
 
+    if (trendFilter === 'OPEN_LOW') return isStockOpenEqualLow(s);
+    if (trendFilter === 'OPEN_HIGH') return isStockOpenEqualHigh(s);
     if (trendFilter === 'VERY_BULLISH') return s.trend === 'Very Bullish';
     if (trendFilter === 'BULLISH') return s.trend === 'Bullish' || s.trend === 'Very Bullish';
     if (trendFilter === 'VERY_BEARISH') return s.trend === 'Very Bearish';
@@ -133,6 +154,28 @@ export const StockTable: React.FC<StockTableProps> = ({
               }`}
             >
               All ({stocks.length})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('OPEN_LOW'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
+                trendFilter === 'OPEN_LOW'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-emerald-800 bg-emerald-100/80 hover:bg-emerald-200 border border-emerald-300/60'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
+              Open = Low ({openLowCount})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('OPEN_HIGH'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
+                trendFilter === 'OPEN_HIGH'
+                  ? 'bg-rose-600 text-white shadow-2xs'
+                  : 'text-rose-800 bg-rose-100/80 hover:bg-rose-200 border border-rose-300/60'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 text-rose-600 dark:text-rose-300" />
+              Open = High ({openHighCount})
             </button>
             <button
               onClick={() => { setTrendFilter('VERY_BULLISH'); setCurrentPage(1); }}
@@ -278,6 +321,24 @@ export const StockTable: React.FC<StockTableProps> = ({
                         >
                           <ExternalLink className="w-3 h-3" />
                         </a>
+                        {isStockOpenEqualLow(stock) && (
+                          <span
+                            title="Open = Low pattern detected (Bullish Intraday Setup)"
+                            className="text-[10px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-2xs"
+                          >
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            O=L
+                          </span>
+                        )}
+                        {isStockOpenEqualHigh(stock) && (
+                          <span
+                            title="Open = High pattern detected (Bearish Intraday Setup)"
+                            className="text-[10px] font-black text-rose-800 bg-rose-100 border border-rose-300 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-2xs"
+                          >
+                            <Target className="w-3 h-3 text-rose-600" />
+                            O=H
+                          </span>
+                        )}
                         {stock.error && (
                           <span
                             title={stock.error}
@@ -365,6 +426,19 @@ export const StockTable: React.FC<StockTableProps> = ({
                     {/* Trend Indicator */}
                     <td className="py-2.5 px-3 text-center">
                       <div className="flex flex-col items-center gap-1">
+                        {isStockOpenEqualLow(stock) && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white shadow-2xs border border-emerald-300">
+                            <ShieldCheck className="w-3 h-3 text-white" />
+                            <span>OPEN = LOW</span>
+                          </span>
+                        )}
+                        {isStockOpenEqualHigh(stock) && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-2xs border border-rose-300">
+                            <Target className="w-3 h-3 text-white" />
+                            <span>OPEN = HIGH</span>
+                          </span>
+                        )}
+
                         {stock.trend ? (
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] ${
                             stock.trend === 'Very Bullish'
@@ -382,7 +456,7 @@ export const StockTable: React.FC<StockTableProps> = ({
                             <span>{stock.trend}</span>
                           </span>
                         ) : (
-                          <span className="text-slate-400">-</span>
+                          !isStockOpenEqualLow(stock) && !isStockOpenEqualHigh(stock) && <span className="text-slate-400">-</span>
                         )}
 
                         {stock.rsi !== undefined && stock.rsi !== null && (
@@ -438,6 +512,17 @@ export const StockTable: React.FC<StockTableProps> = ({
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
+
+                        {/* Position Sizing Calculator */}
+                        {onOpenPositionSizer && (
+                          <button
+                            onClick={() => onOpenPositionSizer(stock)}
+                            title="Calculate Position Size & Lots for this stock"
+                            className="p-1.5 text-slate-500 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                          >
+                            <Calculator className="w-3.5 h-3.5 text-amber-600" />
+                          </button>
+                        )}
 
                         {/* Manual Edit */}
                         <button

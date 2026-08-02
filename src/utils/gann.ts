@@ -37,13 +37,36 @@ export function calculateRSI(closes: number[], period: number = 14): number | nu
 }
 
 /**
- * Calculates Gann 15-minute open & close modulo values and trend with RSI & VWAP confluence
+ * Checks if Open equals Low (or within specified tolerance)
+ */
+export function isOpenLowPattern(openPrice?: number | null, lowPrice?: number | null, tolerancePct: number = 0.001): boolean {
+  if (!openPrice || !lowPrice || openPrice <= 0 || lowPrice <= 0) return false;
+  if (openPrice === lowPrice) return true;
+  const diffPct = Math.abs(openPrice - lowPrice) / openPrice;
+  return diffPct <= tolerancePct;
+}
+
+/**
+ * Checks if Open equals High (or within specified tolerance)
+ */
+export function isOpenHighPattern(openPrice?: number | null, highPrice?: number | null, tolerancePct: number = 0.001): boolean {
+  if (!openPrice || !highPrice || openPrice <= 0 || highPrice <= 0) return false;
+  if (openPrice === highPrice) return true;
+  const diffPct = Math.abs(openPrice - highPrice) / openPrice;
+  return diffPct <= tolerancePct;
+}
+
+/**
+ * Calculates Gann 15-minute open & close modulo values and trend with RSI, VWAP & Open=Low/High pattern confluence
  */
 export function calculateGann15Min(
   openPrice: number,
   closePrice: number,
   rsiVal?: number | null,
-  vwapVal?: number | null
+  vwapVal?: number | null,
+  highPrice?: number | null,
+  lowPrice?: number | null,
+  tolerancePct: number = 0.001
 ): GannCalcResult {
   const sqrtOpen = Math.sqrt(Math.max(0, openPrice));
   const sqrtClose = Math.sqrt(Math.max(0, closePrice));
@@ -91,6 +114,18 @@ export function calculateGann15Min(
 
   const pctChange = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
 
+  // Pattern detection: Open = Low and Open = High
+  const isOpenEqualLow = isOpenLowPattern(openPrice, lowPrice, tolerancePct);
+  const isOpenEqualHigh = isOpenHighPattern(openPrice, highPrice, tolerancePct);
+
+  const openLowDiffPct = openPrice > 0 && lowPrice && lowPrice > 0
+    ? Math.abs(openPrice - lowPrice) / openPrice * 100
+    : null;
+
+  const openHighDiffPct = openPrice > 0 && highPrice && highPrice > 0
+    ? Math.abs(openPrice - highPrice) / openPrice * 100
+    : null;
+
   // Calculate VWAP Status
   let vwapStatus: 'Above' | 'Below' | 'At' | null = null;
   if (vwapVal !== undefined && vwapVal !== null && vwapVal > 0) {
@@ -112,16 +147,14 @@ export function calculateGann15Min(
   const vwapBearish = vwapStatus ? vwapStatus === 'Below' : true;
 
   // Confluence rules:
-  // Very Bullish requires: Bullish Candle + Gann Breakout + RSI > 50 + Above VWAP
-  // Very Bearish requires: Bearish Candle + Gann Breakdown + RSI < 50 + Below VWAP
   if (isBullishCandle) {
-    if (gannBreakout && rsiBullish && vwapBullish) {
+    if ((gannBreakout || isOpenEqualLow) && rsiBullish && vwapBullish) {
       trend = 'Very Bullish';
     } else {
       trend = 'Bullish';
     }
   } else if (isBearishCandle) {
-    if (gannBreakdown && rsiBearish && vwapBearish) {
+    if ((gannBreakdown || isOpenEqualHigh) && rsiBearish && vwapBearish) {
       trend = 'Very Bearish';
     } else {
       trend = 'Bearish';
@@ -144,6 +177,10 @@ export function calculateGann15Min(
     gannScore,
     rsi: rsiVal,
     vwap: vwapVal,
-    vwapStatus
+    vwapStatus,
+    isOpenEqualLow,
+    isOpenEqualHigh,
+    openLowDiffPct,
+    openHighDiffPct
   };
 }

@@ -6,6 +6,7 @@ interface HeaderProps {
   credentials: DhanApiCredentials;
   onOpenSettings: () => void;
   onOpenManualCalc: () => void;
+  onOpenPositionSizer: () => void;
   onOpenCsvImport: () => void;
   onExportCsv: () => void;
   totalStocks: number;
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   credentials,
   onOpenSettings,
   onOpenManualCalc,
+  onOpenPositionSizer,
   onOpenCsvImport,
   onExportCsv,
   totalStocks,
@@ -81,6 +83,15 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Calculator className="w-3.5 h-3.5 text-blue-600" />
               <span>Manual Entry</span>
+            </button>
+
+            {/* Position Sizing Calculator */}
+            <button
+              onClick={onOpenPositionSizer}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-lg text-xs font-bold shadow-2xs transition-colors"
+            >
+              <Calculator className="w-3.5 h-3.5 text-blue-700" />
+              <span>Position Sizer</span>
             </button>
 
             {/* CSV Import / OHLC Data */}

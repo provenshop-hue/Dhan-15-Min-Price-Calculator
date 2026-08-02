@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers } from 'lucide-react';
+import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator } from 'lucide-react';
 import { StockCalculated } from '../types';
 
 interface StockDetailModalProps {
   stock: StockCalculated | null;
   onClose: () => void;
+  onOpenPositionSizer?: (stock?: StockCalculated) => void;
 }
 
-export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClose }) => {
+export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClose, onOpenPositionSizer }) => {
   const [selectedLotMonth, setSelectedLotMonth] = useState<'Jun' | 'Jul' | 'Aug'>('Jun');
 
   if (!stock) return null;
@@ -21,6 +22,9 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
 
   const activePrice = stock.closePrice || stock.openPrice || 0;
   const contractValue = lotSize && activePrice ? lotSize * activePrice : 0;
+
+  const isOpenLow = stock.isOpenEqualLow || (stock.openPrice && stock.lowPrice && Math.abs(stock.openPrice - stock.lowPrice) / stock.openPrice <= 0.001);
+  const isOpenHigh = stock.isOpenEqualHigh || (stock.openPrice && stock.highPrice && Math.abs(stock.openPrice - stock.highPrice) / stock.openPrice <= 0.001);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
@@ -49,6 +53,55 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Pattern Banner Highlights */}
+        {isOpenLow && (
+          <div className="mt-4 p-3 bg-emerald-50 border-2 border-emerald-500 rounded-xl flex items-center justify-between text-emerald-900 shadow-sm">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 bg-emerald-600 text-white rounded-lg">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+                  <span>🟢 OPEN = LOW PATTERN DETECTED</span>
+                  <span className="bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded text-[10px]">High Accuracy</span>
+                </div>
+                <p className="text-xs text-emerald-700 mt-0.5 font-medium">
+                  Opening price (₹{stock.openPrice?.toFixed(2)}) is equal to Low (₹{stock.lowPrice?.toFixed(2) || stock.openPrice?.toFixed(2)}). Buyers defended opening price from 09:15 AM.
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-mono font-bold bg-emerald-600 text-white px-2.5 py-1 rounded-lg">
+                Bullish Setup
+              </span>
+            </div>
+          </div>
+        )}
+
+        {isOpenHigh && (
+          <div className="mt-4 p-3 bg-rose-50 border-2 border-rose-500 rounded-xl flex items-center justify-between text-rose-900 shadow-sm">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 bg-rose-600 text-white rounded-lg">
+                <Target className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center gap-1">
+                  <span>🔴 OPEN = HIGH PATTERN DETECTED</span>
+                  <span className="bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded text-[10px]">High Accuracy</span>
+                </div>
+                <p className="text-xs text-rose-700 mt-0.5 font-medium">
+                  Opening price (₹{stock.openPrice?.toFixed(2)}) is equal to High (₹{stock.highPrice?.toFixed(2) || stock.openPrice?.toFixed(2)}). Sellers dominated immediately at opening bell.
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-mono font-bold bg-rose-600 text-white px-2.5 py-1 rounded-lg">
+                Bearish Setup
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* 15-Min Candle & Gann Primary Result Banner */}
         <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -281,8 +334,21 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
           </div>
         </div>
 
-        {/* Close Button */}
-        <div className="mt-6 text-right">
+        {/* Action Buttons */}
+        <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+          {onOpenPositionSizer ? (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenPositionSizer(stock);
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm flex items-center space-x-1.5"
+            >
+              <Calculator className="w-4 h-4" />
+              <span>Calculate Position Size &amp; Quantity</span>
+            </button>
+          ) : <div />}
+
           <button
             onClick={onClose}
             className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"

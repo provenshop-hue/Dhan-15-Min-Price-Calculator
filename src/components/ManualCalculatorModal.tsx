@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Calculator, ArrowRight, TrendingUp, TrendingDown, Target, Shield, Check } from 'lucide-react';
+import { X, Calculator, ArrowRight, TrendingUp, TrendingDown, Target, Shield, Check, ShieldCheck } from 'lucide-react';
 import { calculateGann15Min } from '../utils/gann';
 import { StockCalculated } from '../types';
 
@@ -24,6 +24,12 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
   const [closePrice, setClosePrice] = useState<string>(
     existingStock && existingStock.closePrice ? String(existingStock.closePrice) : '2978.50'
   );
+  const [highPrice, setHighPrice] = useState<string>(
+    existingStock && existingStock.highPrice ? String(existingStock.highPrice) : '2985.00'
+  );
+  const [lowPrice, setLowPrice] = useState<string>(
+    existingStock && existingStock.lowPrice ? String(existingStock.lowPrice) : '2950.00'
+  );
   const [rsiVal, setRsiVal] = useState<string>(
     existingStock && existingStock.rsi !== undefined && existingStock.rsi !== null ? String(existingStock.rsi) : ''
   );
@@ -35,10 +41,30 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
 
   const numOpen = parseFloat(openPrice) || 0;
   const numClose = parseFloat(closePrice) || 0;
+  const numHigh = parseFloat(highPrice) || (Math.max(numOpen, numClose) || 0);
+  const numLow = parseFloat(lowPrice) || (Math.min(numOpen, numClose) || 0);
   const numRsi = rsiVal ? parseFloat(rsiVal) : null;
   const numVwap = vwapInput ? parseFloat(vwapInput) : null;
 
-  const calc = calculateGann15Min(numOpen, numClose, numRsi, numVwap);
+  const calc = calculateGann15Min(numOpen, numClose, numRsi, numVwap, numHigh, numLow);
+
+  const handleSetOpenLowPreset = () => {
+    if (numOpen > 0) {
+      setLowPrice(String(numOpen));
+      if (parseFloat(highPrice) < numOpen) {
+        setHighPrice(String(Math.max(numOpen, numClose)));
+      }
+    }
+  };
+
+  const handleSetOpenHighPreset = () => {
+    if (numOpen > 0) {
+      setHighPrice(String(numOpen));
+      if (parseFloat(lowPrice) > numOpen) {
+        setLowPrice(String(Math.min(numOpen, numClose)));
+      }
+    }
+  };
 
   const handleSave = () => {
     if (numOpen <= 0 || numClose <= 0) return;
@@ -53,6 +79,8 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
       lotSizeAug2026: existingStock ? existingStock.lotSizeAug2026 : 500,
       openPrice: numOpen,
       closePrice: numClose,
+      highPrice: numHigh,
+      lowPrice: numLow,
       openCalc: calc.openCalc,
       closeCalc: calc.closeCalc,
       buyAbove: calc.buyAbove,
@@ -65,6 +93,10 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
       rsi: numRsi,
       vwap: calc.vwap,
       vwapStatus: calc.vwapStatus,
+      isOpenEqualLow: calc.isOpenEqualLow,
+      isOpenEqualHigh: calc.isOpenEqualHigh,
+      openLowDiffPct: calc.openLowDiffPct,
+      openHighDiffPct: calc.openHighDiffPct,
       isFetched: true,
       isManual: true,
       candleTimestamp: '15-min Candle (Manual)'
@@ -126,7 +158,28 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+          {/* Quick Pattern Presets */}
+          <div className="flex items-center space-x-2 pt-1">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Quick Presets:</span>
+            <button
+              type="button"
+              onClick={handleSetOpenLowPreset}
+              className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-black transition-colors flex items-center space-x-1"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Set Open = Low (Bullish)</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSetOpenHighPreset}
+              className="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-300 rounded-lg text-xs font-black transition-colors flex items-center space-x-1"
+            >
+              <Target className="w-3.5 h-3.5 text-rose-600" />
+              <span>Set Open = High (Bearish)</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
               <label className="block text-xs font-bold text-blue-700 mb-1">
                 15-Min Open (₹)
@@ -152,6 +205,34 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
                 onChange={(e) => setClosePrice(e.target.value)}
                 placeholder="0.00"
                 className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-900 outline-none shadow-2xs"
+              />
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                15-Min High (₹)
+              </label>
+              <input
+                type="number"
+                step="0.05"
+                value={highPrice}
+                onChange={(e) => setHighPrice(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-900 outline-none shadow-2xs"
+              />
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                15-Min Low (₹)
+              </label>
+              <input
+                type="number"
+                step="0.05"
+                value={lowPrice}
+                onChange={(e) => setLowPrice(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-900 outline-none shadow-2xs"
               />
             </div>
 

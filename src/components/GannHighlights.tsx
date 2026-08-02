@@ -1,11 +1,11 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, ShieldAlert, Sparkles, ChevronRight } from 'lucide-react';
-import { StockCalculated } from '../types';
+import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, Target, ShieldCheck } from 'lucide-react';
+import { StockCalculated, TrendFilterType } from '../types';
 
 interface GannHighlightsProps {
   stocks: StockCalculated[];
   onSelectStockDetail: (stock: StockCalculated) => void;
-  onSelectTrendFilter: (filter: 'ALL' | 'VERY_BULLISH' | 'BULLISH' | 'VERY_BEARISH' | 'BEARISH' | 'CALCULATED') => void;
+  onSelectTrendFilter: (filter: TrendFilterType) => void;
 }
 
 export const GannHighlights: React.FC<GannHighlightsProps> = ({
@@ -19,7 +19,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
            s.closePrice !== undefined && s.closePrice !== null && s.closePrice > 0
   );
 
-  // Very Bullish stocks: trend === 'Very Bullish' or top positive % change
+  // Very Bullish stocks: trend === 'Very Bullish'
   const exactVeryBullish = calculatedStocks.filter((s) => s.trend === 'Very Bullish');
   const allBullish = calculatedStocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish');
   
@@ -27,13 +27,17 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
     ? [...exactVeryBullish].sort((a, b) => (b.pctChange || 0) - (a.pctChange || 0)).slice(0, 5)
     : [...allBullish].sort((a, b) => (b.pctChange || 0) - (a.pctChange || 0)).slice(0, 5);
 
-  // Very Bearish stocks: trend === 'Very Bearish' or top negative % change
+  // Very Bearish stocks: trend === 'Very Bearish'
   const exactVeryBearish = calculatedStocks.filter((s) => s.trend === 'Very Bearish');
   const allBearish = calculatedStocks.filter((s) => s.trend === 'Bearish' || s.trend === 'Very Bearish');
   
   const topVeryBearish = exactVeryBearish.length > 0
     ? [...exactVeryBearish].sort((a, b) => (a.pctChange || 0) - (b.pctChange || 0)).slice(0, 5)
     : [...allBearish].sort((a, b) => (a.pctChange || 0) - (b.pctChange || 0)).slice(0, 5);
+
+  // Open = Low (Bullish) and Open = High (Bearish) stocks
+  const openLowStocks = calculatedStocks.filter((s) => s.isOpenEqualLow || (s.openPrice && s.lowPrice && Math.abs(s.openPrice - s.lowPrice) / s.openPrice <= 0.001));
+  const openHighStocks = calculatedStocks.filter((s) => s.isOpenEqualHigh || (s.openPrice && s.highPrice && Math.abs(s.openPrice - s.highPrice) / s.openPrice <= 0.001));
 
   return (
     <div className="mb-6 space-y-4">
@@ -47,20 +51,36 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
             <div className="flex items-center space-x-2">
               <h2 className="text-base font-extrabold tracking-wide text-white">GANN 15-MIN PRO SIGNALS</h2>
               <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
-                Square of 9 Analysis
+                Square of 9 & Intraday Patterns
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              Top Gann 45° Breakout (Very Bullish) & 45° Breakdown (Very Bearish) picks from {calculatedStocks.length} calculated stocks.
+              Instant filtering for <strong>Open=Low (Bullish)</strong>, <strong>Open=High (Bearish)</strong>, and Gann 45° Breakouts.
             </p>
           </div>
         </div>
 
-        {/* Quick Signal Counters */}
+        {/* Quick Signal Filter Buttons */}
         <div className="flex items-center gap-2 self-stretch md:self-auto overflow-x-auto pb-1 md:pb-0">
           <button
+            onClick={() => onSelectTrendFilter('OPEN_LOW')}
+            className="flex items-center space-x-1.5 bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-emerald-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Open = Low ({openLowStocks.length})</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTrendFilter('OPEN_HIGH')}
+            className="flex items-center space-x-1.5 bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-rose-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+          >
+            <Target className="w-3.5 h-3.5 text-rose-400" />
+            <span>Open = High ({openHighStocks.length})</span>
+          </button>
+
+          <button
             onClick={() => onSelectTrendFilter('VERY_BULLISH')}
-            className="flex items-center space-x-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-300 transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center space-x-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-300 transition-all cursor-pointer whitespace-nowrap"
           >
             <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
             <span>Very Bullish ({exactVeryBullish.length})</span>
@@ -68,7 +88,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
 
           <button
             onClick={() => onSelectTrendFilter('VERY_BEARISH')}
-            className="flex items-center space-x-1.5 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-300 transition-all cursor-pointer whitespace-nowrap"
+            className="flex items-center space-x-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-300 transition-all cursor-pointer whitespace-nowrap"
           >
             <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
             <span>Very Bearish ({exactVeryBearish.length})</span>
