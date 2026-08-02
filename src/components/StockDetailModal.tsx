@@ -97,6 +97,79 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
           </div>
         </div>
 
+        {/* Confluence Technical Indicators (Gann + RSI + VWAP) */}
+        <div className="mt-4 p-4 bg-slate-900 text-white rounded-xl border border-slate-800 shadow-md">
+          <div className="text-xs font-bold uppercase text-blue-400 mb-3 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-blue-400" /> Technical Confluence Matrix
+            </span>
+            <span className="text-[10px] text-slate-400 font-normal">Gann Square + RSI + Intraday VWAP</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Gann Signal */}
+            <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">1. Gann Square Level</div>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-xs text-slate-300">Buy/Sell Level</span>
+                <span className={`text-xs font-bold font-mono ${
+                  stock.closePrice && stock.buyAbove && stock.closePrice >= stock.buyAbove
+                    ? 'text-emerald-400'
+                    : stock.closePrice && stock.sellBelow && stock.closePrice <= stock.sellBelow
+                    ? 'text-rose-400'
+                    : 'text-amber-400'
+                }`}>
+                  {stock.closePrice && stock.buyAbove && stock.closePrice >= stock.buyAbove
+                    ? 'Breakout Above Buy'
+                    : stock.closePrice && stock.sellBelow && stock.closePrice <= stock.sellBelow
+                    ? 'Breakdown Below Sell'
+                    : 'In Gann Range'}
+                </span>
+              </div>
+            </div>
+
+            {/* RSI Level */}
+            <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">2. RSI Indicator (14)</div>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-xs text-slate-300">
+                  {stock.rsi !== undefined && stock.rsi !== null ? `RSI ${stock.rsi.toFixed(1)}` : 'RSI N/A'}
+                </span>
+                <span className={`text-xs font-bold ${
+                  stock.rsi !== undefined && stock.rsi !== null && stock.rsi > 50
+                    ? 'text-emerald-400'
+                    : stock.rsi !== undefined && stock.rsi !== null && stock.rsi < 50
+                    ? 'text-rose-400'
+                    : 'text-slate-400'
+                }`}>
+                  {stock.rsi !== undefined && stock.rsi !== null
+                    ? stock.rsi > 50 ? 'Bullish (>50)' : 'Bearish (<50)'
+                    : 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {/* VWAP Level */}
+            <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">3. Intraday VWAP</div>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-xs font-mono text-slate-300">
+                  {stock.vwap ? `₹${stock.vwap.toFixed(2)}` : 'VWAP N/A'}
+                </span>
+                <span className={`text-xs font-extrabold px-2 py-0.5 rounded ${
+                  stock.vwapStatus === 'Above'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : stock.vwapStatus === 'Below'
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                    : 'bg-slate-700 text-slate-300'
+                }`}>
+                  {stock.vwapStatus === 'Above' ? 'Above VWAP 🟢' : stock.vwapStatus === 'Below' ? 'Below VWAP 🔴' : 'At VWAP 🟡'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Gann Square of 9 Trade Signals */}
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Buy Above */}

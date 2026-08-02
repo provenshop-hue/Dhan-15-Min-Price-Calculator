@@ -37,9 +37,14 @@ export function calculateRSI(closes: number[], period: number = 14): number | nu
 }
 
 /**
- * Calculates Gann 15-minute open & close modulo values and trend with RSI confluence
+ * Calculates Gann 15-minute open & close modulo values and trend with RSI & VWAP confluence
  */
-export function calculateGann15Min(openPrice: number, closePrice: number, rsiVal?: number | null): GannCalcResult {
+export function calculateGann15Min(
+  openPrice: number,
+  closePrice: number,
+  rsiVal?: number | null,
+  vwapVal?: number | null
+): GannCalcResult {
   const sqrtOpen = Math.sqrt(Math.max(0, openPrice));
   const sqrtClose = Math.sqrt(Math.max(0, closePrice));
 
@@ -85,6 +90,15 @@ export function calculateGann15Min(openPrice: number, closePrice: number, rsiVal
   ];
 
   const pctChange = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
+
+  // Calculate VWAP Status
+  let vwapStatus: 'Above' | 'Below' | 'At' | null = null;
+  if (vwapVal !== undefined && vwapVal !== null && vwapVal > 0) {
+    if (closePrice > vwapVal) vwapStatus = 'Above';
+    else if (closePrice < vwapVal) vwapStatus = 'Below';
+    else vwapStatus = 'At';
+  }
+
   let trend: 'Very Bullish' | 'Bullish' | 'Very Bearish' | 'Bearish' | 'Neutral' = 'Neutral';
 
   const isBullishCandle = closePrice > openPrice;
@@ -92,36 +106,25 @@ export function calculateGann15Min(openPrice: number, closePrice: number, rsiVal
   const gannBreakout = closePrice >= buyAbove || pctChange >= 0.35 || (closePrice >= targetsUp[0] * 0.998);
   const gannBreakdown = closePrice <= sellBelow || pctChange <= -0.35 || (closePrice <= targetsDown[0] * 1.002);
 
+  const rsiBullish = rsiVal !== undefined && rsiVal !== null ? rsiVal > 50 : true;
+  const rsiBearish = rsiVal !== undefined && rsiVal !== null ? rsiVal < 50 : true;
+  const vwapBullish = vwapStatus ? vwapStatus === 'Above' : true;
+  const vwapBearish = vwapStatus ? vwapStatus === 'Below' : true;
+
   // Confluence rules:
-  // Very Bullish requires: Bullish Candle + Gann Breakout + RSI > 55 (if RSI present)
-  // Very Bearish requires: Bearish Candle + Gann Breakdown + RSI < 40 (if RSI present)
+  // Very Bullish requires: Bullish Candle + Gann Breakout + RSI > 50 + Above VWAP
+  // Very Bearish requires: Bearish Candle + Gann Breakdown + RSI < 50 + Below VWAP
   if (isBullishCandle) {
-    if (rsiVal !== undefined && rsiVal !== null) {
-      if (gannBreakout && rsiVal > 55) {
-        trend = 'Very Bullish';
-      } else {
-        trend = 'Bullish';
-      }
+    if (gannBreakout && rsiBullish && vwapBullish) {
+      trend = 'Very Bullish';
     } else {
-      if (gannBreakout) {
-        trend = 'Very Bullish';
-      } else {
-        trend = 'Bullish';
-      }
+      trend = 'Bullish';
     }
   } else if (isBearishCandle) {
-    if (rsiVal !== undefined && rsiVal !== null) {
-      if (gannBreakdown && rsiVal < 40) {
-        trend = 'Very Bearish';
-      } else {
-        trend = 'Bearish';
-      }
+    if (gannBreakdown && rsiBearish && vwapBearish) {
+      trend = 'Very Bearish';
     } else {
-      if (gannBreakdown) {
-        trend = 'Very Bearish';
-      } else {
-        trend = 'Bearish';
-      }
+      trend = 'Bearish';
     }
   }
 
@@ -139,6 +142,8 @@ export function calculateGann15Min(openPrice: number, closePrice: number, rsiVal
     trend,
     pctChange,
     gannScore,
-    rsi: rsiVal
+    rsi: rsiVal,
+    vwap: vwapVal,
+    vwapStatus
   };
 }

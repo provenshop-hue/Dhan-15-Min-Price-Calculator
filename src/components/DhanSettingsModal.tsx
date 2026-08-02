@@ -23,6 +23,17 @@ export const DhanSettingsModal: React.FC<DhanSettingsModalProps> = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<{ success: boolean; message: string } | null>(null);
 
+  // Sync state when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setClientId(credentials.clientId || '');
+      setAccessToken(credentials.accessToken || '');
+      setDate(credentials.date || new Date().toISOString().split('T')[0]);
+      setSegment(credentials.segment || 'NSE_EQ');
+      setVerifyStatus(null);
+    }
+  }, [isOpen, credentials]);
+
   if (!isOpen) return null;
 
   const handleTestConnection = async () => {
@@ -158,9 +169,18 @@ export const DhanSettingsModal: React.FC<DhanSettingsModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-blue-600" /> Trading Date
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-blue-600" /> Trading Date
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setDate(new Date().toISOString().split('T')[0])}
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline px-1 py-0.5 rounded bg-blue-50 border border-blue-200/60"
+                >
+                  Set Today
+                </button>
+              </div>
               <input
                 type="date"
                 value={date}

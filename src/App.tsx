@@ -16,10 +16,15 @@ import { Download, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
 export default function App() {
   // Dhan API Credentials State
   const [credentials, setCredentials] = useState<DhanApiCredentials>(() => {
+    const today = new Date().toISOString().split('T')[0];
     const saved = localStorage.getItem('dhan_gann_creds');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return {
+          ...parsed,
+          date: today // Always default to today's date on startup
+        };
       } catch (e) {
         console.error('Failed to parse saved credentials', e);
       }
@@ -27,7 +32,7 @@ export default function App() {
     return {
       clientId: '',
       accessToken: '',
-      date: new Date().toISOString().split('T')[0],
+      date: today,
       segment: 'NSE_EQ',
       isConfigured: false
     };
@@ -223,7 +228,8 @@ export default function App() {
       const openPrice = data.open;
       const closePrice = data.close;
       const rsi = data.rsi;
-      const calc = calculateGann15Min(openPrice, closePrice, rsi);
+      const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
+      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap);
 
       setStocks((prev) =>
         prev.map((s) =>
@@ -237,6 +243,8 @@ export default function App() {
                 lowPrice: data.low,
                 volume: data.volume,
                 rsi: rsi !== undefined ? rsi : s.rsi,
+                vwap: calc.vwap,
+                vwapStatus: calc.vwapStatus,
                 candleTimestamp: data.candleTimestamp,
                 openCalc: calc.openCalc,
                 closeCalc: calc.closeCalc,
@@ -311,7 +319,8 @@ export default function App() {
             const openPrice = data.open;
             const closePrice = data.close;
             const rsi = data.rsi;
-            const calc = calculateGann15Min(openPrice, closePrice, rsi);
+            const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
+            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap);
 
             setStocks((prev) =>
               prev.map((s) =>
@@ -325,6 +334,8 @@ export default function App() {
                       lowPrice: data.low,
                       volume: data.volume,
                       rsi: rsi !== undefined ? rsi : s.rsi,
+                      vwap: calc.vwap,
+                      vwapStatus: calc.vwapStatus,
                       candleTimestamp: data.candleTimestamp,
                       openCalc: calc.openCalc,
                       closeCalc: calc.closeCalc,

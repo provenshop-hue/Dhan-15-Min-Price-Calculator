@@ -334,6 +334,26 @@ export function createExpressApp() {
           }
         }
 
+        // Calculate Volume Weighted Average Price (VWAP) across all candles
+        let vwap: number | null = null;
+        if (data.close && data.high && data.low && Array.isArray(data.close) && data.close.length > 0) {
+          let totalTPV = 0;
+          let totalVol = 0;
+          for (let i = 0; i < data.close.length; i++) {
+            const h = Number(data.high[i]) || 0;
+            const l = Number(data.low[i]) || 0;
+            const c = Number(data.close[i]) || 0;
+            const v = Number(data.volume ? data.volume[i] : 0) || 0;
+            const tp = (h + l + c) / 3;
+            const volWeight = v > 0 ? v : 1;
+            totalTPV += tp * volWeight;
+            totalVol += volWeight;
+          }
+          if (totalVol > 0) {
+            vwap = Math.round((totalTPV / totalVol) * 100) / 100;
+          }
+        }
+
         return res.json({
           success: true,
           symbol,
@@ -346,6 +366,7 @@ export function createExpressApp() {
           low: first15MinLow,
           volume: first15MinVol,
           rsi,
+          vwap,
           totalCandles: openCandles.length
         });
       } else {

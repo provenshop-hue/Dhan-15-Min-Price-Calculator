@@ -27,14 +27,18 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
   const [rsiVal, setRsiVal] = useState<string>(
     existingStock && existingStock.rsi !== undefined && existingStock.rsi !== null ? String(existingStock.rsi) : ''
   );
+  const [vwapInput, setVwapInput] = useState<string>(
+    existingStock && existingStock.vwap !== undefined && existingStock.vwap !== null ? String(existingStock.vwap) : ''
+  );
 
   if (!isOpen) return null;
 
   const numOpen = parseFloat(openPrice) || 0;
   const numClose = parseFloat(closePrice) || 0;
   const numRsi = rsiVal ? parseFloat(rsiVal) : null;
+  const numVwap = vwapInput ? parseFloat(vwapInput) : null;
 
-  const calc = calculateGann15Min(numOpen, numClose, numRsi);
+  const calc = calculateGann15Min(numOpen, numClose, numRsi, numVwap);
 
   const handleSave = () => {
     if (numOpen <= 0 || numClose <= 0) return;
@@ -59,6 +63,8 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
       pctChange: calc.pctChange,
       gannScore: calc.gannScore,
       rsi: numRsi,
+      vwap: calc.vwap,
+      vwapStatus: calc.vwapStatus,
       isFetched: true,
       isManual: true,
       candleTimestamp: '15-min Candle (Manual)'
@@ -120,7 +126,7 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 pt-1">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
               <label className="block text-xs font-bold text-blue-700 mb-1">
                 15-Min Open (₹)
@@ -160,6 +166,20 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
                 onChange={(e) => setRsiVal(e.target.value)}
                 placeholder="e.g. 58.5"
                 className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-900 outline-none shadow-2xs"
+              />
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <label className="block text-xs font-bold text-emerald-700 mb-1">
+                VWAP (Optional)
+              </label>
+              <input
+                type="number"
+                step="0.05"
+                value={vwapInput}
+                onChange={(e) => setVwapInput(e.target.value)}
+                placeholder="e.g. 2960.00"
+                className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-sm font-mono font-bold text-slate-900 outline-none shadow-2xs"
               />
             </div>
           </div>

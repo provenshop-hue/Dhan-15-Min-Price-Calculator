@@ -145,6 +145,14 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => onDateChange(e.target.value)}
                 className="bg-transparent text-slate-900 font-bold outline-none cursor-pointer text-[11px]"
               />
+              <button
+                type="button"
+                onClick={() => onDateChange(new Date().toISOString().split('T')[0])}
+                className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-100/70 hover:bg-blue-100 px-1.5 py-0.2 rounded transition-colors"
+                title="Reset to Today's Date"
+              >
+                Today
+              </button>
             </div>
           </div>
         </div>

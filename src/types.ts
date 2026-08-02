@@ -30,6 +30,8 @@ export interface StockCalculated {
   pctChange?: number | null;
   gannScore?: number | null;
   rsi?: number | null;
+  vwap?: number | null;
+  vwapStatus?: 'Above' | 'Below' | 'At' | null;
 
   // Fetch status
   isFetched?: boolean;
@@ -59,4 +61,6 @@ export interface GannCalcResult {
   pctChange: number;
   gannScore: number;
   rsi?: number | null;
+  vwap?: number | null;
+  vwapStatus?: 'Above' | 'Below' | 'At' | null;
 }

@@ -396,6 +396,21 @@ export const StockTable: React.FC<StockTableProps> = ({
                             RSI: {stock.rsi.toFixed(1)}
                           </span>
                         )}
+
+                        {stock.vwapStatus && (
+                          <span
+                            className={`text-[10px] font-extrabold px-2 py-0.2 rounded border flex items-center gap-1 ${
+                              stock.vwapStatus === 'Above'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300/80'
+                                : stock.vwapStatus === 'Below'
+                                ? 'bg-rose-50 text-rose-800 border-rose-300/80'
+                                : 'bg-slate-100 text-slate-700 border-slate-300'
+                            }`}
+                            title={stock.vwap ? `VWAP Level: ₹${stock.vwap.toFixed(2)}` : 'VWAP Status'}
+                          >
+                            <span>VWAP: {stock.vwapStatus === 'Above' ? 'Above ▲' : stock.vwapStatus === 'Below' ? 'Below ▼' : 'At ='}</span>
+                          </span>
+                        )}
                       </div>
                     </td>
 
