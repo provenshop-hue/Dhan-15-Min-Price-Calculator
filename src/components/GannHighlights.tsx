@@ -92,7 +92,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
             className="flex items-center space-x-1.5 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-amber-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
           >
             <Percent className="w-3.5 h-3.5 text-amber-400" />
-            <span>Fib 38.2% Retrace ({fibRetraceStocks.length})</span>
+            <span>Fib 38.2% Retraced Yes ({fibRetraceStocks.length})</span>
           </button>
 
           <button

@@ -171,6 +171,7 @@ export default function App() {
           fib382Bull: calc.fib382Bull,
           fib382Bear: calc.fib382Bear,
           fibPullbackPct: calc.fibPullbackPct,
+          fibStatus: calc.fibStatus,
           isFib382Retrace: calc.isFib382Retrace,
           isFetched: true
         };
@@ -302,6 +303,7 @@ export default function App() {
                 fib382Bull: calc.fib382Bull,
                 fib382Bear: calc.fib382Bear,
                 fibPullbackPct: calc.fibPullbackPct,
+                fibStatus: calc.fibStatus,
                 isFib382Retrace: calc.isFib382Retrace,
                 isFetched: true,
                 isLoading: false,
@@ -401,6 +403,7 @@ export default function App() {
                       fib382Bull: calc.fib382Bull,
                       fib382Bear: calc.fib382Bear,
                       fibPullbackPct: calc.fibPullbackPct,
+                      fibStatus: calc.fibStatus,
                       isFib382Retrace: calc.isFib382Retrace,
                       isFetched: true,
                       isLoading: false,

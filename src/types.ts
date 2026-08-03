@@ -43,6 +43,7 @@ export interface StockCalculated {
   fib382Bull?: number | null;
   fib382Bear?: number | null;
   fibPullbackPct?: number | null;
+  fibStatus?: 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement' | null;
   isFib382Retrace?: boolean;
 
   // Fetch status
@@ -93,5 +94,6 @@ export interface GannCalcResult {
   fib382Bull?: number | null;
   fib382Bear?: number | null;
   fibPullbackPct?: number | null;
+  fibStatus?: 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement' | null;
   isFib382Retrace?: boolean;
 }

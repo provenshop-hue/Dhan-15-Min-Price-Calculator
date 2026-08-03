@@ -61,6 +61,8 @@ export function isOpenHighPattern(openPrice?: number | null, highPrice?: number 
   return diffPct <= tolerancePct;
 }
 
+export type Fib382Status = 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement';
+
 export interface Fib382Result {
   range: number;
   fib382Bull: number; // 38.2% Fibonacci support from High = High - 0.382 * (High - Low)
@@ -69,13 +71,14 @@ export interface Fib382Result {
   fib382Bear: number; // 38.2% Fibonacci resistance from Low = Low + 0.382 * (High - Low)
   pullbackPctFromHigh: number; // ((High - CMP) / Range) * 100
   bouncePctFromLow: number;    // ((CMP - Low) / Range) * 100
-  isFib382Retraced: boolean;   // True if CMP has retraced at least 38.2% from High or Low
+  fibStatus: Fib382Status;     // 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement'
+  isFib382Retraced: boolean;   // True if fibStatus === 'Retraced Yes'
   isBullish382Retrace: boolean;// Retraced between 38.2% and 75% from High (classic healthy pullback)
   isBearish382Retrace: boolean;// Bounced between 38.2% and 75% from Low
 }
 
 /**
- * Calculates Fibonacci Retracement levels (38.2%, 50%, 61.8%) and retracement status
+ * Calculates Fibonacci Retracement levels (38.2%, 50%, 61.8%) and 3-state retracement status
  */
 export function calculateFibonacci382(
   highPrice?: number | null,
@@ -94,12 +97,27 @@ export function calculateFibonacci382(
   const pullbackPctFromHigh = Math.round(((highPrice - closePrice) / range) * 1000) / 10;
   const bouncePctFromLow = Math.round(((closePrice - lowPrice) / range) * 1000) / 10;
 
-  // Stock has retraced after 38.2% Fibonacci if:
-  // - Pullback from High is >= 38.2% (e.g., between 38.2% and 75%), OR
-  // - Bounce from Low is >= 38.2%
+  // Determine Fibonacci 38.2% Reversal Status:
+  // - "Approaching 38.2%": if price has not reached 38.2% level yet (lowPrice > fib382Bull)
+  // - "Retraced Yes": if price touched 38.2% level and returned back above it (lowPrice <= fib382Bull && closePrice >= fib382Bull)
+  // - "No Retracement": if price crossed past 38.2% level without returning back (closePrice < fib382Bull)
+  let fibStatus: Fib382Status = 'Approaching 38.2%';
+
+  if (lowPrice <= fib382Bull && closePrice >= fib382Bull) {
+    fibStatus = 'Retraced Yes';
+  } else if (closePrice < fib382Bull) {
+    fibStatus = 'No Retracement';
+  } else {
+    fibStatus = 'Approaching 38.2%';
+  }
+
+  if (highPrice >= fib382Bear && closePrice <= fib382Bear && fibStatus !== 'Retraced Yes') {
+    fibStatus = 'Retraced Yes';
+  }
+
+  const isFib382Retraced = fibStatus === 'Retraced Yes';
   const isBullish382Retrace = pullbackPctFromHigh >= 38.2 && pullbackPctFromHigh <= 75.0;
   const isBearish382Retrace = bouncePctFromLow >= 38.2 && bouncePctFromLow <= 75.0;
-  const isFib382Retraced = pullbackPctFromHigh >= 38.2 || bouncePctFromLow >= 38.2;
 
   return {
     range,
@@ -109,6 +127,7 @@ export function calculateFibonacci382(
     fib382Bear: Math.round(fib382Bear * 100) / 100,
     pullbackPctFromHigh,
     bouncePctFromLow,
+    fibStatus,
     isFib382Retraced,
     isBullish382Retrace,
     isBearish382Retrace,
@@ -246,6 +265,7 @@ export function calculateGann15Min(
     fib382Bull: fibData?.fib382Bull ?? null,
     fib382Bear: fibData?.fib382Bear ?? null,
     fibPullbackPct: fibData?.pullbackPctFromHigh ?? null,
+    fibStatus: fibData?.fibStatus ?? null,
     isFib382Retrace: fibData?.isFib382Retraced ?? false,
   };
 }

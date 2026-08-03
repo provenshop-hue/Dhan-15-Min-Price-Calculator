@@ -310,13 +310,17 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
                 <div className="text-xs font-extrabold uppercase text-amber-900 flex items-center gap-1.5">
                   <Percent className="w-4 h-4 text-amber-600" /> Fibonacci Retracement Levels
                 </div>
-                {fibData.isFib382Retraced ? (
-                  <span className="text-[10px] font-black text-amber-900 bg-amber-200/90 px-2.5 py-0.5 rounded-full border border-amber-300 shadow-2xs">
-                    ★ 38.2%+ FIB RETRACED ({fibData.pullbackPctFromHigh}% Pullback)
+                {fibData.fibStatus === 'Retraced Yes' ? (
+                  <span className="text-[10px] font-black text-amber-950 bg-amber-200/90 px-2.5 py-0.5 rounded-full border border-amber-300 shadow-2xs">
+                    ★ RETRACED: YES (Touched & Returned Back)
+                  </span>
+                ) : fibData.fibStatus === 'Approaching 38.2%' ? (
+                  <span className="text-[10px] font-extrabold text-sky-900 bg-sky-100 px-2.5 py-0.5 rounded-full border border-sky-300">
+                    APPROACHING 38.2% (Has Not Reached Level)
                   </span>
                 ) : (
-                  <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                    Pullback: {fibData.pullbackPctFromHigh}% from High
+                  <span className="text-[10px] font-bold text-rose-800 bg-rose-100 px-2.5 py-0.5 rounded-full border border-rose-300">
+                    NO RETRACEMENT (Crossed 38.2%)
                   </span>
                 )}
               </div>

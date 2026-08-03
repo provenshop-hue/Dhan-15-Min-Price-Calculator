@@ -553,14 +553,22 @@ export const StockTable: React.FC<StockTableProps> = ({
                         {(() => {
                           const cmp = stock.closePrice || stock.openPrice || 0;
                           const fibData = calculateFibonacci382(stock.highPrice, stock.lowPrice, cmp);
-                          if (!fibData || !fibData.isFib382Retraced) return null;
+                          const status = stock.fibStatus || fibData?.fibStatus;
+                          if (!status || !fibData) return null;
+
                           return (
                             <span
-                              className="text-[10px] font-black px-2 py-0.5 rounded border bg-amber-50 text-amber-900 border-amber-300 flex items-center gap-1 shadow-2xs"
-                              title={`Fib 38.2% Support: ₹${fibData.fib382Bull} | Pullback: ${fibData.pullbackPctFromHigh}% from High`}
+                              className={`text-[10px] font-extrabold px-2 py-0.2 rounded border flex items-center gap-1 shadow-2xs ${
+                                status === 'Retraced Yes'
+                                  ? 'bg-amber-100 text-amber-950 border-amber-400'
+                                  : status === 'Approaching 38.2%'
+                                  ? 'bg-sky-50 text-sky-900 border-sky-300'
+                                  : 'bg-rose-50 text-rose-800 border-rose-200'
+                              }`}
+                              title={`Fib 38.2% Level: ₹${fibData.fib382Bull} | Reversal Status: ${status}`}
                             >
-                              <Percent className="w-3 h-3 text-amber-600" />
-                              <span>Fib 38.2% ({fibData.pullbackPctFromHigh}%)</span>
+                              <Percent className="w-3 h-3 text-amber-700" />
+                              <span>{status === 'Retraced Yes' ? '★ Retraced: Yes' : status === 'Approaching 38.2%' ? 'Approaching 38.2%' : 'No Retracement'}</span>
                             </span>
                           );
                         })()}
