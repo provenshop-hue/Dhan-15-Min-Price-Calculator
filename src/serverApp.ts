@@ -255,161 +255,143 @@ export function createExpressApp() {
         };
         const getISTTime = getISTDateTime;
 
-        // Find exact first 15-minute candle (09:15 AM IST) for the target foundDate
-        if (timestamps && Array.isArray(timestamps) && timestamps.length > 0) {
-          let exactTargetDate915Idx = -1;
-          let targetDate930Idx = -1;
-          let targetDateEarliestIdx = -1;
-          let targetDateMinDiff = Infinity;
+        // Parse all returned candles into structured objects
+        const candlesList: Array<{
+          idx: number;
+          open: number;
+          high: number;
+          low: number;
+          close: number;
+          volume: number;
+          dateStr: string;
+          hours: number;
+          minutes: number;
+          timeStr: string;
+        }> = [];
 
-          let fallback915Idx = -1;
-          let fallbackEarliestIdx = -1;
+        if (openCandles && Array.isArray(openCandles)) {
+          for (let i = 0; i < openCandles.length; i++) {
+            const rawO = Number(data.open?.[i]) || 0;
+            const rawH = Number(data.high?.[i]) || 0;
+            const rawL = Number(data.low?.[i]) || 0;
+            const rawC = Number(data.close?.[i]) || 0;
+            const rawV = Number(data.volume?.[i]) || 0;
+            const rawTs = timestamps?.[i];
 
-          for (let i = 0; i < timestamps.length; i++) {
-            const parsed = getISTDateTime(timestamps[i]);
+            const parsed = getISTDateTime(rawTs);
+            let timeStr = '09:15 AM';
+            let dateStr = '';
+            let hours = 9;
+            let minutes = 15;
+
             if (parsed) {
-              const { dateStr, hours, minutes } = parsed;
-
-              // Check if date matches target foundDate
-              const isTargetDate = !dateStr || dateStr === foundDate;
-
-              if (isTargetDate) {
-                if (hours === 9 && minutes === 15) {
-                  exactTargetDate915Idx = i;
-                  break; // Found exact 09:15 AM on target date!
-                }
-                if (hours === 9 && minutes === 30 && targetDate930Idx === -1) {
-                  targetDate930Idx = i;
-                }
-                if (hours === 9 && minutes >= 15 && minutes <= 45) {
-                  const diff = Math.abs(minutes - 15);
-                  if (diff < targetDateMinDiff) {
-                    targetDateMinDiff = diff;
-                    targetDateEarliestIdx = i;
-                  }
-                }
-              }
-
-              // General fallbacks across entire timestamp array if target date isn't explicitly matched
-              if (hours === 9 && minutes === 15 && fallback915Idx === -1) {
-                fallback915Idx = i;
-              }
-              if (hours === 9 && minutes >= 15 && minutes <= 45 && fallbackEarliestIdx === -1) {
-                fallbackEarliestIdx = i;
-              }
+              dateStr = parsed.dateStr;
+              hours = parsed.hours;
+              minutes = parsed.minutes;
+              const ampm = hours >= 12 ? 'PM' : 'AM';
+              const displayH = hours % 12 === 0 ? 12 : hours % 12;
+              const displayM = minutes < 10 ? `0${minutes}` : minutes;
+              timeStr = `${displayH}:${displayM} ${ampm}`;
             }
-          }
 
-          if (exactTargetDate915Idx !== -1) {
-            candleIdx = exactTargetDate915Idx;
-          } else if (targetDateEarliestIdx !== -1) {
-            candleIdx = targetDateEarliestIdx;
-          } else if (targetDate930Idx !== -1) {
-            candleIdx = targetDate930Idx;
-          } else if (fallback915Idx !== -1) {
-            candleIdx = fallback915Idx;
-          } else if (fallbackEarliestIdx !== -1) {
-            candleIdx = fallbackEarliestIdx;
-          } else {
-            candleIdx = 0;
-          }
-        }
-
-        const rawOpen = Number(data.open[candleIdx]);
-        const rawClose = Number(data.close[candleIdx]);
-        const rawHigh = Number(data.high[candleIdx]);
-        const rawLow = Number(data.low[candleIdx]);
-        const rawVol = Number(data.volume ? data.volume[candleIdx] : 0);
-
-        const first15MinOpen = Math.round(rawOpen * 100) / 100;
-        const first15MinClose = Math.round(rawClose * 100) / 100;
-        const first15MinHigh = Math.round(rawHigh * 100) / 100;
-        const first15MinLow = Math.round(rawLow * 100) / 100;
-        const first15MinVol = Math.round(rawVol);
-
-        let timeStr = '09:15 AM';
-        if (timestamps && timestamps[candleIdx]) {
-          const parsed = getISTTime(timestamps[candleIdx]);
-          if (parsed) {
-            const h = parsed.hours;
-            const m = parsed.minutes;
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            const displayH = h % 12 === 0 ? 12 : h % 12;
-            const displayM = m < 10 ? `0${m}` : m;
-            timeStr = `${displayH}:${displayM} ${ampm}`;
+            candlesList.push({
+              idx: i,
+              open: Math.round(rawO * 100) / 100,
+              high: Math.round(rawH * 100) / 100,
+              low: Math.round(rawL * 100) / 100,
+              close: Math.round(rawC * 100) / 100,
+              volume: Math.round(rawV),
+              dateStr,
+              hours,
+              minutes,
+              timeStr
+            });
           }
         }
 
-        const candleTimestamp = `${foundDate} ${timeStr} (15m)`;
+        // Target session candles for foundDate
+        const targetSessionCandles = candlesList.filter((c) => !c.dateStr || c.dateStr === foundDate);
+        const sessionCandles = targetSessionCandles.length > 0 ? targetSessionCandles : candlesList;
 
-        // Calculate 14-period RSI from the historical candle close prices
-        let rsi: number | null = null;
-        if (data.close && Array.isArray(data.close) && data.close.length >= 2) {
-          const numCloses = data.close.map(Number).filter((n: any) => !isNaN(Number(n)) && Number(n) > 0);
-          if (numCloses.length >= 2) {
-            const period = Math.min(14, numCloses.length - 1);
-            if (period >= 1) {
-              let gains = 0, losses = 0;
-              for (let i = 1; i <= period; i++) {
-                const diff = numCloses[i] - numCloses[i - 1];
-                if (diff >= 0) gains += diff;
-                else losses += Math.abs(diff);
-              }
-              let avgGain = gains / period;
-              let avgLoss = losses / period;
-              for (let i = period + 1; i < numCloses.length; i++) {
-                const diff = numCloses[i] - numCloses[i - 1];
-                const gain = diff >= 0 ? diff : 0;
-                const loss = diff < 0 ? Math.abs(diff) : 0;
-                avgGain = (avgGain * (period - 1) + gain) / period;
-                avgLoss = (avgLoss * (period - 1) + loss) / period;
-              }
-              if (avgLoss === 0) {
-                rsi = avgGain === 0 ? 50 : 100;
-              } else {
-                rsi = Math.round((100 - (100 / (1 + (avgGain / avgLoss)))) * 100) / 100;
-              }
-            }
-          }
+        // First 15-minute candle (09:15 AM IST) for Gann base open calculation
+        let first15m = sessionCandles.find((c) => c.hours === 9 && c.minutes === 15);
+        if (!first15m) {
+          first15m = sessionCandles.find((c) => c.hours === 9 && c.minutes >= 15 && c.minutes <= 45);
+        }
+        if (!first15m && sessionCandles.length > 0) {
+          first15m = sessionCandles[0];
         }
 
-        // Extract session metrics for foundDate (day high, day low, latest close, intraday VWAP)
+        const first15MinOpen = first15m ? first15m.open : (sessionCandles[0]?.open || 0);
+        const first15MinClose = first15m ? first15m.close : (sessionCandles[0]?.close || 0);
+        const first15MinHigh = first15m ? first15m.high : (sessionCandles[0]?.high || 0);
+        const first15MinLow = first15m ? first15m.low : (sessionCandles[0]?.low || 0);
+        const first15MinVol = first15m ? first15m.volume : (sessionCandles[0]?.volume || 0);
+
+        // Latest candle in current session (e.g., 11:00 AM candle when refreshed at 11 AM)
+        const latestCandle = sessionCandles[sessionCandles.length - 1] || candlesList[candlesList.length - 1];
+
+        // Session high, low, VWAP accumulated up to latestCandle
         let sessionHigh = -Infinity;
         let sessionLow = Infinity;
-        let sessionLatestClose = first15MinClose;
         let sessionTotalTPV = 0;
         let sessionTotalVol = 0;
 
-        if (data.close && Array.isArray(data.close) && data.close.length > 0) {
-          for (let i = 0; i < data.close.length; i++) {
-            const parsed = getISTDateTime(timestamps ? timestamps[i] : null);
-            const isTargetSession = !parsed?.dateStr || parsed.dateStr === foundDate;
+        for (const c of sessionCandles) {
+          if (c.high > sessionHigh) sessionHigh = c.high;
+          if (c.low > 0 && c.low < sessionLow) sessionLow = c.low;
 
-            if (isTargetSession) {
-              const h = Number(data.high[i]) || 0;
-              const l = Number(data.low[i]) || 0;
-              const c = Number(data.close[i]) || 0;
-              const v = Number(data.volume ? data.volume[i] : 0) || 0;
+          const tp = (c.high + c.low + c.close) / 3;
+          const v = c.volume > 0 ? c.volume : 1;
+          sessionTotalTPV += tp * v;
+          sessionTotalVol += v;
+        }
 
-              if (h > 0 && h > sessionHigh) sessionHigh = h;
-              if (l > 0 && l < sessionLow) sessionLow = l;
-              if (c > 0) sessionLatestClose = c;
+        if (sessionHigh === -Infinity || isNaN(sessionHigh)) sessionHigh = Math.max(first15MinHigh, latestCandle?.high || 0);
+        if (sessionLow === Infinity || isNaN(sessionLow)) sessionLow = Math.min(first15MinLow, latestCandle?.low || 0);
 
-              const tp = (h + l + c) / 3;
-              const volWeight = v > 0 ? v : 1;
-              sessionTotalTPV += tp * volWeight;
-              sessionTotalVol += volWeight;
+        const sessionVWAP = sessionTotalVol > 0 ? Math.round((sessionTotalTPV / sessionTotalVol) * 100) / 100 : null;
+        const effectiveClose = latestCandle ? latestCandle.close : first15MinClose;
+        const latestTimeStr = latestCandle ? latestCandle.timeStr : '09:15 AM';
+
+        // 14-period RSI calculated up to the latest candle
+        let rsi: number | null = null;
+        const allClosesUpToLatest = candlesList
+          .slice(0, (latestCandle?.idx ?? candlesList.length - 1) + 1)
+          .map((c) => c.close)
+          .filter((c) => c > 0);
+
+        if (allClosesUpToLatest.length >= 2) {
+          const period = Math.min(14, allClosesUpToLatest.length - 1);
+          if (period >= 1) {
+            let gains = 0, losses = 0;
+            for (let i = 1; i <= period; i++) {
+              const diff = allClosesUpToLatest[i] - allClosesUpToLatest[i - 1];
+              if (diff >= 0) gains += diff;
+              else losses += Math.abs(diff);
+            }
+            let avgGain = gains / period;
+            let avgLoss = losses / period;
+
+            for (let i = period + 1; i < allClosesUpToLatest.length; i++) {
+              const diff = allClosesUpToLatest[i] - allClosesUpToLatest[i - 1];
+              const gain = diff >= 0 ? diff : 0;
+              const loss = diff < 0 ? Math.abs(diff) : 0;
+              avgGain = (avgGain * (period - 1) + gain) / period;
+              avgLoss = (avgLoss * (period - 1) + loss) / period;
+            }
+
+            if (avgLoss === 0) {
+              rsi = avgGain === 0 ? 50 : 100;
+            } else {
+              rsi = Math.round((100 - (100 / (1 + (avgGain / avgLoss)))) * 100) / 100;
             }
           }
         }
 
-        if (sessionHigh === -Infinity || isNaN(sessionHigh)) sessionHigh = first15MinHigh;
-        if (sessionLow === Infinity || isNaN(sessionLow)) sessionLow = first15MinLow;
-
-        const sessionVWAP = sessionTotalVol > 0 ? Math.round((sessionTotalTPV / sessionTotalVol) * 100) / 100 : null;
-        const effectiveHigh = Math.max(sessionHigh, first15MinHigh);
-        const effectiveLow = sessionLow > 0 ? Math.min(sessionLow, first15MinLow) : first15MinLow;
-        const effectiveClose = sessionLatestClose || first15MinClose;
+        const candleTimestamp = latestTimeStr !== '09:15 AM'
+          ? `${foundDate} ${latestTimeStr} (Live | 15m)`
+          : `${foundDate} 09:15 AM (15m)`;
 
         return res.json({
           success: true,
@@ -419,8 +401,8 @@ export function createExpressApp() {
           fetchedDate: foundDate,
           open: first15MinOpen,
           close: Math.round(effectiveClose * 100) / 100,
-          high: Math.round(effectiveHigh * 100) / 100,
-          low: Math.round(effectiveLow * 100) / 100,
+          high: Math.round(sessionHigh * 100) / 100,
+          low: Math.round(sessionLow * 100) / 100,
           volume: first15MinVol,
           rsi,
           vwap: sessionVWAP,
