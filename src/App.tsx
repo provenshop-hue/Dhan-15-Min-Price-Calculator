@@ -165,6 +165,13 @@ export default function App() {
           isOpenEqualHigh: calc.isOpenEqualHigh,
           openLowDiffPct: calc.openLowDiffPct,
           openHighDiffPct: calc.openHighDiffPct,
+          rsi: calc.rsi ?? s.rsi ?? null,
+          vwap: calc.vwap,
+          vwapStatus: calc.vwapStatus,
+          fib382Bull: calc.fib382Bull,
+          fib382Bear: calc.fib382Bear,
+          fibPullbackPct: calc.fibPullbackPct,
+          isFib382Retrace: calc.isFib382Retrace,
           isFetched: true
         };
       })
@@ -275,7 +282,7 @@ export default function App() {
                 highPrice: data.high,
                 lowPrice: data.low,
                 volume: data.volume,
-                rsi: rsi !== undefined ? rsi : s.rsi,
+                rsi: rsi !== undefined && rsi !== null ? rsi : (s.rsi ?? null),
                 vwap: calc.vwap,
                 vwapStatus: calc.vwapStatus,
                 candleTimestamp: data.candleTimestamp,
@@ -292,6 +299,10 @@ export default function App() {
                 isOpenEqualHigh: calc.isOpenEqualHigh,
                 openLowDiffPct: calc.openLowDiffPct,
                 openHighDiffPct: calc.openHighDiffPct,
+                fib382Bull: calc.fib382Bull,
+                fib382Bear: calc.fib382Bear,
+                fibPullbackPct: calc.fibPullbackPct,
+                isFib382Retrace: calc.isFib382Retrace,
                 isFetched: true,
                 isLoading: false,
                 error: null
@@ -370,7 +381,7 @@ export default function App() {
                       highPrice: data.high,
                       lowPrice: data.low,
                       volume: data.volume,
-                      rsi: rsi !== undefined ? rsi : s.rsi,
+                      rsi: rsi !== undefined && rsi !== null ? rsi : (s.rsi ?? null),
                       vwap: calc.vwap,
                       vwapStatus: calc.vwapStatus,
                       candleTimestamp: data.candleTimestamp,
@@ -387,6 +398,10 @@ export default function App() {
                       isOpenEqualHigh: calc.isOpenEqualHigh,
                       openLowDiffPct: calc.openLowDiffPct,
                       openHighDiffPct: calc.openHighDiffPct,
+                      fib382Bull: calc.fib382Bull,
+                      fib382Bear: calc.fib382Bear,
+                      fibPullbackPct: calc.fibPullbackPct,
+                      isFib382Retrace: calc.isFib382Retrace,
                       isFetched: true,
                       isLoading: false,
                       error: null

@@ -39,6 +39,12 @@ export interface StockCalculated {
   openLowDiffPct?: number | null;
   openHighDiffPct?: number | null;
 
+  // Fibonacci 38.2% Retracement
+  fib382Bull?: number | null;
+  fib382Bear?: number | null;
+  fibPullbackPct?: number | null;
+  isFib382Retrace?: boolean;
+
   // Fetch status
   isFetched?: boolean;
   isLoading?: boolean;
@@ -54,6 +60,7 @@ export type TrendFilterType =
   | 'BEARISH'
   | 'OPEN_LOW'
   | 'OPEN_HIGH'
+  | 'FIB_382_RETRACE'
   | 'CALCULATED';
 
 export interface DhanApiCredentials {
@@ -83,4 +90,8 @@ export interface GannCalcResult {
   isOpenEqualHigh?: boolean;
   openLowDiffPct?: number | null;
   openHighDiffPct?: number | null;
+  fib382Bull?: number | null;
+  fib382Bear?: number | null;
+  fibPullbackPct?: number | null;
+  isFib382Retrace?: boolean;
 }

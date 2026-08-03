@@ -1,7 +1,7 @@
 import { GannCalcResult } from '../types';
 
 /**
- * Calculates Relative Strength Index (RSI) for a array of closing prices
+ * Calculates Relative Strength Index (RSI) for an array of closing prices using Wilder's Smoothing method
  */
 export function calculateRSI(closes: number[], period: number = 14): number | null {
   if (!closes || !Array.isArray(closes) || closes.length < 2) return null;
@@ -9,6 +9,8 @@ export function calculateRSI(closes: number[], period: number = 14): number | nu
   if (numCloses.length < 2) return null;
 
   const N = Math.min(period, numCloses.length - 1);
+  if (N < 1) return null;
+
   let gains = 0;
   let losses = 0;
 
@@ -30,7 +32,10 @@ export function calculateRSI(closes: number[], period: number = 14): number | nu
     avgLoss = (avgLoss * (N - 1) + loss) / N;
   }
 
-  if (avgLoss === 0) return 100;
+  if (avgLoss === 0) {
+    return avgGain === 0 ? 50 : 100;
+  }
+
   const rs = avgGain / avgLoss;
   const rsi = 100 - (100 / (1 + rs));
   return Math.round(rsi * 100) / 100;
@@ -54,6 +59,60 @@ export function isOpenHighPattern(openPrice?: number | null, highPrice?: number 
   if (openPrice === highPrice) return true;
   const diffPct = Math.abs(openPrice - highPrice) / openPrice;
   return diffPct <= tolerancePct;
+}
+
+export interface Fib382Result {
+  range: number;
+  fib382Bull: number; // 38.2% Fibonacci support from High = High - 0.382 * (High - Low)
+  fib500Bull: number; // 50.0% Fibonacci support from High = High - 0.500 * (High - Low)
+  fib618Bull: number; // 61.8% Fibonacci support from High = High - 0.618 * (High - Low)
+  fib382Bear: number; // 38.2% Fibonacci resistance from Low = Low + 0.382 * (High - Low)
+  pullbackPctFromHigh: number; // ((High - CMP) / Range) * 100
+  bouncePctFromLow: number;    // ((CMP - Low) / Range) * 100
+  isFib382Retraced: boolean;   // True if CMP has retraced at least 38.2% from High or Low
+  isBullish382Retrace: boolean;// Retraced between 38.2% and 75% from High (classic healthy pullback)
+  isBearish382Retrace: boolean;// Bounced between 38.2% and 75% from Low
+}
+
+/**
+ * Calculates Fibonacci Retracement levels (38.2%, 50%, 61.8%) and retracement status
+ */
+export function calculateFibonacci382(
+  highPrice?: number | null,
+  lowPrice?: number | null,
+  closePrice?: number | null
+): Fib382Result | null {
+  if (!highPrice || !lowPrice || !closePrice || highPrice <= 0 || lowPrice <= 0 || closePrice <= 0) return null;
+  const range = highPrice - lowPrice;
+  if (range <= 0) return null;
+
+  const fib382Bull = highPrice - (0.382 * range);
+  const fib500Bull = highPrice - (0.500 * range);
+  const fib618Bull = highPrice - (0.618 * range);
+  const fib382Bear = lowPrice + (0.382 * range);
+
+  const pullbackPctFromHigh = Math.round(((highPrice - closePrice) / range) * 1000) / 10;
+  const bouncePctFromLow = Math.round(((closePrice - lowPrice) / range) * 1000) / 10;
+
+  // Stock has retraced after 38.2% Fibonacci if:
+  // - Pullback from High is >= 38.2% (e.g., between 38.2% and 75%), OR
+  // - Bounce from Low is >= 38.2%
+  const isBullish382Retrace = pullbackPctFromHigh >= 38.2 && pullbackPctFromHigh <= 75.0;
+  const isBearish382Retrace = bouncePctFromLow >= 38.2 && bouncePctFromLow <= 75.0;
+  const isFib382Retraced = pullbackPctFromHigh >= 38.2 || bouncePctFromLow >= 38.2;
+
+  return {
+    range,
+    fib382Bull: Math.round(fib382Bull * 100) / 100,
+    fib500Bull: Math.round(fib500Bull * 100) / 100,
+    fib618Bull: Math.round(fib618Bull * 100) / 100,
+    fib382Bear: Math.round(fib382Bear * 100) / 100,
+    pullbackPctFromHigh,
+    bouncePctFromLow,
+    isFib382Retraced,
+    isBullish382Retrace,
+    isBearish382Retrace,
+  };
 }
 
 /**
@@ -163,6 +222,8 @@ export function calculateGann15Min(
 
   const gannScore = pctChange;
 
+  const fibData = calculateFibonacci382(highPrice, lowPrice, closePrice);
+
   return {
     matchOpenPrice: openPrice,
     matchClosePrice: closePrice,
@@ -181,7 +242,11 @@ export function calculateGann15Min(
     isOpenEqualLow,
     isOpenEqualHigh,
     openLowDiffPct,
-    openHighDiffPct
+    openHighDiffPct,
+    fib382Bull: fibData?.fib382Bull ?? null,
+    fib382Bear: fibData?.fib382Bear ?? null,
+    fibPullbackPct: fibData?.pullbackPctFromHigh ?? null,
+    isFib382Retrace: fibData?.isFib382Retraced ?? false,
   };
 }
 

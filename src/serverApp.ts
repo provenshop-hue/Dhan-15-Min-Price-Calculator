@@ -47,9 +47,25 @@ export function createExpressApp() {
 
       const targetDate = date || new Date().toISOString().split('T')[0];
 
-      // Helper function to query Dhan Intraday Chart API for a specific YYYY-MM-DD date in Spot Equity segment
+      // Helper function to query Dhan Intraday Chart API for a date range in Spot Equity segment
       async function fetchDhanCandles(queryDate: string) {
-        const payloadDateOnly = {
+        // Calculate 10 calendar days back from queryDate to ensure sufficient 15-min candles for 14-period RSI
+        const targetDt = new Date(queryDate);
+        const fromDt = new Date(targetDt);
+        fromDt.setDate(fromDt.getDate() - 10);
+        const fromDateStr = fromDt.toISOString().split('T')[0];
+
+        const payloadMultiDay = {
+          securityId: String(secId),
+          exchangeSegment: 'NSE_EQ',
+          instrument: 'EQUITY',
+          instrumentType: 'EQUITY',
+          fromDate: fromDateStr,
+          toDate: queryDate,
+          interval: '15'
+        };
+
+        const payloadSingleDay = {
           securityId: String(secId),
           exchangeSegment: 'NSE_EQ',
           instrument: 'EQUITY',
@@ -61,6 +77,7 @@ export function createExpressApp() {
 
         for (let retry = 0; retry < 2; retry++) {
           try {
+            // First attempt: Multi-day range to get ample historical 15m candles for 14-period RSI
             const response = await fetch('https://api.dhan.co/v2/charts/intraday', {
               method: 'POST',
               headers: {
@@ -68,11 +85,9 @@ export function createExpressApp() {
                 'client-id': clientId,
                 'access-token': accessToken,
               },
-              body: JSON.stringify(payloadDateOnly),
+              body: JSON.stringify(payloadMultiDay),
               signal: AbortSignal.timeout(6000)
             });
-
-            const data = await response.json();
 
             // If rate limited (429), wait and retry
             if (response.status === 429) {
@@ -80,13 +95,32 @@ export function createExpressApp() {
               continue;
             }
 
+            const data = await response.json();
+
             if (response.ok && data?.open && Array.isArray(data.open) && data.open.length > 0) {
               return { ok: true, status: response.status, data };
             }
 
-            // Attempt with HH:MM:SS format if no open array
+            // Second attempt: Single day payload if multi-day returned empty
+            const responseSingle = await fetch('https://api.dhan.co/v2/charts/intraday', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'client-id': clientId,
+                'access-token': accessToken,
+              },
+              body: JSON.stringify(payloadSingleDay),
+              signal: AbortSignal.timeout(6000)
+            });
+
+            const dataSingle = await responseSingle.json();
+            if (responseSingle.ok && dataSingle?.open && Array.isArray(dataSingle.open) && dataSingle.open.length > 0) {
+              return { ok: true, status: responseSingle.status, data: dataSingle };
+            }
+
+            // Third attempt: With HH:MM:SS format
             const payloadWithTime = {
-              ...payloadDateOnly,
+              ...payloadSingleDay,
               fromDate: `${queryDate} 09:15:00`,
               toDate: `${queryDate} 15:30:00`
             };
@@ -314,45 +348,68 @@ export function createExpressApp() {
           const numCloses = data.close.map(Number).filter((n: any) => !isNaN(Number(n)) && Number(n) > 0);
           if (numCloses.length >= 2) {
             const period = Math.min(14, numCloses.length - 1);
-            let gains = 0, losses = 0;
-            for (let i = 1; i <= period; i++) {
-              const diff = numCloses[i] - numCloses[i - 1];
-              if (diff >= 0) gains += diff;
-              else losses += Math.abs(diff);
+            if (period >= 1) {
+              let gains = 0, losses = 0;
+              for (let i = 1; i <= period; i++) {
+                const diff = numCloses[i] - numCloses[i - 1];
+                if (diff >= 0) gains += diff;
+                else losses += Math.abs(diff);
+              }
+              let avgGain = gains / period;
+              let avgLoss = losses / period;
+              for (let i = period + 1; i < numCloses.length; i++) {
+                const diff = numCloses[i] - numCloses[i - 1];
+                const gain = diff >= 0 ? diff : 0;
+                const loss = diff < 0 ? Math.abs(diff) : 0;
+                avgGain = (avgGain * (period - 1) + gain) / period;
+                avgLoss = (avgLoss * (period - 1) + loss) / period;
+              }
+              if (avgLoss === 0) {
+                rsi = avgGain === 0 ? 50 : 100;
+              } else {
+                rsi = Math.round((100 - (100 / (1 + (avgGain / avgLoss)))) * 100) / 100;
+              }
             }
-            let avgGain = gains / period;
-            let avgLoss = losses / period;
-            for (let i = period + 1; i < numCloses.length; i++) {
-              const diff = numCloses[i] - numCloses[i - 1];
-              const gain = diff >= 0 ? diff : 0;
-              const loss = diff < 0 ? Math.abs(diff) : 0;
-              avgGain = (avgGain * (period - 1) + gain) / period;
-              avgLoss = (avgLoss * (period - 1) + loss) / period;
-            }
-            if (avgLoss === 0) rsi = 100;
-            else rsi = Math.round((100 - (100 / (1 + (avgGain / avgLoss)))) * 100) / 100;
           }
         }
 
-        // Calculate Volume Weighted Average Price (VWAP) across all candles
-        let vwap: number | null = null;
-        if (data.close && data.high && data.low && Array.isArray(data.close) && data.close.length > 0) {
-          let totalTPV = 0;
-          let totalVol = 0;
+        // Extract session metrics for foundDate (day high, day low, latest close, intraday VWAP)
+        let sessionHigh = -Infinity;
+        let sessionLow = Infinity;
+        let sessionLatestClose = first15MinClose;
+        let sessionTotalTPV = 0;
+        let sessionTotalVol = 0;
+
+        if (data.close && Array.isArray(data.close) && data.close.length > 0) {
           for (let i = 0; i < data.close.length; i++) {
-            const h = Number(data.high[i]) || 0;
-            const l = Number(data.low[i]) || 0;
-            const c = Number(data.close[i]) || 0;
-            const v = Number(data.volume ? data.volume[i] : 0) || 0;
-            const tp = (h + l + c) / 3;
-            const volWeight = v > 0 ? v : 1;
-            totalTPV += tp * volWeight;
-            totalVol += volWeight;
-          }
-          if (totalVol > 0) {
-            vwap = Math.round((totalTPV / totalVol) * 100) / 100;
+            const parsed = getISTDateTime(timestamps ? timestamps[i] : null);
+            const isTargetSession = !parsed?.dateStr || parsed.dateStr === foundDate;
+
+            if (isTargetSession) {
+              const h = Number(data.high[i]) || 0;
+              const l = Number(data.low[i]) || 0;
+              const c = Number(data.close[i]) || 0;
+              const v = Number(data.volume ? data.volume[i] : 0) || 0;
+
+              if (h > 0 && h > sessionHigh) sessionHigh = h;
+              if (l > 0 && l < sessionLow) sessionLow = l;
+              if (c > 0) sessionLatestClose = c;
+
+              const tp = (h + l + c) / 3;
+              const volWeight = v > 0 ? v : 1;
+              sessionTotalTPV += tp * volWeight;
+              sessionTotalVol += volWeight;
+            }
           }
         }
+
+        if (sessionHigh === -Infinity || isNaN(sessionHigh)) sessionHigh = first15MinHigh;
+        if (sessionLow === Infinity || isNaN(sessionLow)) sessionLow = first15MinLow;
+
+        const sessionVWAP = sessionTotalVol > 0 ? Math.round((sessionTotalTPV / sessionTotalVol) * 100) / 100 : null;
+        const effectiveHigh = Math.max(sessionHigh, first15MinHigh);
+        const effectiveLow = sessionLow > 0 ? Math.min(sessionLow, first15MinLow) : first15MinLow;
+        const effectiveClose = sessionLatestClose || first15MinClose;
 
         return res.json({
           success: true,
@@ -361,12 +418,12 @@ export function createExpressApp() {
           candleTimestamp,
           fetchedDate: foundDate,
           open: first15MinOpen,
-          close: first15MinClose,
-          high: first15MinHigh,
-          low: first15MinLow,
+          close: Math.round(effectiveClose * 100) / 100,
+          high: Math.round(effectiveHigh * 100) / 100,
+          low: Math.round(effectiveLow * 100) / 100,
           volume: first15MinVol,
           rsi,
-          vwap,
+          vwap: sessionVWAP,
           totalCandles: openCandles.length
         });
       } else {

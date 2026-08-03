@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator } from 'lucide-react';
+import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator, Percent } from 'lucide-react';
 import { StockCalculated } from '../types';
-import { getAtmOptionStrikes } from '../utils/gann';
+import { getAtmOptionStrikes, calculateFibonacci382 } from '../utils/gann';
 
 interface StockDetailModalProps {
   stock: StockCalculated | null;
@@ -298,6 +298,46 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
           </div>
 
         </div>
+
+        {/* Fibonacci Retracement Analysis Box */}
+        {(() => {
+          const cmp = stock.closePrice || stock.openPrice || 0;
+          const fibData = calculateFibonacci382(stock.highPrice, stock.lowPrice, cmp);
+          if (!fibData) return null;
+          return (
+            <div className="mt-4 p-3.5 bg-amber-50/80 rounded-xl border border-amber-200">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-extrabold uppercase text-amber-900 flex items-center gap-1.5">
+                  <Percent className="w-4 h-4 text-amber-600" /> Fibonacci Retracement Levels
+                </div>
+                {fibData.isFib382Retraced ? (
+                  <span className="text-[10px] font-black text-amber-900 bg-amber-200/90 px-2.5 py-0.5 rounded-full border border-amber-300 shadow-2xs">
+                    ★ 38.2%+ FIB RETRACED ({fibData.pullbackPctFromHigh}% Pullback)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                    Pullback: {fibData.pullbackPctFromHigh}% from High
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="bg-white p-2.5 rounded-lg border border-amber-200/90 text-center shadow-2xs">
+                  <span className="block text-[10px] text-amber-800 font-bold uppercase">38.2% Fib Support</span>
+                  <span className="text-sm font-mono font-black text-amber-950">₹{fibData.fib382Bull.toFixed(2)}</span>
+                </div>
+                <div className="bg-white p-2.5 rounded-lg border border-amber-200/90 text-center shadow-2xs">
+                  <span className="block text-[10px] text-amber-800 font-bold uppercase">50.0% Fib Midpoint</span>
+                  <span className="text-sm font-mono font-black text-amber-950">₹{fibData.fib500Bull.toFixed(2)}</span>
+                </div>
+                <div className="bg-white p-2.5 rounded-lg border border-amber-200/90 text-center shadow-2xs">
+                  <span className="block text-[10px] text-amber-800 font-bold uppercase">61.8% Golden Fib</span>
+                  <span className="text-sm font-mono font-black text-amber-950">₹{fibData.fib618Bull.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* At-The-Money (ATM) Option Strikes */}
         {optionStrikes && (

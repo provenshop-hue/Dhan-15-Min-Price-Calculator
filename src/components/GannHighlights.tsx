@@ -1,6 +1,7 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, Target, ShieldCheck } from 'lucide-react';
+import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, Target, ShieldCheck, Percent } from 'lucide-react';
 import { StockCalculated, TrendFilterType } from '../types';
+import { calculateFibonacci382 } from '../utils/gann';
 
 interface GannHighlightsProps {
   stocks: StockCalculated[];
@@ -38,6 +39,14 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
   // Open = Low (Bullish) and Open = High (Bearish) stocks
   const openLowStocks = calculatedStocks.filter((s) => s.isOpenEqualLow || (s.openPrice && s.lowPrice && Math.abs(s.openPrice - s.lowPrice) / s.openPrice <= 0.001));
   const openHighStocks = calculatedStocks.filter((s) => s.isOpenEqualHigh || (s.openPrice && s.highPrice && Math.abs(s.openPrice - s.highPrice) / s.openPrice <= 0.001));
+  
+  // 38.2% Fibonacci Retracements
+  const fibRetraceStocks = calculatedStocks.filter((s) => {
+    if (s.isFib382Retrace) return true;
+    const cmp = s.closePrice || s.openPrice || 0;
+    const fibData = calculateFibonacci382(s.highPrice, s.lowPrice, cmp);
+    return fibData?.isFib382Retraced ?? false;
+  });
 
   return (
     <div className="mb-6 space-y-4">
@@ -76,6 +85,14 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           >
             <Target className="w-3.5 h-3.5 text-rose-400" />
             <span>Open = High ({openHighStocks.length})</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTrendFilter('FIB_382_RETRACE')}
+            className="flex items-center space-x-1.5 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-amber-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+          >
+            <Percent className="w-3.5 h-3.5 text-amber-400" />
+            <span>Fib 38.2% Retrace ({fibRetraceStocks.length})</span>
           </button>
 
           <button

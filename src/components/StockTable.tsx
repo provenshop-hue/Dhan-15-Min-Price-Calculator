@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator } from 'lucide-react';
+import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
-import { calculateGann15Min, getAtmOptionStrikes } from '../utils/gann';
+import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382 } from '../utils/gann';
 
 interface StockTableProps {
   stocks: StockCalculated[];
@@ -64,9 +64,18 @@ export const StockTable: React.FC<StockTableProps> = ({
     return Math.abs(s.openPrice - high) / s.openPrice <= 0.001;
   };
 
+  // Helper check for Fibonacci 38.2% Retracement
+  const isStockFib382Retrace = (s: StockCalculated) => {
+    if (s.isFib382Retrace) return true;
+    const cmp = s.closePrice || s.openPrice || 0;
+    const fibData = calculateFibonacci382(s.highPrice, s.lowPrice, cmp);
+    return fibData?.isFib382Retraced ?? false;
+  };
+
   // Count metrics
   const openLowCount = stocks.filter(isStockOpenEqualLow).length;
   const openHighCount = stocks.filter(isStockOpenEqualHigh).length;
+  const fib382Count = stocks.filter(isStockFib382Retrace).length;
   const veryBullishCount = stocks.filter((s) => s.trend === 'Very Bullish').length;
   const bullishCount = stocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish').length;
   const veryBearishCount = stocks.filter((s) => s.trend === 'Very Bearish').length;
@@ -82,6 +91,7 @@ export const StockTable: React.FC<StockTableProps> = ({
 
     if (trendFilter === 'OPEN_LOW') return isStockOpenEqualLow(s);
     if (trendFilter === 'OPEN_HIGH') return isStockOpenEqualHigh(s);
+    if (trendFilter === 'FIB_382_RETRACE') return isStockFib382Retrace(s);
     if (trendFilter === 'VERY_BULLISH') return s.trend === 'Very Bullish';
     if (trendFilter === 'BULLISH') return s.trend === 'Bullish' || s.trend === 'Very Bullish';
     if (trendFilter === 'VERY_BEARISH') return s.trend === 'Very Bearish';
@@ -176,6 +186,17 @@ export const StockTable: React.FC<StockTableProps> = ({
             >
               <Target className="w-3.5 h-3.5 text-rose-600 dark:text-rose-300" />
               Open = High ({openHighCount})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('FIB_382_RETRACE'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
+                trendFilter === 'FIB_382_RETRACE'
+                  ? 'bg-amber-600 text-white shadow-2xs'
+                  : 'text-amber-900 bg-amber-100/80 hover:bg-amber-200 border border-amber-300/70'
+              }`}
+            >
+              <Percent className="w-3.5 h-3.5 text-amber-600" />
+              Fib 38.2% Retrace ({fib382Count})
             </button>
             <button
               onClick={() => { setTrendFilter('VERY_BULLISH'); setCurrentPage(1); }}
@@ -504,24 +525,45 @@ export const StockTable: React.FC<StockTableProps> = ({
                               ? 'bg-rose-100 text-rose-900 border-rose-300'
                               : 'bg-slate-100 text-slate-700 border-slate-300'
                           }`}>
-                            RSI: {stock.rsi.toFixed(1)}
+                            RSI: {stock.rsi.toFixed(1)} {stock.rsi > 50 ? '▲' : '▼'}
                           </span>
                         )}
 
-                        {stock.vwapStatus && (
-                          <span
-                            className={`text-[10px] font-extrabold px-2 py-0.2 rounded border flex items-center gap-1 ${
-                              stock.vwapStatus === 'Above'
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300/80'
-                                : stock.vwapStatus === 'Below'
-                                ? 'bg-rose-50 text-rose-800 border-rose-300/80'
-                                : 'bg-slate-100 text-slate-700 border-slate-300'
-                            }`}
-                            title={stock.vwap ? `VWAP Level: ₹${stock.vwap.toFixed(2)}` : 'VWAP Status'}
-                          >
-                            <span>VWAP: {stock.vwapStatus === 'Above' ? 'Above ▲' : stock.vwapStatus === 'Below' ? 'Below ▼' : 'At ='}</span>
-                          </span>
-                        )}
+                        {(() => {
+                          const cmp = stock.closePrice || stock.openPrice || 0;
+                          const status = stock.vwapStatus || (stock.vwap && cmp > 0 ? (cmp > stock.vwap ? 'Above' : cmp < stock.vwap ? 'Below' : 'At') : null);
+                          if (!status) return null;
+                          return (
+                            <span
+                              className={`text-[10px] font-extrabold px-2 py-0.2 rounded border flex items-center gap-1 ${
+                                status === 'Above'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300/80'
+                                  : status === 'Below'
+                                  ? 'bg-rose-50 text-rose-800 border-rose-300/80'
+                                  : 'bg-slate-100 text-slate-700 border-slate-300'
+                              }`}
+                              title={stock.vwap ? `VWAP Level: ₹${stock.vwap.toFixed(2)} | CMP: ₹${cmp.toFixed(2)}` : 'VWAP Status'}
+                            >
+                              <span>VWAP: {status === 'Above' ? 'Above ▲' : status === 'Below' ? 'Below ▼' : 'At ='}</span>
+                              {stock.vwap && <span className="text-[9px] opacity-80 font-mono font-bold">(₹{stock.vwap.toFixed(1)})</span>}
+                            </span>
+                          );
+                        })()}
+
+                        {(() => {
+                          const cmp = stock.closePrice || stock.openPrice || 0;
+                          const fibData = calculateFibonacci382(stock.highPrice, stock.lowPrice, cmp);
+                          if (!fibData || !fibData.isFib382Retraced) return null;
+                          return (
+                            <span
+                              className="text-[10px] font-black px-2 py-0.5 rounded border bg-amber-50 text-amber-900 border-amber-300 flex items-center gap-1 shadow-2xs"
+                              title={`Fib 38.2% Support: ₹${fibData.fib382Bull} | Pullback: ${fibData.pullbackPctFromHigh}% from High`}
+                            >
+                              <Percent className="w-3 h-3 text-amber-600" />
+                              <span>Fib 38.2% ({fibData.pullbackPctFromHigh}%)</span>
+                            </span>
+                          );
+                        })()}
                       </div>
                     </td>
 
