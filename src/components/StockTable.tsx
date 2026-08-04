@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent } from 'lucide-react';
+import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382 } from '../utils/gann';
 
@@ -40,6 +40,38 @@ export const StockTable: React.FC<StockTableProps> = ({
   };
 
   const [lotMonth, setLotMonth] = useState<'Jun' | 'Jul' | 'Aug'>('Jun');
+
+  // Sticky / Pinned Stocks state (persisted in localStorage)
+  const [pinnedStockIds, setPinnedStockIds] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('gann_pinned_stock_ids');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return new Set(parsed);
+      } catch (e) {
+        console.error('Failed to parse pinned stocks', e);
+      }
+    }
+    return new Set<string>();
+  });
+
+  const togglePin = (stockId: string) => {
+    setPinnedStockIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(stockId)) {
+        next.delete(stockId);
+      } else {
+        next.add(stockId);
+      }
+      localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
+
+  const clearAllPins = () => {
+    setPinnedStockIds(new Set());
+    localStorage.removeItem('gann_pinned_stock_ids');
+  };
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -101,8 +133,13 @@ export const StockTable: React.FC<StockTableProps> = ({
     return true;
   });
 
-  // Sort stocks
+  // Sort stocks (pinned/checked stocks always stay sticky on top)
   const sortedStocks = [...filteredStocks].sort((a, b) => {
+    const aPinned = pinnedStockIds.has(a.id);
+    const bPinned = pinnedStockIds.has(b.id);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+
     let aVal: any = a[sortField];
     let bVal: any = b[sortField];
 
@@ -131,6 +168,9 @@ export const StockTable: React.FC<StockTableProps> = ({
     }
   };
 
+  const isAllFilteredPinned =
+    filteredStocks.length > 0 && filteredStocks.every((s) => pinnedStockIds.has(s.id));
+
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
       
@@ -152,9 +192,21 @@ export const StockTable: React.FC<StockTableProps> = ({
           />
         </div>
 
-        {/* Filters */}
+        {/* Filters & Pinned Controls */}
         <div className="flex flex-wrap items-center gap-2">
           
+          {/* Sticky Pinned Counter & Clear Button */}
+          {pinnedStockIds.size > 0 && (
+            <button
+              onClick={clearAllPins}
+              className="px-2.5 py-1 rounded-xl bg-amber-500 text-white hover:bg-amber-600 font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+              title="Click to clear all sticky pinned stocks"
+            >
+              <Pin className="w-3.5 h-3.5 fill-current" />
+              <span>Sticky Pinned ({pinnedStockIds.size}) ✕</span>
+            </button>
+          )}
+
           {/* Trend filter buttons */}
           <div className="flex flex-wrap items-center bg-slate-200/60 p-1 rounded-xl border border-slate-200 text-xs gap-1">
             <button
@@ -267,6 +319,31 @@ export const StockTable: React.FC<StockTableProps> = ({
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-slate-100/80 text-slate-600 border-b border-slate-200 font-semibold uppercase tracking-wider text-[11px]">
+              {/* Sticky Pin Checkbox Column Header */}
+              <th className="py-3 px-3 text-center w-12 bg-amber-50/60 border-r border-amber-200/60">
+                <div className="flex items-center justify-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={isAllFilteredPinned}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const next = new Set(pinnedStockIds);
+                        filteredStocks.forEach((s) => next.add(s.id));
+                        setPinnedStockIds(next);
+                        localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(Array.from(next)));
+                      } else {
+                        const next = new Set(pinnedStockIds);
+                        filteredStocks.forEach((s) => next.delete(s.id));
+                        setPinnedStockIds(next);
+                        localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(Array.from(next)));
+                      }
+                    }}
+                    title={isAllFilteredPinned ? "Unpin all visible stocks" : "Pin all visible stocks to stay on top"}
+                    className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer accent-amber-600"
+                  />
+                  <Pin className="w-3 h-3 text-amber-600 fill-amber-500" title="Sticky Pin Column" />
+                </div>
+              </th>
               <th className="py-3 px-4">
                 <button
                   onClick={() => toggleSort('symbol')}
@@ -312,7 +389,7 @@ export const StockTable: React.FC<StockTableProps> = ({
           <tbody className="divide-y divide-slate-100 text-slate-800">
             {paginatedStocks.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-12 text-slate-400">
+                <td colSpan={11} className="text-center py-12 text-slate-400">
                   No stocks match the selected search or filter criteria.
                 </td>
               </tr>
@@ -325,11 +402,32 @@ export const StockTable: React.FC<StockTableProps> = ({
                     ? stock.lotSizeJul2026
                     : stock.lotSizeAug2026;
 
+                const isPinned = pinnedStockIds.has(stock.id);
+
                 return (
                   <tr 
                     key={stock.id} 
-                    className="hover:bg-slate-50/80 transition-colors group"
+                    className={`transition-colors group ${
+                      isPinned 
+                        ? 'bg-amber-50/80 hover:bg-amber-100/80 font-medium' 
+                        : 'hover:bg-slate-50/80'
+                    }`}
                   >
+                    {/* Sticky Checkbox Pin Column */}
+                    <td className="py-2.5 px-3 text-center bg-amber-50/40 border-r border-amber-200/40">
+                      <div className="flex items-center justify-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={isPinned}
+                          onChange={() => togglePin(stock.id)}
+                          title={isPinned ? "Uncheck to unpin stock from top" : "Check to pin stock to always stay on top"}
+                          className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer accent-amber-600 transition-transform active:scale-95"
+                        />
+                        {isPinned && (
+                          <Pin className="w-3.5 h-3.5 text-amber-600 fill-amber-500" title="Sticky on Top" />
+                        )}
+                      </div>
+                    </td>
                     {/* Symbol & Company */}
                     <td className="py-2.5 px-4">
                       <div className="flex items-center space-x-2">
