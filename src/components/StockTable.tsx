@@ -81,19 +81,19 @@ export const StockTable: React.FC<StockTableProps> = ({
   const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'companyName' | 'volume' | 'pctChange'>('symbol');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Helper check for O=L / O=H with tight tolerance
+  // Helper check for O=L / O=H with strict exact match
   const isStockOpenEqualLow = (s: StockCalculated) => {
-    if (s.isOpenEqualLow) return true;
+    if (s.isOpenEqualLow !== undefined) return s.isOpenEqualLow;
     if (!s.openPrice || s.openPrice <= 0) return false;
     const low = s.lowPrice !== undefined && s.lowPrice !== null ? s.lowPrice : Math.min(s.openPrice, s.closePrice || s.openPrice);
-    return Math.abs(s.openPrice - low) / s.openPrice <= 0.001;
+    return Math.abs(s.openPrice - low) < 0.001;
   };
 
   const isStockOpenEqualHigh = (s: StockCalculated) => {
-    if (s.isOpenEqualHigh) return true;
+    if (s.isOpenEqualHigh !== undefined) return s.isOpenEqualHigh;
     if (!s.openPrice || s.openPrice <= 0) return false;
     const high = s.highPrice !== undefined && s.highPrice !== null ? s.highPrice : Math.max(s.openPrice, s.closePrice || s.openPrice);
-    return Math.abs(s.openPrice - high) / s.openPrice <= 0.001;
+    return Math.abs(s.openPrice - high) < 0.001;
   };
 
   // Helper check for Fibonacci 38.2% Retracement

@@ -42,23 +42,19 @@ export function calculateRSI(closes: number[], period: number = 14): number | nu
 }
 
 /**
- * Checks if Open equals Low (or within specified tolerance)
+ * Checks if Open equals Low strictly (exact price match)
  */
-export function isOpenLowPattern(openPrice?: number | null, lowPrice?: number | null, tolerancePct: number = 0.001): boolean {
+export function isOpenLowPattern(openPrice?: number | null, lowPrice?: number | null): boolean {
   if (!openPrice || !lowPrice || openPrice <= 0 || lowPrice <= 0) return false;
-  if (openPrice === lowPrice) return true;
-  const diffPct = Math.abs(openPrice - lowPrice) / openPrice;
-  return diffPct <= tolerancePct;
+  return Math.abs(openPrice - lowPrice) < 0.001;
 }
 
 /**
- * Checks if Open equals High (or within specified tolerance)
+ * Checks if Open equals High strictly (exact price match)
  */
-export function isOpenHighPattern(openPrice?: number | null, highPrice?: number | null, tolerancePct: number = 0.001): boolean {
+export function isOpenHighPattern(openPrice?: number | null, highPrice?: number | null): boolean {
   if (!openPrice || !highPrice || openPrice <= 0 || highPrice <= 0) return false;
-  if (openPrice === highPrice) return true;
-  const diffPct = Math.abs(openPrice - highPrice) / openPrice;
-  return diffPct <= tolerancePct;
+  return Math.abs(openPrice - highPrice) < 0.001;
 }
 
 export type Fib382Status = 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement';
@@ -192,9 +188,9 @@ export function calculateGann15Min(
 
   const pctChange = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
 
-  // Pattern detection: Open = Low and Open = High
-  const isOpenEqualLow = isOpenLowPattern(openPrice, lowPrice, tolerancePct);
-  const isOpenEqualHigh = isOpenHighPattern(openPrice, highPrice, tolerancePct);
+  // Pattern detection: Open = Low and Open = High (Strict Exact Match)
+  const isOpenEqualLow = isOpenLowPattern(openPrice, lowPrice);
+  const isOpenEqualHigh = isOpenHighPattern(openPrice, highPrice);
 
   const openLowDiffPct = openPrice > 0 && lowPrice && lowPrice > 0
     ? Math.abs(openPrice - lowPrice) / openPrice * 100
