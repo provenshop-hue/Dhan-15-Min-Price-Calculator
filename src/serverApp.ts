@@ -87,16 +87,20 @@ export function createExpressApp() {
                 'access-token': accessToken,
               },
               body: JSON.stringify(payloadMultiDay),
-              signal: AbortSignal.timeout(6000)
+              signal: AbortSignal.timeout(3000)
             });
 
-            // If rate limited (429), wait and retry
+            if (response.status === 401 || response.status === 403) {
+              const data = await response.json().catch(() => ({}));
+              return { ok: false, status: response.status, data };
+            }
+
             if (response.status === 429) {
-              await new Promise((r) => setTimeout(r, 300 * (retry + 1)));
+              await new Promise((r) => setTimeout(r, 200 * (retry + 1)));
               continue;
             }
 
-            const data = await response.json();
+            const data = await response.json().catch(() => null);
 
             if (response.ok && data?.open && Array.isArray(data.open) && data.open.length > 0) {
               return { ok: true, status: response.status, data };
@@ -111,41 +115,23 @@ export function createExpressApp() {
                 'access-token': accessToken,
               },
               body: JSON.stringify(payloadSingleDay),
-              signal: AbortSignal.timeout(6000)
+              signal: AbortSignal.timeout(3000)
             });
 
-            const dataSingle = await responseSingle.json();
+            if (responseSingle.status === 401 || responseSingle.status === 403) {
+              const dataS = await responseSingle.json().catch(() => ({}));
+              return { ok: false, status: responseSingle.status, data: dataS };
+            }
+
+            const dataSingle = await responseSingle.json().catch(() => null);
             if (responseSingle.ok && dataSingle?.open && Array.isArray(dataSingle.open) && dataSingle.open.length > 0) {
               return { ok: true, status: responseSingle.status, data: dataSingle };
             }
 
-            // Third attempt: With HH:MM:SS format
-            const payloadWithTime = {
-              ...payloadSingleDay,
-              fromDate: `${queryDate} 09:15:00`,
-              toDate: `${queryDate} 15:30:00`
-            };
-
-            const response2 = await fetch('https://api.dhan.co/v2/charts/intraday', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'client-id': clientId,
-                'access-token': accessToken,
-              },
-              body: JSON.stringify(payloadWithTime),
-              signal: AbortSignal.timeout(6000)
-            });
-
-            const data2 = await response2.json();
-            if (response2.ok && data2?.open && Array.isArray(data2.open) && data2.open.length > 0) {
-              return { ok: true, status: response2.status, data: data2 };
-            }
-
-            return { ok: response.ok, status: response.status, data };
+            return { ok: response.ok, status: response.status, data: data || dataSingle };
           } catch (e: any) {
             if (retry === 0) {
-              await new Promise((r) => setTimeout(r, 200));
+              await new Promise((r) => setTimeout(r, 150));
             } else {
               return { ok: false, status: 500, data: { error: String(e?.message || e) } };
             }
@@ -570,13 +556,19 @@ Return ONLY a valid JSON object matching this schema:
 }
 `;
 
-          const geminiRes = await ai.models.generateContent({
+          const geminiPromise = ai.models.generateContent({
             model: 'gemini-2.0-flash',
             contents: prompt,
             config: {
               responseMimeType: 'application/json'
             }
           });
+
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini API timeout')), 2500)
+          );
+
+          const geminiRes: any = await Promise.race([geminiPromise, timeoutPromise]);
 
           if (geminiRes.text) {
             const parsed = JSON.parse(geminiRes.text);
