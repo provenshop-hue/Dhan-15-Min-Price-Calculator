@@ -107,7 +107,9 @@ export function calculateVolumeAnalysis(stock: StockCalculated): VolumeAnalysisR
   }
 
   const avgCandleVol = Math.round(totalVol / Math.max(1, timeline.length || 1));
-  const firstCandleRVol = avgCandleVol > 0 ? Math.round((fVol / avgCandleVol) * 10) / 10 : 1.0;
+  const otherVolSum = Math.max(0, totalVol - fVol);
+  const avgOtherCandleVol = timeline.length > 1 ? Math.round(otherVolSum / (timeline.length - 1)) : avgCandleVol;
+  const firstCandleRVol = avgOtherCandleVol > 0 ? Math.round((fVol / avgOtherCandleVol) * 10) / 10 : 1.0;
 
   const bullVolPct = Math.round((totalBullVol / Math.max(1, totalVol)) * 1000) / 10;
   const bearVolPct = Math.round((totalBearVol / Math.max(1, totalVol)) * 1000) / 10;

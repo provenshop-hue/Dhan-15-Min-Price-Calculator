@@ -54,9 +54,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   onOpenRsiAnalyst,
   onFetchSingleStock
 }) => {
-  const [activeFilter, setActiveFilter] = useState<PullbackFilterType>('ALL');
+  const [activeFilter, setActiveFilter] = useState<PullbackFilterType>('FIRST_CANDLE_5X');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
+  const [sortBy, setSortBy] = useState<SortOption>('FIRST_CANDLE_RVOL_DESC');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   
   // Interactive Calculator State
@@ -171,7 +171,11 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (sortBy === 'PCT_CHANGE_DESC') return (b.stock.pctChange || 0) - (a.stock.pctChange || 0);
       if (sortBy === 'VOLUME_DESC') return (b.stock.volume || 0) - (a.stock.volume || 0);
       if (sortBy === 'RVOL_DESC') return b.analysis.volumeAnalysis.rVolume - a.analysis.volumeAnalysis.rVolume;
-      if (sortBy === 'FIRST_CANDLE_RVOL_DESC') return b.analysis.volumeAnalysis.firstCandleRVol - a.analysis.volumeAnalysis.firstCandleRVol;
+      if (sortBy === 'FIRST_CANDLE_RVOL_DESC') {
+        const diff = b.analysis.volumeAnalysis.firstCandleRVol - a.analysis.volumeAnalysis.firstCandleRVol;
+        if (Math.abs(diff) > 0.01) return diff;
+        return b.analysis.volumeAnalysis.firstCandleMultiple - a.analysis.volumeAnalysis.firstCandleMultiple;
+      }
       if (sortBy === 'FIRST_CANDLE_RATIO_DESC') return b.analysis.volumeAnalysis.firstCandleMultiple - a.analysis.volumeAnalysis.firstCandleMultiple;
       return 0;
     });
@@ -358,7 +362,14 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
         {/* 5X 1st Candle R-Vol */}
         <button
-          onClick={() => setActiveFilter(activeFilter === 'FIRST_CANDLE_5X' ? 'ALL' : 'FIRST_CANDLE_5X')}
+          onClick={() => {
+            if (activeFilter !== 'FIRST_CANDLE_5X') {
+              setActiveFilter('FIRST_CANDLE_5X');
+              setSortBy('FIRST_CANDLE_RVOL_DESC');
+            } else {
+              setActiveFilter('ALL');
+            }
+          }}
           className={`p-3.5 rounded-2xl border text-left transition-all ${
             activeFilter === 'FIRST_CANDLE_5X'
               ? 'bg-amber-500 text-slate-950 border-amber-600 ring-2 ring-amber-400/50 shadow-md font-black'
@@ -468,6 +479,29 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         </button>
       </div>
 
+      {/* Active Filter Banner for 5X 1st Candle R-Volume */}
+      {activeFilter === 'FIRST_CANDLE_5X' && (
+        <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/10 border border-amber-400/80 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center space-x-2.5 text-amber-950 font-extrabold">
+            <span className="p-1.5 bg-amber-500 text-slate-950 rounded-lg shadow-2xs">
+              <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
+            </span>
+            <div>
+              <span className="text-sm font-black text-amber-950 block">🔥 1st Candle (09:15 AM) 5X+ R-Volume Stocks ({filteredStocks.length}) — Sorted High → Low</span>
+              <span className="text-[11px] text-amber-800 font-medium">Filtering stocks with 09:15 AM opening volume &ge; 5.0X relative volume, sorted from highest multiplier to lowest.</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            <button
+              onClick={() => setActiveFilter('ALL')}
+              className="text-xs font-black text-amber-950 hover:bg-amber-200 bg-amber-100/90 px-3 py-1.5 rounded-xl border border-amber-300 transition-colors shadow-2xs"
+            >
+              Show All ({stocks.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Filter Toolbar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-4">
         
@@ -530,7 +564,10 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveFilter('FIRST_CANDLE_5X')}
+            onClick={() => {
+              setActiveFilter('FIRST_CANDLE_5X');
+              setSortBy('FIRST_CANDLE_RVOL_DESC');
+            }}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 ${
               activeFilter === 'FIRST_CANDLE_5X'
                 ? 'bg-amber-600 text-white shadow-2xs'
