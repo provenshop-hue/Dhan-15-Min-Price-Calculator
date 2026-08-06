@@ -123,6 +123,55 @@ export function calculateVolumeAnalysis(stock: StockCalculated): VolumeAnalysisR
   const isOpeningBuySurge = firstCandleDominantSide === 'BUY' && firstCandleMultiple >= 1.8;
   const isHighRVol = rVolume >= 1.2 || firstCandleRVol >= 1.5;
 
+  // 3. First 15-Minute High / Low Cross & Body Cross Percentage Calculation
+  const currentPrice = stockClose;
+  const latestPoint = timeline.length > 1 ? timeline[timeline.length - 1] : timeline[0];
+  const lOpen = latestPoint?.open || fClose;
+  const lClose = latestPoint?.close || currentPrice;
+  const lBodyTop = Math.max(lOpen, lClose);
+  const lBodyBottom = Math.min(lOpen, lClose);
+  const lBodySize = Math.max(0.01, lBodyTop - lBodyBottom);
+
+  let hasCrossedFirst15mHigh = false;
+  let hasCrossedFirst15mLow = false;
+  let first15mCrossStatus: 'BULLISH_HIGH_CROSS' | 'BEARISH_LOW_CROSS' | 'INSIDE_15M_RANGE' = 'INSIDE_15M_RANGE';
+  let first15mCrossPct = 0;
+  let first15mBodyCrossPct = 0;
+  let first15mCrossLabel = '↔️ Inside 09:15 AM Range';
+
+  if (currentPrice > fHigh || lBodyTop > fHigh) {
+    hasCrossedFirst15mHigh = true;
+    first15mCrossStatus = 'BULLISH_HIGH_CROSS';
+    first15mCrossPct = Math.round(((currentPrice - fHigh) / fHigh) * 10000) / 100;
+
+    const bodyOverHigh = lBodyTop - Math.max(fHigh, lBodyBottom);
+    if (lBodyBottom >= fHigh) {
+      first15mBodyCrossPct = 100;
+    } else if (bodyOverHigh > 0) {
+      first15mBodyCrossPct = Math.min(100, Math.round((bodyOverHigh / lBodySize) * 1000) / 10);
+    } else {
+      // Fallback if price is above high
+      const range15 = Math.max(0.01, fHigh - fLow);
+      first15mBodyCrossPct = Math.min(100, Math.round(((currentPrice - fHigh) / range15) * 1000) / 10);
+    }
+    first15mCrossLabel = `🟢 ${first15mBodyCrossPct}% Body Crossed 15m High (+${first15mCrossPct}%)`;
+  } else if (currentPrice < fLow || lBodyBottom < fLow) {
+    hasCrossedFirst15mLow = true;
+    first15mCrossStatus = 'BEARISH_LOW_CROSS';
+    first15mCrossPct = Math.round(((fLow - currentPrice) / fLow) * -10000) / 100;
+
+    const bodyUnderLow = Math.min(fLow, lBodyTop) - lBodyBottom;
+    if (lBodyTop <= fLow) {
+      first15mBodyCrossPct = 100;
+    } else if (bodyUnderLow > 0) {
+      first15mBodyCrossPct = Math.min(100, Math.round((bodyUnderLow / lBodySize) * 1000) / 10);
+    } else {
+      const range15 = Math.max(0.01, fHigh - fLow);
+      first15mBodyCrossPct = Math.min(100, Math.round(((fLow - currentPrice) / range15) * 1000) / 10);
+    }
+    first15mCrossLabel = `🔴 ${first15mBodyCrossPct}% Body Crossed 15m Low (${first15mCrossPct}%)`;
+  }
+
   return {
     firstCandleVol: fVol,
     firstCandleOpen: fOpen,
@@ -146,6 +195,12 @@ export function calculateVolumeAnalysis(stock: StockCalculated): VolumeAnalysisR
     rVolume,
     avgCandleVol,
     isOpeningBuySurge,
-    isHighRVol
+    isHighRVol,
+    hasCrossedFirst15mHigh,
+    hasCrossedFirst15mLow,
+    first15mCrossStatus,
+    first15mCrossPct,
+    first15mBodyCrossPct,
+    first15mCrossLabel
   };
 }

@@ -42,10 +42,22 @@ type PullbackFilterType =
   | 'VOL_INCREASING'
   | 'FIRST_CANDLE_BUY'
   | 'FIRST_CANDLE_5X'
+  | 'FIRST_15M_HIGH_CROSS'
+  | 'FIRST_15M_LOW_CROSS'
   | 'HIGH_RVOL'
   | 'OPEN_LOW';
 
-type SortOption = 'SCORE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC' | 'RVOL_DESC' | 'FIRST_CANDLE_RVOL_DESC' | 'FIRST_CANDLE_RATIO_DESC';
+type SortOption = 
+  | 'SCORE_DESC' 
+  | 'RSI_ASC' 
+  | 'RSI_DESC' 
+  | 'PCT_CHANGE_DESC' 
+  | 'VOLUME_DESC' 
+  | 'RVOL_DESC' 
+  | 'FIRST_CANDLE_RVOL_DESC' 
+  | 'FIRST_CANDLE_RATIO_DESC'
+  | 'BODY_CROSS_PCT_DESC'
+  | 'FIRST_15M_HIGH_CROSS_DESC';
 
 export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   stocks,
@@ -92,6 +104,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let openingBuySurges = 0;
     let highRVolCount = 0;
     let fiveXSurgeCount = 0;
+    let fifteenMinHighCrossCount = 0;
+    let fifteenMinLowCrossCount = 0;
 
     analyzedStocks.forEach(({ stock, analysis }) => {
       if (analysis.pullbackCategory === 'BULLISH_SWEET_SPOT') bullishSweetSpot++;
@@ -102,6 +116,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (analysis.volumeAnalysis.firstCandleDominantSide === 'BUY' && analysis.volumeAnalysis.firstCandleMultiple >= 1.5) openingBuySurges++;
       if (analysis.volumeAnalysis.rVolume >= 1.2 || analysis.volumeAnalysis.firstCandleRVol >= 1.5) highRVolCount++;
       if (analysis.volumeAnalysis.firstCandleRVol >= 5.0 || analysis.volumeAnalysis.firstCandleMultiple >= 5.0) fiveXSurgeCount++;
+      if (analysis.volumeAnalysis.hasCrossedFirst15mHigh) fifteenMinHighCrossCount++;
+      if (analysis.volumeAnalysis.hasCrossedFirst15mLow) fifteenMinLowCrossCount++;
     });
 
     return {
@@ -113,7 +129,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       highScore,
       openingBuySurges,
       highRVolCount,
-      fiveXSurgeCount
+      fiveXSurgeCount,
+      fifteenMinHighCrossCount,
+      fifteenMinLowCrossCount
     };
   }, [analyzedStocks, stocks.length]);
 
@@ -153,6 +171,12 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (activeFilter === 'FIRST_CANDLE_5X') {
         return analysis.volumeAnalysis.firstCandleRVol >= 5.0 || analysis.volumeAnalysis.firstCandleMultiple >= 5.0;
       }
+      if (activeFilter === 'FIRST_15M_HIGH_CROSS') {
+        return analysis.volumeAnalysis.hasCrossedFirst15mHigh;
+      }
+      if (activeFilter === 'FIRST_15M_LOW_CROSS') {
+        return analysis.volumeAnalysis.hasCrossedFirst15mLow;
+      }
       if (activeFilter === 'HIGH_RVOL') {
         return analysis.volumeAnalysis.rVolume >= 1.2 || analysis.volumeAnalysis.firstCandleRVol >= 1.5;
       }
@@ -165,6 +189,12 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
     // Sorting
     list.sort((a, b) => {
+      if (sortBy === 'BODY_CROSS_PCT_DESC') {
+        return b.analysis.volumeAnalysis.first15mBodyCrossPct - a.analysis.volumeAnalysis.first15mBodyCrossPct;
+      }
+      if (sortBy === 'FIRST_15M_HIGH_CROSS_DESC') {
+        return b.analysis.volumeAnalysis.first15mCrossPct - a.analysis.volumeAnalysis.first15mCrossPct;
+      }
       if (sortBy === 'SCORE_DESC') return b.analysis.pullbackScore - a.analysis.pullbackScore;
       if (sortBy === 'RSI_ASC') return a.analysis.rsiVal - b.analysis.rsiVal;
       if (sortBy === 'RSI_DESC') return b.analysis.rsiVal - a.analysis.rsiVal;
@@ -349,16 +379,80 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       )}
 
       {/* Stats Overview Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-8 gap-2">
         {/* Total Scanned */}
-        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
           <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Scanned</div>
           <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{stats.total}</div>
           <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
             <Layers className="w-3 h-3 text-slate-400" />
-            <span>Nifty F&amp;O Stocks</span>
+            <span>Nifty F&amp;O</span>
           </div>
         </div>
+
+        {/* 15m High Cross (Bullish Breakout) */}
+        <button
+          onClick={() => {
+            if (activeFilter !== 'FIRST_15M_HIGH_CROSS') {
+              setActiveFilter('FIRST_15M_HIGH_CROSS');
+              setSortBy('BODY_CROSS_PCT_DESC');
+            } else {
+              setActiveFilter('ALL');
+            }
+          }}
+          className={`p-3 rounded-2xl border text-left transition-all ${
+            activeFilter === 'FIRST_15M_HIGH_CROSS'
+              ? 'bg-emerald-600 text-white border-emerald-700 ring-2 ring-emerald-400/50 shadow-md font-black'
+              : 'bg-gradient-to-br from-emerald-100/90 to-teal-50 border-emerald-300 hover:border-emerald-400 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[10px] font-black uppercase tracking-wider flex items-center justify-between ${
+            activeFilter === 'FIRST_15M_HIGH_CROSS' ? 'text-white' : 'text-emerald-950'
+          }`}>
+            <span>🟢 15m High Cross</span>
+            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 font-bold" />
+          </div>
+          <div className={`text-xl sm:text-2xl font-black mt-0.5 ${
+            activeFilter === 'FIRST_15M_HIGH_CROSS' ? 'text-white' : 'text-emerald-950'
+          }`}>{stats.fifteenMinHighCrossCount}</div>
+          <div className={`text-[10px] mt-0.5 font-extrabold ${
+            activeFilter === 'FIRST_15M_HIGH_CROSS' ? 'text-emerald-100' : 'text-emerald-800'
+          }`}>
+            Body &gt; 15m High 🚀
+          </div>
+        </button>
+
+        {/* 15m Low Cross (Bearish Breakdown) */}
+        <button
+          onClick={() => {
+            if (activeFilter !== 'FIRST_15M_LOW_CROSS') {
+              setActiveFilter('FIRST_15M_LOW_CROSS');
+              setSortBy('BODY_CROSS_PCT_DESC');
+            } else {
+              setActiveFilter('ALL');
+            }
+          }}
+          className={`p-3 rounded-2xl border text-left transition-all ${
+            activeFilter === 'FIRST_15M_LOW_CROSS'
+              ? 'bg-rose-600 text-white border-rose-700 ring-2 ring-rose-400/50 shadow-md font-black'
+              : 'bg-gradient-to-br from-rose-100/90 to-amber-50 border-rose-300 hover:border-rose-400 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[10px] font-black uppercase tracking-wider flex items-center justify-between ${
+            activeFilter === 'FIRST_15M_LOW_CROSS' ? 'text-white' : 'text-rose-950'
+          }`}>
+            <span>🔴 15m Low Cross</span>
+            <ArrowDownRight className="w-3.5 h-3.5 text-rose-600 font-bold" />
+          </div>
+          <div className={`text-xl sm:text-2xl font-black mt-0.5 ${
+            activeFilter === 'FIRST_15M_LOW_CROSS' ? 'text-white' : 'text-rose-950'
+          }`}>{stats.fifteenMinLowCrossCount}</div>
+          <div className={`text-[10px] mt-0.5 font-extrabold ${
+            activeFilter === 'FIRST_15M_LOW_CROSS' ? 'text-rose-100' : 'text-rose-800'
+          }`}>
+            Body &lt; 15m Low 📉
+          </div>
+        </button>
 
         {/* 5X 1st Candle R-Vol */}
         <button
@@ -370,7 +464,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
               setActiveFilter('ALL');
             }
           }}
-          className={`p-3.5 rounded-2xl border text-left transition-all ${
+          className={`p-3 rounded-2xl border text-left transition-all ${
             activeFilter === 'FIRST_CANDLE_5X'
               ? 'bg-amber-500 text-slate-950 border-amber-600 ring-2 ring-amber-400/50 shadow-md font-black'
               : 'bg-gradient-to-br from-amber-100 to-orange-100 border-amber-300 hover:border-amber-400 shadow-2xs'
@@ -389,7 +483,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         {/* 09:15 Buy Surges */}
         <button
           onClick={() => setActiveFilter(activeFilter === 'FIRST_CANDLE_BUY' ? 'ALL' : 'FIRST_CANDLE_BUY')}
-          className={`p-3.5 rounded-2xl border text-left transition-all ${
+          className={`p-3 rounded-2xl border text-left transition-all ${
             activeFilter === 'FIRST_CANDLE_BUY'
               ? 'bg-emerald-100 border-emerald-500 ring-2 ring-emerald-400/30 shadow-sm'
               : 'bg-gradient-to-br from-emerald-50/90 to-teal-50/60 border-emerald-200/80 hover:border-emerald-300 shadow-2xs'
@@ -401,14 +495,14 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </div>
           <div className="text-xl sm:text-2xl font-black text-emerald-800 mt-0.5">{stats.openingBuySurges}</div>
           <div className="text-[10px] text-emerald-700 mt-0.5 font-bold">
-            1st Candle Buy &gt; 1.5X
+            Buy Vol &gt; 1.5X
           </div>
         </button>
 
         {/* High R-Volume */}
         <button
           onClick={() => setActiveFilter(activeFilter === 'HIGH_RVOL' ? 'ALL' : 'HIGH_RVOL')}
-          className={`p-3.5 rounded-2xl border text-left transition-all ${
+          className={`p-3 rounded-2xl border text-left transition-all ${
             activeFilter === 'HIGH_RVOL'
               ? 'bg-amber-100 border-amber-500 ring-2 ring-amber-400/30 shadow-sm'
               : 'bg-gradient-to-br from-amber-50/90 to-orange-50/60 border-amber-200/80 hover:border-amber-300 shadow-2xs'
@@ -427,7 +521,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         {/* Bullish Sweet Spot */}
         <button
           onClick={() => setActiveFilter(activeFilter === 'BULLISH_SWEET_SPOT' ? 'ALL' : 'BULLISH_SWEET_SPOT')}
-          className={`p-3.5 rounded-2xl border text-left transition-all ${
+          className={`p-3 rounded-2xl border text-left transition-all ${
             activeFilter === 'BULLISH_SWEET_SPOT'
               ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-400/30 shadow-sm'
               : 'bg-white border-slate-200/80 hover:border-emerald-300 shadow-2xs'
@@ -443,26 +537,10 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </div>
         </button>
 
-        {/* Momentum Pullbacks */}
-        <button
-          onClick={() => setActiveFilter(activeFilter === 'BULLISH_MOMENTUM' ? 'ALL' : 'BULLISH_MOMENTUM')}
-          className={`p-3.5 rounded-2xl border text-left transition-all ${
-            activeFilter === 'BULLISH_MOMENTUM'
-              ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400/30 shadow-sm'
-              : 'bg-white border-slate-200/80 hover:border-blue-300 shadow-2xs'
-          }`}
-        >
-          <div className="text-[10px] font-semibold text-blue-700 uppercase tracking-wider">Momentum Dip</div>
-          <div className="text-xl sm:text-2xl font-black text-blue-700 mt-0.5">{stats.bullishMomentum}</div>
-          <div className="text-[10px] text-blue-600 mt-0.5 font-medium">
-            RSI 55–65 Dip
-          </div>
-        </button>
-
         {/* High Conviction */}
         <button
           onClick={() => setActiveFilter(activeFilter === 'HIGH_SCORE' ? 'ALL' : 'HIGH_SCORE')}
-          className={`p-3.5 rounded-2xl border text-left transition-all ${
+          className={`p-3 rounded-2xl border text-left transition-all ${
             activeFilter === 'HIGH_SCORE'
               ? 'bg-purple-50 border-purple-400 ring-2 ring-purple-400/30 shadow-sm'
               : 'bg-white border-slate-200/80 hover:border-purple-300 shadow-2xs'
@@ -478,6 +556,66 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </div>
         </button>
       </div>
+
+      {/* Active Filter Banner for 15m High Cross */}
+      {activeFilter === 'FIRST_15M_HIGH_CROSS' && (
+        <div className="bg-gradient-to-r from-emerald-600/15 via-teal-500/15 to-emerald-500/10 border border-emerald-500/80 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center space-x-2.5 text-emerald-950 font-extrabold">
+            <span className="p-1.5 bg-emerald-600 text-white rounded-lg shadow-2xs">
+              <ArrowUpRight className="w-4 h-4 text-white" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-black text-emerald-950">🟢 Stocks Crossing 09:15 AM First 15m High ({filteredStocks.length}) — Sorted by Candle Body % Crossed</span>
+                <div className="flex items-center gap-1">
+                  <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    🟢 {filteredStocks.filter(s => s.stock.isOpenEqualLow).length} Open=Low
+                  </span>
+                </div>
+              </div>
+              <span className="text-[11px] text-emerald-800 font-medium block mt-0.5">Showing stocks where current price or candle body broke above the first 15-minute high level (09:15-09:30 AM), with exact % body cross calculations.</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            <button
+              onClick={() => setActiveFilter('ALL')}
+              className="text-xs font-black text-emerald-950 hover:bg-emerald-200 bg-emerald-100/90 px-3 py-1.5 rounded-xl border border-emerald-300 transition-colors shadow-2xs"
+            >
+              Show All ({stocks.length})
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active Filter Banner for 15m Low Cross */}
+      {activeFilter === 'FIRST_15M_LOW_CROSS' && (
+        <div className="bg-gradient-to-r from-rose-600/15 via-amber-500/15 to-rose-500/10 border border-rose-500/80 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center space-x-2.5 text-rose-950 font-extrabold">
+            <span className="p-1.5 bg-rose-600 text-white rounded-lg shadow-2xs">
+              <ArrowDownRight className="w-4 h-4 text-white" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-black text-rose-950">🔴 Stocks Crossing 09:15 AM First 15m Low ({filteredStocks.length}) — Sorted by Candle Body % Crossed</span>
+                <div className="flex items-center gap-1">
+                  <span className="bg-rose-100 text-rose-900 border border-rose-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    🔴 {filteredStocks.filter(s => s.stock.isOpenEqualHigh).length} Open=High
+                  </span>
+                </div>
+              </div>
+              <span className="text-[11px] text-rose-800 font-medium block mt-0.5">Showing stocks where current price or candle body broke below the first 15-minute low level (09:15-09:30 AM), with exact % body breakdown calculations.</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center">
+            <button
+              onClick={() => setActiveFilter('ALL')}
+              className="text-xs font-black text-rose-950 hover:bg-rose-200 bg-rose-100/90 px-3 py-1.5 rounded-xl border border-rose-300 transition-colors shadow-2xs"
+            >
+              Show All ({stocks.length})
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Active Filter Banner for 5X 1st Candle R-Volume */}
       {activeFilter === 'FIRST_CANDLE_5X' && (
@@ -575,6 +713,36 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
           <button
             onClick={() => {
+              setActiveFilter('FIRST_15M_HIGH_CROSS');
+              setSortBy('BODY_CROSS_PCT_DESC');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 ${
+              activeFilter === 'FIRST_15M_HIGH_CROSS'
+                ? 'bg-emerald-600 text-white shadow-2xs font-extrabold'
+                : 'bg-emerald-100 text-emerald-950 hover:bg-emerald-200 border border-emerald-400 font-extrabold'
+            }`}
+          >
+            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-700" />
+            <span>🟢 15m High Cross ({stats.fifteenMinHighCrossCount})</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveFilter('FIRST_15M_LOW_CROSS');
+              setSortBy('BODY_CROSS_PCT_DESC');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 ${
+              activeFilter === 'FIRST_15M_LOW_CROSS'
+                ? 'bg-rose-600 text-white shadow-2xs font-extrabold'
+                : 'bg-rose-100 text-rose-950 hover:bg-rose-200 border border-rose-400 font-extrabold'
+            }`}
+          >
+            <ArrowDownRight className="w-3.5 h-3.5 text-rose-700" />
+            <span>🔴 15m Low Cross ({stats.fifteenMinLowCrossCount})</span>
+          </button>
+
+          <button
+            onClick={() => {
               setActiveFilter('FIRST_CANDLE_5X');
               setSortBy('FIRST_CANDLE_RVOL_DESC');
             }}
@@ -644,6 +812,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
             onChange={(e) => setSortBy(e.target.value as SortOption)}
             className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
+            <option value="BODY_CROSS_PCT_DESC">Sort: Highest 15m Body Cross % 🚀</option>
+            <option value="FIRST_15M_HIGH_CROSS_DESC">Sort: 15m High Cross % High → Low 🟢</option>
             <option value="SCORE_DESC">Sort: Best Score</option>
             <option value="FIRST_CANDLE_RVOL_DESC">Sort: 1st Candle R-Vol High → Low 🔥</option>
             <option value="RVOL_DESC">Sort: Session R-Vol High → Low ⚡</option>
@@ -883,6 +1053,89 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                           <span>Buy/Sell Ratio: <strong className="text-emerald-400 font-bold">{analysis.volumeAnalysis.bullBearRatio}X</strong></span>
                           <span>09:15 Candle Vol: <strong className="text-white font-bold">{(analysis.volumeAnalysis.firstCandleVol / 1000).toFixed(1)}k</strong></span>
                         </div>
+                      </div>
+
+                      {/* First 15-Minute Candle High/Low Breakout & Body Cross % Card */}
+                      <div className={`p-2.5 rounded-xl border space-y-1.5 font-mono text-xs shadow-2xs ${
+                        analysis.volumeAnalysis.hasCrossedFirst15mHigh
+                          ? 'bg-gradient-to-r from-emerald-950/90 to-teal-950/80 border-emerald-500/70 text-emerald-100'
+                          : analysis.volumeAnalysis.hasCrossedFirst15mLow
+                          ? 'bg-gradient-to-r from-rose-950/90 to-amber-950/80 border-rose-500/70 text-rose-100'
+                          : 'bg-slate-950/80 border-slate-800 text-slate-300'
+                      }`}>
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {analysis.volumeAnalysis.hasCrossedFirst15mHigh ? (
+                              <span className="text-emerald-300 font-black text-[11px] flex items-center gap-1 uppercase tracking-wider">
+                                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 stroke-[3]" />
+                                🟢 15m High Breakout (₹{analysis.volumeAnalysis.firstCandleHigh.toFixed(1)})
+                              </span>
+                            ) : analysis.volumeAnalysis.hasCrossedFirst15mLow ? (
+                              <span className="text-rose-300 font-black text-[11px] flex items-center gap-1 uppercase tracking-wider">
+                                <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 stroke-[3]" />
+                                🔴 15m Low Breakdown (₹{analysis.volumeAnalysis.firstCandleLow.toFixed(1)})
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-bold text-[11px] flex items-center gap-1">
+                                ↔️ Inside 15m Range (Low ₹{analysis.volumeAnalysis.firstCandleLow.toFixed(1)} - High ₹{analysis.volumeAnalysis.firstCandleHigh.toFixed(1)})
+                              </span>
+                            )}
+
+                            {stock.isOpenEqualLow && (
+                              <span className="bg-emerald-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded">
+                                OPEN=LOW 🟢
+                              </span>
+                            )}
+                            {stock.isOpenEqualHigh && (
+                              <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded">
+                                OPEN=HIGH 🔴
+                              </span>
+                            )}
+                          </div>
+
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                            analysis.volumeAnalysis.hasCrossedFirst15mHigh
+                              ? 'bg-emerald-500 text-slate-950 shadow-2xs'
+                              : analysis.volumeAnalysis.hasCrossedFirst15mLow
+                              ? 'bg-rose-500 text-white shadow-2xs'
+                              : 'bg-slate-800 text-slate-300'
+                          }`}>
+                            {analysis.volumeAnalysis.hasCrossedFirst15mHigh || analysis.volumeAnalysis.hasCrossedFirst15mLow
+                              ? `${analysis.volumeAnalysis.first15mBodyCrossPct}% Body Crossed`
+                              : '0% Body Crossed'}
+                          </span>
+                        </div>
+
+                        {/* Progress Bar & Percentage Stats */}
+                        {(analysis.volumeAnalysis.hasCrossedFirst15mHigh || analysis.volumeAnalysis.hasCrossedFirst15mLow) ? (
+                          <div className="space-y-1 pt-0.5">
+                            <div className="flex items-center justify-between text-[10px] text-slate-300 font-medium">
+                              <span>
+                                Level Cross: <strong className={analysis.volumeAnalysis.hasCrossedFirst15mHigh ? 'text-emerald-300 font-black' : 'text-rose-300 font-black'}>
+                                  {analysis.volumeAnalysis.first15mCrossPct > 0 ? `+${analysis.volumeAnalysis.first15mCrossPct}%` : `${analysis.volumeAnalysis.first15mCrossPct}%`}
+                                </strong>
+                              </span>
+                              <span>
+                                Candle Body Expansion: <strong className="text-amber-300 font-black">{analysis.volumeAnalysis.first15mBodyCrossPct}%</strong>
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800/80">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  analysis.volumeAnalysis.hasCrossedFirst15mHigh
+                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-300'
+                                    : 'bg-gradient-to-r from-rose-500 to-amber-400'
+                                }`}
+                                style={{ width: `${Math.min(100, Math.max(6, analysis.volumeAnalysis.first15mBodyCrossPct))}%` }}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-400 flex items-center justify-between pt-0.5">
+                            <span>09:15-09:30 AM Range: ₹{(analysis.volumeAnalysis.firstCandleHigh - analysis.volumeAnalysis.firstCandleLow).toFixed(2)}</span>
+                            <span>Awaiting 15m High/Low Breakout</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

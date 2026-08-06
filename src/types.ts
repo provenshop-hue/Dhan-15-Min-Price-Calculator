@@ -140,6 +140,14 @@ export interface VolumeAnalysisResult {
   avgCandleVol: number;
   isOpeningBuySurge: boolean; // e.g. Buy/Sell >= 1.8X at 09:15 AM
   isHighRVol: boolean; // e.g. rVolume >= 1.2X
+
+  // First 15-Minute High / Low Cross & Body Cross Percentage
+  hasCrossedFirst15mHigh: boolean;
+  hasCrossedFirst15mLow: boolean;
+  first15mCrossStatus: 'BULLISH_HIGH_CROSS' | 'BEARISH_LOW_CROSS' | 'INSIDE_15M_RANGE';
+  first15mCrossPct: number; // e.g. +1.85% above High or -1.42% below Low
+  first15mBodyCrossPct: number; // % of candle body that crossed beyond 15m High or Low (e.g. 84.5%)
+  first15mCrossLabel: string; // e.g. "🟢 84.5% Body Crossed 15m High (+1.85%)"
 }
 
 export interface RsiAiAnalysisReport {
