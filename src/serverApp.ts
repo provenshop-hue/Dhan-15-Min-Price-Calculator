@@ -409,6 +409,9 @@ export function createExpressApp() {
 
           return {
             timeStr: c.timeStr,
+            open: c.open,
+            high: c.high,
+            low: c.low,
             close: c.close,
             volume: vol,
             rsi: candleRsi,

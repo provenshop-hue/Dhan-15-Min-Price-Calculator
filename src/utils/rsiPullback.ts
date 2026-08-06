@@ -1,4 +1,5 @@
-import { StockCalculated } from '../types';
+import { StockCalculated, VolumeAnalysisResult } from '../types';
+import { calculateVolumeAnalysis } from './volumeAnalysis';
 
 export interface RsiPullbackAnalysis {
   rsiVal: number;
@@ -19,6 +20,7 @@ export interface RsiPullbackAnalysis {
   rsiDelta: number;
   volumeDirection: 'INCREASING' | 'DECREASING' | 'FLAT';
   volumeDeltaPct: number;
+  volumeAnalysis: VolumeAnalysisResult;
 }
 
 /**
@@ -148,6 +150,8 @@ export function analyzeRsiPullback(stock: StockCalculated): RsiPullbackAnalysis 
   const rrVal = risk > 0 ? (reward / risk).toFixed(1) : '2.0';
   const riskRewardRatio = `1 : ${rrVal}`;
 
+  const volumeAnalysis = stock.volumeAnalysis || calculateVolumeAnalysis(stock);
+
   return {
     rsiVal: currentRsi,
     pullbackCategory,
@@ -166,6 +170,7 @@ export function analyzeRsiPullback(stock: StockCalculated): RsiPullbackAnalysis 
     rsiDirection,
     rsiDelta,
     volumeDirection,
-    volumeDeltaPct
+    volumeDeltaPct,
+    volumeAnalysis
   };
 }

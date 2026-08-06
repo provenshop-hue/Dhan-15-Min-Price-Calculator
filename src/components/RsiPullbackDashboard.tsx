@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { StockCalculated } from '../types';
 import { analyzeRsiPullback, RsiPullbackAnalysis } from '../utils/rsiPullback';
+import { calculateVolumeAnalysis } from '../utils/volumeAnalysis';
 import { calculateRSI } from '../utils/gann';
 import { 
   TrendingUp, 
@@ -19,7 +20,8 @@ import {
   HelpCircle,
   ExternalLink,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Zap
 } from 'lucide-react';
 
 interface RsiPullbackDashboardProps {
@@ -38,9 +40,11 @@ type PullbackFilterType =
   | 'BEARISH_RALLY' 
   | 'HIGH_SCORE'
   | 'VOL_INCREASING'
+  | 'FIRST_CANDLE_BUY'
+  | 'HIGH_RVOL'
   | 'OPEN_LOW';
 
-type SortOption = 'SCORE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
+type SortOption = 'SCORE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC' | 'RVOL_DESC' | 'FIRST_CANDLE_RATIO_DESC';
 
 export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   stocks,
@@ -84,6 +88,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let oversold = 0;
     let bearishRally = 0;
     let highScore = 0;
+    let openingBuySurges = 0;
+    let highRVolCount = 0;
 
     analyzedStocks.forEach(({ stock, analysis }) => {
       if (analysis.pullbackCategory === 'BULLISH_SWEET_SPOT') bullishSweetSpot++;
@@ -91,6 +97,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (analysis.pullbackCategory === 'OVERSOLD_BOUNCE') oversold++;
       if (analysis.pullbackCategory === 'BEARISH_RALLY') bearishRally++;
       if (analysis.pullbackScore >= 75) highScore++;
+      if (analysis.volumeAnalysis.firstCandleDominantSide === 'BUY' && analysis.volumeAnalysis.firstCandleMultiple >= 1.5) openingBuySurges++;
+      if (analysis.volumeAnalysis.rVolume >= 1.2 || analysis.volumeAnalysis.firstCandleRVol >= 1.5) highRVolCount++;
     });
 
     return {
@@ -99,7 +107,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       bullishMomentum,
       oversold,
       bearishRally,
-      highScore
+      highScore,
+      openingBuySurges,
+      highRVolCount
     };
   }, [analyzedStocks, stocks.length]);
 
@@ -133,6 +143,12 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (activeFilter === 'VOL_INCREASING') {
         return analysis.volumeDirection === 'INCREASING';
       }
+      if (activeFilter === 'FIRST_CANDLE_BUY') {
+        return analysis.volumeAnalysis.firstCandleDominantSide === 'BUY' && analysis.volumeAnalysis.firstCandleMultiple >= 1.5;
+      }
+      if (activeFilter === 'HIGH_RVOL') {
+        return analysis.volumeAnalysis.rVolume >= 1.2 || analysis.volumeAnalysis.firstCandleRVol >= 1.5;
+      }
       if (activeFilter === 'OPEN_LOW') {
         return Boolean(stock.isOpenEqualLow);
       }
@@ -147,6 +163,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (sortBy === 'RSI_DESC') return b.analysis.rsiVal - a.analysis.rsiVal;
       if (sortBy === 'PCT_CHANGE_DESC') return (b.stock.pctChange || 0) - (a.stock.pctChange || 0);
       if (sortBy === 'VOLUME_DESC') return (b.stock.volume || 0) - (a.stock.volume || 0);
+      if (sortBy === 'RVOL_DESC') return b.analysis.volumeAnalysis.rVolume - a.analysis.volumeAnalysis.rVolume;
+      if (sortBy === 'FIRST_CANDLE_RATIO_DESC') return b.analysis.volumeAnalysis.firstCandleMultiple - a.analysis.volumeAnalysis.firstCandleMultiple;
       return 0;
     });
 
@@ -319,83 +337,105 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       )}
 
       {/* Stats Overview Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Total Scanned */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Scanned</div>
-          <div className="text-2xl font-black text-slate-900 mt-1">{stats.total}</div>
-          <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-            <Layers className="w-3.5 h-3.5 text-slate-400" />
+        <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Total Scanned</div>
+          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{stats.total}</div>
+          <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+            <Layers className="w-3 h-3 text-slate-400" />
             <span>Nifty F&amp;O Stocks</span>
           </div>
         </div>
 
+        {/* 09:15 Buy Surges */}
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'FIRST_CANDLE_BUY' ? 'ALL' : 'FIRST_CANDLE_BUY')}
+          className={`p-3.5 rounded-2xl border text-left transition-all ${
+            activeFilter === 'FIRST_CANDLE_BUY'
+              ? 'bg-emerald-100 border-emerald-500 ring-2 ring-emerald-400/30 shadow-sm'
+              : 'bg-gradient-to-br from-emerald-50/90 to-teal-50/60 border-emerald-200/80 hover:border-emerald-300 shadow-2xs'
+          }`}
+        >
+          <div className="text-[10px] font-extrabold text-emerald-800 uppercase tracking-wider flex items-center justify-between">
+            <span>09:15 Buy Surges</span>
+            <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-emerald-800 mt-0.5">{stats.openingBuySurges}</div>
+          <div className="text-[10px] text-emerald-700 mt-0.5 font-bold">
+            1st Candle Buy &gt; 1.5X
+          </div>
+        </button>
+
+        {/* High R-Volume */}
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'HIGH_RVOL' ? 'ALL' : 'HIGH_RVOL')}
+          className={`p-3.5 rounded-2xl border text-left transition-all ${
+            activeFilter === 'HIGH_RVOL'
+              ? 'bg-amber-100 border-amber-500 ring-2 ring-amber-400/30 shadow-sm'
+              : 'bg-gradient-to-br from-amber-50/90 to-orange-50/60 border-amber-200/80 hover:border-amber-300 shadow-2xs'
+          }`}
+        >
+          <div className="text-[10px] font-extrabold text-amber-900 uppercase tracking-wider flex items-center justify-between">
+            <span>High R-Volume</span>
+            <BarChart3 className="w-3.5 h-3.5 text-amber-600" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-amber-900 mt-0.5">{stats.highRVolCount}</div>
+          <div className="text-[10px] text-amber-800 mt-0.5 font-bold">
+            R-Vol &gt; 1.2X Heavy
+          </div>
+        </button>
+
         {/* Bullish Sweet Spot */}
         <button
           onClick={() => setActiveFilter(activeFilter === 'BULLISH_SWEET_SPOT' ? 'ALL' : 'BULLISH_SWEET_SPOT')}
-          className={`p-4 rounded-2xl border text-left transition-all ${
+          className={`p-3.5 rounded-2xl border text-left transition-all ${
             activeFilter === 'BULLISH_SWEET_SPOT'
               ? 'bg-emerald-50 border-emerald-400 ring-2 ring-emerald-400/30 shadow-sm'
               : 'bg-white border-slate-200/80 hover:border-emerald-300 shadow-2xs'
           }`}
         >
-          <div className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider flex items-center justify-between">
+          <div className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wider flex items-center justify-between">
             <span>Prime Pullbacks</span>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
-          <div className="text-2xl font-black text-emerald-700 mt-1">{stats.bullishSweetSpot}</div>
-          <div className="text-[11px] text-emerald-600 mt-1 font-medium">
-            RSI 40–55 + Above VWAP
+          <div className="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5">{stats.bullishSweetSpot}</div>
+          <div className="text-[10px] text-emerald-600 mt-0.5 font-medium">
+            RSI 40–55 + VWAP
           </div>
         </button>
 
         {/* Momentum Pullbacks */}
         <button
           onClick={() => setActiveFilter(activeFilter === 'BULLISH_MOMENTUM' ? 'ALL' : 'BULLISH_MOMENTUM')}
-          className={`p-4 rounded-2xl border text-left transition-all ${
+          className={`p-3.5 rounded-2xl border text-left transition-all ${
             activeFilter === 'BULLISH_MOMENTUM'
               ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400/30 shadow-sm'
               : 'bg-white border-slate-200/80 hover:border-blue-300 shadow-2xs'
           }`}
         >
-          <div className="text-[11px] font-semibold text-blue-700 uppercase tracking-wider">Momentum Dip</div>
-          <div className="text-2xl font-black text-blue-700 mt-1">{stats.bullishMomentum}</div>
-          <div className="text-[11px] text-blue-600 mt-1 font-medium">
-            RSI 55–65 Continuation
-          </div>
-        </button>
-
-        {/* Oversold Bounces */}
-        <button
-          onClick={() => setActiveFilter(activeFilter === 'OVERSOLD' ? 'ALL' : 'OVERSOLD')}
-          className={`p-4 rounded-2xl border text-left transition-all ${
-            activeFilter === 'OVERSOLD'
-              ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-400/30 shadow-sm'
-              : 'bg-white border-slate-200/80 hover:border-amber-300 shadow-2xs'
-          }`}
-        >
-          <div className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">Oversold Dip</div>
-          <div className="text-2xl font-black text-amber-700 mt-1">{stats.oversold}</div>
-          <div className="text-[11px] text-amber-600 mt-1 font-medium">
-            RSI &lt; 40 Bounce
+          <div className="text-[10px] font-semibold text-blue-700 uppercase tracking-wider">Momentum Dip</div>
+          <div className="text-xl sm:text-2xl font-black text-blue-700 mt-0.5">{stats.bullishMomentum}</div>
+          <div className="text-[10px] text-blue-600 mt-0.5 font-medium">
+            RSI 55–65 Dip
           </div>
         </button>
 
         {/* High Conviction */}
         <button
           onClick={() => setActiveFilter(activeFilter === 'HIGH_SCORE' ? 'ALL' : 'HIGH_SCORE')}
-          className={`p-4 rounded-2xl border text-left transition-all ${
+          className={`p-3.5 rounded-2xl border text-left transition-all ${
             activeFilter === 'HIGH_SCORE'
               ? 'bg-purple-50 border-purple-400 ring-2 ring-purple-400/30 shadow-sm'
               : 'bg-white border-slate-200/80 hover:border-purple-300 shadow-2xs'
           }`}
         >
-          <div className="text-[11px] font-semibold text-purple-700 uppercase tracking-wider flex items-center justify-between">
+          <div className="text-[10px] font-semibold text-purple-700 uppercase tracking-wider flex items-center justify-between">
             <span>High Quality</span>
             <Sparkles className="w-3.5 h-3.5 text-purple-600" />
           </div>
-          <div className="text-2xl font-black text-purple-700 mt-1">{stats.highScore}</div>
-          <div className="text-[11px] text-purple-600 mt-1 font-medium">
+          <div className="text-xl sm:text-2xl font-black text-purple-700 mt-0.5">{stats.highScore}</div>
+          <div className="text-[10px] text-purple-600 mt-0.5 font-medium">
             Score 75+ ⭐⭐⭐⭐
           </div>
         </button>
@@ -463,6 +503,30 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveFilter('FIRST_CANDLE_BUY')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 ${
+              activeFilter === 'FIRST_CANDLE_BUY'
+                ? 'bg-emerald-600 text-white shadow-2xs'
+                : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border border-emerald-300'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>09:15 Buy Surge (&gt;1.5X) 🟢</span>
+          </button>
+
+          <button
+            onClick={() => setActiveFilter('HIGH_RVOL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 ${
+              activeFilter === 'HIGH_RVOL'
+                ? 'bg-amber-600 text-white shadow-2xs'
+                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-amber-600" />
+            <span>High R-Vol (&gt;1.2X) ⚡</span>
+          </button>
+
+          <button
             onClick={() => setActiveFilter('OPEN_LOW')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               activeFilter === 'OPEN_LOW'
@@ -495,6 +559,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
             className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="SCORE_DESC">Sort: Best Score</option>
+            <option value="RVOL_DESC">Sort: R-Vol High → Low ⚡</option>
+            <option value="FIRST_CANDLE_RATIO_DESC">Sort: 09:15 Buy Vol Multiplier 🟢</option>
             <option value="RSI_ASC">Sort: RSI Low → High</option>
             <option value="RSI_DESC">Sort: RSI High → Low</option>
             <option value="PCT_CHANGE_DESC">Sort: % Gainers</option>
@@ -634,6 +700,46 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                       <span>70 (Overbought)</span>
                     </div>
                   </div>
+
+                  {/* R-Volume & 09:15 Opening Candle Buy/Sell Volume Section */}
+                  {analysis.volumeAnalysis && (
+                    <div className="bg-slate-900 text-white p-3 rounded-xl space-y-2 border border-slate-800 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-[10px] font-bold uppercase text-slate-400">09:15 1st Candle:</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                            analysis.volumeAnalysis.firstCandleDominantSide === 'BUY'
+                              ? 'bg-emerald-500 text-slate-950 font-extrabold'
+                              : 'bg-rose-500 text-white font-extrabold'
+                          }`}>
+                            {analysis.volumeAnalysis.firstCandleDirectionLabel}
+                          </span>
+                        </div>
+
+                        <span className="text-[10px] font-extrabold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40">
+                          ⚡ R-Vol: {analysis.volumeAnalysis.rVolume}X
+                        </span>
+                      </div>
+
+                      {/* Bull Vol vs Bear Vol Bar */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-300">
+                          <span>🟢 Buy Vol: {analysis.volumeAnalysis.bullVolPct}% ({(analysis.volumeAnalysis.totalBullVol / 1000).toFixed(1)}k)</span>
+                          <span>🔴 Sell Vol: {analysis.volumeAnalysis.bearVolPct}% ({(analysis.volumeAnalysis.totalBearVol / 1000).toFixed(1)}k)</span>
+                        </div>
+                        <div className="w-full h-2 bg-rose-600/80 rounded-full overflow-hidden flex">
+                          <div 
+                            className="h-full bg-emerald-500 transition-all duration-300" 
+                            style={{ width: `${analysis.volumeAnalysis.bullVolPct}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span>Buy/Sell Ratio: <strong className="text-emerald-400 font-bold">{analysis.volumeAnalysis.bullBearRatio}X</strong></span>
+                          <span>1st Candle Vol: <strong className="text-white font-bold">{(analysis.volumeAnalysis.firstCandleVol / 1000).toFixed(1)}k</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Pullback Setup Box */}
                   <div className={`p-3 rounded-xl border space-y-1.5 ${

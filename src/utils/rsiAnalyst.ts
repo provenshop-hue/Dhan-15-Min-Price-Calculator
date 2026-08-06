@@ -108,9 +108,17 @@ export function generateIntradayRsiTimeline(stock: StockCalculated): RsiIntraday
 
     prevVol = intervalVol;
 
+    const cOpen = i === 0 ? open : timeline[i - 1].close;
+    const cClose = Math.round(p * 100) / 100;
+    const cHigh = Math.round((Math.max(cOpen, cClose) + Math.abs(cClose - cOpen) * 0.3 + 0.15) * 100) / 100;
+    const cLow = Math.round((Math.min(cOpen, cClose) - Math.abs(cClose - cOpen) * 0.3 - 0.15) * 100) / 100;
+
     timeline.push({
       timeStr: activeTimes[i],
-      close: Math.round(p * 100) / 100,
+      open: cOpen,
+      high: cHigh,
+      low: cLow,
+      close: cClose,
       volume: intervalVol,
       rsi: rsiVal,
       rsiDirection: direction,
