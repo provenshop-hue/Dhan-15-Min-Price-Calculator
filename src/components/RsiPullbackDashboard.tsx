@@ -487,8 +487,18 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
               <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
             </span>
             <div>
-              <span className="text-sm font-black text-amber-950 block">🔥 1st Candle (09:15 AM) 5X+ R-Volume Stocks ({filteredStocks.length}) — Sorted High → Low</span>
-              <span className="text-[11px] text-amber-800 font-medium">Filtering stocks with 09:15 AM opening volume &ge; 5.0X relative volume, sorted from highest multiplier to lowest.</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-black text-amber-950">🔥 1st Candle (09:15 AM) 5X+ R-Volume Stocks ({filteredStocks.length}) — Sorted High → Low</span>
+                <div className="flex items-center gap-1">
+                  <span className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    🟢 {filteredStocks.filter(s => s.stock.isOpenEqualLow).length} Open=Low
+                  </span>
+                  <span className="bg-rose-100 text-rose-900 border border-rose-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    🔴 {filteredStocks.filter(s => s.stock.isOpenEqualHigh).length} Open=High
+                  </span>
+                </div>
+              </div>
+              <span className="text-[11px] text-amber-800 font-medium block mt-0.5">Filtering stocks with 09:15 AM opening volume &ge; 5.0X relative volume, sorted from highest multiplier to lowest.</span>
             </div>
           </div>
           <div className="flex items-center gap-2 self-end sm:self-center">
@@ -781,12 +791,14 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                   {/* R-Volume & 09:15 Opening Candle Buy/Sell Volume Section */}
                   {analysis.volumeAnalysis && (
                     <div className="bg-slate-900 text-white p-3 rounded-xl space-y-2.5 border border-slate-800 shadow-xs">
-                      {/* 5X+ Surge Alert Badge */}
+                      {/* 5X+ Surge Alert Badge with Open=Low/High mention */}
                       {(analysis.volumeAnalysis.firstCandleRVol >= 5.0 || analysis.volumeAnalysis.firstCandleMultiple >= 5.0) && (
                         <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black px-2.5 py-1 rounded-lg text-[11px] flex items-center justify-between shadow-xs animate-pulse">
                           <span className="flex items-center gap-1 uppercase tracking-wider">
                             <Zap className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
                             🔥 5X+ Opening Volume Surge
+                            {stock.isOpenEqualLow && <span className="bg-slate-950 text-emerald-300 px-1.5 py-0.2 rounded text-[9px] font-black border border-emerald-400">OPEN=LOW 🟢</span>}
+                            {stock.isOpenEqualHigh && <span className="bg-slate-950 text-rose-300 px-1.5 py-0.2 rounded text-[9px] font-black border border-rose-400">OPEN=HIGH 🔴</span>}
                           </span>
                           <span className="font-mono bg-slate-950 text-amber-300 px-1.5 py-0.2 rounded text-[10px]">
                             {analysis.volumeAnalysis.firstCandleRVol >= 5.0
@@ -797,7 +809,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                       )}
 
                       <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                        <div className="flex items-center space-x-1.5">
+                        <div className="flex items-center space-x-1.5 flex-wrap gap-1">
                           <span className="text-[10px] font-bold uppercase text-slate-400">09:15 Candle:</span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                             analysis.volumeAnalysis.firstCandleDominantSide === 'BUY'
@@ -806,6 +818,17 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                           }`}>
                             {analysis.volumeAnalysis.firstCandleDirectionLabel}
                           </span>
+
+                          {/* OPEN=LOW or OPEN=HIGH badge in R-Volume */}
+                          {stock.isOpenEqualLow ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-400 text-slate-950 border border-emerald-300 flex items-center gap-0.5">
+                              🟢 OPEN=LOW
+                            </span>
+                          ) : stock.isOpenEqualHigh ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-500 text-white border border-rose-400 flex items-center gap-0.5">
+                              🔴 OPEN=HIGH
+                            </span>
+                          ) : null}
                         </div>
 
                         <div className="flex items-center gap-1.5">
@@ -823,6 +846,25 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                             ⚡ Session R-Vol: {analysis.volumeAnalysis.rVolume}X
                           </span>
                         </div>
+                      </div>
+
+                      {/* Explicit Open Pattern & R-Volume Status Banner */}
+                      <div className="flex items-center justify-between text-[10px] bg-slate-950/90 px-2.5 py-1 rounded-lg border border-slate-800 font-mono">
+                        <span className="text-slate-400 flex items-center gap-1.5">
+                          <span className="text-slate-500">Open Pattern:</span>
+                          {stock.isOpenEqualLow ? (
+                            <strong className="text-emerald-400 font-black uppercase">🟢 OPEN = LOW (Bullish Base)</strong>
+                          ) : stock.isOpenEqualHigh ? (
+                            <strong className="text-rose-400 font-black uppercase">🔴 OPEN = HIGH (Bearish Cap)</strong>
+                          ) : (
+                            <strong className="text-slate-400 font-normal">Normal Open</strong>
+                          )}
+                        </span>
+                        <span className="text-slate-400">
+                          R-Vol Impact: <strong className={analysis.volumeAnalysis.firstCandleRVol >= 5.0 ? "text-amber-300 font-bold" : "text-slate-300"}>
+                            {analysis.volumeAnalysis.firstCandleRVol >= 5.0 ? '🔥 5X Extreme Vol' : `${analysis.volumeAnalysis.firstCandleRVol}X`}
+                          </strong>
+                        </span>
                       </div>
 
                       {/* Bull Vol vs Bear Vol Bar */}
