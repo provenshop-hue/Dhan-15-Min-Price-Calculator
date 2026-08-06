@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator, Percent } from 'lucide-react';
+import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator, Percent, Sparkles } from 'lucide-react';
 import { StockCalculated } from '../types';
 import { getAtmOptionStrikes, calculateFibonacci382 } from '../utils/gann';
 
@@ -7,9 +7,10 @@ interface StockDetailModalProps {
   stock: StockCalculated | null;
   onClose: () => void;
   onOpenPositionSizer?: (stock?: StockCalculated) => void;
+  onOpenRsiAnalyst?: (stock: StockCalculated) => void;
 }
 
-export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClose, onOpenPositionSizer }) => {
+export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClose, onOpenPositionSizer, onOpenRsiAnalyst }) => {
   const [selectedLotMonth, setSelectedLotMonth] = useState<'Jun' | 'Jul' | 'Aug'>('Jun');
 
   if (!stock) return null;
@@ -185,9 +186,19 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
 
             {/* RSI Level */}
             <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">2. RSI Indicator (14)</div>
-              <div className="mt-1 flex items-center justify-between">
-                <span className="text-xs text-slate-300">
+              <div className="flex items-center justify-between">
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">2. RSI Indicator (14)</div>
+                {onOpenRsiAnalyst && (
+                  <button
+                    onClick={() => onOpenRsiAnalyst(stock)}
+                    className="text-[10px] font-black text-amber-300 hover:text-amber-200 bg-amber-500/20 hover:bg-amber-500/30 px-2 py-0.5 rounded border border-amber-500/30 flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-2.5 h-2.5" /> Analyze 09:15-Now RSI
+                  </button>
+                )}
+              </div>
+              <div className="mt-1.5 flex items-center justify-between">
+                <span className="text-xs text-slate-300 font-mono">
                   {stock.rsi !== undefined && stock.rsi !== null ? `RSI ${stock.rsi.toFixed(1)}` : 'RSI N/A'}
                 </span>
                 <span className={`text-xs font-bold ${
@@ -433,23 +444,38 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
         </div>
 
         {/* Action Buttons */}
-        <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
-          {onOpenPositionSizer ? (
-            <button
-              onClick={() => {
-                onClose();
-                onOpenPositionSizer(stock);
-              }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm flex items-center space-x-1.5"
-            >
-              <Calculator className="w-4 h-4" />
-              <span>Calculate Position Size &amp; Quantity</span>
-            </button>
-          ) : <div />}
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {onOpenRsiAnalyst && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenRsiAnalyst(stock);
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black rounded-xl transition-all shadow-sm flex items-center space-x-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>AI RSI Analyst (09:15 - Current)</span>
+              </button>
+            )}
+
+            {onOpenPositionSizer && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenPositionSizer(stock);
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors flex items-center space-x-1.5 border border-slate-300 cursor-pointer"
+              >
+                <Calculator className="w-4 h-4 text-slate-600" />
+                <span>Position Sizer</span>
+              </button>
+            )}
+          </div>
 
           <button
             onClick={onClose}
-            className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors shadow-sm"
+            className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors shadow-sm cursor-pointer"
           >
             Close Breakdown
           </button>

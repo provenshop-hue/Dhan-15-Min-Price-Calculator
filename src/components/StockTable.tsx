@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin } from 'lucide-react';
+import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382 } from '../utils/gann';
 
@@ -10,6 +10,7 @@ interface StockTableProps {
   onSelectStockDetail: (stock: StockCalculated) => void;
   onEditStockManual: (stock: StockCalculated) => void;
   onOpenPositionSizer?: (stock?: StockCalculated) => void;
+  onOpenRsiAnalyst?: (stock: StockCalculated) => void;
   credentials: DhanApiCredentials;
   activeTrendFilter?: TrendFilterType;
   onTrendFilterChange?: (filter: TrendFilterType) => void;
@@ -22,6 +23,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   onSelectStockDetail,
   onEditStockManual,
   onOpenPositionSizer,
+  onOpenRsiAnalyst,
   credentials,
   activeTrendFilter,
   onTrendFilterChange
@@ -686,6 +688,17 @@ export const StockTable: React.FC<StockTableProps> = ({
                             className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
                           >
                             <RefreshCw className={`w-3.5 h-3.5 ${stock.isLoading ? 'animate-spin text-blue-600' : ''}`} />
+                          </button>
+                        )}
+
+                        {/* AI RSI Trend Analyst */}
+                        {onOpenRsiAnalyst && (
+                          <button
+                            onClick={() => onOpenRsiAnalyst(stock)}
+                            title="Run AI RSI Trend Analyst (09:15 AM to Current Time)"
+                            className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 bg-indigo-50/50 rounded transition-colors border border-indigo-100"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
                           </button>
                         )}
 

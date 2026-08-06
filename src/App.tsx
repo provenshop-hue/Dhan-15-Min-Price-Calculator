@@ -9,6 +9,7 @@ import { ManualCalculatorModal } from './components/ManualCalculatorModal';
 import { StockDetailModal } from './components/StockDetailModal';
 import { CsvImportModal } from './components/CsvImportModal';
 import { PositionSizingModal } from './components/PositionSizingModal';
+import { RsiAnalystModal } from './components/RsiAnalystModal';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from './types';
@@ -68,6 +69,7 @@ export default function App() {
   const [positionSizerStock, setPositionSizerStock] = useState<StockCalculated | null>(null);
   const [selectedDetailStock, setSelectedDetailStock] = useState<StockCalculated | null>(null);
   const [editingStockManual, setEditingStockManual] = useState<StockCalculated | null>(null);
+  const [rsiAnalystStock, setRsiAnalystStock] = useState<StockCalculated | null>(null);
 
   const handleOpenPositionSizer = (stock?: StockCalculated | null) => {
     setPositionSizerStock(stock || null);
@@ -284,6 +286,7 @@ export default function App() {
                 lowPrice: data.low,
                 volume: data.volume,
                 rsi: rsi !== undefined && rsi !== null ? rsi : (s.rsi ?? null),
+                rsiTimeline: data.rsiTimeline || s.rsiTimeline,
                 vwap: calc.vwap,
                 vwapStatus: calc.vwapStatus,
                 candleTimestamp: data.candleTimestamp,
@@ -384,6 +387,7 @@ export default function App() {
                       lowPrice: data.low,
                       volume: data.volume,
                       rsi: rsi !== undefined && rsi !== null ? rsi : (s.rsi ?? null),
+                      rsiTimeline: data.rsiTimeline || s.rsiTimeline,
                       vwap: calc.vwap,
                       vwapStatus: calc.vwapStatus,
                       candleTimestamp: data.candleTimestamp,
@@ -662,6 +666,7 @@ export default function App() {
             setIsManualCalcOpen(true);
           }}
           onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+          onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
           credentials={credentials}
           activeTrendFilter={activeTrendFilter}
           onTrendFilterChange={(f) => setActiveTrendFilter(f)}
@@ -709,6 +714,12 @@ export default function App() {
         stock={selectedDetailStock}
         onClose={() => setSelectedDetailStock(null)}
         onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+        onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+      />
+
+      <RsiAnalystModal
+        stock={rsiAnalystStock}
+        onClose={() => setRsiAnalystStock(null)}
       />
 
       <PositionSizingModal

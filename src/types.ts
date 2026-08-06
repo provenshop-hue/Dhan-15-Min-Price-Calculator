@@ -30,6 +30,7 @@ export interface StockCalculated {
   pctChange?: number | null;
   gannScore?: number | null;
   rsi?: number | null;
+  rsiTimeline?: RsiIntradayPoint[];
   vwap?: number | null;
   vwapStatus?: 'Above' | 'Below' | 'At' | null;
 
@@ -97,3 +98,28 @@ export interface GannCalcResult {
   fibStatus?: 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement' | null;
   isFib382Retrace?: boolean;
 }
+
+export interface RsiIntradayPoint {
+  timeStr: string; // e.g. "09:15 AM", "09:30 AM", "09:45 AM", etc.
+  close: number;
+  volume?: number;
+  rsi: number;
+  rsiDirection: 'INCREASING' | 'DECREASING' | 'FLAT';
+  rsiDelta: number;
+}
+
+export interface RsiAiAnalysisReport {
+  verdict: 'POSITIVE_BUY' | 'NEGATIVE_AVOID' | 'NEUTRAL_WAIT';
+  verdictTitle: string;
+  confidencePct: number;
+  gradualIncreaseDetected: boolean;
+  rsiTrendSummary: string;
+  analysisDetails: string;
+  entryPoint: string;
+  exitTargets: string[];
+  stopLoss: string;
+  riskRewardRatio: string;
+  actionableAdvice: string;
+  analyzedAt: string;
+}
+
