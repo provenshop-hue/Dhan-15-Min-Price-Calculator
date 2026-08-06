@@ -2,6 +2,8 @@ import express from 'express';
 import { GoogleGenAI } from '@google/genai';
 import { getDhanSecurityId } from './data/dhanSecurityMap.js';
 
+let geminiCoolOffUntil = 0;
+
 export function createExpressApp() {
   const app = express();
 
@@ -509,8 +511,8 @@ export function createExpressApp() {
 
       let report = null;
 
-      // Try Gemini API if process.env.GEMINI_API_KEY is defined
-      if (process.env.GEMINI_API_KEY) {
+      // Try Gemini API if process.env.GEMINI_API_KEY is defined and cooloff has expired
+      if (process.env.GEMINI_API_KEY && Date.now() > geminiCoolOffUntil) {
         try {
           const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
           const timelineText = points
@@ -565,7 +567,7 @@ Return ONLY a valid JSON object matching this schema:
           });
 
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Gemini API timeout')), 2500)
+            setTimeout(() => reject(new Error('Gemini API timeout')), 2000)
           );
 
           const geminiRes: any = await Promise.race([geminiPromise, timeoutPromise]);
@@ -578,7 +580,8 @@ Return ONLY a valid JSON object matching this schema:
             };
           }
         } catch (e: any) {
-          console.warn('Gemini API rate limit or request failed, using algorithmic fallback report:', e?.message || e);
+          // If rate limited, quota exceeded or timed out, cool off for 5 mins to prevent spamming
+          geminiCoolOffUntil = Date.now() + 300000;
         }
       }
 

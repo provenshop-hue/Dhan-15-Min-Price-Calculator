@@ -144,8 +144,8 @@ export async function analyzeRsiProgressWithAi(
         return data.report;
       }
     }
-  } catch (e) {
-    console.warn('Backend AI route failed, producing local technical analysis report:', e);
+  } catch {
+    // Silent fallback to local technical analysis calculation
   }
 
   // Fallback local report generation

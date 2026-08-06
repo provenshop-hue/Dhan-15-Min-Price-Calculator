@@ -16,6 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
+  activeDashboardTab: 'gann' | 'rsi_pullback';
+  onChangeDashboardTab: (tab: 'gann' | 'rsi_pullback') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -31,7 +33,9 @@ export const Header: React.FC<HeaderProps> = ({
   isBulkLoading,
   onFetchAll,
   onDateChange,
-  onLock
+  onLock,
+  activeDashboardTab,
+  onChangeDashboardTab
 }) => {
   return (
     <header className="bg-white border-b border-slate-200/80 text-slate-800 sticky top-0 z-30 shadow-sm">
@@ -140,8 +144,39 @@ export const Header: React.FC<HeaderProps> = ({
 
         </div>
 
-        {/* Stats Strip */}
-        <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+        {/* Dashboard Navigation Tabs & Stats Strip */}
+        <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+          
+          {/* Main Dashboard Navigation Tabs */}
+          <div className="flex items-center space-x-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80">
+            <button
+              onClick={() => onChangeDashboardTab('gann')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                activeDashboardTab === 'gann'
+                  ? 'bg-white text-slate-900 shadow-2xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <span>📊 Gann 15m Scanner</span>
+            </button>
+
+            <button
+              onClick={() => onChangeDashboardTab('rsi_pullback')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                activeDashboardTab === 'rsi_pullback'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <span>📉 RSI Pullback Dashboard</span>
+                <span className="bg-emerald-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">
+                  NEW
+                </span>
+              </span>
+            </button>
+          </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <span>Total F&O Stocks: <strong className="text-slate-900">{totalStocks}</strong></span>
             <span>Calculated: <strong className="text-blue-600">{calculatedCount} / {totalStocks}</strong></span>

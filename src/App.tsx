@@ -4,6 +4,7 @@ import { AccessCodeGate } from './components/AccessCodeGate';
 import { DhanApiGateModal } from './components/DhanApiGateModal';
 import { StockTable } from './components/StockTable';
 import { GannHighlights } from './components/GannHighlights';
+import { RsiPullbackDashboard } from './components/RsiPullbackDashboard';
 import { DhanSettingsModal } from './components/DhanSettingsModal';
 import { ManualCalculatorModal } from './components/ManualCalculatorModal';
 import { StockDetailModal } from './components/StockDetailModal';
@@ -53,6 +54,9 @@ export default function App() {
 
   // Active filter state
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
+
+  // Active Dashboard View Tab ('gann' or 'rsi_pullback')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'rsi_pullback'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -588,6 +592,8 @@ export default function App() {
           sessionStorage.removeItem('gann_app_access_code_unlocked');
           setIsUnlocked(false);
         }}
+        activeDashboardTab={activeDashboardTab}
+        onChangeDashboardTab={setActiveDashboardTab}
       />
 
       {/* Main Body */}
@@ -648,29 +654,43 @@ export default function App() {
           </div>
         )}
 
-        {/* Gann Pro Signals & Open=Low/High Highlights Banner */}
-        <GannHighlights
-          stocks={stocks}
-          onSelectStockDetail={(s) => setSelectedDetailStock(s)}
-          onSelectTrendFilter={(f) => setActiveTrendFilter(f)}
-        />
+        {/* Dashboard View Switcher */}
+        {activeDashboardTab === 'gann' ? (
+          <>
+            {/* Gann Pro Signals & Open=Low/High Highlights Banner */}
+            <GannHighlights
+              stocks={stocks}
+              onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+              onSelectTrendFilter={(f) => setActiveTrendFilter(f)}
+            />
 
-        {/* Stock Table */}
-        <StockTable
-          stocks={stocks}
-          onUpdateStockPrices={handleUpdateStockPrices}
-          onFetchSingleStock={handleFetchSingleDhan}
-          onSelectStockDetail={(s) => setSelectedDetailStock(s)}
-          onEditStockManual={(s) => {
-            setEditingStockManual(s);
-            setIsManualCalcOpen(true);
-          }}
-          onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
-          onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
-          credentials={credentials}
-          activeTrendFilter={activeTrendFilter}
-          onTrendFilterChange={(f) => setActiveTrendFilter(f)}
-        />
+            {/* Stock Table */}
+            <StockTable
+              stocks={stocks}
+              onUpdateStockPrices={handleUpdateStockPrices}
+              onFetchSingleStock={handleFetchSingleDhan}
+              onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+              onEditStockManual={(s) => {
+                setEditingStockManual(s);
+                setIsManualCalcOpen(true);
+              }}
+              onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+              onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+              credentials={credentials}
+              activeTrendFilter={activeTrendFilter}
+              onTrendFilterChange={(f) => setActiveTrendFilter(f)}
+            />
+          </>
+        ) : (
+          /* Dedicated RSI Pullback Dashboard */
+          <RsiPullbackDashboard
+            stocks={stocks}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+            onFetchSingleStock={handleFetchSingleDhan}
+          />
+        )}
 
       </main>
 
