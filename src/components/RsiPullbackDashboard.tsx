@@ -704,9 +704,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                   {/* R-Volume & 09:15 Opening Candle Buy/Sell Volume Section */}
                   {analysis.volumeAnalysis && (
                     <div className="bg-slate-900 text-white p-3 rounded-xl space-y-2 border border-slate-800 shadow-xs">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-1 flex-wrap">
                         <div className="flex items-center space-x-1.5">
-                          <span className="text-[10px] font-bold uppercase text-slate-400">09:15 1st Candle:</span>
+                          <span className="text-[10px] font-bold uppercase text-slate-400">1st Candle (09:15–09:30):</span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                             analysis.volumeAnalysis.firstCandleDominantSide === 'BUY'
                               ? 'bg-emerald-500 text-slate-950 font-extrabold'
@@ -717,15 +717,15 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                         </div>
 
                         <span className="text-[10px] font-extrabold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40">
-                          ⚡ R-Vol: {analysis.volumeAnalysis.rVolume}X
+                          ⚡ Session R-Vol: {analysis.volumeAnalysis.rVolume}X
                         </span>
                       </div>
 
                       {/* Bull Vol vs Bear Vol Bar */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-[10px] font-mono text-slate-300">
-                          <span>🟢 Buy Vol: {analysis.volumeAnalysis.bullVolPct}% ({(analysis.volumeAnalysis.totalBullVol / 1000).toFixed(1)}k)</span>
-                          <span>🔴 Sell Vol: {analysis.volumeAnalysis.bearVolPct}% ({(analysis.volumeAnalysis.totalBearVol / 1000).toFixed(1)}k)</span>
+                          <span>🟢 Day Buy Vol: {analysis.volumeAnalysis.bullVolPct}% ({(analysis.volumeAnalysis.totalBullVol / 1000).toFixed(1)}k)</span>
+                          <span>🔴 Day Sell Vol: {analysis.volumeAnalysis.bearVolPct}% ({(analysis.volumeAnalysis.totalBearVol / 1000).toFixed(1)}k)</span>
                         </div>
                         <div className="w-full h-2 bg-rose-600/80 rounded-full overflow-hidden flex">
                           <div 
@@ -735,7 +735,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-slate-400">
                           <span>Buy/Sell Ratio: <strong className="text-emerald-400 font-bold">{analysis.volumeAnalysis.bullBearRatio}X</strong></span>
-                          <span>1st Candle Vol: <strong className="text-white font-bold">{(analysis.volumeAnalysis.firstCandleVol / 1000).toFixed(1)}k</strong></span>
+                          <span>09:15 Candle Vol: <strong className="text-white font-bold">{(analysis.volumeAnalysis.firstCandleVol / 1000).toFixed(1)}k</strong></span>
                         </div>
                       </div>
                     </div>
