@@ -73,6 +73,9 @@ export function generateIntradayRsiTimeline(stock: StockCalculated): RsiIntraday
 
   const timeline: RsiIntradayPoint[] = [];
 
+  const baseVol = stock.volume ? Math.round(stock.volume / Math.max(1, activeTimes.length)) : 25000;
+  let prevVol = baseVol;
+
   for (let i = 0; i < activeTimes.length; i++) {
     const t = activeTimes.length > 1 ? i / (activeTimes.length - 1) : 1;
     
@@ -93,12 +96,28 @@ export function generateIntradayRsiTimeline(stock: StockCalculated): RsiIntraday
     if (delta > 0.1) direction = 'INCREASING';
     else if (delta < -0.1) direction = 'DECREASING';
 
+    // Calculate simulated interval volume and trend
+    const volCurve = 0.85 + 0.3 * Math.sin(t * Math.PI) + (direction === 'INCREASING' ? t * 0.3 : -t * 0.1);
+    const intervalVol = Math.max(1200, Math.round(baseVol * Math.max(0.4, volCurve)));
+
+    const volDelta = i > 0 ? intervalVol - prevVol : 0;
+    const volDeltaPct = prevVol > 0 ? Math.round((volDelta / prevVol) * 1000) / 10 : 0;
+    let volDirection: 'INCREASING' | 'DECREASING' | 'FLAT' = 'FLAT';
+    if (volDelta > 0) volDirection = 'INCREASING';
+    else if (volDelta < 0) volDirection = 'DECREASING';
+
+    prevVol = intervalVol;
+
     timeline.push({
       timeStr: activeTimes[i],
       close: Math.round(p * 100) / 100,
+      volume: intervalVol,
       rsi: rsiVal,
       rsiDirection: direction,
-      rsiDelta: delta
+      rsiDelta: delta,
+      volumeDirection: volDirection,
+      volumeDelta: volDelta,
+      volumeDeltaPct: volDeltaPct
     });
   }
 

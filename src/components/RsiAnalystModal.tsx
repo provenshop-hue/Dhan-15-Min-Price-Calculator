@@ -139,9 +139,9 @@ ${report.exitTargets.map((t) => `  • ${t}`).join('\n')}
         </div>
 
         {/* Quick Summary Metrics Cards */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
           <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 uppercase block">Start RSI (09:15 AM)</span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase block">Start RSI (09:15)</span>
             <span className="text-base font-mono font-extrabold text-slate-900 mt-0.5 block">{startRsi.toFixed(1)}</span>
           </div>
 
@@ -150,21 +150,12 @@ ${report.exitTargets.map((t) => `  • ${t}`).join('\n')}
             <span className={`text-base font-mono font-extrabold mt-0.5 block ${
               endRsi >= 55 ? 'text-emerald-600' : endRsi <= 45 ? 'text-rose-600' : 'text-slate-900'
             }`}>
-              {endRsi.toFixed(1)}
+              {endRsi.toFixed(1)} ({rsiDiff > 0 ? `+${rsiDiff.toFixed(1)}` : rsiDiff.toFixed(1)})
             </span>
           </div>
 
           <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 uppercase block">RSI Net Shift</span>
-            <span className={`text-base font-mono font-extrabold mt-0.5 block ${
-              rsiDiff > 0 ? 'text-emerald-600' : rsiDiff < 0 ? 'text-rose-600' : 'text-slate-600'
-            }`}>
-              {rsiDiff > 0 ? `+${rsiDiff.toFixed(1)}` : rsiDiff.toFixed(1)} Pts
-            </span>
-          </div>
-
-          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-            <span className="text-[10px] font-bold text-slate-500 uppercase block">Gradual Increase</span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase block">Gradual RSI</span>
             <span className={`text-xs font-extrabold mt-1 inline-block px-2 py-0.5 rounded ${
               report?.gradualIncreaseDetected || (rsiDiff > 2 && endRsi > 50)
                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
@@ -172,6 +163,48 @@ ${report.exitTargets.map((t) => `  • ${t}`).join('\n')}
             }`}>
               {report?.gradualIncreaseDetected || (rsiDiff > 2 && endRsi > 50) ? 'YES 📈' : 'NO / FLAT ⚠️'}
             </span>
+          </div>
+
+          <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <span className="text-[10px] font-bold text-slate-500 uppercase block">Volume Trend</span>
+            {(() => {
+              const lastPt = timeline[timeline.length - 1];
+              const isVolUp = lastPt?.volumeDirection === 'INCREASING';
+              const isVolDown = lastPt?.volumeDirection === 'DECREASING';
+              const volPct = lastPt?.volumeDeltaPct ?? 0;
+              return (
+                <span className={`text-xs font-extrabold mt-1 inline-block px-2 py-0.5 rounded ${
+                  isVolUp
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : isVolDown
+                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                    : 'bg-slate-100 text-slate-700 border border-slate-300'
+                }`}>
+                  {isVolUp ? `Increasing (+${volPct}%) 📈` : isVolDown ? `Decreasing (${volPct}%) 📉` : 'Flat ➖'}
+                </span>
+              );
+            })()}
+          </div>
+
+          <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-indigo-50 to-blue-50 p-2.5 rounded-xl border border-indigo-200/80">
+            <span className="text-[10px] font-bold text-indigo-700 uppercase block">RSI & Vol Confluence</span>
+            {(() => {
+              const lastPt = timeline[timeline.length - 1];
+              const rsiUp = lastPt?.rsiDirection === 'INCREASING';
+              const volUp = lastPt?.volumeDirection === 'INCREASING';
+              const rsiDown = lastPt?.rsiDirection === 'DECREASING';
+              const volDown = lastPt?.volumeDirection === 'DECREASING';
+
+              if (rsiUp && volUp) {
+                return <span className="text-xs font-black text-emerald-700 mt-1 block">🚀 Dual Bullish</span>;
+              } else if (rsiDown && volUp) {
+                return <span className="text-xs font-black text-rose-700 mt-1 block">⚠️ Selling Pressure</span>;
+              } else if (rsiUp && volDown) {
+                return <span className="text-xs font-bold text-amber-700 mt-1 block">⚠️ Low Vol Rise</span>;
+              } else {
+                return <span className="text-xs font-bold text-slate-600 mt-1 block">Neutral</span>;
+              }
+            })()}
           </div>
         </div>
 
@@ -290,66 +323,114 @@ ${report.exitTargets.map((t) => `  • ${t}`).join('\n')}
           </div>
         )}
 
-        {/* 15-Minute RSI Progression Timeline Table */}
-        <div className="mt-5 border border-slate-200 rounded-xl overflow-hidden">
+        {/* 15-Minute RSI & Volume Progression Timeline Table */}
+        <div className="mt-5 border border-slate-200 rounded-xl overflow-hidden shadow-xs">
           <div className="bg-slate-100/90 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
-            <span className="text-xs font-extrabold uppercase text-slate-700 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-slate-500" /> 15-Min Candle RSI Data Table (09:15 AM - Current)
+            <span className="text-xs font-extrabold uppercase text-slate-800 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-blue-600" /> 15-Min Candle RSI & Volume Sequence (09:15 AM - Current)
             </span>
             <span className="text-[10px] text-slate-500 font-mono">Total {timeline.length} Intervals</span>
           </div>
 
-          <div className="max-h-60 overflow-y-auto">
+          <div className="max-h-64 overflow-y-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] border-b border-slate-200 sticky top-0 bg-slate-50">
+              <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] border-b border-slate-200 sticky top-0 z-10">
                 <tr>
-                  <th className="py-2 px-3">Time</th>
-                  <th className="py-2 px-3">Price</th>
-                  <th className="py-2 px-3">14-Period RSI</th>
-                  <th className="py-2 px-3 text-center">Progression Shift</th>
-                  <th className="py-2 px-3 text-center">Status</th>
+                  <th className="py-2.5 px-3">Time</th>
+                  <th className="py-2.5 px-3">Price</th>
+                  <th className="py-2.5 px-3">14-Period RSI</th>
+                  <th className="py-2.5 px-3 text-center">RSI Shift</th>
+                  <th className="py-2.5 px-3 text-right">15m Volume</th>
+                  <th className="py-2.5 px-3 text-center">Volume Trend</th>
+                  <th className="py-2.5 px-3 text-center">Confluence</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono">
-                {timeline.map((point, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-2 px-3 font-semibold text-slate-800">{point.timeStr}</td>
-                    <td className="py-2 px-3 font-bold text-slate-900">₹{point.close.toFixed(2)}</td>
-                    <td className="py-2 px-3 font-extrabold">
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        point.rsi >= 60
-                          ? 'bg-emerald-100 text-emerald-900 font-black'
-                          : point.rsi >= 50
-                          ? 'bg-emerald-50 text-emerald-800'
-                          : point.rsi <= 40
-                          ? 'bg-rose-100 text-rose-900 font-black'
-                          : 'bg-slate-100 text-slate-800'
-                      }`}>
-                        {point.rsi.toFixed(1)}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-center">
-                      <span className={`text-xs font-bold ${
-                        point.rsiDelta > 0 ? 'text-emerald-600' : point.rsiDelta < 0 ? 'text-rose-600' : 'text-slate-400'
-                      }`}>
-                        {point.rsiDelta > 0 ? `+${point.rsiDelta.toFixed(1)}` : point.rsiDelta.toFixed(1)}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-center">
-                      {point.rsiDirection === 'INCREASING' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">
-                          <TrendingUp className="w-3 h-3 text-emerald-600" /> Increasing
+                {timeline.map((point, idx) => {
+                  const formatVol = (v?: number) => {
+                    if (!v || v === 0) return '-';
+                    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`;
+                    if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
+                    return v.toLocaleString('en-IN');
+                  };
+
+                  const isVolUp = point.volumeDirection === 'INCREASING';
+                  const isVolDown = point.volumeDirection === 'DECREASING';
+                  const volPct = point.volumeDeltaPct ?? 0;
+
+                  const isRsiUp = point.rsiDirection === 'INCREASING';
+                  const isRsiDown = point.rsiDirection === 'DECREASING';
+
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2 px-3 font-semibold text-slate-800">{point.timeStr}</td>
+                      <td className="py-2 px-3 font-bold text-slate-900">₹{point.close.toFixed(2)}</td>
+                      
+                      {/* RSI Cell */}
+                      <td className="py-2 px-3 font-extrabold">
+                        <span className={`px-2 py-0.5 rounded text-xs ${
+                          point.rsi >= 60
+                            ? 'bg-emerald-100 text-emerald-900 font-black'
+                            : point.rsi >= 50
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : point.rsi <= 40
+                            ? 'bg-rose-100 text-rose-900 font-black'
+                            : 'bg-slate-100 text-slate-800'
+                        }`}>
+                          {point.rsi.toFixed(1)}
                         </span>
-                      ) : point.rsiDirection === 'DECREASING' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-rose-50 text-rose-700 px-2 py-0.5 rounded border border-rose-200">
-                          <TrendingDown className="w-3 h-3 text-rose-600" /> Decreasing
+                      </td>
+
+                      {/* RSI Shift Cell */}
+                      <td className="py-2 px-3 text-center">
+                        <span className={`text-xs font-bold ${
+                          point.rsiDelta > 0 ? 'text-emerald-600' : point.rsiDelta < 0 ? 'text-rose-600' : 'text-slate-400'
+                        }`}>
+                          {point.rsiDelta > 0 ? `+${point.rsiDelta.toFixed(1)}` : point.rsiDelta.toFixed(1)}
                         </span>
-                      ) : (
-                        <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Flat</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+
+                      {/* 15m Volume Cell */}
+                      <td className="py-2 px-3 text-right font-bold text-slate-800">
+                        {formatVol(point.volume)}
+                      </td>
+
+                      {/* Volume Trend Cell */}
+                      <td className="py-2 px-3 text-center">
+                        {isVolUp ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200">
+                            <TrendingUp className="w-3 h-3 text-emerald-600" /> Increasing ({volPct > 0 ? `+${volPct}` : volPct}%)
+                          </span>
+                        ) : isVolDown ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-rose-50 text-rose-700 px-2 py-0.5 rounded border border-rose-200">
+                            <TrendingDown className="w-3 h-3 text-rose-600" /> Decreasing ({volPct}%)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Flat</span>
+                        )}
+                      </td>
+
+                      {/* RSI & Vol Confluence Status Cell */}
+                      <td className="py-2 px-3 text-center">
+                        {isRsiUp && isVolUp ? (
+                          <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                            Strong Bullish
+                          </span>
+                        ) : isRsiDown && isVolUp ? (
+                          <span className="text-[10px] font-black uppercase text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">
+                            Heavy Selling
+                          </span>
+                        ) : isRsiUp && isVolDown ? (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            Low Vol Rise
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

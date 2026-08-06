@@ -106,6 +106,9 @@ export interface RsiIntradayPoint {
   rsi: number;
   rsiDirection: 'INCREASING' | 'DECREASING' | 'FLAT';
   rsiDelta: number;
+  volumeDirection?: 'INCREASING' | 'DECREASING' | 'FLAT';
+  volumeDelta?: number;
+  volumeDeltaPct?: number;
 }
 
 export interface RsiAiAnalysisReport {

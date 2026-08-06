@@ -397,13 +397,26 @@ export function createExpressApp() {
           const delta = Math.round((candleRsi - prevRsi) * 10) / 10;
           const direction = delta > 0.1 ? 'INCREASING' : delta < -0.1 ? 'DECREASING' : 'FLAT';
 
+          // Calculate 15m volume direction and delta
+          const vol = c.volume || 0;
+          let prevVol = vol;
+          if (idx > 0) {
+            prevVol = sessionCandles[idx - 1].volume || 0;
+          }
+          const volDelta = vol - prevVol;
+          const volDeltaPct = prevVol > 0 ? Math.round(((vol - prevVol) / prevVol) * 1000) / 10 : 0;
+          const volDirection: 'INCREASING' | 'DECREASING' | 'FLAT' = volDelta > 0 ? 'INCREASING' : volDelta < 0 ? 'DECREASING' : 'FLAT';
+
           return {
             timeStr: c.timeStr,
             close: c.close,
-            volume: c.volume,
+            volume: vol,
             rsi: candleRsi,
             rsiDirection: direction,
-            rsiDelta: delta
+            rsiDelta: delta,
+            volumeDirection: volDirection,
+            volumeDelta: volDelta,
+            volumeDeltaPct: volDeltaPct
           };
         });
 
@@ -516,7 +529,7 @@ export function createExpressApp() {
         try {
           const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
           const timelineText = points
-            .map((p: any) => `Time: ${p.timeStr}, Price: ₹${p.close}, RSI: ${p.rsi} (${p.rsiDirection})`)
+            .map((p: any) => `Time: ${p.timeStr}, Price: ₹${p.close}, Volume: ${p.volume || 'N/A'} (${p.volumeDirection || 'N/A'}, ${p.volumeDeltaPct ? (p.volumeDeltaPct > 0 ? '+' : '') + p.volumeDeltaPct + '%' : '0%'}), RSI: ${p.rsi} (${p.rsiDirection})`)
             .join('\n');
 
           const prompt = `

@@ -17,6 +17,8 @@ export interface RsiPullbackAnalysis {
   isVwapBullish: boolean;
   rsiDirection: 'UP' | 'DOWN' | 'FLAT';
   rsiDelta: number;
+  volumeDirection: 'INCREASING' | 'DECREASING' | 'FLAT';
+  volumeDeltaPct: number;
 }
 
 /**
@@ -30,17 +32,24 @@ export function analyzeRsiPullback(stock: StockCalculated): RsiPullbackAnalysis 
   const vwap = stock.vwap || (open + high + low + close) / 4;
   const currentRsi = stock.rsi !== undefined && stock.rsi !== null ? stock.rsi : (close >= open ? 54 : 44);
 
-  // Derive RSI timeline momentum if available
+  // Derive RSI timeline momentum & Volume trend if available
   let rsiDirection: 'UP' | 'DOWN' | 'FLAT' = 'FLAT';
   let rsiDelta = 0;
+  let volumeDirection: 'INCREASING' | 'DECREASING' | 'FLAT' = 'FLAT';
+  let volumeDeltaPct = 0;
+
   if (stock.rsiTimeline && stock.rsiTimeline.length >= 2) {
     const last = stock.rsiTimeline[stock.rsiTimeline.length - 1];
     const prev = stock.rsiTimeline[stock.rsiTimeline.length - 2];
     rsiDelta = Math.round((last.rsi - prev.rsi) * 10) / 10;
     if (rsiDelta > 0.3) rsiDirection = 'UP';
     else if (rsiDelta < -0.3) rsiDirection = 'DOWN';
+
+    if (last.volumeDirection) volumeDirection = last.volumeDirection;
+    if (last.volumeDeltaPct) volumeDeltaPct = last.volumeDeltaPct;
   } else {
     rsiDirection = close >= open ? 'UP' : 'DOWN';
+    volumeDirection = close >= open ? 'INCREASING' : 'FLAT';
   }
 
   const isAboveVwap = close >= vwap;
@@ -155,6 +164,8 @@ export function analyzeRsiPullback(stock: StockCalculated): RsiPullbackAnalysis 
     vwapStatus,
     isVwapBullish: isAboveVwap,
     rsiDirection,
-    rsiDelta
+    rsiDelta,
+    volumeDirection,
+    volumeDeltaPct
   };
 }

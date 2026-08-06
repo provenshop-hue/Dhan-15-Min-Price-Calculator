@@ -37,6 +37,7 @@ type PullbackFilterType =
   | 'OVERSOLD' 
   | 'BEARISH_RALLY' 
   | 'HIGH_SCORE'
+  | 'VOL_INCREASING'
   | 'OPEN_LOW';
 
 type SortOption = 'SCORE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
@@ -128,6 +129,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
       if (activeFilter === 'HIGH_SCORE') {
         return analysis.pullbackScore >= 75;
+      }
+      if (activeFilter === 'VOL_INCREASING') {
+        return analysis.volumeDirection === 'INCREASING';
       }
       if (activeFilter === 'OPEN_LOW') {
         return Boolean(stock.isOpenEqualLow);
@@ -447,6 +451,18 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveFilter('VOL_INCREASING')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 ${
+              activeFilter === 'VOL_INCREASING'
+                ? 'bg-indigo-600 text-white shadow-2xs'
+                : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200/80'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Volume Increasing 📈</span>
+          </button>
+
+          <button
             onClick={() => setActiveFilter('OPEN_LOW')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               activeFilter === 'OPEN_LOW'
@@ -555,9 +571,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
                   {/* RSI Gauge Bar & Category */}
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="font-bold text-slate-700">RSI 14 (15m):</span>
+                    <div className="flex items-center justify-between text-xs flex-wrap gap-1">
+                      <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                        <span className="font-bold text-slate-700">RSI 14:</span>
                         <span className={`px-2 py-0.5 rounded-md font-black text-xs ${
                           analysis.rsiVal >= 40 && analysis.rsiVal <= 55
                             ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
@@ -569,6 +585,23 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                         }`}>
                           {analysis.rsiVal.toFixed(1)}
                         </span>
+
+                        {/* Volume Trend Badge */}
+                        {analysis.volumeDirection === 'INCREASING' ? (
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded border border-emerald-300 flex items-center gap-0.5">
+                            <TrendingUp className="w-3 h-3 text-emerald-600" />
+                            Vol +{analysis.volumeDeltaPct}% 📈
+                          </span>
+                        ) : analysis.volumeDirection === 'DECREASING' ? (
+                          <span className="bg-rose-100 text-rose-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded border border-rose-300 flex items-center gap-0.5">
+                            <TrendingDown className="w-3 h-3 text-rose-600" />
+                            Vol {analysis.volumeDeltaPct}% 📉
+                          </span>
+                        ) : (
+                          <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-slate-200">
+                            Vol Flat
+                          </span>
+                        )}
                       </div>
 
                       <span className={`text-[11px] font-bold ${
