@@ -10,22 +10,28 @@ export interface PrevMonthGannData {
   prevMonthEndDate: string; // e.g. "31 Jul 2026"
   
   cmp: number; // Current Market Price
+  cmpAngle: number; // MOD(SQRT(cmp)*180 - 225, 360)
   openPrice: number;
   
   prevMonthHigh: number;
   prevMonthHighDate: string; // e.g. "16 Jul 2026"
+  prevMonthHighAngle: number; // MOD(SQRT(pmh)*180 - 225, 360)
   
   prevMonthLow: number;
   prevMonthLowDate: string; // e.g. "04 Jul 2026"
+  prevMonthLowAngle: number; // MOD(SQRT(pml)*180 - 225, 360)
   
   prevMonthClose: number;
   prevMonthRange: number; // High - Low
   prevMonthRangePct: number; // ((High - Low) / Low) * 100
   
   gannMidpoint: number; // (High + Low) / 2
+  gannMidpointAngle: number;
   
   gannBuyAbove: number; // Gann Square of 9 breakout target level above PMH
+  gannBuyAboveAngle: number;
   gannSellBelow: number; // Gann Square of 9 breakdown target level below PML
+  gannSellBelowAngle: number;
   
   gannTargetsUp: number[];
   gannTargetsDown: number[];
@@ -46,6 +52,17 @@ export interface PrevMonthGannData {
   cmpStatusLabel: string;
   cmpStatusBadgeClass: string;
   isRealApiData?: boolean;
+}
+
+/**
+ * Calculates Gann Angle / Degree for a given price using the Square of 9 formula:
+ * MOD(SQRT(Price) * 180 - 225, 360)
+ */
+export function calculateGannAngle(price: number): number {
+  if (!price || price <= 0) return 0;
+  const rawValue = Math.sqrt(price) * 180 - 225;
+  const angle = ((rawValue % 360) + 360) % 360;
+  return Math.round(angle * 100) / 100;
 }
 
 /**
@@ -245,6 +262,14 @@ export function calculateGannMonthData(
     cmpStatusBadgeClass = 'bg-amber-50 text-amber-800 border-amber-200';
   }
   
+  // Gann Angle / Degree calculations using formula MOD(SQRT(Price)*180-225, 360)
+  const pmhAngle = calculateGannAngle(pmh);
+  const pmlAngle = calculateGannAngle(pml);
+  const cmpAngle = calculateGannAngle(cmp);
+  const midpointAngle = calculateGannAngle(midpoint);
+  const buyAboveAngle = calculateGannAngle(buyAbove);
+  const sellBelowAngle = calculateGannAngle(sellBelow);
+
   return {
     stockId: stock.id,
     symbol: stock.symbol,
@@ -254,17 +279,23 @@ export function calculateGannMonthData(
     prevMonthStartDate: bounds.prevMonthStartDate,
     prevMonthEndDate: bounds.prevMonthEndDate,
     cmp,
+    cmpAngle,
     openPrice,
     prevMonthHigh: pmh,
     prevMonthHighDate: pmhDate,
+    prevMonthHighAngle: pmhAngle,
     prevMonthLow: pml,
     prevMonthLowDate: pmlDate,
+    prevMonthLowAngle: pmlAngle,
     prevMonthClose: pmc,
     prevMonthRange: range,
     prevMonthRangePct: rangePct,
     gannMidpoint: midpoint,
+    gannMidpointAngle: midpointAngle,
     gannBuyAbove: buyAbove,
+    gannBuyAboveAngle: buyAboveAngle,
     gannSellBelow: sellBelow,
+    gannSellBelowAngle: sellBelowAngle,
     gannTargetsUp,
     gannTargetsDown,
     gannOctaves: octaves,

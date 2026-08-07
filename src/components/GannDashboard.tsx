@@ -411,8 +411,13 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                         <span>PMH High</span>
                         <span className="text-[9px] bg-emerald-900/60 px-1.5 py-0.2 rounded text-emerald-300">{idxItem.prevMonthHighDate}</span>
                       </div>
-                      <div className="text-sm font-black text-emerald-300">
-                        ₹{idxItem.prevMonthHigh.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <div className="flex items-baseline justify-between">
+                        <div className="text-sm font-black text-emerald-300">
+                          ₹{idxItem.prevMonthHigh.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          {idxItem.prevMonthHighAngle}° Angle
+                        </div>
                       </div>
                     </div>
 
@@ -421,8 +426,13 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                         <span>PML Low</span>
                         <span className="text-[9px] bg-rose-900/60 px-1.5 py-0.2 rounded text-rose-300">{idxItem.prevMonthLowDate}</span>
                       </div>
-                      <div className="text-sm font-black text-rose-300">
-                        ₹{idxItem.prevMonthLow.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <div className="flex items-baseline justify-between">
+                        <div className="text-sm font-black text-rose-300">
+                          ₹{idxItem.prevMonthLow.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-[10px] font-black px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                          {idxItem.prevMonthLowAngle}° Angle
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -431,19 +441,26 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                   <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800/90 text-xs space-y-2">
                     <div className="flex items-center justify-between text-slate-300 pb-1.5 border-b border-slate-800">
                       <span className="font-bold text-blue-400">Gann 50% Midpoint:</span>
-                      <span className="font-black text-blue-300">
-                        ₹{idxItem.gannMidpoint.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-black text-blue-300">
+                          ₹{idxItem.gannMidpoint.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                          {idxItem.gannMidpointAngle}° Angle
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-[11px]">
                       <div className="text-emerald-400">
                         <span className="text-[10px] font-bold block text-slate-400">Buy Breakout &gt;</span>
                         <span className="font-black">₹{idxItem.gannBuyAbove.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-[9px] text-emerald-300 ml-1">({idxItem.gannBuyAboveAngle}°)</span>
                       </div>
                       <div className="text-rose-400">
                         <span className="text-[10px] font-bold block text-slate-400">Sell Breakdown &lt;</span>
                         <span className="font-black">₹{idxItem.gannSellBelow.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-[9px] text-rose-300 ml-1">({idxItem.gannSellBelowAngle}°)</span>
                       </div>
                     </div>
                   </div>
@@ -670,7 +687,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                       <span className="text-indigo-700 font-extrabold">Range: {item.prevMonthRangePct}%</span>
                     </div>
 
-                    {/* High Date & Price */}
+                    {/* High Date & Price & Angle */}
                     <div className="flex items-center justify-between text-slate-800">
                       <div className="flex items-center space-x-1.5">
                         <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -679,10 +696,15 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                           <span className="text-[10px] text-slate-500 ml-1 font-semibold">({item.prevMonthHighDate})</span>
                         </div>
                       </div>
-                      <span className="font-black text-emerald-700">₹{item.prevMonthHigh.toFixed(2)}</span>
+                      <div className="text-right">
+                        <span className="font-black text-emerald-700">₹{item.prevMonthHigh.toFixed(2)}</span>
+                        <span className="text-[9px] font-extrabold text-emerald-600 bg-emerald-100/80 px-1 py-0.2 rounded ml-1 border border-emerald-200">
+                          {item.prevMonthHighAngle}°
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Low Date & Price */}
+                    {/* Low Date & Price & Angle */}
                     <div className="flex items-center justify-between text-slate-800">
                       <div className="flex items-center space-x-1.5">
                         <TrendingDown className="w-3.5 h-3.5 text-rose-600 shrink-0" />
@@ -691,13 +713,23 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                           <span className="text-[10px] text-slate-500 ml-1 font-semibold">({item.prevMonthLowDate})</span>
                         </div>
                       </div>
-                      <span className="font-black text-rose-700">₹{item.prevMonthLow.toFixed(2)}</span>
+                      <div className="text-right">
+                        <span className="font-black text-rose-700">₹{item.prevMonthLow.toFixed(2)}</span>
+                        <span className="text-[9px] font-extrabold text-rose-600 bg-rose-100/80 px-1 py-0.2 rounded ml-1 border border-rose-200">
+                          {item.prevMonthLowAngle}°
+                        </span>
+                      </div>
                     </div>
 
                     {/* Gann 50% Midpoint */}
                     <div className="flex items-center justify-between text-slate-700 pt-1 border-t border-slate-200/60 text-[11px]">
                       <span className="font-bold text-blue-700">Gann 50% Midpoint:</span>
-                      <span className="font-black text-blue-800">₹{item.gannMidpoint.toFixed(2)}</span>
+                      <div className="text-right">
+                        <span className="font-black text-blue-800">₹{item.gannMidpoint.toFixed(2)}</span>
+                        <span className="text-[9px] font-extrabold text-blue-600 bg-blue-100/80 px-1 py-0.2 rounded ml-1 border border-blue-200">
+                          {item.gannMidpointAngle}°
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -750,9 +782,19 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                         <div className="text-[10px] text-slate-500 truncate max-w-[140px]">{item.companyName}</div>
                       </td>
                       <td className="p-3.5 font-black text-slate-900">₹{item.cmp.toFixed(2)}</td>
-                      <td className="p-3.5 font-bold text-emerald-700">₹{item.prevMonthHigh.toFixed(2)}</td>
+                      <td className="p-3.5 font-bold text-emerald-700">
+                        <div>₹{item.prevMonthHigh.toFixed(2)}</div>
+                        <div className="text-[9px] font-extrabold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200 inline-block mt-0.5">
+                          {item.prevMonthHighAngle}° Angle
+                        </div>
+                      </td>
                       <td className="p-3.5 font-semibold text-slate-600 bg-emerald-50/40 rounded-lg">{item.prevMonthHighDate}</td>
-                      <td className="p-3.5 font-bold text-rose-700">₹{item.prevMonthLow.toFixed(2)}</td>
+                      <td className="p-3.5 font-bold text-rose-700">
+                        <div>₹{item.prevMonthLow.toFixed(2)}</div>
+                        <div className="text-[9px] font-extrabold text-rose-600 bg-rose-50 px-1 py-0.2 rounded border border-rose-200 inline-block mt-0.5">
+                          {item.prevMonthLowAngle}° Angle
+                        </div>
+                      </td>
                       <td className="p-3.5 font-semibold text-slate-600 bg-rose-50/40 rounded-lg">{item.prevMonthLowDate}</td>
                       <td className="p-3.5 font-black text-blue-800">₹{item.gannMidpoint.toFixed(2)}</td>
                       <td className="p-3.5 font-black text-emerald-800">₹{item.gannBuyAbove.toFixed(2)}</td>
@@ -817,9 +859,14 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
             {/* Exact Appearance Dates & Prices Box */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-emerald-50/80 p-4 rounded-2xl border border-emerald-200 space-y-1">
-                <div className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
-                  <TrendingUp className="w-4 h-4 text-emerald-600" />
-                  <span>Previous Month High (PMH)</span>
+                <div className="text-xs font-bold text-emerald-800 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    <span>Previous Month High (PMH)</span>
+                  </div>
+                  <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                    {selectedStockData.prevMonthHighAngle}° Degree
+                  </span>
                 </div>
                 <div className="text-2xl font-black text-emerald-950">₹{selectedStockData.prevMonthHigh.toFixed(2)}</div>
                 <div className="text-xs font-extrabold text-emerald-700 pt-1">
@@ -828,13 +875,71 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
               </div>
 
               <div className="bg-rose-50/80 p-4 rounded-2xl border border-rose-200 space-y-1">
-                <div className="text-xs font-bold text-rose-800 flex items-center gap-1.5">
-                  <TrendingDown className="w-4 h-4 text-rose-600" />
-                  <span>Previous Month Low (PML)</span>
+                <div className="text-xs font-bold text-rose-800 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingDown className="w-4 h-4 text-rose-600" />
+                    <span>Previous Month Low (PML)</span>
+                  </div>
+                  <span className="text-[10px] font-black bg-rose-600 text-white px-2 py-0.5 rounded-full">
+                    {selectedStockData.prevMonthLowAngle}° Degree
+                  </span>
                 </div>
                 <div className="text-2xl font-black text-rose-950">₹{selectedStockData.prevMonthLow.toFixed(2)}</div>
                 <div className="text-xs font-extrabold text-rose-700 pt-1">
                   📅 Low Appeared On: <span className="bg-white px-2 py-0.5 rounded border border-rose-300 shadow-2xs">{selectedStockData.prevMonthLowDate}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Gann Square of 9 Degree / Angle Matrix */}
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4 rounded-2xl border border-indigo-500/30 text-white space-y-3 shadow-md">
+              <div className="flex flex-wrap items-center justify-between border-b border-indigo-800/60 pb-2 gap-2">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                    Gann Square of 9 Degree / Angle Matrix
+                  </h3>
+                </div>
+                <div className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 rounded text-[10px] font-mono font-bold">
+                  MOD(SQRT(Price)*180 - 225, 360)
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-0.5">
+                  <div className="text-[10px] text-emerald-400 font-extrabold uppercase">PMH High Angle</div>
+                  <div className="text-base font-black text-emerald-300">{selectedStockData.prevMonthHighAngle}°</div>
+                  <div className="text-[9px] text-slate-400">Price: ₹{selectedStockData.prevMonthHigh.toFixed(2)}</div>
+                </div>
+
+                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-0.5">
+                  <div className="text-[10px] text-rose-400 font-extrabold uppercase">PML Low Angle</div>
+                  <div className="text-base font-black text-rose-300">{selectedStockData.prevMonthLowAngle}°</div>
+                  <div className="text-[9px] text-slate-400">Price: ₹{selectedStockData.prevMonthLow.toFixed(2)}</div>
+                </div>
+
+                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-0.5">
+                  <div className="text-[10px] text-blue-400 font-extrabold uppercase">CMP Price Angle</div>
+                  <div className="text-base font-black text-blue-300">{selectedStockData.cmpAngle}°</div>
+                  <div className="text-[9px] text-slate-400">Price: ₹{selectedStockData.cmp.toFixed(2)}</div>
+                </div>
+
+                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-0.5">
+                  <div className="text-[10px] text-indigo-400 font-extrabold uppercase">50% Midpoint Angle</div>
+                  <div className="text-base font-black text-indigo-300">{selectedStockData.gannMidpointAngle}°</div>
+                  <div className="text-[9px] text-slate-400">Price: ₹{selectedStockData.gannMidpoint.toFixed(2)}</div>
+                </div>
+
+                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-0.5">
+                  <div className="text-[10px] text-emerald-400 font-extrabold uppercase">Buy Above Angle</div>
+                  <div className="text-base font-black text-emerald-300">{selectedStockData.gannBuyAboveAngle}°</div>
+                  <div className="text-[9px] text-slate-400">Price: ₹{selectedStockData.gannBuyAbove.toFixed(2)}</div>
+                </div>
+
+                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-0.5">
+                  <div className="text-[10px] text-rose-400 font-extrabold uppercase">Sell Below Angle</div>
+                  <div className="text-base font-black text-rose-300">{selectedStockData.gannSellBelowAngle}°</div>
+                  <div className="text-[9px] text-slate-400">Price: ₹{selectedStockData.gannSellBelow.toFixed(2)}</div>
                 </div>
               </div>
             </div>
