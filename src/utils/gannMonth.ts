@@ -22,8 +22,9 @@ export interface PrevMonthGannData {
   prevMonthLowAngle: number; // MOD(SQRT(pml)*180 - 225, 360)
   
   prevMonthClose: number;
-  prevMonthRange: number; // High - Low
+  prevMonthRange: number; // High - Low (C4)
   prevMonthRangePct: number; // ((High - Low) / Low) * 100
+  prevMonthRangeAngle: number; // MOD(SQRT(C4)*180 - 225, 360) where C4 = PMH - PML
   
   gannMidpoint: number; // (High + Low) / 2
   gannMidpointAngle: number;
@@ -265,6 +266,7 @@ export function calculateGannMonthData(
   // Gann Angle / Degree calculations using formula MOD(SQRT(Price)*180-225, 360)
   const pmhAngle = calculateGannAngle(pmh);
   const pmlAngle = calculateGannAngle(pml);
+  const rangeAngle = calculateGannAngle(range); // C4 = PMH - PML
   const cmpAngle = calculateGannAngle(cmp);
   const midpointAngle = calculateGannAngle(midpoint);
   const buyAboveAngle = calculateGannAngle(buyAbove);
@@ -290,6 +292,7 @@ export function calculateGannMonthData(
     prevMonthClose: pmc,
     prevMonthRange: range,
     prevMonthRangePct: rangePct,
+    prevMonthRangeAngle: rangeAngle,
     gannMidpoint: midpoint,
     gannMidpointAngle: midpointAngle,
     gannBuyAbove: buyAbove,

@@ -437,8 +437,23 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                     </div>
                   </div>
 
-                  {/* Gann Midpoint & Breakouts */}
+                  {/* Gann Midpoint, C4 Range Diff & Breakouts */}
                   <div className="bg-slate-900/90 p-3 rounded-xl border border-slate-800/90 text-xs space-y-2">
+                    {/* C4 Range Difference & Gann Degree */}
+                    <div className="flex items-center justify-between text-slate-300 pb-1.5 border-b border-slate-800">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-bold text-amber-400">Range Diff (C4 = High - Low):</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-black text-amber-300">
+                          ₹{idxItem.prevMonthRange.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                          {idxItem.prevMonthRangeAngle}° Range Degree
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="flex items-center justify-between text-slate-300 pb-1.5 border-b border-slate-800">
                       <span className="font-bold text-blue-400">Gann 50% Midpoint:</span>
                       <div className="flex items-center space-x-2">
@@ -684,7 +699,9 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2 text-xs">
                     <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-200/80 pb-1">
                       <span>{item.prevMonthName} Bounds</span>
-                      <span className="text-indigo-700 font-extrabold">Range: {item.prevMonthRangePct}%</span>
+                      <span className="text-amber-800 font-extrabold bg-amber-100 px-1.5 py-0.2 rounded border border-amber-200">
+                        C4 Angle: {item.prevMonthRangeAngle}°
+                      </span>
                     </div>
 
                     {/* High Date & Price & Angle */}
@@ -721,8 +738,19 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                       </div>
                     </div>
 
-                    {/* Gann 50% Midpoint */}
+                    {/* Range Difference (C4) */}
                     <div className="flex items-center justify-between text-slate-700 pt-1 border-t border-slate-200/60 text-[11px]">
+                      <span className="font-bold text-amber-800">Range Diff (C4 = High - Low):</span>
+                      <div className="text-right">
+                        <span className="font-black text-slate-900">₹{item.prevMonthRange.toFixed(2)}</span>
+                        <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded ml-1 border border-amber-300">
+                          {item.prevMonthRangeAngle}° Degree
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Gann 50% Midpoint */}
+                    <div className="flex items-center justify-between text-slate-700 text-[11px]">
                       <span className="font-bold text-blue-700">Gann 50% Midpoint:</span>
                       <div className="text-right">
                         <span className="font-black text-blue-800">₹{item.gannMidpoint.toFixed(2)}</span>
@@ -768,6 +796,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                     <th className="p-3.5">Date High Appeared</th>
                     <th className="p-3.5">PML ({bounds.prevMonthName.split(' ')[0]} Low)</th>
                     <th className="p-3.5">Date Low Appeared</th>
+                    <th className="p-3.5">Range Diff (C4)</th>
                     <th className="p-3.5">50% Midpoint</th>
                     <th className="p-3.5">Gann Buy Trigger</th>
                     <th className="p-3.5">Status</th>
@@ -796,6 +825,12 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                         </div>
                       </td>
                       <td className="p-3.5 font-semibold text-slate-600 bg-rose-50/40 rounded-lg">{item.prevMonthLowDate}</td>
+                      <td className="p-3.5 font-bold text-amber-900 bg-amber-50/40 rounded-lg">
+                        <div>₹{item.prevMonthRange.toFixed(2)}</div>
+                        <div className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-1 py-0.2 rounded border border-amber-300 inline-block mt-0.5">
+                          {item.prevMonthRangeAngle}° Degree
+                        </div>
+                      </td>
                       <td className="p-3.5 font-black text-blue-800">₹{item.gannMidpoint.toFixed(2)}</td>
                       <td className="p-3.5 font-black text-emerald-800">₹{item.gannBuyAbove.toFixed(2)}</td>
                       <td className="p-3.5">
@@ -901,7 +936,26 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                   </h3>
                 </div>
                 <div className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 rounded text-[10px] font-mono font-bold">
-                  MOD(SQRT(Price)*180 - 225, 360)
+                  MOD(SQRT(C4)*180 - 225, 360)
+                </div>
+              </div>
+
+              {/* Featured Range Difference (C4 = PMH - PML) Degree Box */}
+              <div className="bg-gradient-to-r from-amber-950/90 via-indigo-950/90 to-amber-950/90 p-3 rounded-xl border border-amber-500/50 flex flex-wrap items-center justify-between gap-3 shadow-inner">
+                <div>
+                  <div className="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Range Difference C4 (PMH - PML)</span>
+                  </div>
+                  <div className="text-xl font-black text-amber-200 mt-0.5">
+                    ₹{selectedStockData.prevMonthRange.toFixed(2)} <span className="text-xs text-amber-300/80 font-normal">({selectedStockData.prevMonthRangePct}%)</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider">Range Gann Degree (C4)</div>
+                  <div className="text-2xl font-black text-amber-300 bg-amber-500/20 px-3.5 py-1 rounded-xl border border-amber-400/40 inline-block shadow-sm">
+                    {selectedStockData.prevMonthRangeAngle}° Degree
+                  </div>
                 </div>
               </div>
 
