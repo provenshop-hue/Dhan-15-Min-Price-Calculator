@@ -409,9 +409,6 @@ export function createExpressApp() {
 
           return {
             timeStr: c.timeStr,
-            open: c.open,
-            high: c.high,
-            low: c.low,
             close: c.close,
             volume: vol,
             rsi: candleRsi,
@@ -426,6 +423,73 @@ export function createExpressApp() {
         // 14-period RSI calculated up to the latest candle
         const latestRsiObj = rsiTimeline[rsiTimeline.length - 1];
         const rsi = latestRsiObj ? latestRsiObj.rsi : null;
+
+        // Calculate 14-period ADX from historical candles
+        const calcADXForCandles = (cList: Array<{ high: number; low: number; close: number }>, period = 14): number | null => {
+          if (!cList || cList.length < 2) return null;
+          const trs: number[] = [];
+          const plusDMs: number[] = [];
+          const minusDMs: number[] = [];
+
+          for (let i = 1; i < cList.length; i++) {
+            const h = cList[i].high;
+            const l = cList[i].low;
+            const prevH = cList[i - 1].high;
+            const prevL = cList[i - 1].low;
+            const prevC = cList[i - 1].close;
+
+            const tr = Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC));
+            trs.push(tr);
+
+            const upMove = h - prevH;
+            const downMove = prevL - l;
+
+            if (upMove > downMove && upMove > 0) plusDMs.push(upMove);
+            else plusDMs.push(0);
+
+            if (downMove > upMove && downMove > 0) minusDMs.push(downMove);
+            else minusDMs.push(0);
+          }
+
+          if (trs.length === 0) return null;
+          const p = Math.min(period, trs.length);
+
+          let trSmooth = 0;
+          let plusDMSmooth = 0;
+          let minusDMSmooth = 0;
+
+          for (let i = 0; i < p; i++) {
+            trSmooth += trs[i];
+            plusDMSmooth += plusDMs[i];
+            minusDMSmooth += minusDMs[i];
+          }
+
+          const dxs: number[] = [];
+          const getDX = (pDM: number, mDM: number, tr: number) => {
+            if (tr === 0) return 0;
+            const plusDI = 100 * (pDM / tr);
+            const minusDI = 100 * (mDM / tr);
+            const diff = Math.abs(plusDI - minusDI);
+            const sum = plusDI + minusDI;
+            if (sum === 0) return 0;
+            return 100 * (diff / sum);
+          };
+
+          dxs.push(getDX(plusDMSmooth, minusDMSmooth, trSmooth));
+
+          for (let i = p; i < cList.length - 1; i++) {
+            trSmooth = trSmooth - (trSmooth / p) + trs[i];
+            plusDMSmooth = plusDMSmooth - (plusDMSmooth / p) + plusDMs[i];
+            minusDMSmooth = minusDMSmooth - (minusDMSmooth / p) + minusDMs[i];
+            dxs.push(getDX(plusDMSmooth, minusDMSmooth, trSmooth));
+          }
+
+          if (dxs.length === 0) return null;
+          const adxVal = dxs.reduce((a, b) => a + b, 0) / dxs.length;
+          return Math.round(adxVal * 10) / 10;
+        };
+
+        const adx = calcADXForCandles(candlesList);
 
         const candleTimestamp = latestTimeStr !== '09:15 AM'
           ? `${foundDate} ${latestTimeStr} (Live | 15m)`
@@ -443,6 +507,7 @@ export function createExpressApp() {
           low: Math.round(sessionLow * 100) / 100,
           volume: first15MinVol,
           rsi,
+          adx,
           vwap: sessionVWAP,
           rsiTimeline,
           totalCandles: openCandles.length

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
-import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382 } from '../utils/gann';
+import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
 
 interface StockTableProps {
   stocks: StockCalculated[];
@@ -86,16 +86,12 @@ export const StockTable: React.FC<StockTableProps> = ({
   // Helper check for O=L / O=H with strict exact match
   const isStockOpenEqualLow = (s: StockCalculated) => {
     if (s.isOpenEqualLow !== undefined) return s.isOpenEqualLow;
-    if (!s.openPrice || s.openPrice <= 0) return false;
-    const low = s.lowPrice !== undefined && s.lowPrice !== null ? s.lowPrice : Math.min(s.openPrice, s.closePrice || s.openPrice);
-    return Math.abs(s.openPrice - low) < 0.001;
+    return isOpenLowPattern(s.openPrice, s.lowPrice);
   };
 
   const isStockOpenEqualHigh = (s: StockCalculated) => {
     if (s.isOpenEqualHigh !== undefined) return s.isOpenEqualHigh;
-    if (!s.openPrice || s.openPrice <= 0) return false;
-    const high = s.highPrice !== undefined && s.highPrice !== null ? s.highPrice : Math.max(s.openPrice, s.closePrice || s.openPrice);
-    return Math.abs(s.openPrice - high) < 0.001;
+    return isOpenHighPattern(s.openPrice, s.highPrice);
   };
 
   // Helper check for Fibonacci 38.2% Retracement
@@ -619,13 +615,23 @@ export const StockTable: React.FC<StockTableProps> = ({
 
                         {stock.rsi !== undefined && stock.rsi !== null && (
                           <span className={`text-[10px] font-black px-2 py-0.2 rounded border ${
-                            stock.rsi > 55
+                            stock.rsi > 58
                               ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
                               : stock.rsi < 40
                               ? 'bg-rose-100 text-rose-900 border-rose-300'
                               : 'bg-slate-100 text-slate-700 border-slate-300'
                           }`}>
                             RSI: {stock.rsi.toFixed(1)} {stock.rsi > 50 ? '▲' : '▼'}
+                          </span>
+                        )}
+
+                        {stock.adx !== undefined && stock.adx !== null && (
+                          <span className={`text-[10px] font-black px-2 py-0.2 rounded border ${
+                            stock.adx > 21
+                              ? 'bg-blue-100 text-blue-900 border-blue-300'
+                              : 'bg-slate-100 text-slate-700 border-slate-300'
+                          }`}>
+                            ADX: {stock.adx.toFixed(1)} {stock.adx > 21 ? '⚡' : ''}
                           </span>
                         )}
 

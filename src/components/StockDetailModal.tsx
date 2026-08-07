@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator, Percent, Sparkles } from 'lucide-react';
 import { StockCalculated } from '../types';
-import { getAtmOptionStrikes, calculateFibonacci382 } from '../utils/gann';
+import { getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
 
 interface StockDetailModalProps {
   stock: StockCalculated | null;
@@ -26,8 +26,8 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
   const contractValue = lotSize && activePrice ? lotSize * activePrice : 0;
   const optionStrikes = getAtmOptionStrikes(activePrice, stock.symbol);
 
-  const isOpenLow = stock.isOpenEqualLow ?? Boolean(stock.openPrice && stock.lowPrice && Math.abs(stock.openPrice - stock.lowPrice) < 0.001);
-  const isOpenHigh = stock.isOpenEqualHigh ?? Boolean(stock.openPrice && stock.highPrice && Math.abs(stock.openPrice - stock.highPrice) < 0.001);
+  const isOpenLow = stock.isOpenEqualLow ?? isOpenLowPattern(stock.openPrice, stock.lowPrice);
+  const isOpenHigh = stock.isOpenEqualHigh ?? isOpenHighPattern(stock.openPrice, stock.highPrice);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
@@ -162,7 +162,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
             <span className="text-[10px] text-slate-400 font-normal">Gann Square + RSI + Intraday VWAP</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
             {/* Gann Signal */}
             <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">1. Gann Square Level</div>
@@ -229,7 +229,26 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
                     ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
                     : 'bg-slate-700 text-slate-300'
                 }`}>
-                  {stock.vwapStatus === 'Above' ? 'Above VWAP 🟢' : stock.vwapStatus === 'Below' ? 'Below VWAP 🔴' : 'At VWAP 🟡'}
+                  {stock.vwapStatus === 'Above' ? 'Above 🟢' : stock.vwapStatus === 'Below' ? 'Below 🔴' : 'At 🟡'}
+                </span>
+              </div>
+            </div>
+
+            {/* ADX Trend Strength */}
+            <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">4. ADX Strength (14)</div>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-xs font-mono text-slate-300">
+                  {stock.adx !== undefined && stock.adx !== null ? `ADX ${stock.adx.toFixed(1)}` : 'ADX N/A'}
+                </span>
+                <span className={`text-xs font-extrabold px-2 py-0.5 rounded ${
+                  stock.adx !== undefined && stock.adx !== null && stock.adx > 21
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
+                    : 'bg-slate-700 text-slate-300'
+                }`}>
+                  {stock.adx !== undefined && stock.adx !== null
+                    ? stock.adx > 21 ? 'Strong (>21) ⚡' : 'Weak (<21)'
+                    : 'N/A'}
                 </span>
               </div>
             </div>

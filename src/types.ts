@@ -30,8 +30,8 @@ export interface StockCalculated {
   pctChange?: number | null;
   gannScore?: number | null;
   rsi?: number | null;
+  adx?: number | null;
   rsiTimeline?: RsiIntradayPoint[];
-  volumeAnalysis?: VolumeAnalysisResult;
   vwap?: number | null;
   vwapStatus?: 'Above' | 'Below' | 'At' | null;
 
@@ -87,6 +87,7 @@ export interface GannCalcResult {
   pctChange: number;
   gannScore: number;
   rsi?: number | null;
+  adx?: number | null;
   vwap?: number | null;
   vwapStatus?: 'Above' | 'Below' | 'At' | null;
   isOpenEqualLow?: boolean;
@@ -102,9 +103,6 @@ export interface GannCalcResult {
 
 export interface RsiIntradayPoint {
   timeStr: string; // e.g. "09:15 AM", "09:30 AM", "09:45 AM", etc.
-  open?: number;
-  high?: number;
-  low?: number;
   close: number;
   volume?: number;
   rsi: number;
@@ -113,41 +111,6 @@ export interface RsiIntradayPoint {
   volumeDirection?: 'INCREASING' | 'DECREASING' | 'FLAT';
   volumeDelta?: number;
   volumeDeltaPct?: number;
-}
-
-export interface VolumeAnalysisResult {
-  firstCandleVol: number;
-  firstCandleOpen: number;
-  firstCandleClose: number;
-  firstCandleHigh: number;
-  firstCandleLow: number;
-  firstCandleBuyVol: number;
-  firstCandleSellVol: number;
-  firstCandleBuyRatio: number; // e.g. 2.8 (2.8X Buy vs Sell)
-  firstCandleSellRatio: number; // e.g. 0.36
-  firstCandleMultiple: number; // e.g. 2.8 (dominant volume ratio multiplier)
-  firstCandleDominantSide: 'BUY' | 'SELL' | 'NEUTRAL';
-  firstCandleDirectionLabel: string; // e.g. "2.8X Buy Vol (Bullish)" or "3.2X Sell Vol (Bearish)"
-  firstCandleRVol: number; // First candle volume / average candle volume
-
-  totalVolume: number;
-  totalBullVol: number;
-  totalBearVol: number;
-  bullVolPct: number; // e.g. 68.5%
-  bearVolPct: number; // e.g. 31.5%
-  bullBearRatio: number; // e.g. 2.18 (2.18X Buy Volume vs Sell Volume)
-  rVolume: number; // Relative volume multiplier (e.g. 1.85X)
-  avgCandleVol: number;
-  isOpeningBuySurge: boolean; // e.g. Buy/Sell >= 1.8X at 09:15 AM
-  isHighRVol: boolean; // e.g. rVolume >= 1.2X
-
-  // First 15-Minute High / Low Cross & Body Cross Percentage
-  hasCrossedFirst15mHigh: boolean;
-  hasCrossedFirst15mLow: boolean;
-  first15mCrossStatus: 'BULLISH_HIGH_CROSS' | 'BEARISH_LOW_CROSS' | 'INSIDE_15M_RANGE';
-  first15mCrossPct: number; // e.g. +1.85% above High or -1.42% below Low
-  first15mBodyCrossPct: number; // % of candle body that crossed beyond 15m High or Low (e.g. 84.5%)
-  first15mCrossLabel: string; // e.g. "🟢 84.5% Body Crossed 15m High (+1.85%)"
 }
 
 export interface RsiAiAnalysisReport {

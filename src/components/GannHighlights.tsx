@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, Target, ShieldCheck, Percent } from 'lucide-react';
 import { StockCalculated, TrendFilterType } from '../types';
-import { calculateFibonacci382 } from '../utils/gann';
+import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
 
 interface GannHighlightsProps {
   stocks: StockCalculated[];
@@ -37,8 +37,8 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
     : [...allBearish].sort((a, b) => (a.pctChange || 0) - (b.pctChange || 0)).slice(0, 5);
 
   // Open = Low (Bullish) and Open = High (Bearish) stocks (Strict Exact Match)
-  const openLowStocks = calculatedStocks.filter((s) => s.isOpenEqualLow ?? Boolean(s.openPrice && s.lowPrice && Math.abs(s.openPrice - s.lowPrice) < 0.001));
-  const openHighStocks = calculatedStocks.filter((s) => s.isOpenEqualHigh ?? Boolean(s.openPrice && s.highPrice && Math.abs(s.openPrice - s.highPrice) < 0.001));
+  const openLowStocks = calculatedStocks.filter((s) => s.isOpenEqualLow ?? isOpenLowPattern(s.openPrice, s.lowPrice));
+  const openHighStocks = calculatedStocks.filter((s) => s.isOpenEqualHigh ?? isOpenHighPattern(s.openPrice, s.highPrice));
   
   // 38.2% Fibonacci Retracements
   const fibRetraceStocks = calculatedStocks.filter((s) => {
@@ -135,10 +135,10 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
                   <h3 className="text-xs font-extrabold text-emerald-950 tracking-wider uppercase flex items-center gap-1.5">
                     Very Bullish Picks
                     <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.2 rounded-full font-bold">
-                      Gann 45° Breakout
+                      RSI &gt; 58 | ADX &gt; 21 | Open = Low
                     </span>
                   </h3>
-                  <p className="text-[11px] text-slate-500">15m Close &gt; Open with Gann Buy Above Trigger</p>
+                  <p className="text-[11px] text-slate-500">Strong Momentum: RSI &gt; 58, ADX &gt; 21 &amp; Open=Low pattern</p>
                 </div>
               </div>
 
@@ -176,6 +176,11 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
                             {stock.rsi !== undefined && stock.rsi !== null && (
                               <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-900 px-1.5 py-0.2 rounded border border-emerald-300">
                                 RSI {stock.rsi.toFixed(1)}
+                              </span>
+                            )}
+                            {stock.adx !== undefined && stock.adx !== null && (
+                              <span className="text-[10px] font-extrabold bg-blue-100 text-blue-900 px-1.5 py-0.2 rounded border border-blue-300">
+                                ADX {stock.adx.toFixed(1)}
                               </span>
                             )}
                           </div>

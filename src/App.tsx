@@ -148,10 +148,10 @@ export default function App() {
           };
         }
 
-        const highPrice = highPriceInput !== undefined && highPriceInput !== null ? highPriceInput : (s.highPrice || Math.max(openPrice, closePrice));
-        const lowPrice = lowPriceInput !== undefined && lowPriceInput !== null ? lowPriceInput : (s.lowPrice || Math.min(openPrice, closePrice));
+        const highPrice = highPriceInput !== undefined && highPriceInput !== null ? highPriceInput : s.highPrice;
+        const lowPrice = lowPriceInput !== undefined && lowPriceInput !== null ? lowPriceInput : s.lowPrice;
 
-        const calc = calculateGann15Min(openPrice, closePrice, s.rsi, s.vwap, highPrice, lowPrice);
+        const calc = calculateGann15Min(openPrice, closePrice, s.rsi, s.vwap, highPrice, lowPrice, 0.001, s.adx);
         return {
           ...s,
           openPrice,
@@ -172,6 +172,7 @@ export default function App() {
           openLowDiffPct: calc.openLowDiffPct,
           openHighDiffPct: calc.openHighDiffPct,
           rsi: calc.rsi ?? s.rsi ?? null,
+          adx: calc.adx ?? s.adx ?? null,
           vwap: calc.vwap,
           vwapStatus: calc.vwapStatus,
           fib382Bull: calc.fib382Bull,
@@ -275,8 +276,9 @@ export default function App() {
       const openPrice = data.open;
       const closePrice = data.close;
       const rsi = data.rsi;
+      const adx = data.adx;
       const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low);
+      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx);
 
       setStocks((prev) =>
         prev.map((s) =>
@@ -290,6 +292,7 @@ export default function App() {
                 lowPrice: data.low,
                 volume: data.volume,
                 rsi: rsi !== undefined && rsi !== null ? rsi : (s.rsi ?? null),
+                adx: calc.adx ?? adx ?? s.adx ?? null,
                 rsiTimeline: data.rsiTimeline || s.rsiTimeline,
                 vwap: calc.vwap,
                 vwapStatus: calc.vwapStatus,
@@ -376,8 +379,9 @@ export default function App() {
             const openPrice = data.open;
             const closePrice = data.close;
             const rsi = data.rsi;
+            const adx = data.adx;
             const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low);
+            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx);
 
             setStocks((prev) =>
               prev.map((s) =>
@@ -391,6 +395,7 @@ export default function App() {
                       lowPrice: data.low,
                       volume: data.volume,
                       rsi: rsi !== undefined && rsi !== null ? rsi : (s.rsi ?? null),
+                      adx: calc.adx ?? adx ?? s.adx ?? null,
                       rsiTimeline: data.rsiTimeline || s.rsiTimeline,
                       vwap: calc.vwap,
                       vwapStatus: calc.vwapStatus,

@@ -36,17 +36,21 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
   const [vwapInput, setVwapInput] = useState<string>(
     existingStock && existingStock.vwap !== undefined && existingStock.vwap !== null ? String(existingStock.vwap) : ''
   );
+  const [adxVal, setAdxVal] = useState<string>(
+    existingStock && existingStock.adx !== undefined && existingStock.adx !== null ? String(existingStock.adx) : ''
+  );
 
   if (!isOpen) return null;
 
   const numOpen = parseFloat(openPrice) || 0;
   const numClose = parseFloat(closePrice) || 0;
-  const numHigh = parseFloat(highPrice) || (Math.max(numOpen, numClose) || 0);
-  const numLow = parseFloat(lowPrice) || (Math.min(numOpen, numClose) || 0);
-  const numRsi = rsiVal ? parseFloat(rsiVal) : null;
-  const numVwap = vwapInput ? parseFloat(vwapInput) : null;
+  const numHigh = highPrice.trim() !== '' ? parseFloat(highPrice) : undefined;
+  const numLow = lowPrice.trim() !== '' ? parseFloat(lowPrice) : undefined;
+  const numRsi = rsiVal.trim() !== '' ? parseFloat(rsiVal) : null;
+  const numVwap = vwapInput.trim() !== '' ? parseFloat(vwapInput) : null;
+  const numAdx = adxVal.trim() !== '' ? parseFloat(adxVal) : null;
 
-  const calc = calculateGann15Min(numOpen, numClose, numRsi, numVwap, numHigh, numLow);
+  const calc = calculateGann15Min(numOpen, numClose, numRsi, numVwap, numHigh, numLow, 0.001, numAdx);
 
   const handleSetOpenLowPreset = () => {
     if (numOpen > 0) {
@@ -91,6 +95,7 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
       pctChange: calc.pctChange,
       gannScore: calc.gannScore,
       rsi: numRsi,
+      adx: calc.adx ?? numAdx,
       vwap: calc.vwap,
       vwapStatus: calc.vwapStatus,
       isOpenEqualLow: calc.isOpenEqualLow,

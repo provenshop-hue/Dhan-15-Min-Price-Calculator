@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { X, Sparkles, TrendingUp, TrendingDown, RefreshCw, CheckCircle2, AlertTriangle, ArrowUpRight, ArrowDownRight, Target, ShieldAlert, BarChart3, Clock, Copy, Check } from 'lucide-react';
 import { StockCalculated, RsiIntradayPoint, RsiAiAnalysisReport } from '../types';
 import { generateIntradayRsiTimeline, analyzeRsiProgressWithAi } from '../utils/rsiAnalyst';
-import { calculateVolumeAnalysis } from '../utils/volumeAnalysis';
 
 interface RsiAnalystModalProps {
   stock: StockCalculated | null;
@@ -208,87 +207,6 @@ ${report.exitTargets.map((t) => `  • ${t}`).join('\n')}
             })()}
           </div>
         </div>
-
-        {/* R-Volume & 09:15 AM Opening Candle Volume Direction Card */}
-        {(() => {
-          const volAnalysis = stock.volumeAnalysis || calculateVolumeAnalysis({ ...stock, rsiTimeline: timeline });
-          return (
-            <div className="mt-4 bg-slate-900 text-white p-4 rounded-xl shadow-md border border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
-                <div className="flex items-center space-x-2">
-                  <BarChart3 className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-black uppercase text-slate-200 tracking-wider">
-                    Relative Volume (R-Vol) & Bull/Bear Volume Split
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="bg-amber-950 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-full text-xs font-black">
-                    ⚡ R-Vol: {volAnalysis.rVolume}X
-                  </span>
-                  <span className="bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold">
-                    1st Candle R-Vol: {volAnalysis.firstCandleRVol}X
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 09:15 AM Opening Candle Analysis */}
-                <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700/80 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-400">09:15 AM Opening Candle Volume:</span>
-                    <span className="font-mono font-bold text-white">{(volAnalysis.firstCandleVol / 1000).toFixed(1)}k</span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-300 font-medium">1st Candle Direction:</span>
-                    <span className={`px-2.5 py-0.5 rounded text-xs font-black uppercase ${
-                      volAnalysis.firstCandleDominantSide === 'BUY'
-                        ? 'bg-emerald-500 text-slate-950 shadow-xs'
-                        : 'bg-rose-500 text-white shadow-xs'
-                    }`}>
-                      {volAnalysis.firstCandleDirectionLabel}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] font-mono pt-1 text-slate-300 border-t border-slate-700/80">
-                    <span>🟢 1st Candle Buy Vol: <strong className="text-emerald-400 font-bold">{(volAnalysis.firstCandleBuyVol / 1000).toFixed(1)}k</strong></span>
-                    <span>🔴 Sell Vol: <strong className="text-rose-400 font-bold">{(volAnalysis.firstCandleSellVol / 1000).toFixed(1)}k</strong></span>
-                  </div>
-
-                  <div className="text-[11px] text-slate-300 text-center font-semibold bg-slate-900/90 py-1 rounded">
-                    09:15 Candle Dominance: <strong className="text-emerald-300">{volAnalysis.firstCandleMultiple}X</strong> {volAnalysis.firstCandleDominantSide} Volume
-                  </div>
-                </div>
-
-                {/* Session Cumulative Bull vs Bear Volume */}
-                <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700/80 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-400">Cumulative Session Buy vs Sell:</span>
-                    <span className="font-mono text-emerald-400 font-bold">{volAnalysis.bullBearRatio}X Bull/Bear</span>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
-                      <span>Buy Vol: {volAnalysis.bullVolPct}% ({(volAnalysis.totalBullVol / 1000).toFixed(1)}k)</span>
-                      <span>Sell Vol: {volAnalysis.bearVolPct}% ({(volAnalysis.totalBearVol / 1000).toFixed(1)}k)</span>
-                    </div>
-                    <div className="w-full h-2.5 bg-rose-600/80 rounded-full overflow-hidden flex">
-                      <div 
-                        className="h-full bg-emerald-500 transition-all duration-300"
-                        style={{ width: `${volAnalysis.bullVolPct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="text-[11px] text-slate-300 text-center font-semibold bg-slate-900/90 py-1 rounded">
-                    Total Session Volume: <strong className="text-white font-mono font-bold">{(volAnalysis.totalVolume / 1000).toFixed(1)}k</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
 
         {/* AI Analysis Report Card (If Generated) */}
         {report && (

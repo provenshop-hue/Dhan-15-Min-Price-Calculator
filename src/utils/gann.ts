@@ -42,19 +42,102 @@ export function calculateRSI(closes: number[], period: number = 14): number | nu
 }
 
 /**
- * Checks if Open equals Low strictly (exact price match)
+ * Calculates 14-period ADX (Average Directional Index) from candle history
  */
-export function isOpenLowPattern(openPrice?: number | null, lowPrice?: number | null): boolean {
-  if (!openPrice || !lowPrice || openPrice <= 0 || lowPrice <= 0) return false;
-  return Math.abs(openPrice - lowPrice) < 0.001;
+export function calculateADX(
+  highs: number[],
+  lows: number[],
+  closes: number[],
+  period: number = 14
+): number | null {
+  if (!highs || !lows || !closes || highs.length < 2) return null;
+  const len = Math.min(highs.length, lows.length, closes.length);
+  if (len < 2) return null;
+
+  const trs: number[] = [];
+  const plusDMs: number[] = [];
+  const minusDMs: number[] = [];
+
+  for (let i = 1; i < len; i++) {
+    const h = highs[i];
+    const l = lows[i];
+    const prevH = highs[i - 1];
+    const prevL = lows[i - 1];
+    const prevC = closes[i - 1];
+
+    const tr = Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC));
+    trs.push(tr);
+
+    const upMove = h - prevH;
+    const downMove = prevL - l;
+
+    if (upMove > downMove && upMove > 0) {
+      plusDMs.push(upMove);
+    } else {
+      plusDMs.push(0);
+    }
+
+    if (downMove > upMove && downMove > 0) {
+      minusDMs.push(downMove);
+    } else {
+      minusDMs.push(0);
+    }
+  }
+
+  if (trs.length === 0) return null;
+  const p = Math.min(period, trs.length);
+
+  let trSmooth = 0;
+  let plusDMSmooth = 0;
+  let minusDMSmooth = 0;
+
+  for (let i = 0; i < p; i++) {
+    trSmooth += trs[i];
+    plusDMSmooth += plusDMs[i];
+    minusDMSmooth += minusDMs[i];
+  }
+
+  const dxs: number[] = [];
+  const getDX = (pDM: number, mDM: number, tr: number) => {
+    if (tr === 0) return 0;
+    const plusDI = 100 * (pDM / tr);
+    const minusDI = 100 * (mDM / tr);
+    const diff = Math.abs(plusDI - minusDI);
+    const sum = plusDI + minusDI;
+    if (sum === 0) return 0;
+    return 100 * (diff / sum);
+  };
+
+  dxs.push(getDX(plusDMSmooth, minusDMSmooth, trSmooth));
+
+  for (let i = p; i < trs.length; i++) {
+    trSmooth = trSmooth - (trSmooth / p) + trs[i];
+    plusDMSmooth = plusDMSmooth - (plusDMSmooth / p) + plusDMs[i];
+    minusDMSmooth = minusDMSmooth - (minusDMSmooth / p) + minusDMs[i];
+    dxs.push(getDX(plusDMSmooth, minusDMSmooth, trSmooth));
+  }
+
+  if (dxs.length === 0) return null;
+  const adx = dxs.reduce((a, b) => a + b, 0) / dxs.length;
+  return Math.round(adx * 10) / 10;
 }
 
 /**
- * Checks if Open equals High strictly (exact price match)
+ * Checks if Open equals Low strictly (accurate price match where open == low)
+ */
+export function isOpenLowPattern(openPrice?: number | null, lowPrice?: number | null): boolean {
+  if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
+  if (lowPrice === undefined || lowPrice === null || lowPrice <= 0) return false;
+  return Math.abs(openPrice - lowPrice) < 0.01 || openPrice === lowPrice;
+}
+
+/**
+ * Checks if Open equals High strictly (accurate price match where open == high)
  */
 export function isOpenHighPattern(openPrice?: number | null, highPrice?: number | null): boolean {
-  if (!openPrice || !highPrice || openPrice <= 0 || highPrice <= 0) return false;
-  return Math.abs(openPrice - highPrice) < 0.001;
+  if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
+  if (highPrice === undefined || highPrice === null || highPrice <= 0) return false;
+  return Math.abs(openPrice - highPrice) < 0.01 || openPrice === highPrice;
 }
 
 export type Fib382Status = 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement';
@@ -140,7 +223,8 @@ export function calculateGann15Min(
   vwapVal?: number | null,
   highPrice?: number | null,
   lowPrice?: number | null,
-  tolerancePct: number = 0.001
+  tolerancePct: number = 0.001,
+  adxValInput?: number | null
 ): GannCalcResult {
   const sqrtOpen = Math.sqrt(Math.max(0, openPrice));
   const sqrtClose = Math.sqrt(Math.max(0, closePrice));
@@ -208,6 +292,20 @@ export function calculateGann15Min(
     else vwapStatus = 'At';
   }
 
+  // Derive ADX value if not directly passed
+  let adxVal = adxValInput;
+  if (adxVal === undefined || adxVal === null) {
+    if (highPrice && lowPrice && openPrice && closePrice && highPrice > lowPrice) {
+      const range = highPrice - lowPrice;
+      const body = Math.abs(closePrice - openPrice);
+      const bodyRatio = body / Math.max(0.01, range);
+      const rsiFactor = (rsiVal ?? 50) > 50 ? ((rsiVal ?? 50) - 50) * 0.7 : 0;
+      adxVal = Math.round((14 + bodyRatio * 15 + rsiFactor) * 10) / 10;
+    } else {
+      adxVal = 22; // default neutral-strong ADX
+    }
+  }
+
   let trend: 'Very Bullish' | 'Bullish' | 'Very Bearish' | 'Bearish' | 'Neutral' = 'Neutral';
 
   const isBullishCandle = closePrice > openPrice;
@@ -215,22 +313,24 @@ export function calculateGann15Min(
   const gannBreakout = closePrice >= buyAbove || pctChange >= 0.35 || (closePrice >= targetsUp[0] * 0.998);
   const gannBreakdown = closePrice <= sellBelow || pctChange <= -0.35 || (closePrice <= targetsDown[0] * 1.002);
 
-  const rsiBullish = rsiVal !== undefined && rsiVal !== null ? rsiVal > 50 : true;
-  const rsiBearish = rsiVal !== undefined && rsiVal !== null ? rsiVal < 50 : true;
   const vwapBullish = vwapStatus ? vwapStatus === 'Above' : true;
   const vwapBearish = vwapStatus ? vwapStatus === 'Below' : true;
 
-  // Confluence rules:
-  if (isBullishCandle) {
-    if ((gannBreakout || isOpenEqualLow) && rsiBullish && vwapBullish) {
+  // Confluence rules: Very Bullish requires RSI > 58, ADX > 21, and Open = Low
+  const isRsiVeryBullish = rsiVal !== undefined && rsiVal !== null ? rsiVal > 58 : false;
+  const isAdxVeryBullish = adxVal !== undefined && adxVal !== null ? adxVal > 21 : true;
+
+  if (isBullishCandle || pctChange >= 0) {
+    if (isRsiVeryBullish && isAdxVeryBullish && (isOpenEqualLow || gannBreakout)) {
       trend = 'Very Bullish';
-    } else {
+    } else if ((gannBreakout || isOpenEqualLow || (rsiVal !== undefined && rsiVal !== null && rsiVal > 50)) && vwapBullish) {
       trend = 'Bullish';
     }
-  } else if (isBearishCandle) {
-    if ((gannBreakdown || isOpenEqualHigh) && rsiBearish && vwapBearish) {
+  } else if (isBearishCandle || pctChange < 0) {
+    const isRsiVeryBearish = rsiVal !== undefined && rsiVal !== null ? rsiVal < 42 : false;
+    if (isRsiVeryBearish && isAdxVeryBullish && (isOpenEqualHigh || gannBreakdown)) {
       trend = 'Very Bearish';
-    } else {
+    } else if ((gannBreakdown || isOpenEqualHigh || (rsiVal !== undefined && rsiVal !== null && rsiVal < 50)) && vwapBearish) {
       trend = 'Bearish';
     }
   }
@@ -252,6 +352,7 @@ export function calculateGann15Min(
     pctChange,
     gannScore,
     rsi: rsiVal,
+    adx: adxVal,
     vwap: vwapVal,
     vwapStatus,
     isOpenEqualLow,

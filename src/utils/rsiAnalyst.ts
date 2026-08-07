@@ -97,21 +97,7 @@ export function generateIntradayRsiTimeline(stock: StockCalculated): RsiIntraday
     else if (delta < -0.1) direction = 'DECREASING';
 
     // Calculate simulated interval volume and trend
-    let volCurve = 0.85 + 0.3 * Math.sin(t * Math.PI) + (direction === 'INCREASING' ? t * 0.3 : -t * 0.1);
-    
-    // 09:15 AM Opening Candle (i === 0) naturally experiences heavy institutional opening volume
-    if (i === 0) {
-      if (stock.isOpenEqualLow || (stock.pctChange && stock.pctChange > 1.5)) {
-        volCurve = 5.5 + ((stock.symbol.charCodeAt(0) % 4) * 0.8); // 5.5X to 7.9X
-      } else if (stock.gannScore && stock.gannScore >= 65) {
-        volCurve = 4.8 + ((stock.symbol.charCodeAt(1) || 65) % 3) * 0.6; // 4.8X to 6.0X
-      } else if (stock.symbol.length % 2 === 0) {
-        volCurve = 5.2;
-      } else {
-        volCurve = 2.8;
-      }
-    }
-
+    const volCurve = 0.85 + 0.3 * Math.sin(t * Math.PI) + (direction === 'INCREASING' ? t * 0.3 : -t * 0.1);
     const intervalVol = Math.max(1200, Math.round(baseVol * Math.max(0.4, volCurve)));
 
     const volDelta = i > 0 ? intervalVol - prevVol : 0;
@@ -122,17 +108,9 @@ export function generateIntradayRsiTimeline(stock: StockCalculated): RsiIntraday
 
     prevVol = intervalVol;
 
-    const cOpen = i === 0 ? open : timeline[i - 1].close;
-    const cClose = Math.round(p * 100) / 100;
-    const cHigh = Math.round((Math.max(cOpen, cClose) + Math.abs(cClose - cOpen) * 0.3 + 0.15) * 100) / 100;
-    const cLow = Math.round((Math.min(cOpen, cClose) - Math.abs(cClose - cOpen) * 0.3 - 0.15) * 100) / 100;
-
     timeline.push({
       timeStr: activeTimes[i],
-      open: cOpen,
-      high: cHigh,
-      low: cLow,
-      close: cClose,
+      close: Math.round(p * 100) / 100,
       volume: intervalVol,
       rsi: rsiVal,
       rsiDirection: direction,
