@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'rsi_pullback';
-  onChangeDashboardTab: (tab: 'gann' | 'rsi_pullback') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -158,6 +158,22 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <span>📊 Gann 15m Scanner</span>
+            </button>
+
+            <button
+              onClick={() => onChangeDashboardTab('gann_dashboard')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                activeDashboardTab === 'gann_dashboard'
+                  ? 'bg-indigo-600 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <span>🏛️ Gann Dashboard</span>
+                <span className="bg-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">
+                  MONTH
+                </span>
+              </span>
             </button>
 
             <button

@@ -2,6 +2,10 @@
 // Verified & Synced directly with official Dhan Scrip Master (https://images.dhan.co/api-data/api-scrip-master.csv)
 
 export const DHAN_SECURITY_MAP: Record<string, string> = {
+  "NIFTY": "13",
+  "NIFTY50": "13",
+  "BANKNIFTY": "25",
+  "NIFTYBANK": "25",
   "ABB": "13",
   "ABCAPITAL": "21614",
   "ADANIENSOL": "10217",
@@ -239,9 +243,31 @@ export const DHAN_SECURITY_MAP: Record<string, string> = {
   "ZYDUSLIFE": "7929"
 };
 
+export function isIndexSymbol(symbol: string): boolean {
+  if (!symbol) return false;
+  const clean = symbol.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return (
+    clean === 'NIFTY' ||
+    clean === 'NIFTY50' ||
+    clean === 'NIFTY50INDEX' ||
+    clean === 'BANKNIFTY' ||
+    clean === 'NIFTYBANK' ||
+    clean === 'BANKNIFTYINDEX' ||
+    clean === 'FINNIFTY' ||
+    clean === 'MIDCPNIFTY'
+  );
+}
+
 export function getDhanSecurityId(symbol: string): string | undefined {
   if (!symbol) return undefined;
   const cleanSymbol = symbol.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  if (cleanSymbol === 'NIFTY' || cleanSymbol === 'NIFTY50' || cleanSymbol === 'NIFTY50INDEX') {
+    return '13';
+  }
+  if (cleanSymbol === 'BANKNIFTY' || cleanSymbol === 'NIFTYBANK' || cleanSymbol === 'BANKNIFTYINDEX') {
+    return '25';
+  }
 
   // Direct match
   if (DHAN_SECURITY_MAP[cleanSymbol]) {

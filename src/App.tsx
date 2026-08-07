@@ -5,6 +5,7 @@ import { DhanApiGateModal } from './components/DhanApiGateModal';
 import { StockTable } from './components/StockTable';
 import { GannHighlights } from './components/GannHighlights';
 import { RsiPullbackDashboard } from './components/RsiPullbackDashboard';
+import { GannDashboard } from './components/GannDashboard';
 import { DhanSettingsModal } from './components/DhanSettingsModal';
 import { ManualCalculatorModal } from './components/ManualCalculatorModal';
 import { StockDetailModal } from './components/StockDetailModal';
@@ -55,8 +56,8 @@ export default function App() {
   // Active filter state
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
-  // Active Dashboard View Tab ('gann' or 'rsi_pullback')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'rsi_pullback'>('gann');
+  // Active Dashboard View Tab ('gann', 'gann_dashboard', or 'rsi_pullback')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -686,6 +687,14 @@ export default function App() {
               onTrendFilterChange={(f) => setActiveTrendFilter(f)}
             />
           </>
+        ) : activeDashboardTab === 'gann_dashboard' ? (
+          /* Dedicated Gann Month High/Low Dashboard */
+          <GannDashboard
+            stocks={stocks}
+            credentials={credentials}
+            onOpenSettings={() => setIsDhanGateOpen(true)}
+            selectedDate={credentials.date}
+          />
         ) : (
           /* Dedicated RSI Pullback Dashboard */
           <RsiPullbackDashboard

@@ -1,6 +1,6 @@
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
-import { getDhanSecurityId } from './data/dhanSecurityMap.js';
+import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap.js';
 
 let geminiCoolOffUntil = 0;
 
@@ -34,7 +34,7 @@ export function createExpressApp() {
         });
       }
 
-      // Resolve Security ID
+      // Resolve Security ID & Segment Type
       let secId = securityId;
       if (!secId || secId === '1333' || secId === 'undefined') {
         if (symbol) {
@@ -48,9 +48,13 @@ export function createExpressApp() {
         });
       }
 
+      const isIndex = isIndexSymbol(symbol || '') || secId === '13' || secId === '25';
+      const exchangeSegment = isIndex ? 'IDX_I' : 'NSE_EQ';
+      const instrument = isIndex ? 'INDEX' : 'EQUITY';
+
       const targetDate = date || new Date().toISOString().split('T')[0];
 
-      // Helper function to query Dhan Intraday Chart API for a date range in Spot Equity segment
+      // Helper function to query Dhan Intraday Chart API for a date range
       async function fetchDhanCandles(queryDate: string) {
         // Calculate 10 calendar days back from queryDate to ensure sufficient 15-min candles for 14-period RSI
         const targetDt = new Date(queryDate);
@@ -60,9 +64,9 @@ export function createExpressApp() {
 
         const payloadMultiDay = {
           securityId: String(secId),
-          exchangeSegment: 'NSE_EQ',
-          instrument: 'EQUITY',
-          instrumentType: 'EQUITY',
+          exchangeSegment,
+          instrument,
+          instrumentType: instrument,
           fromDate: fromDateStr,
           toDate: queryDate,
           interval: '15'
@@ -70,9 +74,9 @@ export function createExpressApp() {
 
         const payloadSingleDay = {
           securityId: String(secId),
-          exchangeSegment: 'NSE_EQ',
-          instrument: 'EQUITY',
-          instrumentType: 'EQUITY',
+          exchangeSegment,
+          instrument,
+          instrumentType: instrument,
           fromDate: queryDate,
           toDate: queryDate,
           interval: '15'
@@ -523,6 +527,213 @@ export function createExpressApp() {
       res.status(500).json({
         error: err.message || 'Internal Server Error while communicating with Dhan API'
       });
+    }
+  });
+
+  // API Route: Fetch Previous Month Daily OHLC for Gann Analysis (Equity & Spot Indices)
+  apiRouter.post('/dhan/prev-month-ohlc', async (req, res) => {
+    try {
+      const { clientId, accessToken, symbol, securityId, fromDate, toDate } = req.body;
+
+      if (!clientId || !accessToken) {
+        return res.status(400).json({
+          error: 'Missing Dhan credentials. Please provide Client ID and Access Token in Dhan Settings.'
+        });
+      }
+
+      const symUpper = (symbol || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const isIndex =
+        isIndexSymbol(symbol || '') ||
+        symUpper.includes('NIFTY') ||
+        symUpper.includes('BANKNIFTY') ||
+        securityId === '13' ||
+        securityId === '25';
+
+      let secId = securityId;
+      if (symUpper === 'NIFTY' || symUpper === 'NIFTY50' || symUpper === 'NIFTY50INDEX') {
+        secId = '13';
+      } else if (symUpper === 'BANKNIFTY' || symUpper === 'NIFTYBANK' || symUpper === 'BANKNIFTYINDEX') {
+        secId = '25';
+      } else if (!secId) {
+        secId = getDhanSecurityId(symbol);
+      }
+
+      if (!secId) {
+        return res.status(400).json({
+          error: `Could not find Dhan Security ID for "${symbol}".`
+        });
+      }
+
+      const segmentsToTry = isIndex
+        ? [
+            { exchangeSegment: 'IDX_I', instrument: 'INDEX' },
+            { exchangeSegment: 'NSE_IDX', instrument: 'INDEX' }
+          ]
+        : [
+            { exchangeSegment: 'NSE_EQ', instrument: 'EQUITY' }
+          ];
+
+      let apiData: any = null;
+      let successfulSegment: any = null;
+
+      const formatISTDateDisplay = (rawTs: any): string => {
+        if (!rawTs) return '';
+        const num = Number(rawTs);
+        let dt: Date;
+        if (!isNaN(num) && num > 0) {
+          const sec = num > 1e11 ? Math.floor(num / 1000) : num;
+          dt = new Date(sec * 1000);
+        } else {
+          dt = new Date(rawTs);
+        }
+        if (isNaN(dt.getTime())) return String(rawTs);
+
+        try {
+          const formatter = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Asia/Kolkata',
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+          });
+          return formatter.format(dt);
+        } catch (e) {
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const d = String(dt.getUTCDate()).padStart(2, '0');
+          const m = months[dt.getUTCMonth()];
+          const y = dt.getUTCFullYear();
+          return `${d} ${m} ${y}`;
+        }
+      };
+
+      // 1. Try /v2/charts/historical for Daily Candles
+      for (const seg of segmentsToTry) {
+        try {
+          const payloadHistorical = {
+            securityId: String(secId),
+            exchangeSegment: seg.exchangeSegment,
+            instrument: seg.instrument,
+            expiryCode: 0,
+            fromDate,
+            toDate
+          };
+
+          const response = await fetch('https://api.dhan.co/v2/charts/historical', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'client-id': clientId,
+              'access-token': accessToken,
+            },
+            body: JSON.stringify(payloadHistorical),
+            signal: AbortSignal.timeout(4000)
+          });
+
+          if (response.ok) {
+            const resJson = await response.json().catch(() => null);
+            if (resJson && Array.isArray(resJson.high) && resJson.high.length > 0) {
+              apiData = resJson;
+              successfulSegment = seg;
+              break;
+            }
+          }
+        } catch (e) {
+          // Continue
+        }
+      }
+
+      // 2. Fallback to /v2/charts/intraday if historical chart returned empty
+      if (!apiData) {
+        for (const seg of segmentsToTry) {
+          try {
+            const payloadIntraday = {
+              securityId: String(secId),
+              exchangeSegment: seg.exchangeSegment,
+              instrument: seg.instrument,
+              instrumentType: seg.instrument,
+              fromDate,
+              toDate,
+              interval: '60'
+            };
+
+            const response = await fetch('https://api.dhan.co/v2/charts/intraday', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'client-id': clientId,
+                'access-token': accessToken,
+              },
+              body: JSON.stringify(payloadIntraday),
+              signal: AbortSignal.timeout(4000)
+            });
+
+            if (response.ok) {
+              const resJson = await response.json().catch(() => null);
+              if (resJson && Array.isArray(resJson.high) && resJson.high.length > 0) {
+                apiData = resJson;
+                successfulSegment = seg;
+                break;
+              }
+            }
+          } catch (e) {
+            // Continue
+          }
+        }
+      }
+
+      if (apiData && Array.isArray(apiData.high) && apiData.high.length > 0) {
+        const highs = apiData.high;
+        const lows = apiData.low;
+        const closes = apiData.close;
+        const opens = apiData.open;
+        const times = apiData.start_time || apiData.timestamp || apiData.t || apiData.time || [];
+
+        let maxHigh = -Infinity;
+        let maxHighDate = '';
+        let minLow = Infinity;
+        let minLowDate = '';
+
+        for (let i = 0; i < highs.length; i++) {
+          const h = Number(highs[i]) || 0;
+          const l = Number(lows[i]) || 0;
+          const ts = times[i];
+          const dateDisp = formatISTDateDisplay(ts);
+
+          if (h > maxHigh) {
+            maxHigh = h;
+            if (dateDisp) maxHighDate = dateDisp;
+          }
+
+          if (l > 0 && l < minLow) {
+            minLow = l;
+            if (dateDisp) minLowDate = dateDisp;
+          }
+        }
+
+        const prevMonthClose = Number(closes[closes.length - 1]) || Number(opens[0]) || maxHigh;
+        const cmp = Number(closes[closes.length - 1]) || prevMonthClose;
+
+        return res.json({
+          success: true,
+          symbol,
+          securityId: String(secId),
+          isIndex,
+          segment: successfulSegment?.exchangeSegment,
+          prevMonthHigh: Math.round(maxHigh * 100) / 100,
+          prevMonthHighDate: maxHighDate,
+          prevMonthLow: Math.round(minLow * 100) / 100,
+          prevMonthLowDate: minLowDate,
+          prevMonthClose: Math.round(prevMonthClose * 100) / 100,
+          cmp: Math.round(cmp * 100) / 100
+        });
+      }
+
+      return res.status(404).json({
+        error: `No chart data returned from Dhan for ${symbol} (SecId: ${secId}) in range ${fromDate} to ${toDate}.`,
+        securityId: String(secId),
+        isIndex
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Error processing Dhan request' });
     }
   });
 
