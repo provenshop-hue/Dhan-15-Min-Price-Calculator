@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action Buttons & Status */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Dhan API Settings Button (Protected by Code 1212) */}
+            {/* Settings Button (Protected by Code 1212) */}
             <button
               onClick={onOpenSettings}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
@@ -74,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Key className="w-3.5 h-3.5" />
-              <span>Dhan API Settings</span>
+              <span>Settings</span>
               {credentials.isConfigured && (
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
               )}

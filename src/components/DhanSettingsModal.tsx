@@ -99,7 +99,7 @@ export const DhanSettingsModal: React.FC<DhanSettingsModalProps> = ({
               <Key className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Dhan HQ API Settings</h3>
+              <h3 className="text-lg font-bold text-slate-900">Settings</h3>
               <p className="text-xs text-slate-500">Configure your Data API credentials for live 15-min candles</p>
             </div>
           </div>

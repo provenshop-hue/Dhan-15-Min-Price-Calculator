@@ -368,7 +368,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           <div className={`text-[11px] mt-1 font-medium ${
             activeFilter === 'BULLISH_RALLY' ? 'text-emerald-100' : 'text-emerald-700'
           }`}>
-            Score &ge; 65 (10 Rules)
+            Score &ge; 65
           </div>
         </button>
 
@@ -393,7 +393,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           <div className={`text-[11px] mt-1 font-medium ${
             activeFilter === 'BEARISH_RALLY' ? 'text-rose-100' : 'text-rose-700'
           }`}>
-            Score &ge; 65 (10 Rules)
+            Score &ge; 65
           </div>
         </button>
 
@@ -781,64 +781,6 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                     </div>
                   </div>
 
-                  {/* Confluence Checklist Expander Button */}
-                  <button
-                    onClick={() => setExpandedChecklistStockId(expandedChecklistStockId === stock.id ? null : stock.id)}
-                    className="w-full py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold rounded-xl border border-slate-200 flex items-center justify-between transition-colors"
-                  >
-                    <span className="flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                      <span>10-Factor Rally Confluence Rules</span>
-                    </span>
-                    {expandedChecklistStockId === stock.id ? (
-                      <ChevronUp className="w-4 h-4 text-slate-500" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-500" />
-                    )}
-                  </button>
-
-                  {/* Confluence Checklist Drawer */}
-                  {expandedChecklistStockId === stock.id && (
-                    <div className="p-3 bg-slate-900 text-slate-200 rounded-xl space-y-3 text-[11px] animate-fade-in border border-slate-800">
-                      <div>
-                        <div className="font-black text-emerald-400 mb-1.5 flex items-center justify-between border-b border-slate-800 pb-1">
-                          <span>🔥 Bullish Rally Breakdown ({analysis.bullishRally.score}/100)</span>
-                          <span className="text-[10px] text-emerald-300 font-bold">{analysis.bullishRally.interpretation}</span>
-                        </div>
-                        <div className="space-y-1">
-                          {analysis.bullishRally.factors.map((f) => (
-                            <div key={f.id} className="flex items-center justify-between text-[10px]">
-                              <span className={f.passed ? 'text-emerald-300 font-medium' : 'text-slate-500 line-through'}>
-                                {f.label}
-                              </span>
-                              <span className={f.passed ? 'text-emerald-400 font-bold' : 'text-slate-600'}>
-                                {f.passed ? `+${f.points}` : '0'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="font-black text-rose-400 mb-1.5 flex items-center justify-between border-b border-slate-800 pb-1 pt-1">
-                          <span>🔻 Bearish Rally Breakdown ({analysis.bearishRally.score}/100)</span>
-                          <span className="text-[10px] text-rose-300 font-bold">{analysis.bearishRally.interpretation}</span>
-                        </div>
-                        <div className="space-y-1">
-                          {analysis.bearishRally.factors.map((f) => (
-                            <div key={f.id} className="flex items-center justify-between text-[10px]">
-                              <span className={f.passed ? 'text-rose-300 font-medium' : 'text-slate-500 line-through'}>
-                                {f.label}
-                              </span>
-                              <span className={f.passed ? 'text-rose-400 font-bold' : 'text-slate-600'}>
-                                {f.passed ? `+${f.points}` : '0'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Card Bottom Actions */}

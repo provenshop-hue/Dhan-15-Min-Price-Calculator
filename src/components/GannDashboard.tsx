@@ -362,7 +362,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                   className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 border border-amber-400/40 cursor-pointer shadow-sm"
                 >
                   <Sliders className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Connect Dhan API for Spot</span>
+                  <span>Connect API in Settings</span>
                 </button>
               )}
             </div>
