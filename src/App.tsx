@@ -279,7 +279,7 @@ export default function App() {
       const rsi = data.rsi;
       const adx = data.adx;
       const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx);
+      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow);
 
       setStocks((prev) =>
         prev.map((s) =>
@@ -291,6 +291,8 @@ export default function App() {
                 closePrice,
                 highPrice: data.high,
                 lowPrice: data.low,
+                first15mHigh: data.first15mHigh,
+                first15mLow: data.first15mLow,
                 volume: data.volume,
                 rsi: rsi !== undefined && rsi !== null ? rsi : (s.rsi ?? null),
                 adx: calc.adx ?? adx ?? s.adx ?? null,
@@ -382,7 +384,7 @@ export default function App() {
             const rsi = data.rsi;
             const adx = data.adx;
             const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx);
+            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow);
 
             setStocks((prev) =>
               prev.map((s) =>
@@ -394,6 +396,8 @@ export default function App() {
                       closePrice,
                       highPrice: data.high,
                       lowPrice: data.low,
+                      first15mHigh: data.first15mHigh,
+                      first15mLow: data.first15mLow,
                       volume: data.volume,
                       rsi: rsi !== undefined && rsi !== null ? rsi : (s.rsi ?? null),
                       adx: calc.adx ?? adx ?? s.adx ?? null,

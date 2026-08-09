@@ -509,6 +509,8 @@ export function createExpressApp() {
           close: Math.round(effectiveClose * 100) / 100,
           high: Math.round(sessionHigh * 100) / 100,
           low: Math.round(sessionLow * 100) / 100,
+          first15mHigh: Math.round(first15MinHigh * 100) / 100,
+          first15mLow: Math.round(first15MinLow * 100) / 100,
           volume: first15MinVol,
           rsi,
           adx,

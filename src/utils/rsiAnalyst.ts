@@ -1,4 +1,5 @@
 import { StockCalculated, RsiIntradayPoint, RsiAiAnalysisReport } from '../types';
+import { isOpenLowPattern, isOpenHighPattern } from './gann';
 
 /**
  * Generates a realistic 15-minute intraday RSI timeline from 09:15 AM to current time
@@ -58,10 +59,13 @@ export function generateIntradayRsiTimeline(stock: StockCalculated): RsiIntraday
 
   const activeTimes = times.slice(0, intervalCount);
 
+  const isOL = isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow) || Boolean(stock.isOpenEqualLow);
+  const isOH = isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh) || Boolean(stock.isOpenEqualHigh);
+
   let baseStartRsi = 50;
-  if (stock.isOpenEqualLow) {
+  if (isOL) {
     baseStartRsi = Math.max(30, currentRsi - 12);
-  } else if (stock.isOpenEqualHigh) {
+  } else if (isOH) {
     baseStartRsi = Math.min(70, currentRsi + 12);
   } else if (close > open) {
     baseStartRsi = Math.max(35, currentRsi - 8);
@@ -80,9 +84,9 @@ export function generateIntradayRsiTimeline(stock: StockCalculated): RsiIntraday
     const t = activeTimes.length > 1 ? i / (activeTimes.length - 1) : 1;
     
     let p = open + (close - open) * t;
-    if (stock.isOpenEqualLow) {
+    if (isOL) {
       p = open + (close - open) * Math.pow(t, 0.8);
-    } else if (stock.isOpenEqualHigh) {
+    } else if (isOH) {
       p = open - (open - close) * Math.pow(t, 0.8);
     }
 

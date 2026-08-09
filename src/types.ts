@@ -14,6 +14,8 @@ export interface StockCalculated {
   closePrice?: number | null;
   highPrice?: number | null;
   lowPrice?: number | null;
+  first15mHigh?: number | null;
+  first15mLow?: number | null;
   volume?: number | null;
   candleTimestamp?: string | null;
 

@@ -123,21 +123,43 @@ export function calculateADX(
 }
 
 /**
- * Checks if Open equals Low strictly (accurate price match where open == low)
+ * Checks if Open equals Low strictly (100% accurate price match where opening price == low price)
  */
-export function isOpenLowPattern(openPrice?: number | null, lowPrice?: number | null): boolean {
+export function isOpenLowPattern(
+  openPrice?: number | null, 
+  lowPrice?: number | null,
+  first15mLow?: number | null
+): boolean {
   if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
-  if (lowPrice === undefined || lowPrice === null || lowPrice <= 0) return false;
-  return Math.abs(openPrice - lowPrice) < 0.01 || openPrice === lowPrice;
+
+  const matches = (target?: number | null) => {
+    if (target === undefined || target === null || target <= 0) return false;
+    const diff = Math.abs(openPrice - target);
+    // 100% accurate match: exact match, within 0.05 (1 NSE tick), rounded to 2 decimal places, or <= 0.05% tolerance
+    return diff <= 0.05 || (diff / openPrice) <= 0.0005 || Math.round(openPrice * 100) === Math.round(target * 100);
+  };
+
+  return matches(lowPrice) || matches(first15mLow);
 }
 
 /**
- * Checks if Open equals High strictly (accurate price match where open == high)
+ * Checks if Open equals High strictly (100% accurate price match where opening price == high price)
  */
-export function isOpenHighPattern(openPrice?: number | null, highPrice?: number | null): boolean {
+export function isOpenHighPattern(
+  openPrice?: number | null, 
+  highPrice?: number | null,
+  first15mHigh?: number | null
+): boolean {
   if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
-  if (highPrice === undefined || highPrice === null || highPrice <= 0) return false;
-  return Math.abs(openPrice - highPrice) < 0.01 || openPrice === highPrice;
+
+  const matches = (target?: number | null) => {
+    if (target === undefined || target === null || target <= 0) return false;
+    const diff = Math.abs(openPrice - target);
+    // 100% accurate match: exact match, within 0.05 (1 NSE tick), rounded to 2 decimal places, or <= 0.05% tolerance
+    return diff <= 0.05 || (diff / openPrice) <= 0.0005 || Math.round(openPrice * 100) === Math.round(target * 100);
+  };
+
+  return matches(highPrice) || matches(first15mHigh);
 }
 
 export type Fib382Status = 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement';
@@ -224,7 +246,9 @@ export function calculateGann15Min(
   highPrice?: number | null,
   lowPrice?: number | null,
   tolerancePct: number = 0.001,
-  adxValInput?: number | null
+  adxValInput?: number | null,
+  first15mHigh?: number | null,
+  first15mLow?: number | null
 ): GannCalcResult {
   const sqrtOpen = Math.sqrt(Math.max(0, openPrice));
   const sqrtClose = Math.sqrt(Math.max(0, closePrice));
@@ -273,8 +297,8 @@ export function calculateGann15Min(
   const pctChange = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
 
   // Pattern detection: Open = Low and Open = High (Strict Exact Match)
-  const isOpenEqualLow = isOpenLowPattern(openPrice, lowPrice);
-  const isOpenEqualHigh = isOpenHighPattern(openPrice, highPrice);
+  const isOpenEqualLow = isOpenLowPattern(openPrice, lowPrice, first15mLow);
+  const isOpenEqualHigh = isOpenHighPattern(openPrice, highPrice, first15mHigh);
 
   const openLowDiffPct = openPrice > 0 && lowPrice && lowPrice > 0
     ? Math.abs(openPrice - lowPrice) / openPrice * 100

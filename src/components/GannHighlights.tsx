@@ -37,8 +37,18 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
     : [...allBearish].sort((a, b) => (a.pctChange || 0) - (b.pctChange || 0)).slice(0, 5);
 
   // Open = Low (Bullish) and Open = High (Bearish) stocks (Strict Exact Match)
-  const openLowStocks = calculatedStocks.filter((s) => s.isOpenEqualLow ?? isOpenLowPattern(s.openPrice, s.lowPrice));
-  const openHighStocks = calculatedStocks.filter((s) => s.isOpenEqualHigh ?? isOpenHighPattern(s.openPrice, s.highPrice));
+  const openLowStocks = calculatedStocks.filter((s) => {
+    if (s.openPrice !== undefined && s.openPrice !== null) {
+      return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow);
+    }
+    return Boolean(s.isOpenEqualLow);
+  });
+  const openHighStocks = calculatedStocks.filter((s) => {
+    if (s.openPrice !== undefined && s.openPrice !== null) {
+      return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh);
+    }
+    return Boolean(s.isOpenEqualHigh);
+  });
   
   // 38.2% Fibonacci Retracements
   const fibRetraceStocks = calculatedStocks.filter((s) => {

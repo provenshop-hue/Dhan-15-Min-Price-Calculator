@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { StockCalculated } from '../types';
 import { analyzeRsiPullback, RsiPullbackAnalysis } from '../utils/rsiPullback';
-import { calculateRSI } from '../utils/gann';
+import { calculateRSI, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -51,7 +51,8 @@ type PullbackFilterType =
   | 'OVERSOLD' 
   | 'HIGH_SCORE'
   | 'VOL_INCREASING'
-  | 'OPEN_LOW';
+  | 'OPEN_LOW'
+  | 'OPEN_HIGH';
 
 type SortOption = 'SCORE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
 
@@ -97,6 +98,15 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     });
   }, [stocks, selectedDate]);
 
+  // Extract NIFTY and BANKNIFTY for top pinned section
+  const niftyIndex = useMemo(() => {
+    return analyzedStocks.find((s) => s.stock.symbol === 'NIFTY');
+  }, [analyzedStocks]);
+
+  const bankNiftyIndex = useMemo(() => {
+    return analyzedStocks.find((s) => s.stock.symbol === 'BANKNIFTY');
+  }, [analyzedStocks]);
+
   // Statistics
   const stats = useMemo(() => {
     let highConfluenceCount = 0;
@@ -108,6 +118,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let bullishMomentum = 0;
     let oversold = 0;
     let highScore = 0;
+    let openLowCount = 0;
+    let openHighCount = 0;
 
     analyzedStocks.forEach(({ stock, analysis }) => {
       if (analysis.confluenceValidation.status === 'HIGH_CONFLUENCE') highConfluenceCount++;
@@ -120,6 +132,16 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (analysis.pullbackCategory === 'BULLISH_MOMENTUM') bullishMomentum++;
       if (analysis.pullbackCategory === 'OVERSOLD_BOUNCE') oversold++;
       if (analysis.pullbackScore >= 75) highScore++;
+
+      const isOL = (stock.openPrice !== undefined && stock.openPrice !== null)
+        ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
+        : Boolean(stock.isOpenEqualLow);
+      const isOH = (stock.openPrice !== undefined && stock.openPrice !== null)
+        ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
+        : Boolean(stock.isOpenEqualHigh);
+
+      if (isOL) openLowCount++;
+      if (isOH) openHighCount++;
     });
 
     return {
@@ -132,7 +154,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       bullishSweetSpot,
       bullishMomentum,
       oversold,
-      highScore
+      highScore,
+      openLowCount,
+      openHighCount
     };
   }, [analyzedStocks, stocks.length]);
 
@@ -176,14 +200,32 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         return analysis.volumeDirection === 'INCREASING';
       }
       if (activeFilter === 'OPEN_LOW') {
-        return Boolean(stock.isOpenEqualLow);
+        return (stock.openPrice !== undefined && stock.openPrice !== null)
+          ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
+          : Boolean(stock.isOpenEqualLow);
+      }
+      if (activeFilter === 'OPEN_HIGH') {
+        return (stock.openPrice !== undefined && stock.openPrice !== null)
+          ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
+          : Boolean(stock.isOpenEqualHigh);
       }
 
       return true;
     });
 
-    // Sorting
+    // Sorting (NIFTY & BANKNIFTY pinned at top unless searching specific query)
     list.sort((a, b) => {
+      if (!searchQuery.trim()) {
+        const isAIndex = a.stock.symbol === 'NIFTY' || a.stock.symbol === 'BANKNIFTY';
+        const isBIndex = b.stock.symbol === 'NIFTY' || b.stock.symbol === 'BANKNIFTY';
+        if (isAIndex && !isBIndex) return -1;
+        if (!isAIndex && isBIndex) return 1;
+        if (isAIndex && isBIndex) {
+          if (a.stock.symbol === 'NIFTY') return -1;
+          return 1;
+        }
+      }
+
       if (sortBy === 'SCORE_DESC') return b.analysis.pullbackScore - a.analysis.pullbackScore;
       if (sortBy === 'RSI_ASC') return a.analysis.rsiVal - b.analysis.rsiVal;
       if (sortBy === 'RSI_DESC') return b.analysis.rsiVal - a.analysis.rsiVal;
@@ -546,6 +588,230 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         </div>
       )}
 
+      {/* PINNED BENCHMARK INDICES AT VERY TOP: NIFTY 50 & BANK NIFTY */}
+      {(niftyIndex || bankNiftyIndex) && (
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                📌 Pinned Benchmark Indices Snapshot (NIFTY 50 &amp; BANK NIFTY)
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-500 font-bold hidden sm:inline">
+              Always Pinned at Top for Market Trend Direction &amp; Intraday Rally Signals
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* NIFTY 50 INDEX CARD */}
+            {niftyIndex && (
+              <div className="bg-slate-900 text-white rounded-2xl p-4 border-2 border-amber-400/80 shadow-md space-y-3 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-bl-lg tracking-wider uppercase shadow-2xs">
+                  📌 PINNED INDEX BENCHMARK
+                </div>
+
+                {/* Top Row: Symbol, Price, Change */}
+                <div className="flex items-start justify-between border-b border-slate-800 pb-2.5">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-black text-xl text-white tracking-wide">
+                        {niftyIndex.stock.companyName || 'NIFTY 50'}
+                      </span>
+                      <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10.5px] font-mono font-bold px-2 py-0.5 rounded-full">
+                        Lot: {niftyIndex.stock.lotSizeAug2026 || niftyIndex.stock.lotSizeJul2026 || 75} shares
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-medium">Symbol: {niftyIndex.stock.symbol}</span>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-xl font-black text-white font-mono">
+                      {niftyIndex.stock.closePrice !== undefined && niftyIndex.stock.closePrice !== null ? `₹${niftyIndex.stock.closePrice.toFixed(2)}` : 'N/A'}
+                    </div>
+                    <div className={`text-xs font-black ${
+                      (niftyIndex.stock.pctChange || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {(niftyIndex.stock.pctChange || 0) >= 0 ? '+' : ''}{(niftyIndex.stock.pctChange || 0).toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Middle Row: Bullish vs Bearish Rally Status & Trigger Times */}
+                <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                  {/* Bullish Rally Box */}
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                    niftyIndex.analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met'
+                      ? 'bg-emerald-950/90 border-emerald-500 text-white ring-1 ring-emerald-400'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                  }`}>
+                    <div className="flex items-center justify-between font-extrabold text-[10px] uppercase text-emerald-400 border-b border-slate-700/60 pb-1">
+                      <span>🔥 Bullish Rally</span>
+                      <span className="font-mono text-white">RSI {niftyIndex.analysis.rsiVal.toFixed(1)}</span>
+                    </div>
+                    <div className="font-mono mt-1 space-y-0.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Trigger Time:</span>
+                        <strong className={niftyIndex.analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' ? 'text-amber-300' : 'text-slate-400'}>
+                          {niftyIndex.analysis.intradayConfluence.bullishConfluenceTime}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Right Entry:</span>
+                        <strong className="text-emerald-300 font-extrabold">
+                          ₹{niftyIndex.analysis.intradayConfluence.bullishEntryPoint || niftyIndex.analysis.idealEntry}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bearish Rally Box */}
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                    niftyIndex.analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met'
+                      ? 'bg-rose-950/90 border-rose-500 text-white ring-1 ring-rose-400'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                  }`}>
+                    <div className="flex items-center justify-between font-extrabold text-[10px] uppercase text-rose-400 border-b border-slate-700/60 pb-1">
+                      <span>🔻 Bearish Rally</span>
+                      <span className="font-mono text-white">RSI {niftyIndex.analysis.rsiVal.toFixed(1)}</span>
+                    </div>
+                    <div className="font-mono mt-1 space-y-0.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Trigger Time:</span>
+                        <strong className={niftyIndex.analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met' ? 'text-amber-300' : 'text-slate-400'}>
+                          {niftyIndex.analysis.intradayConfluence.bearishConfluenceTime}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Right Entry:</span>
+                        <strong className="text-rose-300 font-extrabold">
+                          ₹{niftyIndex.analysis.intradayConfluence.bearishEntryPoint || niftyIndex.analysis.idealEntry}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row: 5 Confluence Validation */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[10.5px]">
+                  <div className="flex items-center space-x-1.5 font-bold text-slate-300">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Confluence Signal Quality:</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${niftyIndex.analysis.confluenceValidation.badgeColor}`}>
+                    {niftyIndex.analysis.confluenceValidation.statusLabel}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* BANK NIFTY INDEX CARD */}
+            {bankNiftyIndex && (
+              <div className="bg-slate-900 text-white rounded-2xl p-4 border-2 border-amber-400/80 shadow-md space-y-3 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-bl-lg tracking-wider uppercase shadow-2xs">
+                  📌 PINNED INDEX BENCHMARK
+                </div>
+
+                {/* Top Row: Symbol, Price, Change */}
+                <div className="flex items-start justify-between border-b border-slate-800 pb-2.5">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-black text-xl text-white tracking-wide">
+                        {bankNiftyIndex.stock.companyName || 'BANK NIFTY'}
+                      </span>
+                      <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10.5px] font-mono font-bold px-2 py-0.5 rounded-full">
+                        Lot: {bankNiftyIndex.stock.lotSizeAug2026 || bankNiftyIndex.stock.lotSizeJul2026 || 15} shares
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-medium">Symbol: {bankNiftyIndex.stock.symbol}</span>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-xl font-black text-white font-mono">
+                      {bankNiftyIndex.stock.closePrice !== undefined && bankNiftyIndex.stock.closePrice !== null ? `₹${bankNiftyIndex.stock.closePrice.toFixed(2)}` : 'N/A'}
+                    </div>
+                    <div className={`text-xs font-black ${
+                      (bankNiftyIndex.stock.pctChange || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {(bankNiftyIndex.stock.pctChange || 0) >= 0 ? '+' : ''}{(bankNiftyIndex.stock.pctChange || 0).toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Middle Row: Bullish vs Bearish Rally Status & Trigger Times */}
+                <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                  {/* Bullish Rally Box */}
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                    bankNiftyIndex.analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met'
+                      ? 'bg-emerald-950/90 border-emerald-500 text-white ring-1 ring-emerald-400'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                  }`}>
+                    <div className="flex items-center justify-between font-extrabold text-[10px] uppercase text-emerald-400 border-b border-slate-700/60 pb-1">
+                      <span>🔥 Bullish Rally</span>
+                      <span className="font-mono text-white">RSI {bankNiftyIndex.analysis.rsiVal.toFixed(1)}</span>
+                    </div>
+                    <div className="font-mono mt-1 space-y-0.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Trigger Time:</span>
+                        <strong className={bankNiftyIndex.analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' ? 'text-amber-300' : 'text-slate-400'}>
+                          {bankNiftyIndex.analysis.intradayConfluence.bullishConfluenceTime}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Right Entry:</span>
+                        <strong className="text-emerald-300 font-extrabold">
+                          ₹{bankNiftyIndex.analysis.intradayConfluence.bullishEntryPoint || bankNiftyIndex.analysis.idealEntry}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bearish Rally Box */}
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                    bankNiftyIndex.analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met'
+                      ? 'bg-rose-950/90 border-rose-500 text-white ring-1 ring-rose-400'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                  }`}>
+                    <div className="flex items-center justify-between font-extrabold text-[10px] uppercase text-rose-400 border-b border-slate-700/60 pb-1">
+                      <span>🔻 Bearish Rally</span>
+                      <span className="font-mono text-white">RSI {bankNiftyIndex.analysis.rsiVal.toFixed(1)}</span>
+                    </div>
+                    <div className="font-mono mt-1 space-y-0.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Trigger Time:</span>
+                        <strong className={bankNiftyIndex.analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met' ? 'text-amber-300' : 'text-slate-400'}>
+                          {bankNiftyIndex.analysis.intradayConfluence.bearishConfluenceTime}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Right Entry:</span>
+                        <strong className="text-rose-300 font-extrabold">
+                          ₹{bankNiftyIndex.analysis.intradayConfluence.bearishEntryPoint || bankNiftyIndex.analysis.idealEntry}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row: 5 Confluence Validation */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[10.5px]">
+                  <div className="flex items-center space-x-1.5 font-bold text-slate-300">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Confluence Signal Quality:</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${bankNiftyIndex.analysis.confluenceValidation.badgeColor}`}>
+                    {bankNiftyIndex.analysis.confluenceValidation.statusLabel}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Stats Overview Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Total Scanned */}
@@ -758,14 +1024,25 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveFilter('OPEN_LOW')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            onClick={() => setActiveFilter(activeFilter === 'OPEN_LOW' ? 'ALL' : 'OPEN_LOW')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
               activeFilter === 'OPEN_LOW'
-                ? 'bg-blue-600 text-white shadow-2xs'
-                : 'bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200/80'
+                ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 border-emerald-200'
             }`}
           >
-            Open = Low
+            <span>🟢 Open = Low ({stats.openLowCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveFilter(activeFilter === 'OPEN_HIGH' ? 'ALL' : 'OPEN_HIGH')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
+              activeFilter === 'OPEN_HIGH'
+                ? 'bg-rose-600 text-white border-rose-700 shadow-2xs'
+                : 'bg-rose-50 text-rose-900 hover:bg-rose-100 border-rose-200'
+            }`}
+          >
+            <span>🔴 Open = High ({stats.openHighCount})</span>
           </button>
         </div>
 
@@ -853,12 +1130,21 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                         <span className="font-black text-slate-900 text-lg group-hover:text-blue-600 transition-colors">
                           {stock.symbol}
                         </span>
-                        {stock.isOpenEqualLow && (
+                        {(stock.symbol === 'NIFTY' || stock.symbol === 'BANKNIFTY') && (
+                          <span className="bg-amber-100 text-amber-900 text-[10px] font-black px-1.5 py-0.5 rounded border border-amber-300 shadow-2xs">
+                            📌 PINNED INDEX
+                          </span>
+                        )}
+                        {((stock.openPrice !== undefined && stock.openPrice !== null && stock.lowPrice !== undefined && stock.lowPrice !== null)
+                          ? isOpenLowPattern(stock.openPrice, stock.lowPrice)
+                          : Boolean(stock.isOpenEqualLow)) && (
                           <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-300">
                             OPEN=LOW
                           </span>
                         )}
-                        {stock.isOpenEqualHigh && (
+                        {((stock.openPrice !== undefined && stock.openPrice !== null && stock.highPrice !== undefined && stock.highPrice !== null)
+                          ? isOpenHighPattern(stock.openPrice, stock.highPrice)
+                          : Boolean(stock.isOpenEqualHigh)) && (
                           <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300">
                             OPEN=HIGH
                           </span>

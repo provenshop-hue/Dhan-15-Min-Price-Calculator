@@ -26,8 +26,12 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
   const contractValue = lotSize && activePrice ? lotSize * activePrice : 0;
   const optionStrikes = getAtmOptionStrikes(activePrice, stock.symbol);
 
-  const isOpenLow = stock.isOpenEqualLow ?? isOpenLowPattern(stock.openPrice, stock.lowPrice);
-  const isOpenHigh = stock.isOpenEqualHigh ?? isOpenHighPattern(stock.openPrice, stock.highPrice);
+  const isOpenLow = (stock.openPrice !== undefined && stock.openPrice !== null)
+    ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
+    : Boolean(stock.isOpenEqualLow);
+  const isOpenHigh = (stock.openPrice !== undefined && stock.openPrice !== null)
+    ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
+    : Boolean(stock.isOpenEqualHigh);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
