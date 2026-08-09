@@ -49,6 +49,7 @@ export interface StockCalculated {
   fibPullbackPct?: number | null;
   fibStatus?: 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement' | null;
   isFib382Retrace?: boolean;
+  fib382Time?: string | null;
 
   // Fetch status
   isFetched?: boolean;
@@ -101,6 +102,7 @@ export interface GannCalcResult {
   fibPullbackPct?: number | null;
   fibStatus?: 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement' | null;
   isFib382Retrace?: boolean;
+  fib382Time?: string | null;
 }
 
 export interface RsiIntradayPoint {

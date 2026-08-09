@@ -152,7 +152,7 @@ export default function App() {
         const highPrice = highPriceInput !== undefined && highPriceInput !== null ? highPriceInput : s.highPrice;
         const lowPrice = lowPriceInput !== undefined && lowPriceInput !== null ? lowPriceInput : s.lowPrice;
 
-        const calc = calculateGann15Min(openPrice, closePrice, s.rsi, s.vwap, highPrice, lowPrice, 0.001, s.adx);
+        const calc = calculateGann15Min(openPrice, closePrice, s.rsi, s.vwap, highPrice, lowPrice, 0.001, s.adx, s.first15mHigh, s.first15mLow, s.symbol, s.candleTimestamp);
         return {
           ...s,
           openPrice,
@@ -181,6 +181,7 @@ export default function App() {
           fibPullbackPct: calc.fibPullbackPct,
           fibStatus: calc.fibStatus,
           isFib382Retrace: calc.isFib382Retrace,
+          fib382Time: calc.fib382Time,
           isFetched: true
         };
       })
@@ -279,7 +280,7 @@ export default function App() {
       const rsi = data.rsi;
       const adx = data.adx;
       const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow);
+      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow, stock.symbol, data.candleTimestamp);
 
       setStocks((prev) =>
         prev.map((s) =>
@@ -318,6 +319,7 @@ export default function App() {
                 fibPullbackPct: calc.fibPullbackPct,
                 fibStatus: calc.fibStatus,
                 isFib382Retrace: calc.isFib382Retrace,
+                fib382Time: calc.fib382Time,
                 isFetched: true,
                 isLoading: false,
                 error: null
@@ -384,7 +386,7 @@ export default function App() {
             const rsi = data.rsi;
             const adx = data.adx;
             const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow);
+            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow, stock.symbol, data.candleTimestamp);
 
             setStocks((prev) =>
               prev.map((s) =>
@@ -423,6 +425,7 @@ export default function App() {
                       fibPullbackPct: calc.fibPullbackPct,
                       fibStatus: calc.fibStatus,
                       isFib382Retrace: calc.isFib382Retrace,
+                      fib382Time: calc.fib382Time,
                       isFetched: true,
                       isLoading: false,
                       error: null

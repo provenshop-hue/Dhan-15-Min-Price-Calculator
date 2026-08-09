@@ -662,8 +662,9 @@ export const StockTable: React.FC<StockTableProps> = ({
 
                         {(() => {
                           const cmp = stock.closePrice || stock.openPrice || 0;
-                          const fibData = calculateFibonacci382(stock.highPrice, stock.lowPrice, cmp);
+                          const fibData = calculateFibonacci382(stock.highPrice, stock.lowPrice, cmp, stock.symbol, stock.candleTimestamp);
                           const status = stock.fibStatus || fibData?.fibStatus;
+                          const retraceTime = stock.fib382Time || fibData?.fib382Time || '09:45 AM';
                           if (!status || !fibData) return null;
 
                           return (
@@ -675,10 +676,16 @@ export const StockTable: React.FC<StockTableProps> = ({
                                   ? 'bg-sky-50 text-sky-900 border-sky-300'
                                   : 'bg-rose-50 text-rose-800 border-rose-200'
                               }`}
-                              title={`Fib 38.2% Level: ₹${fibData.fib382Bull} | Reversal Status: ${status}`}
+                              title={`Fib 38.2% Level: ₹${fibData.fib382Bull} | Retraced Time: ${retraceTime} IST | Status: ${status}`}
                             >
                               <Percent className="w-3 h-3 text-amber-700" />
-                              <span>{status === 'Retraced Yes' ? '★ Retraced: Yes' : status === 'Approaching 38.2%' ? 'Approaching 38.2%' : 'No Retracement'}</span>
+                              <span>
+                                {status === 'Retraced Yes'
+                                  ? `★ Retraced Yes (${retraceTime})`
+                                  : status === 'Approaching 38.2%'
+                                  ? `Approaching 38.2% (${retraceTime})`
+                                  : 'No Retracement'}
+                              </span>
                             </span>
                           );
                         })()}

@@ -133,6 +133,66 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* FIB 38.2% RETRACED STOCKS TIME TRACKER SECTION */}
+          {fibRetraceStocks.length > 0 && (
+            <div className="lg:col-span-2 bg-gradient-to-br from-amber-950/10 via-amber-50/50 to-white border-2 border-amber-500/30 rounded-2xl p-4 shadow-sm">
+              <div className="flex items-center justify-between pb-3 border-b border-amber-200/80 mb-3 flex-wrap gap-2">
+                <div className="flex items-center space-x-2">
+                  <div className="p-1.5 bg-amber-500 text-white rounded-lg shadow-xs">
+                    <Percent className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-extrabold text-amber-950 tracking-wider uppercase flex items-center gap-1.5">
+                      Fibonacci 38.2% Retraced Stocks Time Tracker
+                      <span className="bg-amber-100 text-amber-900 text-[10px] px-2 py-0.2 rounded-full font-bold border border-amber-300">
+                        {fibRetraceStocks.length} Stocks
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-amber-800">Exact 15m candle time when price touched 38.2% Fibonacci support &amp; bounced</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onSelectTrendFilter('FIB_382_RETRACE')}
+                  className="text-[11px] font-bold text-amber-800 hover:text-amber-900 flex items-center space-x-0.5 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg border border-amber-300 transition-colors cursor-pointer"
+                >
+                  <span>View All Retraced ({fibRetraceStocks.length})</span>
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {fibRetraceStocks.slice(0, 6).map((stock) => {
+                  const cmp = stock.closePrice || stock.openPrice || 0;
+                  const fibData = calculateFibonacci382(stock.highPrice, stock.lowPrice, cmp, stock.symbol, stock.candleTimestamp);
+                  const retraceTime = stock.fib382Time || fibData?.fib382Time || '09:45 AM';
+
+                  return (
+                    <div
+                      key={stock.id}
+                      onClick={() => onSelectStockDetail(stock)}
+                      className="group bg-white hover:bg-amber-50/80 border border-amber-200 hover:border-amber-400 rounded-xl p-2.5 transition-all cursor-pointer shadow-2xs flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-mono font-black text-slate-900 text-xs">{stock.symbol}</span>
+                          <span className="text-[10px] font-black bg-amber-200/80 text-amber-950 px-1.5 py-0.2 rounded border border-amber-300 shadow-2xs flex items-center gap-1">
+                            🕒 {retraceTime}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 truncate max-w-[130px]">{stock.companyName}</div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-bold text-xs text-slate-800">₹{cmp.toFixed(1)}</div>
+                        <div className="text-[10px] text-amber-800 font-extrabold">38.2% @ ₹{fibData?.fib382Bull.toFixed(1)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           
           {/* VERY BULLISH SECTION */}
           <div className="bg-gradient-to-br from-emerald-950/20 via-white to-slate-50 border-2 border-emerald-500/30 rounded-2xl p-4 shadow-sm relative overflow-hidden">

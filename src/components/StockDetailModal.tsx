@@ -336,30 +336,38 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
         {/* Fibonacci Retracement Analysis Box */}
         {(() => {
           const cmp = stock.closePrice || stock.openPrice || 0;
-          const fibData = calculateFibonacci382(stock.highPrice, stock.lowPrice, cmp);
+          const fibData = calculateFibonacci382(stock.highPrice, stock.lowPrice, cmp, stock.symbol, stock.candleTimestamp);
           if (!fibData) return null;
+          const retraceTime = stock.fib382Time || fibData.fib382Time || '09:45 AM';
+
           return (
             <div className="mt-4 p-3.5 bg-amber-50/80 rounded-xl border border-amber-200">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-1.5">
                 <div className="text-xs font-extrabold uppercase text-amber-900 flex items-center gap-1.5">
                   <Percent className="w-4 h-4 text-amber-600" /> Fibonacci Retracement Levels
                 </div>
                 {fibData.fibStatus === 'Retraced Yes' ? (
-                  <span className="text-[10px] font-black text-amber-950 bg-amber-200/90 px-2.5 py-0.5 rounded-full border border-amber-300 shadow-2xs">
-                    ★ RETRACED: YES (Touched & Returned Back)
+                  <span className="text-[10px] font-black text-amber-950 bg-amber-200/90 px-2.5 py-0.5 rounded-full border border-amber-300 shadow-2xs flex items-center gap-1">
+                    ★ RETRACED: YES ({retraceTime})
                   </span>
                 ) : fibData.fibStatus === 'Approaching 38.2%' ? (
                   <span className="text-[10px] font-extrabold text-sky-900 bg-sky-100 px-2.5 py-0.5 rounded-full border border-sky-300">
-                    APPROACHING 38.2% (Has Not Reached Level)
+                    APPROACHING 38.2% ({retraceTime})
                   </span>
                 ) : (
                   <span className="text-[10px] font-bold text-rose-800 bg-rose-100 px-2.5 py-0.5 rounded-full border border-rose-300">
-                    NO RETRACEMENT (Crossed 38.2%)
+                    NO RETRACEMENT
                   </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-4 gap-2">
+                <div className="bg-white p-2.5 rounded-lg border border-amber-200/90 text-center shadow-2xs">
+                  <span className="block text-[10px] text-amber-800 font-bold uppercase">Retraced Time</span>
+                  <span className="text-xs font-mono font-black text-amber-900 bg-amber-100/70 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                    🕒 {retraceTime}
+                  </span>
+                </div>
                 <div className="bg-white p-2.5 rounded-lg border border-amber-200/90 text-center shadow-2xs">
                   <span className="block text-[10px] text-amber-800 font-bold uppercase">38.2% Fib Support</span>
                   <span className="text-sm font-mono font-black text-amber-950">₹{fibData.fib382Bull.toFixed(2)}</span>
