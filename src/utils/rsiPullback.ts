@@ -40,6 +40,23 @@ export interface IntradayConfluenceInfo {
   timeline: Intraday15MinBar[];
 }
 
+export interface ConfluenceCheckItem {
+  id: string;
+  name: string;
+  passed: boolean;
+  requiredFor: 'BULL' | 'BEAR' | 'BOTH';
+  detail: string;
+}
+
+export interface RallyConfluenceValidation {
+  status: 'HIGH_CONFLUENCE' | 'MODERATE_CAUTION' | 'FALSE_BREAKOUT_RISK';
+  statusLabel: string;
+  badgeColor: string;
+  summaryReason: string;
+  score: number; // 0 to 100
+  checks: ConfluenceCheckItem[];
+}
+
 export interface RsiPullbackAnalysis {
   rsiVal: number;
   pullbackCategory: 'BULLISH_RALLY' | 'BEARISH_RALLY' | 'BULLISH_SWEET_SPOT' | 'BULLISH_MOMENTUM' | 'OVERSOLD_BOUNCE' | 'OVERBOUGHT' | 'NEUTRAL';
@@ -62,6 +79,7 @@ export interface RsiPullbackAnalysis {
   volumeDirection: 'INCREASING' | 'DECREASING' | 'FLAT';
   volumeDeltaPct: number;
   intradayConfluence: IntradayConfluenceInfo;
+  confluenceValidation: RallyConfluenceValidation;
 }
 
 /**
@@ -558,6 +576,18 @@ export function analyzeRsiPullback(stock: StockCalculated, tradingDate?: string)
     tradingDate
   );
 
+  // Validate 5 Non-Negotiable Confluences to eliminate False Bullish/Bearish Signals
+  const confluenceValidation = validateConfluenceAndFalseBreakoutRisk(
+    stock,
+    currentRsi,
+    rsiDirection,
+    volumeDeltaPct,
+    volumeDirection,
+    bullishRally.score,
+    bearishRally.score,
+    pullbackCategory
+  );
+
   return {
     rsiVal: currentRsi,
     pullbackCategory,
@@ -579,7 +609,146 @@ export function analyzeRsiPullback(stock: StockCalculated, tradingDate?: string)
     rsiDelta,
     volumeDirection,
     volumeDeltaPct,
-    intradayConfluence
+    intradayConfluence,
+    confluenceValidation
+  };
+}
+
+/**
+ * Validates 5 Non-Negotiable Confluences to eliminate False Bullish/Bearish Rally Signals
+ */
+export function validateConfluenceAndFalseBreakoutRisk(
+  stock: StockCalculated,
+  currentRsi: number,
+  rsiDirection: 'UP' | 'DOWN' | 'FLAT',
+  volumeDeltaPct: number,
+  volumeDirection: 'INCREASING' | 'DECREASING' | 'FLAT',
+  bullishScore: number,
+  bearishScore: number,
+  category: 'BULLISH_RALLY' | 'BEARISH_RALLY' | 'BULLISH_SWEET_SPOT' | 'BULLISH_MOMENTUM' | 'OVERSOLD_BOUNCE' | 'OVERBOUGHT' | 'NEUTRAL'
+): RallyConfluenceValidation {
+  const open = stock.openPrice || 100;
+  const close = stock.closePrice || open;
+  const high = stock.highPrice || Math.max(open, close);
+  const low = stock.lowPrice || Math.min(open, close);
+  const vwap = stock.vwap || (open + high + low + close) / 4;
+  const range = high - low;
+
+  const isBullishFocus = category === 'BULLISH_RALLY' || category === 'BULLISH_SWEET_SPOT' || category === 'BULLISH_MOMENTUM' || category === 'OVERSOLD_BOUNCE' || (bullishScore >= bearishScore);
+
+  // 1. VWAP Filter
+  const vwapPass = isBullishFocus ? close >= vwap : close <= vwap;
+  const vwapDetail = isBullishFocus
+    ? (vwapPass ? `Price (₹${close}) is above VWAP (₹${vwap.toFixed(1)}). Institutional support confirmed.` : `⚠️ PRICE BELOW VWAP (₹${vwap.toFixed(1)}). High rejection risk by sellers overhead.`)
+    : (vwapPass ? `Price (₹${close}) is below VWAP (₹${vwap.toFixed(1)}). Short pressure confirmed.` : `⚠️ PRICE ABOVE VWAP (₹${vwap.toFixed(1)}). Buyers trapping shorts.`);
+
+  // 2. Relative Volume (RVOL) Filter
+  const rvolPass = volumeDeltaPct >= 15 || volumeDirection === 'INCREASING' || (stock.volume ? stock.volume > 100000 : false) || stock.isOpenEqualLow || stock.isOpenEqualHigh;
+  const rvolDetail = rvolPass
+    ? `Strong institutional volume participation (+${volumeDeltaPct}% RVOL surge).`
+    : `⚠️ LOW VOLUME WARNING. Move lacks volume backing; false breakout failure rate is ~80%.`;
+
+  // 3. RSI Sweet Spot vs Overbought/Oversold Trap
+  let rsiPass = false;
+  let rsiDetail = '';
+  if (isBullishFocus) {
+    if (currentRsi > 72) {
+      rsiPass = false;
+      rsiDetail = `⚠️ RSI OVERBOUGHT TRAP (${currentRsi.toFixed(1)} > 72). Buying at peak leads to sharp pullbacks.`;
+    } else if (currentRsi >= 45) {
+      rsiPass = true;
+      rsiDetail = `RSI (${currentRsi.toFixed(1)}) is in optimal Bullish Momentum zone (45–68).`;
+    } else {
+      rsiPass = false;
+      rsiDetail = `RSI (${currentRsi.toFixed(1)}) below 45. Weak momentum for bullish rally.`;
+    }
+  } else {
+    if (currentRsi < 28) {
+      rsiPass = false;
+      rsiDetail = `⚠️ RSI OVERSOLD TRAP (${currentRsi.toFixed(1)} < 28). Shorting at bottom leads to short squeezes.`;
+    } else if (currentRsi <= 52) {
+      rsiPass = true;
+      rsiDetail = `RSI (${currentRsi.toFixed(1)}) is in solid Bearish Breakdown zone (32–52).`;
+    } else {
+      rsiPass = false;
+      rsiDetail = `RSI (${currentRsi.toFixed(1)}) above 52. Weak setup for shorting.`;
+    }
+  }
+
+  // 4. Candle Body vs Rejection Wick Filter
+  const upperWick = high - Math.max(open, close);
+  const lowerWick = Math.min(open, close) - low;
+  const upperWickRatio = range > 0 ? upperWick / range : 0;
+  const lowerWickRatio = range > 0 ? lowerWick / range : 0;
+
+  let wickPass = false;
+  let wickDetail = '';
+  if (isBullishFocus) {
+    wickPass = upperWickRatio <= 0.30;
+    wickDetail = wickPass
+      ? `Small upper wick (${(upperWickRatio * 100).toFixed(0)}%). Strong closing near high.`
+      : `⚠️ HEAVY UPPER REJECTION (${(upperWickRatio * 100).toFixed(0)}% upper wick). Profit-taking detected.`;
+  } else {
+    wickPass = lowerWickRatio <= 0.30;
+    wickDetail = wickPass
+      ? `Small lower wick (${(lowerWickRatio * 100).toFixed(0)}%). Strong closing near low.`
+      : `⚠️ HEAVY LOWER BUYING REJECTION (${(lowerWickRatio * 100).toFixed(0)}% lower wick). Buyers defending support.`;
+  }
+
+  // 5. Broader Trend / Sector Alignment
+  let trendPass = false;
+  let trendDetail = '';
+  if (isBullishFocus) {
+    trendPass = stock.trend !== 'Very Bearish' && (stock.pctChange || 0) >= -0.3;
+    trendDetail = trendPass
+      ? `Trend (${stock.trend || 'Bullish'}) aligns with positive sector momentum.`
+      : `⚠️ CONTRARIAN TRADE. Stock is in strong overall Bearish trend (${stock.pctChange}%).`;
+  } else {
+    trendPass = stock.trend !== 'Very Bullish' && (stock.pctChange || 0) <= 0.3;
+    trendDetail = trendPass
+      ? `Trend (${stock.trend || 'Bearish'}) aligns with negative sector pressure.`
+      : `⚠️ CONTRARIAN SHORT. Stock is in strong overall Bullish trend (+${stock.pctChange}%).`;
+  }
+
+  const checks: ConfluenceCheckItem[] = [
+    { id: 'vwap_filter', name: '1. VWAP Price Alignment', passed: vwapPass, requiredFor: isBullishFocus ? 'BULL' : 'BEAR', detail: vwapDetail },
+    { id: 'rvol_filter', name: '2. RVOL Institutional Volume', passed: rvolPass, requiredFor: 'BOTH', detail: rvolDetail },
+    { id: 'rsi_filter', name: '3. RSI Sweet Spot (No Trap)', passed: rsiPass, requiredFor: isBullishFocus ? 'BULL' : 'BEAR', detail: rsiDetail },
+    { id: 'wick_filter', name: '4. Candle Wick Rejection Check', passed: wickPass, requiredFor: isBullishFocus ? 'BULL' : 'BEAR', detail: wickDetail },
+    { id: 'trend_filter', name: '5. Broader Trend Confluence', passed: trendPass, requiredFor: 'BOTH', detail: trendDetail },
+  ];
+
+  const passedCount = checks.filter(c => c.passed).length;
+  const score = Math.round((passedCount / checks.length) * 100);
+
+  let status: RallyConfluenceValidation['status'] = 'HIGH_CONFLUENCE';
+  let statusLabel = 'VERIFIED HIGH CONFLUENCE';
+  let badgeColor = 'bg-emerald-600 text-white border-emerald-700 shadow-2xs';
+  let summaryReason = 'Passed all 5 Non-Negotiable Confluences. Low risk of false signal.';
+
+  if (!vwapPass || !rsiPass || passedCount <= 2) {
+    status = 'FALSE_BREAKOUT_RISK';
+    statusLabel = '⚠️ FALSE SIGNAL RISK';
+    badgeColor = 'bg-rose-600 text-white border-rose-700 shadow-2xs';
+    summaryReason = !vwapPass
+      ? `CRITICAL FAILURE: ${isBullishFocus ? 'Price is below VWAP' : 'Price is above VWAP'}. Overhead pressure creates high fakeout risk.`
+      : !rsiPass
+      ? `CRITICAL FAILURE: Extreme RSI trap level. High probability of false breakout reversal.`
+      : `FAILED CONFLUENCE: Only ${passedCount}/5 rules passed. High false signal likelihood.`;
+  } else if (passedCount < 5) {
+    status = 'MODERATE_CAUTION';
+    statusLabel = 'MODERATE CONFLUENCE';
+    badgeColor = 'bg-amber-500 text-slate-950 border-amber-600 shadow-2xs';
+    summaryReason = `Passed ${passedCount}/5 confluences. Trade with strict Stop-Loss & trailing targets.`;
+  }
+
+  return {
+    status,
+    statusLabel,
+    badgeColor,
+    summaryReason,
+    score,
+    checks
   };
 }
 

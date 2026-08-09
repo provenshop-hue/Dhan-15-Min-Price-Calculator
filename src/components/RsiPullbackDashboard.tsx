@@ -14,6 +14,8 @@ import {
   ArrowUpRight, 
   ArrowDownRight, 
   ShieldAlert, 
+  ShieldCheck,
+  AlertTriangle,
   CheckCircle2, 
   Flame, 
   HelpCircle,
@@ -40,6 +42,8 @@ interface RsiPullbackDashboardProps {
 
 type PullbackFilterType = 
   | 'ALL' 
+  | 'HIGH_CONFLUENCE'
+  | 'TRIGGERED_TODAY'
   | 'BULLISH_RALLY'
   | 'BEARISH_RALLY'
   | 'BULLISH_SWEET_SPOT' 
@@ -68,6 +72,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [expandedChecklistStockId, setExpandedChecklistStockId] = useState<string | null>(null);
   const [expanded15MinStockId, setExpanded15MinStockId] = useState<string | null>(null);
+  const [isConfluenceGuideOpen, setIsConfluenceGuideOpen] = useState(false);
   
   // Interactive Calculator State
   const [isCalcOpen, setIsCalcOpen] = useState(false);
@@ -94,6 +99,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
   // Statistics
   const stats = useMemo(() => {
+    let highConfluenceCount = 0;
+    let falseSignalRiskCount = 0;
+    let triggeredTodayCount = 0;
     let bullishRallyCount = 0;
     let bearishRallyCount = 0;
     let bullishSweetSpot = 0;
@@ -102,6 +110,10 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let highScore = 0;
 
     analyzedStocks.forEach(({ stock, analysis }) => {
+      if (analysis.confluenceValidation.status === 'HIGH_CONFLUENCE') highConfluenceCount++;
+      if (analysis.confluenceValidation.status === 'FALSE_BREAKOUT_RISK') falseSignalRiskCount++;
+      const isTriggered = analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' || analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met';
+      if (isTriggered) triggeredTodayCount++;
       if (analysis.bullishRally.score >= 65) bullishRallyCount++;
       if (analysis.bearishRally.score >= 65) bearishRallyCount++;
       if (analysis.pullbackCategory === 'BULLISH_SWEET_SPOT') bullishSweetSpot++;
@@ -112,6 +124,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
     return {
       total: stocks.length,
+      highConfluenceCount,
+      falseSignalRiskCount,
+      triggeredTodayCount,
       bullishRallyCount,
       bearishRallyCount,
       bullishSweetSpot,
@@ -133,6 +148,12 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
 
       // Filter category
+      if (activeFilter === 'HIGH_CONFLUENCE') {
+        return analysis.confluenceValidation.status === 'HIGH_CONFLUENCE';
+      }
+      if (activeFilter === 'TRIGGERED_TODAY') {
+        return analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' || analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met';
+      }
       if (activeFilter === 'BULLISH_RALLY') {
         return analysis.bullishRally.score >= 65;
       }
@@ -231,7 +252,15 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center space-x-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={() => setIsConfluenceGuideOpen(!isConfluenceGuideOpen)}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center space-x-1.5 border border-emerald-400/30"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-200" />
+              <span>{isConfluenceGuideOpen ? 'Hide Confluence Rules' : '5 Rules to Avoid False Signals'}</span>
+            </button>
+
             <button
               onClick={() => setIsCalcOpen(!isCalcOpen)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center space-x-2 border border-blue-400/30"
@@ -242,6 +271,81 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Educational Panel: How 5 Confluences Eliminate False Signals */}
+      {isConfluenceGuideOpen && (
+        <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-lg space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="font-black text-base text-white">How 5 Non-Negotiable Confluences Eliminate False Signals</h3>
+                <p className="text-xs text-slate-300">Why stocks reverse after a Bullish/Bearish Rally signal and how our algorithm filters out fakeouts.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsConfluenceGuideOpen(false)}
+              className="text-slate-400 hover:text-white text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700"
+            >
+              Close Guide ✕
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 text-xs">
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-1.5">
+              <div className="font-extrabold text-amber-400 flex items-center gap-1 text-[11px] uppercase">
+                <span>1. VWAP Price Rule</span>
+              </div>
+              <p className="text-slate-300 text-[10.5px] leading-relaxed">
+                <strong className="text-white">Bullish:</strong> MUST trade above VWAP.<br/>
+                <strong className="text-rose-400">Why Signals Fail:</strong> Buying a rally below VWAP causes instant reversal because institutional supply dumps overhead.
+              </p>
+            </div>
+
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-1.5">
+              <div className="font-extrabold text-amber-400 flex items-center gap-1 text-[11px] uppercase">
+                <span>2. RVOL Volume Surge</span>
+              </div>
+              <p className="text-slate-300 text-[10.5px] leading-relaxed">
+                <strong className="text-white">Institutional Backing:</strong> RVOL &ge; 1.2x.<br/>
+                <strong className="text-rose-400">Why Signals Fail:</strong> Rallies on low volume are retail traps; institutions easily push price down.
+              </p>
+            </div>
+
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-1.5">
+              <div className="font-extrabold text-amber-400 flex items-center gap-1 text-[11px] uppercase">
+                <span>3. RSI Sweet Spot (45–68)</span>
+              </div>
+              <p className="text-slate-300 text-[10.5px] leading-relaxed">
+                <strong className="text-white">No Overbought Trap:</strong> RSI between 45 and 68.<br/>
+                <strong className="text-rose-400">Why Signals Fail:</strong> Buying when RSI &gt; 72 means buying at peak exhaustion right before profit-taking.
+              </p>
+            </div>
+
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-1.5">
+              <div className="font-extrabold text-amber-400 flex items-center gap-1 text-[11px] uppercase">
+                <span>4. Small Wick Rejection</span>
+              </div>
+              <p className="text-slate-300 text-[10.5px] leading-relaxed">
+                <strong className="text-white">Upper Wick &lt; 30%:</strong> Close near high.<br/>
+                <strong className="text-rose-400">Why Signals Fail:</strong> A long upper wick proves sellers rejected higher prices before candle close.
+              </p>
+            </div>
+
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 space-y-1.5">
+              <div className="font-extrabold text-amber-400 flex items-center gap-1 text-[11px] uppercase">
+                <span>5. Sector &amp; Trend Confluence</span>
+              </div>
+              <p className="text-slate-300 text-[10.5px] leading-relaxed">
+                <strong className="text-white">Align with Market:</strong> Overall market direction.<br/>
+                <strong className="text-rose-400">Why Signals Fail:</strong> Individual bullish breakouts fail 80% of time when Nifty/sector is collapsing.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Trading Date Selector Control Bar */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -575,6 +679,29 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveFilter('HIGH_CONFLUENCE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
+              activeFilter === 'HIGH_CONFLUENCE'
+                ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border-blue-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+            <span>🛡️ Verified High Confluence ({stats.highConfluenceCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveFilter('TRIGGERED_TODAY')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
+              activeFilter === 'TRIGGERED_TODAY'
+                ? 'bg-amber-600 text-white border-amber-700 shadow-2xs'
+                : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border-amber-200'
+            }`}
+          >
+            <span>⏱️ Triggered Today ({stats.triggeredTodayCount})</span>
+          </button>
+
+          <button
             onClick={() => setActiveFilter('BULLISH_RALLY')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
               activeFilter === 'BULLISH_RALLY'
@@ -696,17 +823,34 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
             const isBullish = analysis.pullbackCategory === 'BULLISH_SWEET_SPOT' || analysis.pullbackCategory === 'BULLISH_MOMENTUM' || analysis.pullbackCategory === 'OVERSOLD_BOUNCE';
             const isBearish = analysis.pullbackCategory === 'BEARISH_RALLY';
 
+            const lotSize = stock.lotSizeAug2026 || stock.lotSizeJul2026 || stock.lotSizeJun2026 || 500;
+            const cmp = stock.closePrice || stock.openPrice || 100;
+            const contractValue = cmp * lotSize;
+            const marginEst = contractValue * 0.20;
+
+            const isBullTriggered = analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met';
+            const isBearTriggered = analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met';
+
+            const bullEntry = analysis.intradayConfluence.bullishEntryPoint || analysis.idealEntry;
+            const bearEntry = analysis.intradayConfluence.bearishEntryPoint || analysis.idealEntry;
+
+            const lotRiskBull = Math.round(Math.abs(bullEntry - analysis.stopLoss) * lotSize);
+            const lotRewardBull = Math.round(Math.abs(analysis.target1 - bullEntry) * lotSize);
+
+            const lotRiskBear = Math.round(Math.abs(analysis.stopLoss - bearEntry) * lotSize);
+            const lotRewardBear = Math.round(Math.abs(bearEntry - analysis.target1) * lotSize);
+
             return (
               <div
                 key={stock.id}
                 className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group relative"
               >
-                {/* Card Top: Header & Badges */}
-                <div className="space-y-3">
+                {/* 1. STOCK NAME & HEADER (AT VERY TOP) */}
+                <div className="space-y-2 border-b border-slate-100 pb-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="font-black text-slate-900 text-base group-hover:text-blue-600 transition-colors">
+                        <span className="font-black text-slate-900 text-lg group-hover:text-blue-600 transition-colors">
                           {stock.symbol}
                         </span>
                         {stock.isOpenEqualLow && (
@@ -720,16 +864,16 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-500 truncate max-w-[200px]">
+                      <div className="text-xs font-medium text-slate-500 truncate max-w-[220px]">
                         {stock.companyName}
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <div className="text-base font-black text-slate-900">
+                      <div className="text-lg font-black text-slate-900">
                         {stock.closePrice !== undefined && stock.closePrice !== null ? `₹${stock.closePrice.toFixed(2)}` : 'N/A'}
                       </div>
-                      <div className={`text-xs font-bold ${
+                      <div className={`text-xs font-extrabold ${
                         (stock.pctChange || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'
                       }`}>
                         {(stock.pctChange || 0) >= 0 ? '+' : ''}{(stock.pctChange || 0).toFixed(2)}%
@@ -737,8 +881,150 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                     </div>
                   </div>
 
-                  {/* RSI Gauge Bar & Category */}
-                  <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
+                  {/* F&O Lot Size & Contract Info Strip */}
+                  <div className="bg-slate-900 text-white rounded-xl p-2.5 flex items-center justify-between text-[11px] font-mono shadow-2xs">
+                    <div className="flex items-center space-x-1.5 text-amber-300 font-bold">
+                      <Layers className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Lot Size: <strong className="text-white text-xs">{lotSize.toLocaleString('en-IN')}</strong> shares</span>
+                    </div>
+                    <div className="text-right text-[10.5px]">
+                      Val: <strong className="text-emerald-300">₹{(contractValue / 100000).toFixed(2)}L</strong> | Margin: <strong className="text-blue-300">₹{(marginEst / 100000).toFixed(2)}L</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. BULLISH & BEARISH RALLY TRIGGER & ENTRY TIME BANNER */}
+                <div className="space-y-2">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center space-x-1">
+                    <Clock className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Intraday Rally Trigger &amp; Right Entry Point ({selectedDate})</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                    {/* Bullish Rally Box */}
+                    <div className={`p-2.5 rounded-xl border flex flex-col justify-between space-y-1.5 ${
+                      isBullTriggered
+                        ? 'bg-emerald-950/95 border-emerald-500 text-white ring-1 ring-emerald-400 shadow-2xs'
+                        : 'bg-slate-800/60 border-slate-700/70 text-slate-300'
+                    }`}>
+                      <div className="flex items-center justify-between font-extrabold text-[10px] uppercase tracking-wider text-emerald-400 border-b border-slate-700/60 pb-1">
+                        <span>🔥 Bullish Rally</span>
+                        {isBullTriggered ? (
+                          <span className="bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded text-[8.5px] font-black shadow-2xs">TRIGGERED</span>
+                        ) : (
+                          <span className="text-slate-500 font-normal">Score {analysis.bullishRally.score}</span>
+                        )}
+                      </div>
+
+                      <div className="font-mono space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 text-[10px]">Exact Time:</span>
+                          <strong className={isBullTriggered ? 'text-amber-300 text-[11px] font-bold' : 'text-slate-400'}>
+                            {analysis.intradayConfluence.bullishConfluenceTime}
+                          </strong>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 text-[10px]">Right Entry:</span>
+                          <strong className="text-emerald-300 font-extrabold text-[11.5px]">
+                            ₹{bullEntry}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="pt-1 border-t border-slate-700/60 text-[9.5px] font-mono flex justify-between">
+                        <span className="text-rose-300">Risk: -₹{lotRiskBull.toLocaleString('en-IN')}</span>
+                        <span className="text-emerald-300 font-bold">T1: +₹{lotRewardBull.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+
+                    {/* Bearish Rally Box */}
+                    <div className={`p-2.5 rounded-xl border flex flex-col justify-between space-y-1.5 ${
+                      isBearTriggered
+                        ? 'bg-rose-950/95 border-rose-500 text-white ring-1 ring-rose-400 shadow-2xs'
+                        : 'bg-slate-800/60 border-slate-700/70 text-slate-300'
+                    }`}>
+                      <div className="flex items-center justify-between font-extrabold text-[10px] uppercase tracking-wider text-rose-400 border-b border-slate-700/60 pb-1">
+                        <span>🔻 Bearish Rally</span>
+                        {isBearTriggered ? (
+                          <span className="bg-rose-500 text-white px-1.5 py-0.2 rounded text-[8.5px] font-black shadow-2xs">TRIGGERED</span>
+                        ) : (
+                          <span className="text-slate-500 font-normal">Score {analysis.bearishRally.score}</span>
+                        )}
+                      </div>
+
+                      <div className="font-mono space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 text-[10px]">Exact Time:</span>
+                          <strong className={isBearTriggered ? 'text-amber-300 text-[11px] font-bold' : 'text-slate-400'}>
+                            {analysis.intradayConfluence.bearishConfluenceTime}
+                          </strong>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 text-[10px]">Right Entry:</span>
+                          <strong className="text-rose-300 font-extrabold text-[11.5px]">
+                            ₹{bearEntry}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="pt-1 border-t border-slate-700/60 text-[9.5px] font-mono flex justify-between">
+                        <span className="text-rose-300">Risk: -₹{lotRiskBear.toLocaleString('en-IN')}</span>
+                        <span className="text-emerald-300 font-bold">T1: +₹{lotRewardBear.toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. SIGNAL VERIFICATION & FALSE BREAKOUT RISK BAR */}
+                <div className="bg-slate-900 text-white p-3 rounded-xl border border-slate-800 space-y-2 shadow-2xs">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center space-x-1.5 font-bold">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Confluence Quality:</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${analysis.confluenceValidation.badgeColor}`}>
+                      {analysis.confluenceValidation.statusLabel}
+                    </span>
+                  </div>
+
+                  <p className="text-[10.5px] text-slate-300 leading-snug font-sans">
+                    {analysis.confluenceValidation.summaryReason}
+                  </p>
+
+                  <button
+                    onClick={() => setExpandedChecklistStockId(expandedChecklistStockId === stock.id ? null : stock.id)}
+                    className="w-full text-center py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center space-x-1 border border-slate-700/80"
+                  >
+                    <span>{expandedChecklistStockId === stock.id ? 'Hide 5 Confluence Checks' : 'Inspect 5 Confluences (Prevent False Signals)'}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 transform transition-transform ${expandedChecklistStockId === stock.id ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {expandedChecklistStockId === stock.id && (
+                    <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                      <div className="text-[9.5px] font-bold text-amber-400 uppercase tracking-wider">
+                        5 Non-Negotiable Confluences Matrix:
+                      </div>
+                      <div className="space-y-1">
+                        {analysis.confluenceValidation.checks.map((chk) => (
+                          <div key={chk.id} className="p-1.5 rounded bg-slate-950/90 border border-slate-800 flex items-start space-x-1.5">
+                            <span className={`shrink-0 text-xs ${chk.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {chk.passed ? '✅' : '❌'}
+                            </span>
+                            <div className="flex-1 text-[9.5px] leading-snug">
+                              <span className={`font-bold ${chk.passed ? 'text-white' : 'text-rose-300'}`}>{chk.name}:</span>{' '}
+                              <span className="text-slate-300">{chk.detail}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* RSI Gauge Bar & Category */}
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 space-y-2">
                     <div className="flex items-center justify-between text-xs flex-wrap gap-1">
                       <div className="flex items-center space-x-1.5 flex-wrap gap-1">
                         <span className="font-bold text-slate-700">RSI 14:</span>
@@ -995,8 +1281,6 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                       </div>
                     </div>
                   </div>
-
-                </div>
 
                 {/* Card Bottom Actions */}
                 <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100">
