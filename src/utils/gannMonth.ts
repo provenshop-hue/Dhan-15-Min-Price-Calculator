@@ -26,6 +26,24 @@ export interface PrevMonthGannData {
   prevMonthRangePct: number; // ((High - Low) / Low) * 100
   prevMonthRangeAngle: number; // MOD(SQRT(C4)*180 - 225, 360) where C4 = PMH - PML
   
+  // Time Span Analysis between PMH Date & PML Date
+  pmhToPmlCalendarDays: number;
+  pmhToPmlTradingDays: number;
+  pmhToPmlHolidays: number;
+  pmhToPmlWeekends: number;
+  pmhPmlSequence: 'PMH_FIRST' | 'PML_FIRST' | 'SAME_DAY';
+  pmhPmlHolidayNames: string[];
+  
+  calendarDaysAngle: number; // MOD(SQRT(CalendarDays)*180 - 225, 360)
+  tradingDaysAngle: number; // MOD(SQRT(TradingDays)*180 - 225, 360)
+  lowestDegree: number; // Min of (Range Degree, Calendar Days Degree, Trading Days Degree)
+  lowestDegreeSource: string; // 'Range (C4)' | 'Calendar Days' | 'Trading Days'
+  highestDegree: number; // Max of (Range Degree, Calendar Days Degree, Trading Days Degree)
+  highestDegreeSource: string; // 'Range (C4)' | 'Calendar Days' | 'Trading Days'
+  
+  minAngleIterativeLevels: GannIterativeLevel[]; // Formula: (2*N + 2*A/365 + 1.25)^2 for N=1..7 with Min Angle A
+  maxAngleIterativeLevels: GannIterativeLevel[]; // Formula: (2*N + 2*A/365 + 1.25)^2 for N=1..7 with Max Angle A
+  
   gannMidpoint: number; // (High + Low) / 2
   gannMidpointAngle: number;
   
@@ -56,6 +74,147 @@ export interface PrevMonthGannData {
 }
 
 /**
+ * Official NSE Trading Holidays for 2026
+ */
+export const NSE_HOLIDAYS_2026: Record<string, string> = {
+  '2026-01-15': 'Municipal Corporation Election - Maharashtra',
+  '2026-01-26': 'Republic Day',
+  '2026-02-15': 'Mahashivratri (Sunday)',
+  '2026-03-03': 'Holi',
+  '2026-03-21': 'Id-Ul-Fitr / Ramadan Eid (Saturday)',
+  '2026-03-26': 'Shri Ram Navami',
+  '2026-03-31': 'Shri Mahavir Jayanti',
+  '2026-04-03': 'Good Friday',
+  '2026-04-14': 'Dr. Baba Saheb Ambedkar Jayanti',
+  '2026-05-01': 'Maharashtra Day',
+  '2026-05-28': 'Bakri Id',
+  '2026-06-26': 'Muharram',
+  '2026-08-15': 'Independence Day (Saturday)',
+  '2026-09-14': 'Ganesh Chaturthi',
+  '2026-10-02': 'Mahatma Gandhi Jayanti',
+  '2026-10-20': 'Dussehra',
+  '2026-11-08': 'Diwali Laxmi Pujan (Sunday)',
+  '2026-11-10': 'Diwali-Balipratipada',
+  '2026-11-24': 'Prakash Gurpurb Sri Guru Nanak Dev',
+  '2026-12-25': 'Christmas',
+};
+
+/**
+ * Parses date string in various formats (e.g. "16 Jul 2026", "2026-07-16", "16/07/2026") into a Date object
+ */
+export function parseDateString(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const trimmed = dateStr.trim();
+  
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime())) return d;
+  
+  const monthMap: Record<string, number> = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+  };
+  
+  const parts = trimmed.split(/\s+|-|\//);
+  if (parts.length === 3) {
+    let day = parseInt(parts[0], 10);
+    let monthStr = parts[1].toLowerCase().substring(0, 3);
+    let year = parseInt(parts[2], 10);
+    
+    if (parts[0].length === 4) {
+      year = parseInt(parts[0], 10);
+      monthStr = parts[1].toLowerCase().substring(0, 3);
+      day = parseInt(parts[2], 10);
+    }
+    
+    if (!isNaN(day) && monthMap[monthStr] !== undefined && !isNaN(year)) {
+      return new Date(year, monthMap[monthStr], day);
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Calculates Calendar Days vs Trading Days between PMH Date & PML Date
+ * Subtracts weekend days (Sat/Sun) and NSE trading holidays
+ */
+export function calculateTradingTimeSpan(pmhDateStr: string, pmlDateStr: string) {
+  const dtHigh = parseDateString(pmhDateStr);
+  const dtLow = parseDateString(pmlDateStr);
+  
+  if (!dtHigh || !dtLow) {
+    return {
+      calendarDays: 0,
+      tradingDays: 0,
+      holidaysSubtracted: 0,
+      weekendDaysSubtracted: 0,
+      holidayNames: [] as string[],
+      sequence: 'SAME_DAY' as const,
+    };
+  }
+  
+  const highTime = dtHigh.getTime();
+  const lowTime = dtLow.getTime();
+  
+  let sequence: 'PMH_FIRST' | 'PML_FIRST' | 'SAME_DAY' = 'SAME_DAY';
+  if (highTime < lowTime) {
+    sequence = 'PMH_FIRST';
+  } else if (lowTime < highTime) {
+    sequence = 'PML_FIRST';
+  } else {
+    return {
+      calendarDays: 0,
+      tradingDays: 0,
+      holidaysSubtracted: 0,
+      weekendDaysSubtracted: 0,
+      holidayNames: [],
+      sequence: 'SAME_DAY' as const,
+    };
+  }
+  
+  const startDate = new Date(Math.min(highTime, lowTime));
+  const endDate = new Date(Math.max(highTime, lowTime));
+  
+  const calendarDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  let tradingDays = 0;
+  let holidaysSubtracted = 0;
+  let weekendDaysSubtracted = 0;
+  const holidayNames: string[] = [];
+  
+  const curr = new Date(startDate.getTime());
+  while (curr.getTime() < endDate.getTime()) {
+    curr.setDate(curr.getDate() + 1);
+    
+    const dayOfWeek = curr.getDay(); // 0 = Sun, 6 = Sat
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      weekendDaysSubtracted++;
+    } else {
+      const yyyy = curr.getFullYear();
+      const mm = String(curr.getMonth() + 1).padStart(2, '0');
+      const dd = String(curr.getDate()).padStart(2, '0');
+      const dateKey = `${yyyy}-${mm}-${dd}`;
+      
+      if (NSE_HOLIDAYS_2026[dateKey]) {
+        holidaysSubtracted++;
+        holidayNames.push(`${NSE_HOLIDAYS_2026[dateKey]} (${dd}/${mm})`);
+      } else {
+        tradingDays++;
+      }
+    }
+  }
+  
+  return {
+    calendarDays,
+    tradingDays,
+    holidaysSubtracted,
+    weekendDaysSubtracted,
+    holidayNames,
+    sequence,
+  };
+}
+
+/**
  * Calculates Gann Angle / Degree for a given price using the Square of 9 formula:
  * MOD(SQRT(Price) * 180 - 225, 360)
  */
@@ -64,6 +223,87 @@ export function calculateGannAngle(price: number): number {
   const rawValue = Math.sqrt(price) * 180 - 225;
   const angle = ((rawValue % 360) + 360) % 360;
   return Math.round(angle * 100) / 100;
+}
+
+export interface GannIterativeLevel {
+  n: number;
+  level: number;
+  degree: number;
+  daysAdded: number;
+  projectedDate: string;
+  projectedDayName: string;
+  baseDate: string;
+}
+
+/**
+  * Applies formula (2*N + 2*(A/365) + 1.25)^2 for N = 1..7
+  * where A is the given angle (e.g. Minimum Angle or Maximum Angle).
+  * Adds each output degree as days to the baseDate (High Appeared Date or Low Appeared Date)
+  * to generate 7 projected target dates in that month/future.
+  */
+export function calculateGannIterativeFormula(angle: number, baseDateStr?: string): GannIterativeLevel[] {
+  const levels: GannIterativeLevel[] = [];
+  const baseDateObj = baseDateStr ? (parseDateString(baseDateStr) || new Date()) : new Date();
+  
+  const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  for (let n = 1; n <= 7; n++) {
+    const rawLevel = Math.pow(2 * n + 2 * (angle / 365) + 1.25, 2);
+    const level = Math.round(rawLevel * 100) / 100;
+    const degree = calculateGannAngle(level);
+    
+    // Add Projected Level (as calendar days) to High or Low Appeared Date
+    const daysToAdd = Math.round(level);
+    const targetDateObj = new Date(baseDateObj.getTime() + daysToAdd * 86400000);
+    
+    const projectedDate = `${pad(targetDateObj.getDate())} ${monthNames[targetDateObj.getMonth()]} ${targetDateObj.getFullYear()}`;
+    const projectedDayName = dayNames[targetDateObj.getDay()];
+
+    levels.push({
+      n,
+      level,
+      degree,
+      daysAdded: daysToAdd,
+      projectedDate,
+      projectedDayName,
+      baseDate: baseDateStr || '',
+    });
+  }
+  return levels;
+}
+
+/**
+ * Finds the Lowest Degree and Highest Degree among:
+ * 1. Range Gann Degree (C4)
+ * 2. Calendar Days Degree
+ * 3. Trading Days Degree
+ */
+export function findMinMaxDegrees(
+  rangeAngle: number,
+  calendarDaysAngle: number,
+  tradingDaysAngle: number
+) {
+  const items = [
+    { degree: rangeAngle, source: 'Range (C4)' },
+    { degree: calendarDaysAngle, source: 'Calendar Days' },
+    { degree: tradingDaysAngle, source: 'Trading Days' },
+  ];
+
+  items.sort((a, b) => a.degree - b.degree);
+
+  const lowest = items[0];
+  const highest = items[items.length - 1];
+
+  return {
+    calendarDaysAngle,
+    tradingDaysAngle,
+    lowestDegree: lowest.degree,
+    lowestDegreeSource: lowest.source,
+    highestDegree: highest.degree,
+    highestDegreeSource: highest.source,
+  };
 }
 
 /**
@@ -272,6 +512,20 @@ export function calculateGannMonthData(
   const buyAboveAngle = calculateGannAngle(buyAbove);
   const sellBelowAngle = calculateGannAngle(sellBelow);
 
+  // Time Span Analysis (Calendar Days vs Trading Days & Trading Holidays Subtraction)
+  const timeSpan = calculateTradingTimeSpan(pmhDate, pmlDate);
+  const calendarDaysAngle = calculateGannAngle(timeSpan.calendarDays);
+  const tradingDaysAngle = calculateGannAngle(timeSpan.tradingDays);
+
+  // Compare 3 Degrees: Range Gann Degree (C4), Calendar Days Degree, Trading Days Degree
+  const degreeComp = findMinMaxDegrees(rangeAngle, calendarDaysAngle, tradingDaysAngle);
+
+  // Compute 7-Iteration formula (2*N + 2*A/365 + 1.25)^2 for Lowest & Highest Degrees
+  // Minimum Angle output degrees added to High Appeared Date (pmhDate)
+  // Maximum Angle output degrees added to Low Appeared Date (pmlDate)
+  const minAngleIterativeLevels = calculateGannIterativeFormula(degreeComp.lowestDegree, pmhDate);
+  const maxAngleIterativeLevels = calculateGannIterativeFormula(degreeComp.highestDegree, pmlDate);
+
   return {
     stockId: stock.id,
     symbol: stock.symbol,
@@ -293,6 +547,20 @@ export function calculateGannMonthData(
     prevMonthRange: range,
     prevMonthRangePct: rangePct,
     prevMonthRangeAngle: rangeAngle,
+    pmhToPmlCalendarDays: timeSpan.calendarDays,
+    pmhToPmlTradingDays: timeSpan.tradingDays,
+    pmhToPmlHolidays: timeSpan.holidaysSubtracted,
+    pmhToPmlWeekends: timeSpan.weekendDaysSubtracted,
+    pmhPmlSequence: timeSpan.sequence,
+    pmhPmlHolidayNames: timeSpan.holidayNames,
+    calendarDaysAngle,
+    tradingDaysAngle,
+    lowestDegree: degreeComp.lowestDegree,
+    lowestDegreeSource: degreeComp.lowestDegreeSource,
+    highestDegree: degreeComp.highestDegree,
+    highestDegreeSource: degreeComp.highestDegreeSource,
+    minAngleIterativeLevels,
+    maxAngleIterativeLevels,
     gannMidpoint: midpoint,
     gannMidpointAngle: midpointAngle,
     gannBuyAbove: buyAbove,

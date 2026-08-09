@@ -703,6 +703,10 @@ export default function App() {
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
             onFetchSingleStock={handleFetchSingleDhan}
+            selectedDate={credentials.date}
+            onDateChange={handleDateChange}
+            onFetchAll={handleFetchAllDhan}
+            isBulkLoading={isBulkLoading}
           />
         )}
 

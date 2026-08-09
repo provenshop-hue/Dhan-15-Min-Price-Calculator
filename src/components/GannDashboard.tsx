@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Calendar, Search, Filter, RefreshCw, Sparkles, TrendingUp, TrendingDown, 
+  Calendar, Clock, Search, Filter, RefreshCw, Sparkles, TrendingUp, TrendingDown, 
   Layers, ArrowUpRight, ArrowDownRight, ChevronRight, CheckCircle2, ShieldAlert,
   Sliders, Eye, HelpCircle, X, Check, Activity, BarChart2, Zap
 } from 'lucide-react';
@@ -454,6 +454,34 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                       </div>
                     </div>
 
+                    {/* High-Low Calendar vs Trading Days Interval & Degrees */}
+                    <div className="flex flex-col space-y-1 text-slate-300 pb-1.5 border-b border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-1">
+                          <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                          <span className="font-bold text-cyan-300">Days Interval &amp; Degrees:</span>
+                        </div>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-black text-cyan-200 text-[11px]">
+                            {idxItem.pmhToPmlCalendarDays} Cal ({idxItem.calendarDaysAngle}°) / {idxItem.pmhToPmlTradingDays} Mkt ({idxItem.tradingDaysAngle}°)
+                          </span>
+                          {idxItem.pmhToPmlHolidays > 0 && (
+                            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30" title={idxItem.pmhPmlHolidayNames.join(', ')}>
+                              -{idxItem.pmhToPmlHolidays} Hol
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] pt-0.5 font-bold">
+                        <span className="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                          🔻 Lowest: <span className="font-black">{idxItem.lowestDegree}°</span> ({idxItem.lowestDegreeSource})
+                        </span>
+                        <span className="text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/30">
+                          🔺 Highest: <span className="font-black">{idxItem.highestDegree}°</span> ({idxItem.highestDegreeSource})
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="flex items-center justify-between text-slate-300 pb-1.5 border-b border-slate-800">
                       <span className="font-bold text-blue-400">Gann 50% Midpoint:</span>
                       <div className="flex items-center space-x-2">
@@ -749,6 +777,34 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                       </div>
                     </div>
 
+                    {/* High-Low Days Span (Calendar Days vs Trading Days & Degrees) */}
+                    <div className="flex flex-col space-y-1 text-slate-700 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-cyan-800 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-cyan-600" />
+                          <span>Days Span &amp; Degrees:</span>
+                        </span>
+                        <div className="text-right">
+                          <span className="font-black text-slate-900">
+                            {item.pmhToPmlCalendarDays} Cal ({item.calendarDaysAngle}°) / {item.pmhToPmlTradingDays} Mkt ({item.tradingDaysAngle}°)
+                          </span>
+                          {item.pmhToPmlHolidays > 0 && (
+                            <span className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-1 py-0.2 rounded ml-1 border border-amber-300" title={item.pmhPmlHolidayNames.join(', ')}>
+                              -{item.pmhToPmlHolidays} Hol
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-bold pt-0.5">
+                        <span className="text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          Lowest: <span className="font-black">{item.lowestDegree}°</span> ({item.lowestDegreeSource})
+                        </span>
+                        <span className="text-indigo-800 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                          Highest: <span className="font-black">{item.highestDegree}°</span> ({item.highestDegreeSource})
+                        </span>
+                      </div>
+                    </div>
+
                     {/* Gann 50% Midpoint */}
                     <div className="flex items-center justify-between text-slate-700 text-[11px]">
                       <span className="font-bold text-blue-700">Gann 50% Midpoint:</span>
@@ -797,6 +853,8 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                     <th className="p-3.5">PML ({bounds.prevMonthName.split(' ')[0]} Low)</th>
                     <th className="p-3.5">Date Low Appeared</th>
                     <th className="p-3.5">Range Diff (C4)</th>
+                    <th className="p-3.5">High-Low Days &amp; Degrees</th>
+                    <th className="p-3.5">3-Degrees Min / Max</th>
                     <th className="p-3.5">50% Midpoint</th>
                     <th className="p-3.5">Gann Buy Trigger</th>
                     <th className="p-3.5">Status</th>
@@ -829,6 +887,20 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                         <div>₹{item.prevMonthRange.toFixed(2)}</div>
                         <div className="text-[9px] font-extrabold text-amber-800 bg-amber-100 px-1 py-0.2 rounded border border-amber-300 inline-block mt-0.5">
                           {item.prevMonthRangeAngle}° Degree
+                        </div>
+                      </td>
+                      <td className="p-3.5 font-bold text-slate-800 bg-cyan-50/40 rounded-lg">
+                        <div className="text-cyan-950 font-black">{item.pmhToPmlCalendarDays} Cal ({item.calendarDaysAngle}°) / {item.pmhToPmlTradingDays} Mkt ({item.tradingDaysAngle}°)</div>
+                        <div className="text-[9px] text-slate-500 font-medium">
+                          -{item.pmhToPmlWeekends} Wknd{item.pmhToPmlHolidays > 0 ? `, -${item.pmhToPmlHolidays} Hol` : ''}
+                        </div>
+                      </td>
+                      <td className="p-3.5 text-[10px] font-bold space-y-1">
+                        <div className="text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          🔻 Lowest: <span className="font-black">{item.lowestDegree}°</span> ({item.lowestDegreeSource})
+                        </div>
+                        <div className="text-purple-900 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                          🔺 Highest: <span className="font-black">{item.highestDegree}°</span> ({item.highestDegreeSource})
                         </div>
                       </td>
                       <td className="p-3.5 font-black text-blue-800">₹{item.gannMidpoint.toFixed(2)}</td>
@@ -922,6 +994,271 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                 <div className="text-2xl font-black text-rose-950">₹{selectedStockData.prevMonthLow.toFixed(2)}</div>
                 <div className="text-xs font-extrabold text-rose-700 pt-1">
                   📅 Low Appeared On: <span className="bg-white px-2 py-0.5 rounded border border-rose-300 shadow-2xs">{selectedStockData.prevMonthLowDate}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Calendar Days vs Trading Days Time Interval Analysis */}
+            <div className="bg-slate-900 text-white p-4 rounded-2xl border border-slate-800 space-y-3 shadow-md">
+              <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-2 gap-2">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                    High-Low Time Interval Analysis (Calendar vs Trading Days)
+                  </h3>
+                </div>
+                <span className="text-[10px] font-black text-cyan-300 bg-cyan-950/90 px-2.5 py-0.5 rounded-full border border-cyan-800">
+                  {selectedStockData.pmhPmlSequence === 'PMH_FIRST' 
+                    ? 'High Appeared First (PMH → PML)' 
+                    : selectedStockData.pmhPmlSequence === 'PML_FIRST'
+                    ? 'Low Appeared First (PML → PMH)'
+                    : 'Same Day High & Low'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-0.5">
+                  <div className="text-[10px] text-slate-400 font-extrabold uppercase">Calendar Days Span</div>
+                  <div className="text-xl font-black text-white">{selectedStockData.pmhToPmlCalendarDays} <span className="text-xs font-medium text-slate-400">Days</span></div>
+                  <div className="text-[9px] text-slate-500">Total Calendar Days</div>
+                </div>
+
+                <div className="bg-cyan-950/60 p-2.5 rounded-xl border border-cyan-800/80 space-y-0.5">
+                  <div className="text-[10px] text-cyan-400 font-extrabold uppercase">Trading Days</div>
+                  <div className="text-xl font-black text-cyan-300">{selectedStockData.pmhToPmlTradingDays} <span className="text-xs font-medium text-cyan-400/80">Mkt Days</span></div>
+                  <div className="text-[9px] text-cyan-400/80">Actual Market Open Days</div>
+                </div>
+
+                <div className="bg-amber-950/60 p-2.5 rounded-xl border border-amber-800/80 space-y-0.5">
+                  <div className="text-[10px] text-amber-400 font-extrabold uppercase">Trading Holidays</div>
+                  <div className="text-xl font-black text-amber-300">-{selectedStockData.pmhToPmlHolidays} <span className="text-xs font-medium text-amber-400/80">Holidays</span></div>
+                  <div className="text-[9px] text-amber-400/80">Subtracted NSE Holidays</div>
+                </div>
+
+                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-0.5">
+                  <div className="text-[10px] text-slate-400 font-extrabold uppercase">Weekends Subtracted</div>
+                  <div className="text-xl font-black text-slate-300">-{selectedStockData.pmhToPmlWeekends} <span className="text-xs font-medium text-slate-400">Days</span></div>
+                  <div className="text-[9px] text-slate-500">Saturdays &amp; Sundays</div>
+                </div>
+              </div>
+
+              {selectedStockData.pmhPmlHolidayNames && selectedStockData.pmhPmlHolidayNames.length > 0 && (
+                <div className="text-[11px] bg-amber-950/40 p-2.5 rounded-xl border border-amber-800/50 text-amber-300 space-y-1">
+                  <div className="font-extrabold text-[10px] uppercase flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                    <span>NSE Trading Holidays Subtracted in this Interval ({selectedStockData.pmhPmlHolidayNames.length}):</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {selectedStockData.pmhPmlHolidayNames.map((name, i) => (
+                      <span key={i} className="bg-amber-900/60 text-amber-200 text-[10px] px-2 py-0.5 rounded-md border border-amber-700/60 font-medium">
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3-Degrees Comparison Card (Calendar Days Degree, Trading Days Degree, Range C4 Degree) */}
+            <div className="bg-gradient-to-br from-slate-900 via-cyan-950 to-slate-900 p-4 rounded-2xl border border-cyan-500/30 text-white space-y-3 shadow-md">
+              <div className="flex flex-wrap items-center justify-between border-b border-cyan-800/60 pb-2 gap-2">
+                <div className="flex items-center space-x-2">
+                  <Zap className="w-4 h-4 text-cyan-400" />
+                  <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                    3-Degrees Comparison (Calendar Days, Trading Days &amp; Range Gann Degree)
+                  </h3>
+                </div>
+                <div className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 rounded text-[10px] font-mono font-bold">
+                  MOD(SQRT(Value)*180 - 225, 360)
+                </div>
+              </div>
+
+              {/* 3 Individual Degrees Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center">
+                <div className="bg-slate-950/80 p-3 rounded-xl border border-amber-500/40 space-y-1">
+                  <div className="text-[10px] text-amber-400 font-extrabold uppercase">1. Range Gann Degree (C4)</div>
+                  <div className="text-2xl font-black text-amber-300">{selectedStockData.prevMonthRangeAngle}°</div>
+                  <div className="text-[9px] text-slate-400">Range: ₹{selectedStockData.prevMonthRange.toFixed(2)}</div>
+                </div>
+
+                <div className="bg-slate-950/80 p-3 rounded-xl border border-cyan-500/40 space-y-1">
+                  <div className="text-[10px] text-cyan-400 font-extrabold uppercase">2. Calendar Days Degree</div>
+                  <div className="text-2xl font-black text-cyan-300">{selectedStockData.calendarDaysAngle}°</div>
+                  <div className="text-[9px] text-slate-400">Total: {selectedStockData.pmhToPmlCalendarDays} Calendar Days</div>
+                </div>
+
+                <div className="bg-slate-950/80 p-3 rounded-xl border border-teal-500/40 space-y-1">
+                  <div className="text-[10px] text-teal-400 font-extrabold uppercase">3. Trading Days Degree</div>
+                  <div className="text-2xl font-black text-teal-300">{selectedStockData.tradingDaysAngle}°</div>
+                  <div className="text-[9px] text-slate-400">Open: {selectedStockData.pmhToPmlTradingDays} Trading Days</div>
+                </div>
+              </div>
+
+              {/* Lowest vs Highest Degree Highlight Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="bg-emerald-950/70 p-3 rounded-xl border border-emerald-500/50 flex items-center justify-between shadow-inner">
+                  <div>
+                    <div className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-wider">🔻 Lowest Degree</div>
+                    <div className="text-xs text-emerald-200/80 font-semibold">{selectedStockData.lowestDegreeSource}</div>
+                  </div>
+                  <div className="text-2xl font-black text-emerald-300 bg-emerald-900/80 px-3 py-1 rounded-xl border border-emerald-400/50">
+                    {selectedStockData.lowestDegree}°
+                  </div>
+                </div>
+
+                <div className="bg-purple-950/70 p-3 rounded-xl border border-purple-500/50 flex items-center justify-between shadow-inner">
+                  <div>
+                    <div className="text-[10px] text-purple-300 font-extrabold uppercase tracking-wider">🔺 Highest Degree</div>
+                    <div className="text-xs text-purple-200/80 font-semibold">{selectedStockData.highestDegreeSource}</div>
+                  </div>
+                  <div className="text-2xl font-black text-purple-200 bg-purple-900/80 px-3 py-1 rounded-xl border border-purple-400/50">
+                    {selectedStockData.highestDegree}°
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 7-Iteration Formula Table Card: (2*N + 2*A/365 + 1.25)^2 for N=1..7 */}
+            <div className="bg-slate-900 text-white p-4 rounded-2xl border border-indigo-500/30 space-y-4 shadow-md">
+              <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-2.5 gap-2">
+                <div className="flex items-center space-x-2">
+                  <Activity className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-xs font-black text-white uppercase tracking-wider">
+                    7-Iteration Gann Level &amp; Projected Target Dates
+                  </h3>
+                </div>
+                <div className="px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-mono font-bold">
+                  Formula: (2×N + 2×(A/365) + 1.25)² &nbsp;|&nbsp; N = 1 to 7
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Minimum Angle 7 Iterations + High Appeared Day Addition */}
+                <div className="bg-slate-950/90 p-3.5 rounded-xl border border-emerald-500/40 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-2 gap-2">
+                    <div>
+                      <div className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-wider">
+                        Minimum Angle (A = {selectedStockData.lowestDegree}°)
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-medium">Source: {selectedStockData.lowestDegreeSource}</div>
+                    </div>
+                    <div className="text-right bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-800/80">
+                      <div className="text-[9px] text-emerald-400 uppercase font-black">High Appeared Day (Base):</div>
+                      <div className="text-[11px] font-black text-white">{selectedStockData.prevMonthHighDate}</div>
+                    </div>
+                  </div>
+
+                  {/* 7 Projected Target Days Badge Summary (High Date + Projected Level) */}
+                  <div className="bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-800/50 space-y-1.5">
+                    <div className="text-[9.5px] text-emerald-300 font-black uppercase tracking-wider flex items-center justify-between">
+                      <span>7 Projected Days in Month (High Date + Projected Level):</span>
+                      <span className="text-[9px] text-emerald-400 font-normal">Base: {selectedStockData.prevMonthHighDate}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-[10px] font-mono font-bold text-emerald-200">
+                      {selectedStockData.minAngleIterativeLevels.map((lvl) => (
+                        <span key={lvl.n} className="bg-emerald-900/90 px-2 py-0.5 rounded border border-emerald-700/80 flex items-center gap-1 shadow-2xs">
+                          <span className="text-emerald-400">N{lvl.n}:</span>
+                          <span className="text-white font-black">{lvl.projectedDate}</span>
+                          <span className="text-emerald-300 text-[9px]">({lvl.projectedDayName})</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Iterations Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px] text-left">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 bg-slate-900/80">
+                          <th className="py-1.5 px-2">N</th>
+                          <th className="py-1.5 px-2">Formula Expression</th>
+                          <th className="py-1.5 px-2 text-right">Level</th>
+                          <th className="py-1.5 px-2 text-right">Degree</th>
+                          <th className="py-1.5 px-2 text-right text-emerald-400">High + Level Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-mono">
+                        {selectedStockData.minAngleIterativeLevels.map((item) => (
+                          <tr key={item.n} className="hover:bg-slate-900/50 transition-colors">
+                            <td className="py-1.5 px-2 font-black text-emerald-400">N={item.n}</td>
+                            <td className="py-1.5 px-2 text-[10px] text-slate-400">
+                              (2×{item.n} + 2×({selectedStockData.lowestDegree}/365) + 1.25)²
+                            </td>
+                            <td className="py-1.5 px-2 text-right font-black text-white">₹{item.level.toFixed(2)}</td>
+                            <td className="py-1.5 px-2 text-right font-black text-emerald-300 bg-emerald-950/40">{item.degree}°</td>
+                            <td className="py-1.5 px-2 text-right font-black text-emerald-200">
+                              <div>{item.projectedDate}</div>
+                              <div className="text-[9px] text-emerald-400/80 font-medium">+{item.daysAdded}d ({item.projectedDayName})</div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Maximum Angle 7 Iterations + Low Appeared Day Addition */}
+                <div className="bg-slate-950/90 p-3.5 rounded-xl border border-purple-500/40 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-2 gap-2">
+                    <div>
+                      <div className="text-[10px] text-purple-300 font-extrabold uppercase tracking-wider">
+                        Maximum Angle (A = {selectedStockData.highestDegree}°)
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-medium">Source: {selectedStockData.highestDegreeSource}</div>
+                    </div>
+                    <div className="text-right bg-purple-950/80 px-2.5 py-1 rounded-lg border border-purple-800/80">
+                      <div className="text-[9px] text-purple-300 uppercase font-black">Low Appeared Day (Base):</div>
+                      <div className="text-[11px] font-black text-white">{selectedStockData.prevMonthLowDate}</div>
+                    </div>
+                  </div>
+
+                  {/* 7 Projected Target Days Badge Summary (Low Date + Projected Level) */}
+                  <div className="bg-purple-950/40 p-2.5 rounded-lg border border-purple-800/50 space-y-1.5">
+                    <div className="text-[9.5px] text-purple-300 font-black uppercase tracking-wider flex items-center justify-between">
+                      <span>7 Projected Days in Month (Low Date + Projected Level):</span>
+                      <span className="text-[9px] text-purple-400 font-normal">Base: {selectedStockData.prevMonthLowDate}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-[10px] font-mono font-bold text-purple-200">
+                      {selectedStockData.maxAngleIterativeLevels.map((lvl) => (
+                        <span key={lvl.n} className="bg-purple-900/90 px-2 py-0.5 rounded border border-purple-700/80 flex items-center gap-1 shadow-2xs">
+                          <span className="text-purple-300">N{lvl.n}:</span>
+                          <span className="text-white font-black">{lvl.projectedDate}</span>
+                          <span className="text-purple-300 text-[9px]">({lvl.projectedDayName})</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Iterations Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px] text-left">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 bg-slate-900/80">
+                          <th className="py-1.5 px-2">N</th>
+                          <th className="py-1.5 px-2">Formula Expression</th>
+                          <th className="py-1.5 px-2 text-right">Level</th>
+                          <th className="py-1.5 px-2 text-right">Degree</th>
+                          <th className="py-1.5 px-2 text-right text-purple-300">Low + Level Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 font-mono">
+                        {selectedStockData.maxAngleIterativeLevels.map((item) => (
+                          <tr key={item.n} className="hover:bg-slate-900/50 transition-colors">
+                            <td className="py-1.5 px-2 font-black text-purple-400">N={item.n}</td>
+                            <td className="py-1.5 px-2 text-[10px] text-slate-400">
+                              (2×{item.n} + 2×({selectedStockData.highestDegree}/365) + 1.25)²
+                            </td>
+                            <td className="py-1.5 px-2 text-right font-black text-white">₹{item.level.toFixed(2)}</td>
+                            <td className="py-1.5 px-2 text-right font-black text-purple-300 bg-purple-950/40">{item.degree}°</td>
+                            <td className="py-1.5 px-2 text-right font-black text-purple-200">
+                              <div>{item.projectedDate}</div>
+                              <div className="text-[9px] text-purple-300/80 font-medium">+{item.daysAdded}d ({item.projectedDayName})</div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

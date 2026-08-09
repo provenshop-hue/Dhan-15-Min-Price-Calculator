@@ -19,7 +19,11 @@ import {
   HelpCircle,
   ExternalLink,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Clock,
+  Target,
+  Calendar,
+  RefreshCw
 } from 'lucide-react';
 
 interface RsiPullbackDashboardProps {
@@ -28,6 +32,10 @@ interface RsiPullbackDashboardProps {
   onOpenPositionSizer: (stock: StockCalculated) => void;
   onOpenRsiAnalyst: (stock: StockCalculated) => void;
   onFetchSingleStock?: (symbol: string) => void;
+  selectedDate?: string;
+  onDateChange?: (date: string) => void;
+  onFetchAll?: () => void;
+  isBulkLoading?: boolean;
 }
 
 type PullbackFilterType = 
@@ -48,13 +56,18 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   onSelectStockDetail,
   onOpenPositionSizer,
   onOpenRsiAnalyst,
-  onFetchSingleStock
+  onFetchSingleStock,
+  selectedDate = new Date().toISOString().split('T')[0],
+  onDateChange,
+  onFetchAll,
+  isBulkLoading = false
 }) => {
   const [activeFilter, setActiveFilter] = useState<PullbackFilterType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [expandedChecklistStockId, setExpandedChecklistStockId] = useState<string | null>(null);
+  const [expanded15MinStockId, setExpanded15MinStockId] = useState<string | null>(null);
   
   // Interactive Calculator State
   const [isCalcOpen, setIsCalcOpen] = useState(false);
@@ -68,16 +81,16 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   });
   const [calcResult, setCalcResult] = useState<{ rsi: number; analysis: RsiPullbackAnalysis } | null>(null);
 
-  // Compute RSI Pullback Analysis for all stocks
+  // Compute RSI Pullback Analysis for all stocks for the selected trading date
   const analyzedStocks = useMemo(() => {
     return stocks.map((stock) => {
-      const analysis = analyzeRsiPullback(stock);
+      const analysis = analyzeRsiPullback(stock, selectedDate);
       return {
         stock,
         analysis
       };
     });
-  }, [stocks]);
+  }, [stocks, selectedDate]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -209,6 +222,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
               <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-2.5 py-0.5 rounded-full font-bold border border-emerald-500/30 uppercase tracking-wider">
                 Live 15m Momentum
               </span>
+              <span className="bg-blue-500/30 text-blue-200 text-[10px] px-2.5 py-0.5 rounded-full font-bold border border-blue-400/40 font-mono">
+                📅 {selectedDate}
+              </span>
             </div>
             <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
               Detect high-conviction RSI pullbacks (40–55 sweet spot) above VWAP, oversold bounces (&lt;40 RSI), and bearish counter-rallies across Nifty F&amp;O stocks with calculated entry, stop loss, and risk-reward ratios.
@@ -224,6 +240,83 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
               <span>{isCalcOpen ? 'Hide RSI Calculator' : 'Interactive RSI Calculator'}</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Trading Date Selector Control Bar */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl border border-blue-200/80">
+            <Calendar className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">Trading Date Filter:</span>
+              <span className="bg-blue-600 text-white text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-md shadow-2xs">
+                {selectedDate}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Select any trading session date to view RSI pullbacks, 15m confluence triggers, and entry levels for that day.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <span className="text-[11px] font-semibold text-slate-600 pl-2">Trading Date:</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => onDateChange?.(e.target.value)}
+              className="bg-white text-slate-900 font-bold px-2 py-1 rounded-lg border border-slate-300 text-xs shadow-2xs outline-none cursor-pointer focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Quick Preset Date Buttons */}
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => onDateChange?.(new Date().toISOString().split('T')[0])}
+              className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                selectedDate === new Date().toISOString().split('T')[0]
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 1);
+                onDateChange?.(d.toISOString().split('T')[0]);
+              }}
+              className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-all"
+            >
+              Yesterday
+            </button>
+            <button
+              onClick={() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 2);
+                onDateChange?.(d.toISOString().split('T')[0]);
+              }}
+              className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-all"
+            >
+              -2 Days
+            </button>
+          </div>
+
+          {onFetchAll && (
+            <button
+              onClick={onFetchAll}
+              disabled={isBulkLoading}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center space-x-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isBulkLoading ? 'animate-spin' : ''}`} />
+              <span>Fetch Session Data</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -322,6 +415,20 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                 <span className={`px-2 py-0.5 rounded font-black text-[11px] border ${calcResult.analysis.bearishRally.badgeColor}`}>
                   🔻 Bearish Rally: {calcResult.analysis.bearishRally.score}/100 ({calcResult.analysis.bearishRally.interpretation})
                 </span>
+              </div>
+              <div className="bg-slate-900 text-white p-2.5 rounded-lg flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <div className="flex items-center space-x-1.5 font-bold text-amber-300">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>15m Intraday Confluence:</span>
+                </div>
+                <div className="flex items-center space-x-3 font-mono">
+                  <span className="text-emerald-300">
+                    🔥 Bull Met: <strong>{calcResult.analysis.intradayConfluence.bullishConfluenceTime}</strong> @ ₹{calcResult.analysis.intradayConfluence.bullishEntryPoint}
+                  </span>
+                  <span className="text-rose-300">
+                    🔻 Bear Met: <strong>{calcResult.analysis.intradayConfluence.bearishConfluenceTime}</strong> @ ₹{calcResult.analysis.intradayConfluence.bearishEntryPoint}
+                  </span>
+                </div>
               </div>
               <p className="text-slate-700 leading-relaxed font-medium">{calcResult.analysis.reasoning}</p>
               <div className="flex flex-wrap items-center gap-4 text-slate-800 pt-1 font-semibold">
@@ -729,6 +836,114 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                         {analysis.bearishRally.interpretation}
                       </div>
                     </div>
+                  </div>
+
+                  {/* 15-Minute Intraday Confluence Time & Entry Point Box */}
+                  <div className="bg-slate-900 text-white p-3 rounded-xl space-y-2 border border-slate-800">
+                    <div className="flex items-center justify-between text-[11px] font-bold">
+                      <span className="flex items-center space-x-1.5 text-amber-300">
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>15m Confluence Trigger ({selectedDate})</span>
+                      </span>
+                      <button
+                        onClick={() => setExpanded15MinStockId(expanded15MinStockId === stock.id ? null : stock.id)}
+                        className="text-[10px] text-blue-300 hover:text-white underline font-semibold flex items-center space-x-1"
+                      >
+                        <span>{expanded15MinStockId === stock.id ? 'Hide 15m Bars' : '15m Timeline'}</span>
+                        {expanded15MinStockId === stock.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      {/* Bullish Trigger info */}
+                      <div className={`p-2 rounded-lg border ${
+                        analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met'
+                          ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-200'
+                          : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
+                      }`}>
+                        <div className="font-extrabold text-[9.5px] uppercase tracking-wider text-emerald-400 flex items-center justify-between">
+                          <span>🔥 Bull Met</span>
+                          <span className="font-mono text-[9px]">{analysis.intradayConfluence.bullishTriggerScore}/100</span>
+                        </div>
+                        <div className="mt-1 flex flex-col font-mono leading-tight">
+                          <span className="text-[11px] font-black text-white">
+                            ⏱️ {analysis.intradayConfluence.bullishConfluenceTime}
+                          </span>
+                          <span className="text-[10px] font-extrabold text-emerald-300">
+                            Entry: ₹{analysis.intradayConfluence.bullishEntryPoint}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Bearish Trigger info */}
+                      <div className={`p-2 rounded-lg border ${
+                        analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met'
+                          ? 'bg-rose-950/80 border-rose-700/80 text-rose-200'
+                          : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
+                      }`}>
+                        <div className="font-extrabold text-[9.5px] uppercase tracking-wider text-rose-400 flex items-center justify-between">
+                          <span>🔻 Bear Met</span>
+                          <span className="font-mono text-[9px]">{analysis.intradayConfluence.bearishTriggerScore}/100</span>
+                        </div>
+                        <div className="mt-1 flex flex-col font-mono leading-tight">
+                          <span className="text-[11px] font-black text-white">
+                            ⏱️ {analysis.intradayConfluence.bearishConfluenceTime}
+                          </span>
+                          <span className="text-[10px] font-extrabold text-rose-300">
+                            Entry: ₹{analysis.intradayConfluence.bearishEntryPoint}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expanded 15-Minute Timeline Bar */}
+                    {expanded15MinStockId === stock.id && (
+                      <div className="mt-2 pt-2 border-t border-slate-800 space-y-1.5 max-h-56 overflow-y-auto pr-1 text-[10px] font-mono">
+                        <div className="text-[9.5px] text-slate-400 font-sans font-bold flex items-center justify-between">
+                          <span>15-Min Candle Log ({selectedDate} • 09:15 AM – 03:15 PM)</span>
+                          <span className="text-amber-400">25 Bars</span>
+                        </div>
+                        <div className="space-y-1">
+                          {analysis.intradayConfluence.timeline.map((bar, bIdx) => {
+                            const isBullTriggerBar = bar.time === analysis.intradayConfluence.bullishConfluenceTime;
+                            const isBearTriggerBar = bar.time === analysis.intradayConfluence.bearishConfluenceTime;
+
+                            return (
+                              <div
+                                key={bIdx}
+                                className={`p-1.5 rounded flex items-center justify-between border ${
+                                  isBullTriggerBar
+                                    ? 'bg-emerald-900/90 border-emerald-500 text-white font-bold ring-1 ring-emerald-400'
+                                    : isBearTriggerBar
+                                    ? 'bg-rose-900/90 border-rose-500 text-white font-bold ring-1 ring-rose-400'
+                                    : 'bg-slate-800/40 border-slate-700/50 text-slate-300'
+                                }`}
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-slate-400 w-14 text-[9.5px]">{bar.time}</span>
+                                  <span className="font-bold text-white">₹{bar.price.toFixed(2)}</span>
+                                  <span className="text-[9px] text-slate-400">RSI {bar.rsi}</span>
+                                </div>
+                                <div className="flex items-center space-x-1.5">
+                                  {isBullTriggerBar && (
+                                    <span className="bg-emerald-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow-xs">
+                                      🎯 BULL ENTRY
+                                    </span>
+                                  )}
+                                  {isBearTriggerBar && (
+                                    <span className="bg-rose-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded shadow-xs">
+                                      🎯 BEAR ENTRY
+                                    </span>
+                                  )}
+                                  <span className="text-emerald-400 font-bold">B:{bar.bullishScore}</span>
+                                  <span className="text-rose-400 font-bold">R:{bar.bearishScore}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Pullback Setup Box */}
