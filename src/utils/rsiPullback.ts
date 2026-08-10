@@ -2,17 +2,17 @@ import { StockCalculated } from '../types';
 import { isOpenLowPattern, isOpenHighPattern } from './gann';
 
 export function checkStockOpenLow(stock: StockCalculated): boolean {
-  if (stock.openPrice !== undefined && stock.openPrice !== null) {
-    if (isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)) return true;
+  if (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0) {
+    return isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow);
   }
-  return Boolean(stock.isOpenEqualLow);
+  return false;
 }
 
 export function checkStockOpenHigh(stock: StockCalculated): boolean {
-  if (stock.openPrice !== undefined && stock.openPrice !== null) {
-    if (isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)) return true;
+  if (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0) {
+    return isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh);
   }
-  return Boolean(stock.isOpenEqualHigh);
+  return false;
 }
 
 export interface RallyConfluenceFactor {

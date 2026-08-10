@@ -14,6 +14,15 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
   onSelectStockDetail,
   onSelectTrendFilter
 }) => {
+  const handleFilterClick = (filter: TrendFilterType) => {
+    onSelectTrendFilter(filter);
+    setTimeout(() => {
+      const element = document.getElementById('stock-table-section');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 50);
+  };
   // Filter all stocks that have calculated open & close prices
   const calculatedStocks = stocks.filter(
     (s) => s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0 &&
@@ -38,16 +47,16 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
 
   // Open = Low (Bullish) and Open = High (Bearish) stocks (Strict Exact Match)
   const openLowStocks = calculatedStocks.filter((s) => {
-    if (s.openPrice !== undefined && s.openPrice !== null) {
+    if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
       return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow);
     }
-    return Boolean(s.isOpenEqualLow);
+    return false;
   });
   const openHighStocks = calculatedStocks.filter((s) => {
-    if (s.openPrice !== undefined && s.openPrice !== null) {
+    if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
       return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh);
     }
-    return Boolean(s.isOpenEqualHigh);
+    return false;
   });
   
   // 38.2% Fibonacci Retracements
@@ -82,7 +91,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
         {/* Quick Signal Filter Buttons */}
         <div className="flex items-center gap-2 self-stretch md:self-auto overflow-x-auto pb-1 md:pb-0">
           <button
-            onClick={() => onSelectTrendFilter('OPEN_LOW')}
+            onClick={() => handleFilterClick('OPEN_LOW')}
             className="flex items-center space-x-1.5 bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-emerald-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
           >
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
@@ -90,7 +99,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           </button>
 
           <button
-            onClick={() => onSelectTrendFilter('OPEN_HIGH')}
+            onClick={() => handleFilterClick('OPEN_HIGH')}
             className="flex items-center space-x-1.5 bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-rose-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
           >
             <Target className="w-3.5 h-3.5 text-rose-400" />
@@ -98,7 +107,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           </button>
 
           <button
-            onClick={() => onSelectTrendFilter('FIB_382_RETRACE')}
+            onClick={() => handleFilterClick('FIB_382_RETRACE')}
             className="flex items-center space-x-1.5 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-amber-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
           >
             <Percent className="w-3.5 h-3.5 text-amber-400" />
@@ -106,7 +115,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           </button>
 
           <button
-            onClick={() => onSelectTrendFilter('VERY_BULLISH')}
+            onClick={() => handleFilterClick('VERY_BULLISH')}
             className="flex items-center space-x-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-300 transition-all cursor-pointer whitespace-nowrap"
           >
             <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
@@ -114,7 +123,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           </button>
 
           <button
-            onClick={() => onSelectTrendFilter('VERY_BEARISH')}
+            onClick={() => handleFilterClick('VERY_BEARISH')}
             className="flex items-center space-x-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-300 transition-all cursor-pointer whitespace-nowrap"
           >
             <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
@@ -153,7 +162,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
                 </div>
 
                 <button
-                  onClick={() => onSelectTrendFilter('FIB_382_RETRACE')}
+                  onClick={() => handleFilterClick('FIB_382_RETRACE')}
                   className="text-[11px] font-bold text-amber-800 hover:text-amber-900 flex items-center space-x-0.5 bg-amber-100 hover:bg-amber-200 px-2.5 py-1 rounded-lg border border-amber-300 transition-colors cursor-pointer"
                 >
                   <span>View All Retraced ({fibRetraceStocks.length})</span>
@@ -213,7 +222,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
               </div>
 
               <button
-                onClick={() => onSelectTrendFilter('VERY_BULLISH')}
+                onClick={() => handleFilterClick('VERY_BULLISH')}
                 className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center space-x-0.5 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition-colors"
               >
                 <span>View All ({allBullish.length})</span>
@@ -303,7 +312,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
               </div>
 
               <button
-                onClick={() => onSelectTrendFilter('VERY_BEARISH')}
+                onClick={() => handleFilterClick('VERY_BEARISH')}
                 className="text-[11px] font-bold text-rose-700 hover:text-rose-800 flex items-center space-x-0.5 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg border border-rose-200 transition-colors"
               >
                 <span>View All ({allBearish.length})</span>

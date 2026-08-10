@@ -678,21 +678,23 @@ export default function App() {
             />
 
             {/* Stock Table */}
-            <StockTable
-              stocks={stocks}
-              onUpdateStockPrices={handleUpdateStockPrices}
-              onFetchSingleStock={handleFetchSingleDhan}
-              onSelectStockDetail={(s) => setSelectedDetailStock(s)}
-              onEditStockManual={(s) => {
-                setEditingStockManual(s);
-                setIsManualCalcOpen(true);
-              }}
-              onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
-              onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
-              credentials={credentials}
-              activeTrendFilter={activeTrendFilter}
-              onTrendFilterChange={(f) => setActiveTrendFilter(f)}
-            />
+            <div id="stock-table-section">
+              <StockTable
+                stocks={stocks}
+                onUpdateStockPrices={handleUpdateStockPrices}
+                onFetchSingleStock={handleFetchSingleDhan}
+                onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+                onEditStockManual={(s) => {
+                  setEditingStockManual(s);
+                  setIsManualCalcOpen(true);
+                }}
+                onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+                onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+                credentials={credentials}
+                activeTrendFilter={activeTrendFilter}
+                onTrendFilterChange={(f) => setActiveTrendFilter(f)}
+              />
+            </div>
           </>
         ) : activeDashboardTab === 'gann_dashboard' ? (
           /* Dedicated Gann Month High/Low Dashboard */

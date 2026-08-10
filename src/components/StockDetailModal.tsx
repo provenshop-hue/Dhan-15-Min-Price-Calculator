@@ -26,12 +26,12 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
   const contractValue = lotSize && activePrice ? lotSize * activePrice : 0;
   const optionStrikes = getAtmOptionStrikes(activePrice, stock.symbol);
 
-  const isOpenLow = (stock.openPrice !== undefined && stock.openPrice !== null)
+  const isOpenLow = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
     ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
-    : Boolean(stock.isOpenEqualLow);
-  const isOpenHigh = (stock.openPrice !== undefined && stock.openPrice !== null)
+    : false;
+  const isOpenHigh = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
     ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
-    : Boolean(stock.isOpenEqualHigh);
+    : false;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
@@ -74,7 +74,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
                   <span className="bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded text-[10px]">High Accuracy</span>
                 </div>
                 <p className="text-xs text-emerald-700 mt-0.5 font-medium">
-                  Opening price (₹{stock.openPrice?.toFixed(2)}) is equal to Low (₹{stock.lowPrice?.toFixed(2) || stock.openPrice?.toFixed(2)}). Buyers defended opening price from 09:15 AM.
+                  Opening price (₹{stock.openPrice?.toFixed(2)}) is equal to Low (₹{(stock.first15mLow || stock.lowPrice || stock.openPrice)?.toFixed(2)}). Buyers defended opening price from 09:15 AM.
                 </p>
               </div>
             </div>
@@ -98,7 +98,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
                   <span className="bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded text-[10px]">High Accuracy</span>
                 </div>
                 <p className="text-xs text-rose-700 mt-0.5 font-medium">
-                  Opening price (₹{stock.openPrice?.toFixed(2)}) is equal to High (₹{stock.highPrice?.toFixed(2) || stock.openPrice?.toFixed(2)}). Sellers dominated immediately at opening bell.
+                  Opening price (₹{stock.openPrice?.toFixed(2)}) is equal to High (₹{(stock.first15mHigh || stock.highPrice || stock.openPrice)?.toFixed(2)}). Sellers dominated immediately at opening bell.
                 </p>
               </div>
             </div>
@@ -119,38 +119,52 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center mb-4">
             <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
               <div className="text-[10px] text-slate-500 uppercase font-semibold">15-Min Open</div>
-              <div className="text-sm font-mono font-bold text-slate-900 mt-0.5">
+              <div className="text-xs font-mono font-bold text-slate-900 mt-0.5">
                 {stock.openPrice ? `₹${stock.openPrice.toFixed(2)}` : 'N/A'}
               </div>
             </div>
 
-            <div className="bg-blue-50/70 p-2 rounded-lg border border-blue-200/80">
-              <div className="text-[10px] text-blue-700 font-bold uppercase">Open Calc</div>
-              <div className="text-sm font-mono font-extrabold text-blue-700 mt-0.5">
-                {stock.openCalc !== undefined && stock.openCalc !== null ? stock.openCalc.toFixed(4) : 'N/A'}
+            <div className="bg-emerald-50/70 p-2 rounded-lg border border-emerald-200/80">
+              <div className="text-[10px] text-emerald-800 font-bold uppercase">15-Min Low</div>
+              <div className="text-xs font-mono font-extrabold text-emerald-900 mt-0.5">
+                {stock.first15mLow ? `₹${stock.first15mLow.toFixed(2)}` : stock.lowPrice ? `₹${stock.lowPrice.toFixed(2)}` : 'N/A'}
+              </div>
+            </div>
+
+            <div className="bg-rose-50/70 p-2 rounded-lg border border-rose-200/80">
+              <div className="text-[10px] text-rose-800 font-bold uppercase">15-Min High</div>
+              <div className="text-xs font-mono font-extrabold text-rose-900 mt-0.5">
+                {stock.first15mHigh ? `₹${stock.first15mHigh.toFixed(2)}` : stock.highPrice ? `₹${stock.highPrice.toFixed(2)}` : 'N/A'}
               </div>
             </div>
 
             <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
               <div className="text-[10px] text-slate-500 uppercase font-semibold">15-Min Close</div>
-              <div className="text-sm font-mono font-bold text-slate-900 mt-0.5">
+              <div className="text-xs font-mono font-bold text-slate-900 mt-0.5">
                 {stock.closePrice ? `₹${stock.closePrice.toFixed(2)}` : 'N/A'}
               </div>
             </div>
 
             <div className="bg-blue-50/70 p-2 rounded-lg border border-blue-200/80">
+              <div className="text-[10px] text-blue-700 font-bold uppercase">Open Calc</div>
+              <div className="text-xs font-mono font-extrabold text-blue-700 mt-0.5">
+                {stock.openCalc !== undefined && stock.openCalc !== null ? stock.openCalc.toFixed(4) : 'N/A'}
+              </div>
+            </div>
+
+            <div className="bg-blue-50/70 p-2 rounded-lg border border-blue-200/80">
               <div className="text-[10px] text-blue-700 font-bold uppercase">Close Calc</div>
-              <div className="text-sm font-mono font-extrabold text-blue-700 mt-0.5">
+              <div className="text-xs font-mono font-extrabold text-blue-700 mt-0.5">
                 {stock.closeCalc !== undefined && stock.closeCalc !== null ? stock.closeCalc.toFixed(4) : 'N/A'}
               </div>
             </div>
 
             <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs col-span-2 sm:col-span-1">
               <div className="text-[10px] text-slate-500 uppercase font-semibold">15-Min Volume</div>
-              <div className="text-sm font-mono font-bold text-slate-900 mt-0.5">
+              <div className="text-xs font-mono font-bold text-slate-900 mt-0.5">
                 {stock.volume ? stock.volume.toLocaleString('en-IN') : 'N/A'}
               </div>
             </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
@@ -41,6 +41,14 @@ export const StockTable: React.FC<StockTableProps> = ({
     }
   };
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Automatically reset to Page 1 when filter or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [trendFilter, searchTerm]);
+
   const [lotMonth, setLotMonth] = useState<'Jun' | 'Jul' | 'Aug'>('Jun');
 
   // Sticky / Pinned Stocks state (persisted in localStorage)
@@ -75,8 +83,7 @@ export const StockTable: React.FC<StockTableProps> = ({
     localStorage.removeItem('gann_pinned_stock_ids');
   };
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
+  // Pagination settings
   const itemsPerPage = 25;
 
   // Sorting
@@ -85,17 +92,17 @@ export const StockTable: React.FC<StockTableProps> = ({
 
   // Helper check for O=L / O=H with strict exact match
   const isStockOpenEqualLow = (s: StockCalculated) => {
-    if (s.openPrice !== undefined && s.openPrice !== null) {
+    if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
       return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow);
     }
-    return Boolean(s.isOpenEqualLow);
+    return false;
   };
 
   const isStockOpenEqualHigh = (s: StockCalculated) => {
-    if (s.openPrice !== undefined && s.openPrice !== null) {
+    if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
       return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh);
     }
-    return Boolean(s.isOpenEqualHigh);
+    return false;
   };
 
   // Helper check for Fibonacci 38.2% Retracement

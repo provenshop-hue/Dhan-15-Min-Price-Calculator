@@ -132,14 +132,18 @@ export function isOpenLowPattern(
 ): boolean {
   if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
 
-  const matches = (target?: number | null) => {
-    if (target === undefined || target === null || target <= 0) return false;
-    const diff = Math.abs(openPrice - target);
-    // 100% accurate match: exact match, within 0.05 (1 NSE tick), rounded to 2 decimal places, or <= 0.05% tolerance
-    return diff <= 0.05 || (diff / openPrice) <= 0.0005 || Math.round(openPrice * 100) === Math.round(target * 100);
-  };
+  // STRICT 15-minute candle priority:
+  // If first15mLow is present (> 0), compare openPrice against first15mLow.
+  // Otherwise, fall back to lowPrice.
+  const target = (first15mLow !== undefined && first15mLow !== null && first15mLow > 0)
+    ? first15mLow
+    : (lowPrice !== undefined && lowPrice !== null && lowPrice > 0 ? lowPrice : null);
 
-  return matches(lowPrice) || matches(first15mLow);
+  if (target === null || target <= 0) return false;
+
+  const diff = Math.abs(openPrice - target);
+  // Strictly same open and low price (diff <= 0.01 or exact rounded match)
+  return diff <= 0.01 || Math.round(openPrice * 100) === Math.round(target * 100);
 }
 
 /**
@@ -152,14 +156,18 @@ export function isOpenHighPattern(
 ): boolean {
   if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
 
-  const matches = (target?: number | null) => {
-    if (target === undefined || target === null || target <= 0) return false;
-    const diff = Math.abs(openPrice - target);
-    // 100% accurate match: exact match, within 0.05 (1 NSE tick), rounded to 2 decimal places, or <= 0.05% tolerance
-    return diff <= 0.05 || (diff / openPrice) <= 0.0005 || Math.round(openPrice * 100) === Math.round(target * 100);
-  };
+  // STRICT 15-minute candle priority:
+  // If first15mHigh is present (> 0), compare openPrice against first15mHigh.
+  // Otherwise, fall back to highPrice.
+  const target = (first15mHigh !== undefined && first15mHigh !== null && first15mHigh > 0)
+    ? first15mHigh
+    : (highPrice !== undefined && highPrice !== null && highPrice > 0 ? highPrice : null);
 
-  return matches(highPrice) || matches(first15mHigh);
+  if (target === null || target <= 0) return false;
+
+  const diff = Math.abs(openPrice - target);
+  // Strictly same open and high price (diff <= 0.01 or exact rounded match)
+  return diff <= 0.01 || Math.round(openPrice * 100) === Math.round(target * 100);
 }
 
 export type Fib382Status = 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement';

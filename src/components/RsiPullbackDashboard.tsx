@@ -133,12 +133,12 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (analysis.pullbackCategory === 'OVERSOLD_BOUNCE') oversold++;
       if (analysis.pullbackScore >= 75) highScore++;
 
-      const isOL = (stock.openPrice !== undefined && stock.openPrice !== null)
+      const isOL = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
         ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
-        : Boolean(stock.isOpenEqualLow);
-      const isOH = (stock.openPrice !== undefined && stock.openPrice !== null)
+        : false;
+      const isOH = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
         ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
-        : Boolean(stock.isOpenEqualHigh);
+        : false;
 
       if (isOL) openLowCount++;
       if (isOH) openHighCount++;
@@ -200,14 +200,14 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         return analysis.volumeDirection === 'INCREASING';
       }
       if (activeFilter === 'OPEN_LOW') {
-        return (stock.openPrice !== undefined && stock.openPrice !== null)
+        return (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
           ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
-          : Boolean(stock.isOpenEqualLow);
+          : false;
       }
       if (activeFilter === 'OPEN_HIGH') {
-        return (stock.openPrice !== undefined && stock.openPrice !== null)
+        return (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
           ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
-          : Boolean(stock.isOpenEqualHigh);
+          : false;
       }
 
       return true;
@@ -1135,16 +1135,16 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                             📌 PINNED INDEX
                           </span>
                         )}
-                        {((stock.openPrice !== undefined && stock.openPrice !== null && stock.lowPrice !== undefined && stock.lowPrice !== null)
-                          ? isOpenLowPattern(stock.openPrice, stock.lowPrice)
-                          : Boolean(stock.isOpenEqualLow)) && (
+                        {((stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
+                          ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
+                          : false) && (
                           <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-300">
                             OPEN=LOW
                           </span>
                         )}
-                        {((stock.openPrice !== undefined && stock.openPrice !== null && stock.highPrice !== undefined && stock.highPrice !== null)
-                          ? isOpenHighPattern(stock.openPrice, stock.highPrice)
-                          : Boolean(stock.isOpenEqualHigh)) && (
+                        {((stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
+                          ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
+                          : false) && (
                           <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300">
                             OPEN=HIGH
                           </span>
