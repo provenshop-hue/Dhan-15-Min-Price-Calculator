@@ -18,6 +18,7 @@ export interface StockCalculated {
   first15mLow?: number | null;
   volume?: number | null;
   candleTimestamp?: string | null;
+  previousClose?: number | null;
 
   // Gann Calculated Values
   openCalc?: number | null; // ((sqrt(open) * 15) - 15) % 15

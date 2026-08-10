@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { StockCalculated } from '../types';
-import { analyzeRsiPullback, RsiPullbackAnalysis } from '../utils/rsiPullback';
+import { analyzeRsiPullback, RsiPullbackAnalysis, is100PercentBullishMove, is100PercentBearishMove } from '../utils/rsiPullback';
 import { calculateRSI, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
 import { 
   TrendingUp, 
@@ -44,6 +44,8 @@ type PullbackFilterType =
   | 'ALL' 
   | 'HIGH_CONFLUENCE'
   | 'TRIGGERED_TODAY'
+  | 'BULLISH_100_MOVE'
+  | 'BEARISH_100_MOVE'
   | 'BULLISH_RALLY'
   | 'BEARISH_RALLY'
   | 'BULLISH_SWEET_SPOT' 
@@ -112,6 +114,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let highConfluenceCount = 0;
     let falseSignalRiskCount = 0;
     let triggeredTodayCount = 0;
+    let bullish100Count = 0;
+    let bearish100Count = 0;
     let bullishRallyCount = 0;
     let bearishRallyCount = 0;
     let bullishSweetSpot = 0;
@@ -126,6 +130,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (analysis.confluenceValidation.status === 'FALSE_BREAKOUT_RISK') falseSignalRiskCount++;
       const isTriggered = analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' || analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met';
       if (isTriggered) triggeredTodayCount++;
+      if (is100PercentBullishMove(stock)) bullish100Count++;
+      if (is100PercentBearishMove(stock)) bearish100Count++;
       if (analysis.bullishRally.score >= 65) bullishRallyCount++;
       if (analysis.bearishRally.score >= 65) bearishRallyCount++;
       if (analysis.pullbackCategory === 'BULLISH_SWEET_SPOT') bullishSweetSpot++;
@@ -149,6 +155,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       highConfluenceCount,
       falseSignalRiskCount,
       triggeredTodayCount,
+      bullish100Count,
+      bearish100Count,
       bullishRallyCount,
       bearishRallyCount,
       bullishSweetSpot,
@@ -177,6 +185,12 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
       if (activeFilter === 'TRIGGERED_TODAY') {
         return analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' || analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met';
+      }
+      if (activeFilter === 'BULLISH_100_MOVE') {
+        return is100PercentBullishMove(stock);
+      }
+      if (activeFilter === 'BEARISH_100_MOVE') {
+        return is100PercentBearishMove(stock);
       }
       if (activeFilter === 'BULLISH_RALLY') {
         return analysis.bullishRally.score >= 65;
@@ -813,7 +827,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       )}
 
       {/* Stats Overview Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         {/* Total Scanned */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Scanned</div>
@@ -823,6 +837,56 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
             <span>Nifty F&amp;O Stocks</span>
           </div>
         </div>
+
+        {/* 100% Bullish Move */}
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'BULLISH_100_MOVE' ? 'ALL' : 'BULLISH_100_MOVE')}
+          className={`p-4 rounded-2xl border text-left transition-all ${
+            activeFilter === 'BULLISH_100_MOVE'
+              ? 'bg-emerald-700 text-white border-emerald-800 ring-2 ring-emerald-400/50 shadow-sm'
+              : 'bg-emerald-100/90 border-emerald-300 hover:border-emerald-500 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[11px] font-black uppercase tracking-wider flex items-center justify-between ${
+            activeFilter === 'BULLISH_100_MOVE' ? 'text-emerald-100' : 'text-emerald-950'
+          }`}>
+            <span>💯 100% Bullish</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+          <div className={`text-2xl font-black mt-1 ${
+            activeFilter === 'BULLISH_100_MOVE' ? 'text-white' : 'text-emerald-950'
+          }`}>{stats.bullish100Count}</div>
+          <div className={`text-[10px] mt-1 font-bold ${
+            activeFilter === 'BULLISH_100_MOVE' ? 'text-emerald-100' : 'text-emerald-800'
+          }`}>
+            Close &gt; Open &amp; PDC
+          </div>
+        </button>
+
+        {/* 100% Bearish Move */}
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'BEARISH_100_MOVE' ? 'ALL' : 'BEARISH_100_MOVE')}
+          className={`p-4 rounded-2xl border text-left transition-all ${
+            activeFilter === 'BEARISH_100_MOVE'
+              ? 'bg-rose-700 text-white border-rose-800 ring-2 ring-rose-400/50 shadow-sm'
+              : 'bg-rose-100/90 border-rose-300 hover:border-rose-500 shadow-2xs'
+          }`}
+        >
+          <div className={`text-[11px] font-black uppercase tracking-wider flex items-center justify-between ${
+            activeFilter === 'BEARISH_100_MOVE' ? 'text-rose-100' : 'text-rose-950'
+          }`}>
+            <span>💥 100% Bearish</span>
+            <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+          </div>
+          <div className={`text-2xl font-black mt-1 ${
+            activeFilter === 'BEARISH_100_MOVE' ? 'text-white' : 'text-rose-950'
+          }`}>{stats.bearish100Count}</div>
+          <div className={`text-[10px] mt-1 font-bold ${
+            activeFilter === 'BEARISH_100_MOVE' ? 'text-rose-100' : 'text-rose-800'
+          }`}>
+            Close &lt; Open &amp; PDC
+          </div>
+        </button>
 
         {/* Bullish Rally */}
         <button
@@ -942,6 +1006,28 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
             }`}
           >
             All Stocks ({stocks.length})
+          </button>
+
+          <button
+            onClick={() => setActiveFilter('BULLISH_100_MOVE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1 ${
+              activeFilter === 'BULLISH_100_MOVE'
+                ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs ring-2 ring-emerald-300'
+                : 'bg-emerald-100 text-emerald-950 hover:bg-emerald-200 border-emerald-300'
+            }`}
+          >
+            <span>💯 100% Bullish ({stats.bullish100Count})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveFilter('BEARISH_100_MOVE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1 ${
+              activeFilter === 'BEARISH_100_MOVE'
+                ? 'bg-rose-700 text-white border-rose-800 shadow-2xs ring-2 ring-rose-300'
+                : 'bg-rose-100 text-rose-950 hover:bg-rose-200 border-rose-300'
+            }`}
+          >
+            <span>💥 100% Bearish ({stats.bearish100Count})</span>
           </button>
 
           <button
@@ -1133,6 +1219,16 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                         {(stock.symbol === 'NIFTY' || stock.symbol === 'BANKNIFTY') && (
                           <span className="bg-amber-100 text-amber-900 text-[10px] font-black px-1.5 py-0.5 rounded border border-amber-300 shadow-2xs">
                             📌 PINNED INDEX
+                          </span>
+                        )}
+                        {analysis.is100PercentBullish && (
+                          <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-400 shadow-2xs animate-pulse" title="Close > Open & Prev Close, Close >= High - 0.2*Range, Body/Range >= 0.6">
+                            💯 100% BULLISH
+                          </span>
+                        )}
+                        {analysis.is100PercentBearish && (
+                          <span className="bg-rose-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-rose-400 shadow-2xs animate-pulse" title="Close < Open & Prev Close, Close <= Low + 0.2*Range, Body/Range >= 0.6">
+                            💥 100% BEARISH
                           </span>
                         )}
                         {((stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)

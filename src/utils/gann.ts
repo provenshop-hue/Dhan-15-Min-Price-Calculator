@@ -123,7 +123,9 @@ export function calculateADX(
 }
 
 /**
- * Checks if Open equals Low strictly (100% accurate price match where opening price == low price)
+ * Checks if Open equals Low strictly & accurately (where opening price == low price).
+ * Accounts for 15-min candle low, session low, NSE tick size (₹0.05), and 0.05% tolerance.
+ * Ensures the session low has not broken below the open price.
  */
 export function isOpenLowPattern(
   openPrice?: number | null, 
@@ -132,22 +134,40 @@ export function isOpenLowPattern(
 ): boolean {
   if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
 
-  // STRICT 15-minute candle priority:
-  // If first15mLow is present (> 0), compare openPrice against first15mLow.
-  // Otherwise, fall back to lowPrice.
-  const target = (first15mLow !== undefined && first15mLow !== null && first15mLow > 0)
-    ? first15mLow
-    : (lowPrice !== undefined && lowPrice !== null && lowPrice > 0 ? lowPrice : null);
+  const validLow = (lowPrice !== undefined && lowPrice !== null && lowPrice > 0) ? lowPrice : null;
+  const valid15mLow = (first15mLow !== undefined && first15mLow !== null && first15mLow > 0) ? first15mLow : null;
 
-  if (target === null || target <= 0) return false;
+  if (validLow === null && valid15mLow === null) return false;
 
-  const diff = Math.abs(openPrice - target);
-  // Strictly same open and low price (diff <= 0.01 or exact rounded match)
-  return diff <= 0.01 || Math.round(openPrice * 100) === Math.round(target * 100);
+  // Maximum allowed price match tolerance:
+  // 1 NSE tick size (₹0.05) or 0.05% of open price (whichever is larger)
+  const tolerance = Math.max(0.05, openPrice * 0.0005);
+
+  // CRITICAL VALIDATION:
+  // If the session low exists and dropped below openPrice by more than tolerance,
+  // then price broke below open, so Open is NO LONGER Low!
+  if (validLow !== null && validLow < openPrice - tolerance) {
+    return false;
+  }
+
+  // Check if open price matches 15m candle low or session low
+  const matches15m = valid15mLow !== null && (
+    Math.abs(openPrice - valid15mLow) <= tolerance ||
+    Math.round(openPrice * 100) === Math.round(valid15mLow * 100)
+  );
+
+  const matchesSessionLow = validLow !== null && (
+    Math.abs(openPrice - validLow) <= tolerance ||
+    Math.round(openPrice * 100) === Math.round(validLow * 100)
+  );
+
+  return matches15m || matchesSessionLow;
 }
 
 /**
- * Checks if Open equals High strictly (100% accurate price match where opening price == high price)
+ * Checks if Open equals High strictly & accurately (where opening price == high price).
+ * Accounts for 15-min candle high, session high, NSE tick size (₹0.05), and 0.05% tolerance.
+ * Ensures the session high has not rallied above the open price.
  */
 export function isOpenHighPattern(
   openPrice?: number | null, 
@@ -156,18 +176,34 @@ export function isOpenHighPattern(
 ): boolean {
   if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
 
-  // STRICT 15-minute candle priority:
-  // If first15mHigh is present (> 0), compare openPrice against first15mHigh.
-  // Otherwise, fall back to highPrice.
-  const target = (first15mHigh !== undefined && first15mHigh !== null && first15mHigh > 0)
-    ? first15mHigh
-    : (highPrice !== undefined && highPrice !== null && highPrice > 0 ? highPrice : null);
+  const validHigh = (highPrice !== undefined && highPrice !== null && highPrice > 0) ? highPrice : null;
+  const valid15mHigh = (first15mHigh !== undefined && first15mHigh !== null && first15mHigh > 0) ? first15mHigh : null;
 
-  if (target === null || target <= 0) return false;
+  if (validHigh === null && valid15mHigh === null) return false;
 
-  const diff = Math.abs(openPrice - target);
-  // Strictly same open and high price (diff <= 0.01 or exact rounded match)
-  return diff <= 0.01 || Math.round(openPrice * 100) === Math.round(target * 100);
+  // Maximum allowed price match tolerance:
+  // 1 NSE tick size (₹0.05) or 0.05% of open price (whichever is larger)
+  const tolerance = Math.max(0.05, openPrice * 0.0005);
+
+  // CRITICAL VALIDATION:
+  // If the session high exists and rallied above openPrice by more than tolerance,
+  // then price broke above open, so Open is NO LONGER High!
+  if (validHigh !== null && validHigh > openPrice + tolerance) {
+    return false;
+  }
+
+  // Check if open price matches 15m candle high or session high
+  const matches15m = valid15mHigh !== null && (
+    Math.abs(openPrice - valid15mHigh) <= tolerance ||
+    Math.round(openPrice * 100) === Math.round(valid15mHigh * 100)
+  );
+
+  const matchesSessionHigh = validHigh !== null && (
+    Math.abs(openPrice - validHigh) <= tolerance ||
+    Math.round(openPrice * 100) === Math.round(validHigh * 100)
+  );
+
+  return matches15m || matchesSessionHigh;
 }
 
 export type Fib382Status = 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement';
@@ -373,19 +409,18 @@ export function calculateGann15Min(
   const vwapBullish = vwapStatus ? vwapStatus === 'Above' : true;
   const vwapBearish = vwapStatus ? vwapStatus === 'Below' : true;
 
-  // Confluence rules: Very Bullish requires RSI > 58, ADX > 21, and Open = Low
+  // Confluence rules: Very Bullish requires RSI > 58 and Open = Low or Gann Breakout (ADX rule removed as requested)
   const isRsiVeryBullish = rsiVal !== undefined && rsiVal !== null ? rsiVal > 58 : false;
-  const isAdxVeryBullish = adxVal !== undefined && adxVal !== null ? adxVal > 21 : true;
 
   if (isBullishCandle || pctChange >= 0) {
-    if (isRsiVeryBullish && isAdxVeryBullish && (isOpenEqualLow || gannBreakout)) {
+    if (isRsiVeryBullish && (isOpenEqualLow || gannBreakout)) {
       trend = 'Very Bullish';
     } else if ((gannBreakout || isOpenEqualLow || (rsiVal !== undefined && rsiVal !== null && rsiVal > 50)) && vwapBullish) {
       trend = 'Bullish';
     }
   } else if (isBearishCandle || pctChange < 0) {
     const isRsiVeryBearish = rsiVal !== undefined && rsiVal !== null ? rsiVal < 42 : false;
-    if (isRsiVeryBearish && isAdxVeryBullish && (isOpenEqualHigh || gannBreakdown)) {
+    if (isRsiVeryBearish && (isOpenEqualHigh || gannBreakdown)) {
       trend = 'Very Bearish';
     } else if ((gannBreakdown || isOpenEqualHigh || (rsiVal !== undefined && rsiVal !== null && rsiVal < 50)) && vwapBearish) {
       trend = 'Bearish';
@@ -473,5 +508,27 @@ export function getAtmOptionStrikes(price?: number | null, symbol?: string): Atm
     ceStrikes: [ce1, ce2],
     peStrikes: [pe1, pe2],
   };
+}
+
+/**
+ * Checks if a stock's current price (closePrice / CMP) has moved ABOVE the high of its first 15-minute candle.
+ */
+export function isAboveFirst15mCandle(stock: { closePrice?: number | null; first15mHigh?: number | null; buyAbove?: number | null }): boolean {
+  const cmp = stock.closePrice || 0;
+  if (cmp <= 0) return false;
+  const candleHigh = (stock.first15mHigh && stock.first15mHigh > 0) ? stock.first15mHigh : (stock.buyAbove && stock.buyAbove > 0 ? stock.buyAbove : null);
+  if (!candleHigh) return false;
+  return cmp > candleHigh;
+}
+
+/**
+ * Checks if a stock's current price (closePrice / CMP) has moved BELOW the low of its first 15-minute candle.
+ */
+export function isBelowFirst15mCandle(stock: { closePrice?: number | null; first15mLow?: number | null; sellBelow?: number | null }): boolean {
+  const cmp = stock.closePrice || 0;
+  if (cmp <= 0) return false;
+  const candleLow = (stock.first15mLow && stock.first15mLow > 0) ? stock.first15mLow : (stock.sellBelow && stock.sellBelow > 0 ? stock.sellBelow : null);
+  if (!candleLow) return false;
+  return cmp < candleLow;
 }
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, Target, ShieldCheck, Percent } from 'lucide-react';
 import { StockCalculated, TrendFilterType } from '../types';
-import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
+import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle } from '../utils/gann';
 
 interface GannHighlightsProps {
   stocks: StockCalculated[];
@@ -30,20 +30,37 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
   );
 
   // Very Bullish stocks: trend === 'Very Bullish'
+  // Prioritize stocks that go above the first 15-minute candle high FIRST, then other stocks
   const exactVeryBullish = calculatedStocks.filter((s) => s.trend === 'Very Bullish');
   const allBullish = calculatedStocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish');
   
+  const sortVeryBullish = (a: StockCalculated, b: StockCalculated) => {
+    const aAbove = isAboveFirst15mCandle(a);
+    const bAbove = isAboveFirst15mCandle(b);
+    if (aAbove && !bAbove) return -1;
+    if (!aAbove && bAbove) return 1;
+    return (b.pctChange || 0) - (a.pctChange || 0);
+  };
+
   const topVeryBullish = exactVeryBullish.length > 0
-    ? [...exactVeryBullish].sort((a, b) => (b.pctChange || 0) - (a.pctChange || 0)).slice(0, 5)
-    : [...allBullish].sort((a, b) => (b.pctChange || 0) - (a.pctChange || 0)).slice(0, 5);
+    ? [...exactVeryBullish].sort(sortVeryBullish).slice(0, 5)
+    : [...allBullish].sort(sortVeryBullish).slice(0, 5);
 
   // Very Bearish stocks: trend === 'Very Bearish'
   const exactVeryBearish = calculatedStocks.filter((s) => s.trend === 'Very Bearish');
   const allBearish = calculatedStocks.filter((s) => s.trend === 'Bearish' || s.trend === 'Very Bearish');
   
+  const sortVeryBearish = (a: StockCalculated, b: StockCalculated) => {
+    const aBelow = isBelowFirst15mCandle(a);
+    const bBelow = isBelowFirst15mCandle(b);
+    if (aBelow && !bBelow) return -1;
+    if (!aBelow && bBelow) return 1;
+    return (a.pctChange || 0) - (b.pctChange || 0);
+  };
+
   const topVeryBearish = exactVeryBearish.length > 0
-    ? [...exactVeryBearish].sort((a, b) => (a.pctChange || 0) - (b.pctChange || 0)).slice(0, 5)
-    : [...allBearish].sort((a, b) => (a.pctChange || 0) - (b.pctChange || 0)).slice(0, 5);
+    ? [...exactVeryBearish].sort(sortVeryBearish).slice(0, 5)
+    : [...allBearish].sort(sortVeryBearish).slice(0, 5);
 
   // Open = Low (Bullish) and Open = High (Bearish) stocks (Strict Exact Match)
   const openLowStocks = calculatedStocks.filter((s) => {

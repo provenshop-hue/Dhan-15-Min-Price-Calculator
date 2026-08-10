@@ -15,6 +15,96 @@ export function checkStockOpenHigh(stock: StockCalculated): boolean {
   return false;
 }
 
+/**
+ * 100% Bullish Move Criteria:
+ * 1. Close > Open
+ * 2. Close > Previous Close
+ * 3. Close >= High - (Range × 0.20)
+ * 4. Body / Range >= 0.60
+ */
+export function is100PercentBullishMove(stock: StockCalculated): boolean {
+  const open = stock.openPrice;
+  const close = stock.closePrice;
+  const high = stock.highPrice;
+  const low = stock.lowPrice;
+
+  if (open === undefined || open === null || open <= 0) return false;
+  if (close === undefined || close === null || close <= 0) return false;
+  if (high === undefined || high === null || high <= 0) return false;
+  if (low === undefined || low === null || low <= 0) return false;
+
+  // 1. Close > Open
+  if (close <= open) return false;
+
+  // 2. Close > Previous Close
+  const prevClose = (stock.previousClose && stock.previousClose > 0)
+    ? stock.previousClose
+    : (stock.pctChange !== undefined && stock.pctChange !== null ? close / (1 + stock.pctChange / 100) : null);
+
+  if (prevClose !== null) {
+    if (close <= prevClose) return false;
+  } else if ((stock.pctChange || 0) <= 0) {
+    return false;
+  }
+
+  const range = high - low;
+  if (range <= 0) return false;
+
+  // 3. Close >= High - (Range × 0.20)
+  if (close < high - (range * 0.20) - 0.0001) return false;
+
+  // 4. Body / Range >= 0.60
+  const body = Math.abs(close - open);
+  if ((body / range) < 0.60 - 0.0001) return false;
+
+  return true;
+}
+
+/**
+ * 100% Bearish Move Criteria:
+ * 1. Close < Open
+ * 2. Close < Previous Close
+ * 3. Close <= Low + (Range × 0.20)
+ * 4. Body / Range >= 0.60
+ */
+export function is100PercentBearishMove(stock: StockCalculated): boolean {
+  const open = stock.openPrice;
+  const close = stock.closePrice;
+  const high = stock.highPrice;
+  const low = stock.lowPrice;
+
+  if (open === undefined || open === null || open <= 0) return false;
+  if (close === undefined || close === null || close <= 0) return false;
+  if (high === undefined || high === null || high <= 0) return false;
+  if (low === undefined || low === null || low <= 0) return false;
+
+  // 1. Close < Open
+  if (close >= open) return false;
+
+  // 2. Close < Previous Close
+  const prevClose = (stock.previousClose && stock.previousClose > 0)
+    ? stock.previousClose
+    : (stock.pctChange !== undefined && stock.pctChange !== null ? close / (1 + stock.pctChange / 100) : null);
+
+  if (prevClose !== null) {
+    if (close >= prevClose) return false;
+  } else if ((stock.pctChange || 0) >= 0) {
+    return false;
+  }
+
+  const range = high - low;
+  if (range <= 0) return false;
+
+  // 3. Close <= Low + (Range × 0.20)
+  if (close > low + (range * 0.20) + 0.0001) return false;
+
+  // 4. Body / Range >= 0.60
+  const body = Math.abs(close - open);
+  if ((body / range) < 0.60 - 0.0001) return false;
+
+  return true;
+}
+
 export interface RallyConfluenceFactor {
   id: string;
   label: string;
@@ -95,6 +185,8 @@ export interface RsiPullbackAnalysis {
   volumeDeltaPct: number;
   intradayConfluence: IntradayConfluenceInfo;
   confluenceValidation: RallyConfluenceValidation;
+  is100PercentBullish: boolean;
+  is100PercentBearish: boolean;
 }
 
 /**
@@ -603,6 +695,9 @@ export function analyzeRsiPullback(stock: StockCalculated, tradingDate?: string)
     pullbackCategory
   );
 
+  const is100Bullish = is100PercentBullishMove(stock);
+  const is100Bearish = is100PercentBearishMove(stock);
+
   return {
     rsiVal: currentRsi,
     pullbackCategory,
@@ -625,7 +720,9 @@ export function analyzeRsiPullback(stock: StockCalculated, tradingDate?: string)
     volumeDirection,
     volumeDeltaPct,
     intradayConfluence,
-    confluenceValidation
+    confluenceValidation,
+    is100PercentBullish: is100Bullish,
+    is100PercentBearish: is100Bearish
   };
 }
 

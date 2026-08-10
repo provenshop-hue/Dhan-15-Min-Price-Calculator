@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
-import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
+import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle } from '../utils/gann';
 
 interface StockTableProps {
   stocks: StockCalculated[];
@@ -159,6 +159,21 @@ export const StockTable: React.FC<StockTableProps> = ({
     const bPinned = pinnedStockIds.has(b.id);
     if (aPinned && !bPinned) return -1;
     if (!aPinned && bPinned) return 1;
+
+    // When VERY_BULLISH filter is active, prioritize stocks that go above the first 15m candle high FIRST
+    if (trendFilter === 'VERY_BULLISH') {
+      const aAbove = isAboveFirst15mCandle(a);
+      const bAbove = isAboveFirst15mCandle(b);
+      if (aAbove && !bAbove) return -1;
+      if (!aAbove && bAbove) return 1;
+    }
+    // When VERY_BEARISH filter is active, prioritize stocks that go below the first 15m candle low FIRST
+    if (trendFilter === 'VERY_BEARISH') {
+      const aBelow = isBelowFirst15mCandle(a);
+      const bBelow = isBelowFirst15mCandle(b);
+      if (aBelow && !bBelow) return -1;
+      if (!aBelow && bBelow) return 1;
+    }
 
     let aVal: any = a[sortField];
     let bVal: any = b[sortField];
@@ -624,6 +639,12 @@ export const StockTable: React.FC<StockTableProps> = ({
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-2xs border border-rose-300">
                             <Target className="w-3 h-3 text-white" />
                             <span>OPEN = HIGH</span>
+                          </span>
+                        )}
+                        {isAboveFirst15mCandle(stock) && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-blue-600 text-white shadow-2xs border border-blue-300" title="Price is trading above the first 15-minute candle high">
+                            <Sparkles className="w-2.5 h-2.5 text-yellow-300" />
+                            <span>Above 15m High</span>
                           </span>
                         )}
 
