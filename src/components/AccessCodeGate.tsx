@@ -10,13 +10,22 @@ export const AccessCodeGate: React.FC<AccessCodeGateProps> = ({ onUnlock }) => {
   const [error, setError] = useState(false);
   const [attempts, setAttempts] = useState(0);
 
+  const handleSuccessfulUnlock = () => {
+    setError(false);
+    localStorage.setItem('gann_app_access_code_unlocked', 'true');
+    sessionStorage.setItem('gann_app_access_code_unlocked', 'true');
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isUnlocked: true })
+    }).catch(() => {});
+    onUnlock();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (code.trim() === '7774') {
-      setError(false);
-      localStorage.setItem('gann_app_access_code_unlocked', 'true');
-      sessionStorage.setItem('gann_app_access_code_unlocked', 'true');
-      onUnlock();
+      handleSuccessfulUnlock();
     } else {
       setError(true);
       setAttempts((prev) => prev + 1);
@@ -29,10 +38,7 @@ export const AccessCodeGate: React.FC<AccessCodeGateProps> = ({ onUnlock }) => {
       const newCode = code + num;
       setCode(newCode);
       if (newCode === '7774') {
-        setError(false);
-        localStorage.setItem('gann_app_access_code_unlocked', 'true');
-        sessionStorage.setItem('gann_app_access_code_unlocked', 'true');
-        onUnlock();
+        handleSuccessfulUnlock();
       } else if (newCode.length === 4) {
         setError(true);
         setAttempts((prev) => prev + 1);
@@ -97,9 +103,7 @@ export const AccessCodeGate: React.FC<AccessCodeGateProps> = ({ onUnlock }) => {
                 setCode(val);
                 setError(false);
                 if (val === '7774') {
-                  localStorage.setItem('gann_app_access_code_unlocked', 'true');
-                  sessionStorage.setItem('gann_app_access_code_unlocked', 'true');
-                  onUnlock();
+                  handleSuccessfulUnlock();
                 } else if (val.length === 4) {
                   setError(true);
                   setAttempts((prev) => prev + 1);

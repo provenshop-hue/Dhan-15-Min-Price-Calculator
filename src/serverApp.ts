@@ -1,8 +1,56 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
 import { GoogleGenAI } from '@google/genai';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap.js';
 
 let geminiCoolOffUntil = 0;
+
+const SETTINGS_FILE_PATH = path.join(process.cwd(), 'global_settings.json');
+
+export interface GlobalSettingsData {
+  dhanCredentials?: {
+    clientId: string;
+    accessToken: string;
+    segment?: string;
+    date?: string;
+    isConfigured?: boolean;
+  };
+  isUnlocked?: boolean;
+  accountCapital?: string;
+  pinnedStockIds?: string[];
+  lastUpdated?: string;
+}
+
+function loadGlobalSettings(): GlobalSettingsData {
+  try {
+    if (fs.existsSync(SETTINGS_FILE_PATH)) {
+      const raw = fs.readFileSync(SETTINGS_FILE_PATH, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Error reading global_settings.json:', err);
+  }
+  return {};
+}
+
+function saveGlobalSettings(newSettings: Partial<GlobalSettingsData>): GlobalSettingsData {
+  const current = loadGlobalSettings();
+  const merged: GlobalSettingsData = {
+    ...current,
+    ...newSettings,
+    dhanCredentials: newSettings.dhanCredentials
+      ? { ...current.dhanCredentials, ...newSettings.dhanCredentials }
+      : current.dhanCredentials,
+    lastUpdated: new Date().toISOString()
+  };
+  try {
+    fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(merged, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error writing global_settings.json:', err);
+  }
+  return merged;
+}
 
 export function createExpressApp() {
   const app = express();
@@ -16,10 +64,40 @@ export function createExpressApp() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
+  // API Route: Global Settings GET
+  apiRouter.get('/settings', (_req, res) => {
+    res.json({ success: true, settings: loadGlobalSettings() });
+  });
+
+  // API Route: Global Settings POST
+  apiRouter.post('/settings', (req, res) => {
+    try {
+      const updated = saveGlobalSettings(req.body);
+      res.json({ success: true, settings: updated });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Failed to save global settings' });
+    }
+  });
+
   // API Route: Fetch Intraday 15-min Candle Data from Dhan API
   apiRouter.post('/dhan/intraday-15m', async (req, res) => {
     try {
-      const { clientId, accessToken, securityId, symbol, date } = req.body;
+      let { clientId, accessToken, securityId, symbol, date } = req.body;
+
+      // Fallback to global saved settings or process.env if missing
+      const globalSettings = loadGlobalSettings();
+      if (!clientId && globalSettings.dhanCredentials?.clientId) {
+        clientId = globalSettings.dhanCredentials.clientId;
+      }
+      if (!accessToken && globalSettings.dhanCredentials?.accessToken) {
+        accessToken = globalSettings.dhanCredentials.accessToken;
+      }
+      if (!clientId && process.env.DHAN_CLIENT_ID) {
+        clientId = process.env.DHAN_CLIENT_ID;
+      }
+      if (!accessToken && process.env.DHAN_ACCESS_TOKEN) {
+        accessToken = process.env.DHAN_ACCESS_TOKEN;
+      }
 
       // Validate inputs
       if (!clientId || !accessToken) {
@@ -742,7 +820,15 @@ export function createExpressApp() {
   // API Route: Test Dhan Credentials
   apiRouter.post('/dhan/verify-credentials', async (req, res) => {
     try {
-      const { clientId, accessToken } = req.body;
+      let { clientId, accessToken } = req.body;
+      const globalSettings = loadGlobalSettings();
+      if (!clientId && globalSettings.dhanCredentials?.clientId) {
+        clientId = globalSettings.dhanCredentials.clientId;
+      }
+      if (!accessToken && globalSettings.dhanCredentials?.accessToken) {
+        accessToken = globalSettings.dhanCredentials.accessToken;
+      }
+
       if (!clientId || !accessToken) {
         return res.status(400).json({ success: false, error: 'Client ID and Access Token required' });
       }

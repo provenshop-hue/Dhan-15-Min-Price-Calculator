@@ -100,10 +100,15 @@ export const PositionSizingModal: React.FC<PositionSizingModalProps> = ({
     }
   }, [activeStock?.id, isOpen]);
 
-  // Save capital preference
+  // Save capital preference locally and globally
   useEffect(() => {
     if (accountCapital) {
       localStorage.setItem('gann_app_capital', accountCapital);
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountCapital })
+      }).catch(() => {});
     }
   }, [accountCapital]);
 

@@ -94,13 +94,73 @@ export default function App() {
     }
   }, [notification]);
 
-  // Save credentials to localStorage
+  // Helper to sync global settings to server
+  const syncGlobalSettings = async (partialSettings: {
+    dhanCredentials?: DhanApiCredentials;
+    isUnlocked?: boolean;
+    accountCapital?: string;
+    pinnedStockIds?: string[];
+  }) => {
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(partialSettings)
+      });
+    } catch (e) {
+      console.error('Failed to sync global settings to server:', e);
+    }
+  };
+
+  // Load global settings from server on initial mount
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.settings) {
+          const { dhanCredentials, isUnlocked: serverUnlocked, accountCapital, pinnedStockIds } = data.settings;
+          
+          if (dhanCredentials && (dhanCredentials.clientId || dhanCredentials.accessToken)) {
+            setCredentials((prev) => {
+              const updated: DhanApiCredentials = {
+                ...prev,
+                ...dhanCredentials,
+                date: dhanCredentials.date || prev.date,
+                isConfigured: Boolean(dhanCredentials.clientId && dhanCredentials.accessToken)
+              };
+              localStorage.setItem('dhan_gann_creds', JSON.stringify(updated));
+              return updated;
+            });
+          }
+
+          if (serverUnlocked === true) {
+            setIsUnlocked(true);
+            localStorage.setItem('gann_app_access_code_unlocked', 'true');
+            sessionStorage.setItem('gann_app_access_code_unlocked', 'true');
+          }
+
+          if (accountCapital) {
+            localStorage.setItem('gann_app_capital', accountCapital);
+          }
+
+          if (pinnedStockIds && Array.isArray(pinnedStockIds)) {
+            localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(pinnedStockIds));
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not fetch global settings from server:', err);
+      });
+  }, []);
+
+  // Save credentials to localStorage and server
   const handleSaveCredentials = (newCreds: DhanApiCredentials) => {
     setCredentials(newCreds);
     localStorage.setItem('dhan_gann_creds', JSON.stringify(newCreds));
+    syncGlobalSettings({ dhanCredentials: newCreds });
     setNotification({
       type: 'success',
-      message: 'Dhan API credentials saved successfully!'
+      message: 'Dhan API credentials saved globally!'
     });
   };
 
@@ -109,6 +169,7 @@ export default function App() {
     const updated = { ...credentials, date: newDate };
     setCredentials(updated);
     localStorage.setItem('dhan_gann_creds', JSON.stringify(updated));
+    syncGlobalSettings({ dhanCredentials: updated });
     setNotification({
       type: 'info',
       message: `Date updated to ${newDate}. Click "Fetch All 15m Candles" to load candles for this date.`
@@ -569,7 +630,10 @@ export default function App() {
   const calculatedCount = stocks.filter((s) => s.openCalc !== undefined && s.openCalc !== null).length;
 
   if (!isUnlocked) {
-    return <AccessCodeGate onUnlock={() => setIsUnlocked(true)} />;
+    return <AccessCodeGate onUnlock={() => {
+      setIsUnlocked(true);
+      syncGlobalSettings({ isUnlocked: true });
+    }} />;
   }
 
   return (

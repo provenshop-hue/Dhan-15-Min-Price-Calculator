@@ -73,7 +73,13 @@ export const StockTable: React.FC<StockTableProps> = ({
       } else {
         next.add(stockId);
       }
-      localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(Array.from(next)));
+      const arr = Array.from(next);
+      localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(arr));
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinnedStockIds: arr })
+      }).catch(() => {});
       return next;
     });
   };
@@ -81,6 +87,11 @@ export const StockTable: React.FC<StockTableProps> = ({
   const clearAllPins = () => {
     setPinnedStockIds(new Set());
     localStorage.removeItem('gann_pinned_stock_ids');
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pinnedStockIds: [] })
+    }).catch(() => {});
   };
 
   // Pagination settings
@@ -339,12 +350,24 @@ export const StockTable: React.FC<StockTableProps> = ({
                         const next = new Set(pinnedStockIds);
                         filteredStocks.forEach((s) => next.add(s.id));
                         setPinnedStockIds(next);
-                        localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(Array.from(next)));
+                        const arr = Array.from(next);
+                        localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(arr));
+                        fetch('/api/settings', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ pinnedStockIds: arr })
+                        }).catch(() => {});
                       } else {
                         const next = new Set(pinnedStockIds);
                         filteredStocks.forEach((s) => next.delete(s.id));
                         setPinnedStockIds(next);
-                        localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(Array.from(next)));
+                        const arr = Array.from(next);
+                        localStorage.setItem('gann_pinned_stock_ids', JSON.stringify(arr));
+                        fetch('/api/settings', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ pinnedStockIds: arr })
+                        }).catch(() => {});
                       }
                     }}
                     title={isAllFilteredPinned ? "Unpin all visible stocks" : "Pin all visible stocks to stay on top"}
