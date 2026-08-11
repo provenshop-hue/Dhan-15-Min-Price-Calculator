@@ -37,34 +37,33 @@ export function is100PercentBullishMove(stock: StockCalculated): boolean {
   if (low === undefined || low === null || low <= 0) return false;
 
   // 1. Must have positive percent change on the session (> 0%)
-  if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange <= 0) {
-    return false;
+  if (stock.pctChange !== undefined && stock.pctChange !== null) {
+    if (stock.pctChange <= 0) return false;
+  } else {
+    const ref = (stock.previousClose && stock.previousClose > 0) ? stock.previousClose : open;
+    if (close <= ref) return false;
   }
 
   // 2. Close > Open (Green candle)
   if (close <= open) return false;
 
   // 3. Close > Previous Close
-  const prevClose = (stock.previousClose && stock.previousClose > 0)
-    ? stock.previousClose
-    : (stock.pctChange !== undefined && stock.pctChange !== null ? close / (1 + stock.pctChange / 100) : null);
-
-  if (prevClose !== null) {
-    if (close <= prevClose) return false;
+  if (stock.previousClose && stock.previousClose > 0) {
+    if (close <= stock.previousClose) return false;
   }
 
   const range = high - low;
   if (range <= 0) return false;
 
-  // 4. Close >= High - (Range × 0.20)
+  // 4. Close >= High - (Range × 0.20) (Closes in top 20% of High-Low range)
   if (close < high - (range * 0.20) - 0.0001) return false;
 
-  // 5. Body / Range >= 0.55
+  // 5. Body / Range >= 0.55 (Strong candle body)
   const body = Math.abs(close - open);
   if ((body / range) < 0.55 - 0.0001) return false;
 
   // 6. VWAP Filter: price must be >= VWAP if present
-  if (stock.vwap && stock.vwap > 0 && close < stock.vwap) {
+  if (stock.vwap && stock.vwap > 0 && close < stock.vwap - 0.0001) {
     return false;
   }
 
@@ -103,20 +102,19 @@ export function is100PercentBearishMove(stock: StockCalculated): boolean {
   if (low === undefined || low === null || low <= 0) return false;
 
   // 1. Must have negative percent change on the session (< 0%)
-  if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange >= 0) {
-    return false;
+  if (stock.pctChange !== undefined && stock.pctChange !== null) {
+    if (stock.pctChange >= 0) return false;
+  } else {
+    const ref = (stock.previousClose && stock.previousClose > 0) ? stock.previousClose : open;
+    if (close >= ref) return false;
   }
 
   // 2. Close < Open (Red candle)
   if (close >= open) return false;
 
   // 3. Close < Previous Close
-  const prevClose = (stock.previousClose && stock.previousClose > 0)
-    ? stock.previousClose
-    : (stock.pctChange !== undefined && stock.pctChange !== null ? close / (1 + stock.pctChange / 100) : null);
-
-  if (prevClose !== null) {
-    if (close >= prevClose) return false;
+  if (stock.previousClose && stock.previousClose > 0) {
+    if (close >= stock.previousClose) return false;
   }
 
   const range = high - low;
@@ -130,7 +128,7 @@ export function is100PercentBearishMove(stock: StockCalculated): boolean {
   if ((body / range) < 0.55 - 0.0001) return false;
 
   // 6. VWAP Filter: price must be <= VWAP if present
-  if (stock.vwap && stock.vwap > 0 && close > stock.vwap) {
+  if (stock.vwap && stock.vwap > 0 && close > stock.vwap + 0.0001) {
     return false;
   }
 
