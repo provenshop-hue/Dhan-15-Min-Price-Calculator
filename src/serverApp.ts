@@ -79,6 +79,118 @@ export function createExpressApp() {
     }
   });
 
+  // API Route: Dynamic Dhan Token Update Endpoint (Option C)
+  apiRouter.post('/dhan/update-token', async (req, res) => {
+    try {
+      const { accessToken, clientId, updateVercel } = req.body;
+
+      if (!accessToken || typeof accessToken !== 'string' || accessToken.trim() === '') {
+        return res.status(400).json({ success: false, error: 'Missing or invalid accessToken in request body' });
+      }
+
+      const cleanToken = accessToken.trim();
+      const cleanClientId = clientId ? String(clientId).trim() : undefined;
+
+      // 1. Update in-memory process.env
+      process.env.DHAN_ACCESS_TOKEN = cleanToken;
+      if (cleanClientId) {
+        process.env.DHAN_CLIENT_ID = cleanClientId;
+      }
+
+      // 2. Persist in global_settings.json
+      const currentSettings = loadGlobalSettings();
+      const updatedCredentials = {
+        ...currentSettings.dhanCredentials,
+        accessToken: cleanToken,
+        ...(cleanClientId ? { clientId: cleanClientId } : {}),
+        isConfigured: true,
+        date: new Date().toISOString().split('T')[0]
+      };
+
+      const updatedSettings = saveGlobalSettings({
+        dhanCredentials: updatedCredentials
+      });
+
+      let vercelSynced = false;
+      let vercelMessage = 'Vercel sync skipped (VERCEL_TOKEN or VERCEL_PROJECT_ID not set)';
+
+      // 3. Optionally sync to Vercel Environment Variables via Vercel REST API
+      const vercelToken = process.env.VERCEL_TOKEN;
+      const vercelProjectId = process.env.VERCEL_PROJECT_ID;
+
+      if (updateVercel && vercelToken && vercelProjectId) {
+        try {
+          // List existing env vars to find DHAN_ACCESS_TOKEN id
+          const listRes = await fetch(`https://api.vercel.com/v9/projects/${vercelProjectId}/env`, {
+            headers: { Authorization: `Bearer ${vercelToken}` }
+          });
+          const listData = await listRes.json().catch(() => ({}));
+          const existingVar = listData?.envs?.find((e: any) => e.key === 'DHAN_ACCESS_TOKEN');
+
+          if (existingVar?.id) {
+            // Edit existing env var
+            const patchRes = await fetch(`https://api.vercel.com/v9/projects/${vercelProjectId}/env/${existingVar.id}`, {
+              method: 'PATCH',
+              headers: {
+                Authorization: `Bearer ${vercelToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ value: cleanToken })
+            });
+            if (patchRes.ok) {
+              vercelSynced = true;
+              vercelMessage = 'Successfully updated DHAN_ACCESS_TOKEN in Vercel environment variables';
+            } else {
+              const errBody = await patchRes.json().catch(() => ({}));
+              vercelMessage = `Vercel PATCH failed: ${patchRes.status} ${JSON.stringify(errBody)}`;
+            }
+          } else {
+            // Create new env var
+            const createRes = await fetch(`https://api.vercel.com/v10/projects/${vercelProjectId}/env`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${vercelToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                key: 'DHAN_ACCESS_TOKEN',
+                value: cleanToken,
+                type: 'encrypted',
+                target: ['production', 'preview', 'development']
+              })
+            });
+            if (createRes.ok) {
+              vercelSynced = true;
+              vercelMessage = 'Successfully created DHAN_ACCESS_TOKEN in Vercel environment variables';
+            } else {
+              const errBody = await createRes.json().catch(() => ({}));
+              vercelMessage = `Vercel POST failed: ${createRes.status} ${JSON.stringify(errBody)}`;
+            }
+          }
+        } catch (vErr: any) {
+          vercelMessage = `Vercel sync error: ${vErr.message}`;
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'Dhan Access Token updated successfully in app memory and global settings',
+        lastUpdated: new Date().toISOString(),
+        dhanCredentials: {
+          clientId: updatedCredentials.clientId || 'Configured via ENV',
+          isConfigured: true,
+          tokenLength: cleanToken.length
+        },
+        vercelSync: {
+          synced: vercelSynced,
+          status: vercelMessage
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message || 'Failed to update Dhan Access Token' });
+    }
+  });
+
   // API Route: Fetch Intraday 15-min Candle Data from Dhan API
   apiRouter.post('/dhan/intraday-15m', async (req, res) => {
     try {
