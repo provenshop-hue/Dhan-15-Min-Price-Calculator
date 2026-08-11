@@ -61,13 +61,13 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Logo & Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-500/20 flex items-center justify-center font-bold text-lg">
-              𝒢
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-sm shadow-blue-500/20 flex items-center justify-center font-black text-sm tracking-tighter">
+              ATM
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                  Gannformula-app
+                  StockMarket ATM
                 </h1>
                 <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-semibold border border-blue-200/60">
                   Nifty Futures F&O
@@ -226,7 +226,7 @@ export const Header: React.FC<HeaderProps> = ({
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
             >
-              <span>📊 Gann 15m Scanner</span>
+              <span>📊 15m Scanner</span>
             </button>
 
             <button
@@ -238,7 +238,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <span className="flex items-center gap-1">
-                <span>🏛️ Gann Dashboard</span>
+                <span>🏛️ Monthly Dashboard</span>
                 <span className="bg-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">
                   MONTH
                 </span>

@@ -300,7 +300,7 @@ export const StockTable: React.FC<StockTableProps> = ({
                   ? 'bg-purple-700 text-white shadow-2xs ring-2 ring-purple-300'
                   : 'text-purple-950 bg-purple-200/90 hover:bg-purple-300 border border-purple-400/80 shadow-2xs'
               }`}
-              title="Filter stocks where BOTH Gann Open AND Close modulo calculations are less than 3 (< 3)"
+              title="Filter stocks where BOTH Open AND Close modulo calculations are less than 3 (< 3)"
             >
               <Zap className="w-3.5 h-3.5 text-yellow-500 dark:text-yellow-300 fill-current animate-pulse" />
               Both Calc &lt; 3 ({bothCalcLess3Count})
@@ -312,10 +312,10 @@ export const StockTable: React.FC<StockTableProps> = ({
                   ? 'bg-purple-600 text-white shadow-2xs ring-2 ring-purple-300'
                   : 'text-purple-900 bg-purple-100/80 hover:bg-purple-200 border border-purple-300/70'
               }`}
-              title="Filter stocks where Gann Open or Close modulo calculation is less than 3"
+              title="Filter stocks where Open or Close modulo calculation is less than 3"
             >
               <Zap className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300 fill-current" />
-              Gann Calc &lt; 3 ({gannCalcLess3Count})
+              Calc &lt; 3 ({gannCalcLess3Count})
             </button>
             <button
               onClick={() => { setTrendFilter('VERY_BULLISH'); setCurrentPage(1); }}
@@ -377,11 +377,11 @@ export const StockTable: React.FC<StockTableProps> = ({
             ))}
           </div>
 
-          {/* Sub-filter chips for Gann Calc < 3 */}
+          {/* Sub-filter chips for Calc < 3 */}
           {(trendFilter === 'GANN_CALC_LESS_3' || trendFilter === 'BOTH_CALC_LESS_3' || trendFilter === 'OPEN_CALC_LESS_3' || trendFilter === 'CLOSE_CALC_LESS_3') && (
             <div className="flex items-center gap-1 bg-purple-100 p-1 rounded-xl border border-purple-300 text-xs shadow-2xs overflow-x-auto">
               <span className="text-[10px] font-black text-purple-950 px-1.5 flex items-center gap-1 whitespace-nowrap">
-                <Zap className="w-3 h-3 text-purple-700 fill-current" /> Gann Calc Mode:
+                <Zap className="w-3 h-3 text-purple-700 fill-current" /> Calc Mode:
               </span>
               <button
                 onClick={() => { setTrendFilter('BOTH_CALC_LESS_3'); setCurrentPage(1); }}
@@ -754,7 +754,7 @@ export const StockTable: React.FC<StockTableProps> = ({
                           </span>
                         )}
                         {isGannCalcLessThan3(stock) && (
-                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-purple-700 text-white shadow-2xs border border-purple-300 animate-pulse" title={`Gann Open or Close calc < 3 (Open: ${stock.openCalc?.toFixed(2) ?? '-'}, Close: ${stock.closeCalc?.toFixed(2) ?? '-'})`}>
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-purple-700 text-white shadow-2xs border border-purple-300 animate-pulse" title={`Open or Close calc < 3 (Open: ${stock.openCalc?.toFixed(2) ?? '-'}, Close: ${stock.closeCalc?.toFixed(2) ?? '-'})`}>
                             <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
                             <span>
                               {isOpenCalcLessThan3(stock) && isCloseCalcLessThan3(stock)
@@ -895,7 +895,7 @@ export const StockTable: React.FC<StockTableProps> = ({
                         {/* View Breakdown */}
                         <button
                           onClick={() => onSelectStockDetail(stock)}
-                          title="View Gann Targets & Breakdown"
+                          title="View Targets & Breakdown"
                           className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         >
                           <Eye className="w-3.5 h-3.5" />

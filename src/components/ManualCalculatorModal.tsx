@@ -122,7 +122,7 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
               <Calculator className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Manual Gann 15-Min Entry</h3>
+              <h3 className="text-lg font-bold text-slate-900">Manual 15-Min Entry</h3>
               <p className="text-xs text-slate-500">Enter stock symbol and first 15-minute Open and Close prices</p>
             </div>
           </div>
@@ -274,7 +274,7 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
           <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-3">
               <span className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Target className="w-4 h-4 text-blue-600" /> Gann Formula Live Results
+                <Target className="w-4 h-4 text-blue-600" /> Live Calculated Results
               </span>
               <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${
                 calc.trend === 'Bullish'

@@ -110,10 +110,10 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
           </div>
         )}
 
-        {/* 15-Min Candle & Gann Primary Result Banner */}
+        {/* 15-Min Candle & Primary Result Banner */}
         <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
           <div className="text-xs font-bold uppercase text-blue-700 mb-3 flex items-center justify-between">
-            <span>First 15-Min Candle Data & Gann Calculations</span>
+            <span>First 15-Min Candle Data & Calculated Values</span>
             <span className="text-[11px] text-slate-500 font-mono">
               {stock.candleTimestamp || '09:15 - 09:30 AM IST'}
             </span>
@@ -171,19 +171,19 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
           </div>
         </div>
 
-        {/* Confluence Technical Indicators (Gann + RSI + VWAP) */}
+        {/* Confluence Technical Indicators (Square Root + RSI + VWAP) */}
         <div className="mt-4 p-4 bg-slate-900 text-white rounded-xl border border-slate-800 shadow-md">
           <div className="text-xs font-bold uppercase text-blue-400 mb-3 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-blue-400" /> Technical Confluence Matrix
             </span>
-            <span className="text-[10px] text-slate-400 font-normal">Gann Square + RSI + Intraday VWAP</span>
+            <span className="text-[10px] text-slate-400 font-normal">Square Root + RSI + Intraday VWAP</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-            {/* Gann Signal */}
+            {/* Square Root Signal */}
             <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
-              <div className="text-[10px] text-slate-400 uppercase font-semibold">1. Gann Square Level</div>
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">1. Square Root Level</div>
               <div className="mt-1 flex items-center justify-between">
                 <span className="text-xs text-slate-300">Buy/Sell Level</span>
                 <span className={`text-xs font-bold font-mono ${
@@ -197,7 +197,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
                     ? 'Breakout Above Buy'
                     : stock.closePrice && stock.sellBelow && stock.closePrice <= stock.sellBelow
                     ? 'Breakdown Below Sell'
-                    : 'In Gann Range'}
+                    : 'In Range'}
                 </span>
               </div>
             </div>
@@ -273,13 +273,13 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
           </div>
         </div>
 
-        {/* Gann Square of 9 Trade Signals */}
+        {/* Square of 9 Trade Signals */}
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Buy Above */}
           <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between">
             <div>
               <div className="text-[11px] font-bold uppercase text-emerald-800 flex items-center gap-1">
-                <ArrowUpRight className="w-4 h-4 text-emerald-600" /> Gann Buy Above Level (+45°)
+                <ArrowUpRight className="w-4 h-4 text-emerald-600" /> Buy Above Level (+45°)
               </div>
               <div className="text-xs text-emerald-700/80 mt-0.5">Trigger for long positions</div>
             </div>
@@ -292,7 +292,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
           <div className="bg-rose-50 p-3.5 rounded-xl border border-rose-200 flex items-center justify-between">
             <div>
               <div className="text-[11px] font-bold uppercase text-rose-800 flex items-center gap-1">
-                <ArrowDownRight className="w-4 h-4 text-rose-600" /> Gann Sell Below Level (-45°)
+                <ArrowDownRight className="w-4 h-4 text-rose-600" /> Sell Below Level (-45°)
               </div>
               <div className="text-xs text-rose-700/80 mt-0.5">Trigger for short positions</div>
             </div>

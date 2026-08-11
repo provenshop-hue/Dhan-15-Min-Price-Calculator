@@ -98,13 +98,13 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h2 className="text-base font-extrabold tracking-wide text-white">GANN 15-MIN PRO SIGNALS</h2>
+              <h2 className="text-base font-extrabold tracking-wide text-white">15-MIN MARKET PRO SIGNALS</h2>
               <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
-                Square of 9 & Intraday Patterns
+                Square Root & Intraday Patterns
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              Instant filtering for <strong>Open=Low (Bullish)</strong>, <strong>Open=High (Bearish)</strong>, and Gann 45° Breakouts.
+              Instant filtering for <strong>Open=Low (Bullish)</strong>, <strong>Open=High (Bearish)</strong>, and 45° Breakouts.
             </p>
           </div>
         </div>
@@ -114,7 +114,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           <button
             onClick={() => handleFilterClick('BOTH_CALC_LESS_3')}
             className="flex items-center space-x-1.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/80 px-3 py-1.5 rounded-xl text-xs font-black text-purple-200 transition-all cursor-pointer whitespace-nowrap shadow-xs ring-1 ring-purple-400/40 animate-pulse"
-            title="Filter stocks where BOTH Gann Open AND Close modulo calculations are less than 3"
+            title="Filter stocks where BOTH Open AND Close modulo calculations are less than 3"
           >
             <Zap className="w-3.5 h-3.5 text-yellow-300 fill-current" />
             <span>🔥 Both Calc &lt; 3 ({bothCalcLess3Count})</span>
@@ -123,10 +123,10 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           <button
             onClick={() => handleFilterClick('GANN_CALC_LESS_3')}
             className="flex items-center space-x-1.5 bg-purple-500/20 hover:bg-purple-500/35 border border-purple-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-purple-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
-            title="Filter stocks where Gann Open or Close modulo calculation is less than 3"
+            title="Filter stocks where Open or Close modulo calculation is less than 3"
           >
             <Zap className="w-3.5 h-3.5 text-purple-300" />
-            <span>Gann Calc &lt; 3 ({gannCalcLess3Count})</span>
+            <span>Calc &lt; 3 ({gannCalcLess3Count})</span>
           </button>
 
           <button
@@ -176,7 +176,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
         <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-center text-amber-800 text-xs flex items-center justify-center space-x-2">
           <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
-            No 15-minute candle data calculated yet. Click <strong>"Fetch All 15m Candles"</strong> or enter prices manually to unlock Gann signals.
+            No 15-minute candle data calculated yet. Click <strong>"Fetch All 15m Candles"</strong> or enter prices manually to unlock market signals.
           </span>
         </div>
       ) : (
@@ -348,10 +348,10 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
                   <h3 className="text-xs font-extrabold text-rose-950 tracking-wider uppercase flex items-center gap-1.5">
                     Very Bearish Picks
                     <span className="bg-rose-100 text-rose-800 text-[10px] px-2 py-0.2 rounded-full font-bold">
-                      Gann 45° Breakdown
+                      45° Breakdown
                     </span>
                   </h3>
-                  <p className="text-[11px] text-slate-500">15m Close &lt; Open with Gann Sell Below Trigger</p>
+                  <p className="text-[11px] text-slate-500">15m Close &lt; Open with Sell Below Trigger</p>
                 </div>
               </div>
 

@@ -17,10 +17,13 @@ export function checkStockOpenHigh(stock: StockCalculated): boolean {
 
 /**
  * 100% Bullish Move Criteria:
- * 1. Close > Open
- * 2. Close > Previous Close
- * 3. Close >= High - (Range × 0.20)
- * 4. Body / Range >= 0.60
+ * 1. Close > Open (Green Candle)
+ * 2. Close > Previous Close AND pctChange > 0 (Positive Day Change)
+ * 3. Close >= High - (Range × 0.20) (Closes in top 20% of High-Low range)
+ * 4. Body / Range >= 0.55 (Strong candle body)
+ * 5. Price >= VWAP (Above VWAP support if VWAP exists)
+ * 6. RSI >= 50 (if RSI exists)
+ * 7. Trend must NOT be Bearish
  */
 export function is100PercentBullishMove(stock: StockCalculated): boolean {
   const open = stock.openPrice;
@@ -33,39 +36,60 @@ export function is100PercentBullishMove(stock: StockCalculated): boolean {
   if (high === undefined || high === null || high <= 0) return false;
   if (low === undefined || low === null || low <= 0) return false;
 
-  // 1. Close > Open
+  // 1. Must have positive percent change on the session (> 0%)
+  if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange <= 0) {
+    return false;
+  }
+
+  // 2. Close > Open (Green candle)
   if (close <= open) return false;
 
-  // 2. Close > Previous Close
+  // 3. Close > Previous Close
   const prevClose = (stock.previousClose && stock.previousClose > 0)
     ? stock.previousClose
     : (stock.pctChange !== undefined && stock.pctChange !== null ? close / (1 + stock.pctChange / 100) : null);
 
   if (prevClose !== null) {
     if (close <= prevClose) return false;
-  } else if ((stock.pctChange || 0) <= 0) {
-    return false;
   }
 
   const range = high - low;
   if (range <= 0) return false;
 
-  // 3. Close >= High - (Range × 0.20)
+  // 4. Close >= High - (Range × 0.20)
   if (close < high - (range * 0.20) - 0.0001) return false;
 
-  // 4. Body / Range >= 0.60
+  // 5. Body / Range >= 0.55
   const body = Math.abs(close - open);
-  if ((body / range) < 0.60 - 0.0001) return false;
+  if ((body / range) < 0.55 - 0.0001) return false;
+
+  // 6. VWAP Filter: price must be >= VWAP if present
+  if (stock.vwap && stock.vwap > 0 && close < stock.vwap) {
+    return false;
+  }
+
+  // 7. RSI Filter: RSI must be >= 50 if present
+  if (stock.rsi !== undefined && stock.rsi !== null && stock.rsi < 50) {
+    return false;
+  }
+
+  // 8. Trend Filter: Must NOT be Bearish or Very Bearish
+  if (stock.trend === 'Bearish' || stock.trend === 'Very Bearish') {
+    return false;
+  }
 
   return true;
 }
 
 /**
  * 100% Bearish Move Criteria:
- * 1. Close < Open
- * 2. Close < Previous Close
- * 3. Close <= Low + (Range × 0.20)
- * 4. Body / Range >= 0.60
+ * 1. Close < Open (Red Candle)
+ * 2. Close < Previous Close AND pctChange < 0 (Negative Day Change)
+ * 3. Close <= Low + (Range × 0.20) (Closes in bottom 20% of High-Low range)
+ * 4. Body / Range >= 0.55 (Strong candle body)
+ * 5. Price <= VWAP (Below VWAP resistance if VWAP exists)
+ * 6. RSI <= 50 (if RSI exists)
+ * 7. Trend must NOT be Bullish
  */
 export function is100PercentBearishMove(stock: StockCalculated): boolean {
   const open = stock.openPrice;
@@ -78,29 +102,47 @@ export function is100PercentBearishMove(stock: StockCalculated): boolean {
   if (high === undefined || high === null || high <= 0) return false;
   if (low === undefined || low === null || low <= 0) return false;
 
-  // 1. Close < Open
+  // 1. Must have negative percent change on the session (< 0%)
+  if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange >= 0) {
+    return false;
+  }
+
+  // 2. Close < Open (Red candle)
   if (close >= open) return false;
 
-  // 2. Close < Previous Close
+  // 3. Close < Previous Close
   const prevClose = (stock.previousClose && stock.previousClose > 0)
     ? stock.previousClose
     : (stock.pctChange !== undefined && stock.pctChange !== null ? close / (1 + stock.pctChange / 100) : null);
 
   if (prevClose !== null) {
     if (close >= prevClose) return false;
-  } else if ((stock.pctChange || 0) >= 0) {
-    return false;
   }
 
   const range = high - low;
   if (range <= 0) return false;
 
-  // 3. Close <= Low + (Range × 0.20)
+  // 4. Close <= Low + (Range × 0.20)
   if (close > low + (range * 0.20) + 0.0001) return false;
 
-  // 4. Body / Range >= 0.60
+  // 5. Body / Range >= 0.55
   const body = Math.abs(close - open);
-  if ((body / range) < 0.60 - 0.0001) return false;
+  if ((body / range) < 0.55 - 0.0001) return false;
+
+  // 6. VWAP Filter: price must be <= VWAP if present
+  if (stock.vwap && stock.vwap > 0 && close > stock.vwap) {
+    return false;
+  }
+
+  // 7. RSI Filter: RSI must be <= 50 if present
+  if (stock.rsi !== undefined && stock.rsi !== null && stock.rsi > 50) {
+    return false;
+  }
+
+  // 8. Trend Filter: Must NOT be Bullish or Very Bullish
+  if (stock.trend === 'Bullish' || stock.trend === 'Very Bullish') {
+    return false;
+  }
 
   return true;
 }
@@ -209,7 +251,7 @@ export function calculateBullishRallyScore(
   const body = Math.abs(close - open);
 
   // 1. Candle Strength (Large green body)
-  const isGreen = close > open || stock.pctChange >= 0;
+  const isGreen = close > open && (stock.pctChange || 0) >= 0;
   const bodyRatio = range > 0 ? body / range : 0.5;
   const candleStrengthPass = isGreen && bodyRatio >= 0.4;
 
@@ -224,22 +266,22 @@ export function calculateBullishRallyScore(
   const buyVolumePass = isGreen && (close >= vwap || checkStockOpenLow(stock) || volumeDirection === 'INCREASING');
 
   // 5. RSI > 55
-  const rsiAbove55Pass = rsiVal > 55;
+  const rsiAbove55Pass = rsiVal > 55 && isGreen;
 
   // 6. RSI Rising
-  const rsiRisingPass = rsiDirection === 'UP' || rsiDelta > 0;
+  const rsiRisingPass = (rsiDirection === 'UP' || rsiDelta > 0) && isGreen;
 
   // 7. Price Above VWAP
-  const aboveVwapPass = close >= vwap;
+  const aboveVwapPass = close >= vwap && isGreen;
 
   // 8. Break/Hold Above Previous High / PDC
-  const pdhPass = (stock.buyAbove ? close >= stock.buyAbove * 0.998 : close >= high * 0.998) || (stock.pctChange || 0) >= 0.3 || checkStockOpenLow(stock);
+  const pdhPass = isGreen && ((stock.buyAbove ? close >= stock.buyAbove * 0.998 : close >= high * 0.998) || (stock.pctChange || 0) >= 0.3 || checkStockOpenLow(stock));
 
   // 9. Sector / Trend Bullish
-  const sectorBullishPass = stock.trend === 'Bullish' || stock.trend === 'Very Bullish' || (stock.pctChange || 0) > 0;
+  const sectorBullishPass = isGreen && (stock.trend === 'Bullish' || stock.trend === 'Very Bullish' || (stock.pctChange || 0) > 0);
 
   // 10. Resistance Breakout / Gann Score
-  const breakoutPass = (stock.gannScore || 0) >= 50 || (stock.pctChange || 0) >= 0.5 || checkStockOpenLow(stock);
+  const breakoutPass = isGreen && ((stock.gannScore || 0) >= 50 || (stock.pctChange || 0) >= 0.5 || checkStockOpenLow(stock));
 
   const factors: RallyConfluenceFactor[] = [
     { id: 'candle_strength', label: '1. First Candle Body Strength (Large Green)', points: 10, passed: candleStrengthPass },
@@ -254,7 +296,12 @@ export function calculateBullishRallyScore(
     { id: 'resistance_breakout', label: '10. Resistance Breakout Confirmation', points: 5, passed: breakoutPass },
   ];
 
-  const score = factors.reduce((acc, f) => acc + (f.passed ? f.points : 0), 0);
+  let score = factors.reduce((acc, f) => acc + (f.passed ? f.points : 0), 0);
+
+  // HARD CAP: If candle is red or pctChange is negative, Bullish score CANNOT exceed 25
+  if (close <= open || (stock.pctChange || 0) < 0) {
+    score = Math.min(25, score);
+  }
 
   let interpretation: RallyScoreResult['interpretation'] = 'Moderate / Wait';
   let interpretationCode: RallyScoreResult['interpretationCode'] = 'MODERATE';
@@ -311,7 +358,7 @@ export function calculateBearishRallyScore(
   const body = Math.abs(close - open);
 
   // 1. Candle Strength (Large red body)
-  const isRed = close < open || (stock.pctChange || 0) < 0;
+  const isRed = close < open && (stock.pctChange || 0) <= 0;
   const bodyRatio = range > 0 ? body / range : 0.5;
   const candleStrengthPass = isRed && bodyRatio >= 0.4;
 
@@ -326,22 +373,22 @@ export function calculateBearishRallyScore(
   const sellVolumePass = isRed && (close <= vwap || checkStockOpenHigh(stock) || volumeDirection === 'INCREASING');
 
   // 5. RSI < 45
-  const rsiBelow45Pass = rsiVal < 45;
+  const rsiBelow45Pass = (rsiVal < 45) && isRed;
 
   // 6. RSI Falling
-  const rsiFallingPass = rsiDirection === 'DOWN' || rsiDelta < 0;
+  const rsiFallingPass = (rsiDirection === 'DOWN' || rsiDelta < 0) && isRed;
 
   // 7. Price Below VWAP
-  const belowVwapPass = close <= vwap;
+  const belowVwapPass = close <= vwap && isRed;
 
   // 8. Break Below Previous Low / PDC
-  const pdlPass = (stock.sellBelow ? close <= stock.sellBelow * 1.002 : close <= low * 1.002) || (stock.pctChange || 0) <= -0.3 || checkStockOpenHigh(stock);
+  const pdlPass = isRed && ((stock.sellBelow ? close <= stock.sellBelow * 1.002 : close <= low * 1.002) || (stock.pctChange || 0) <= -0.3 || checkStockOpenHigh(stock));
 
   // 9. Sector / Trend Bearish
-  const sectorBearishPass = stock.trend === 'Bearish' || stock.trend === 'Very Bearish' || (stock.pctChange || 0) < 0;
+  const sectorBearishPass = isRed && (stock.trend === 'Bearish' || stock.trend === 'Very Bearish' || (stock.pctChange || 0) < 0);
 
   // 10. Support Breakdown
-  const breakdownPass = (stock.pctChange || 0) <= -0.5 || checkStockOpenHigh(stock);
+  const breakdownPass = isRed && ((stock.pctChange || 0) <= -0.5 || checkStockOpenHigh(stock));
 
   const factors: RallyConfluenceFactor[] = [
     { id: 'candle_strength', label: '1. First Candle Body Strength (Large Red)', points: 10, passed: candleStrengthPass },
@@ -356,7 +403,12 @@ export function calculateBearishRallyScore(
     { id: 'support_breakdown', label: '10. Support Breakdown Confirmation', points: 5, passed: breakdownPass },
   ];
 
-  const score = factors.reduce((acc, f) => acc + (f.passed ? f.points : 0), 0);
+  let score = factors.reduce((acc, f) => acc + (f.passed ? f.points : 0), 0);
+
+  // HARD CAP: If candle is green or pctChange is positive, Bearish score CANNOT exceed 25
+  if (close >= open || (stock.pctChange || 0) > 0) {
+    score = Math.min(25, score);
+  }
 
   let interpretation: RallyScoreResult['interpretation'] = 'Moderate / Wait';
   let interpretationCode: RallyScoreResult['interpretationCode'] = 'MODERATE';
@@ -746,7 +798,47 @@ export function validateConfluenceAndFalseBreakoutRisk(
   const vwap = stock.vwap || (open + high + low + close) / 4;
   const range = high - low;
 
-  const isBullishFocus = category === 'BULLISH_RALLY' || category === 'BULLISH_SWEET_SPOT' || category === 'BULLISH_MOMENTUM' || category === 'OVERSOLD_BOUNCE' || (bullishScore >= bearishScore);
+  const isBullishFocus = category === 'BULLISH_RALLY' || category === 'BULLISH_SWEET_SPOT' || category === 'BULLISH_MOMENTUM' || category === 'OVERSOLD_BOUNCE' || (bullishScore > bearishScore);
+
+  // CRITICAL DIRECTION ENFORCEMENT:
+  // If evaluating Bullish confluence, BUT the stock is actually DOWN (% change < 0 or red candle),
+  // it is IMPOSSIBLE to validate Bullish Confluence!
+  const pctChange = stock.pctChange || 0;
+  if (isBullishFocus && (pctChange < 0 || close < open)) {
+    return {
+      status: 'FALSE_BREAKOUT_RISK',
+      statusLabel: '⚠️ FALSE SIGNAL (STOCK DOWN)',
+      badgeColor: 'bg-rose-600 text-white border-rose-700 shadow-2xs',
+      summaryReason: `CRITICAL FAILURE: Stock is down (${pctChange.toFixed(2)}% change, Red candle close). Cannot validate Bullish Confluence on a falling stock.`,
+      score: 0,
+      checks: [
+        { id: 'vwap_filter', name: '1. VWAP Price Alignment', passed: false, requiredFor: 'BULL', detail: `⚠️ PRICE IS DOWN ON SESSION (${pctChange.toFixed(2)}%).` },
+        { id: 'rvol_filter', name: '2. RVOL Institutional Volume', passed: false, requiredFor: 'BOTH', detail: `⚠️ Falling price indicates selling pressure.` },
+        { id: 'rsi_filter', name: '3. RSI Sweet Spot (No Trap)', passed: false, requiredFor: 'BULL', detail: `RSI (${currentRsi.toFixed(1)}) is failing due to price decline.` },
+        { id: 'wick_filter', name: '4. Candle Wick Rejection Check', passed: false, requiredFor: 'BULL', detail: `Candle close (₹${close}) is below open (₹${open}).` },
+        { id: 'trend_filter', name: '5. Broader Trend Confluence', passed: false, requiredFor: 'BOTH', detail: `⚠️ Stock is negative on session (${pctChange.toFixed(2)}%).` },
+      ]
+    };
+  }
+
+  // If evaluating Bearish confluence, BUT the stock is actually UP (% change > 0 or green candle),
+  // it is IMPOSSIBLE to validate Bearish Confluence!
+  if (!isBullishFocus && (pctChange > 0 || close > open)) {
+    return {
+      status: 'FALSE_BREAKOUT_RISK',
+      statusLabel: '⚠️ FALSE SIGNAL (STOCK UP)',
+      badgeColor: 'bg-rose-600 text-white border-rose-700 shadow-2xs',
+      summaryReason: `CRITICAL FAILURE: Stock is up (+${pctChange.toFixed(2)}% change, Green candle close). Cannot validate Bearish Confluence on a rising stock.`,
+      score: 0,
+      checks: [
+        { id: 'vwap_filter', name: '1. VWAP Price Alignment', passed: false, requiredFor: 'BEAR', detail: `⚠️ PRICE IS UP ON SESSION (+${pctChange.toFixed(2)}%).` },
+        { id: 'rvol_filter', name: '2. RVOL Institutional Volume', passed: false, requiredFor: 'BOTH', detail: `⚠️ Rising price indicates buying pressure.` },
+        { id: 'rsi_filter', name: '3. RSI Sweet Spot (No Trap)', passed: false, requiredFor: 'BEAR', detail: `RSI (${currentRsi.toFixed(1)}) is rising with price action.` },
+        { id: 'wick_filter', name: '4. Candle Wick Rejection Check', passed: false, requiredFor: 'BEAR', detail: `Candle close (₹${close}) is above open (₹${open}).` },
+        { id: 'trend_filter', name: '5. Broader Trend Confluence', passed: false, requiredFor: 'BOTH', detail: `⚠️ Stock is positive on session (+${pctChange.toFixed(2)}%).` },
+      ]
+    };
+  }
 
   // 1. VWAP Filter
   const vwapPass = isBullishFocus ? close >= vwap : close <= vwap;

@@ -414,7 +414,7 @@ export const PositionSizingModal: React.FC<PositionSizingModalProps> = ({
                       onClick={() => setEntryPrice((Math.round(activeStock.buyAbove! * 100) / 100).toFixed(2))}
                       className="px-1.5 py-0.2 text-[9px] font-bold bg-white text-emerald-800 border border-emerald-300 rounded hover:bg-emerald-50"
                     >
-                      Gann Buy: ₹{activeStock.buyAbove.toFixed(1)}
+                      Buy Level: ₹{activeStock.buyAbove.toFixed(1)}
                     </button>
                   )}
                   {tradeDirection === 'SELL' && activeStock?.sellBelow && activeStock.sellBelow > 0 && (
@@ -423,7 +423,7 @@ export const PositionSizingModal: React.FC<PositionSizingModalProps> = ({
                       onClick={() => setEntryPrice((Math.round(activeStock.sellBelow! * 100) / 100).toFixed(2))}
                       className="px-1.5 py-0.2 text-[9px] font-bold bg-white text-rose-800 border border-rose-300 rounded hover:bg-rose-50"
                     >
-                      Gann Sell: ₹{activeStock.sellBelow.toFixed(1)}
+                      Sell Level: ₹{activeStock.sellBelow.toFixed(1)}
                     </button>
                   )}
                 </div>
@@ -454,7 +454,7 @@ export const PositionSizingModal: React.FC<PositionSizingModalProps> = ({
                         onClick={() => setStopLossPrice((Math.round(activeStock.sellBelow! * 100) / 100).toFixed(2))}
                         className="px-1.5 py-0.2 text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 rounded hover:bg-rose-100"
                       >
-                        Gann SL: ₹{activeStock.sellBelow.toFixed(1)}
+                        SL: ₹{activeStock.sellBelow.toFixed(1)}
                       </button>
                     )}
                     {tradeDirection === 'SELL' && activeStock?.buyAbove && activeStock.buyAbove > 0 && (
@@ -463,7 +463,7 @@ export const PositionSizingModal: React.FC<PositionSizingModalProps> = ({
                         onClick={() => setStopLossPrice((Math.round(activeStock.buyAbove! * 100) / 100).toFixed(2))}
                         className="px-1.5 py-0.2 text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 rounded hover:bg-rose-100"
                       >
-                        Gann SL: ₹{activeStock.buyAbove.toFixed(1)}
+                        SL: ₹{activeStock.buyAbove.toFixed(1)}
                       </button>
                     )}
                   </div>

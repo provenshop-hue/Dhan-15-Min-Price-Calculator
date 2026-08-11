@@ -12,6 +12,7 @@ import { StockDetailModal } from './components/StockDetailModal';
 import { CsvImportModal } from './components/CsvImportModal';
 import { PositionSizingModal } from './components/PositionSizingModal';
 import { RsiAnalystModal } from './components/RsiAnalystModal';
+import { NotificationScroller } from './components/NotificationScroller';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from './types';
@@ -600,7 +601,7 @@ export default function App() {
 
     setNotification({
       type: 'success',
-      message: `Updated Gann calculations for ${manualStock.symbol}`
+      message: `Updated calculations for ${manualStock.symbol}`
     });
   };
 
@@ -661,8 +662,8 @@ export default function App() {
       '15m Open Price',
       '15m Close Price',
       '15m Volume',
-      'Open Gann Calculation',
-      'Close Gann Calculation',
+      'Open Calculation',
+      'Close Calculation',
       'Buy Above (45°)',
       'Sell Below (-45°)',
       'Trend'
@@ -687,7 +688,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Gann_15Min_Report_${credentials.date}.csv`);
+    link.setAttribute('download', `StockMarket_ATM_15Min_Report_${credentials.date}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -747,6 +748,12 @@ export default function App() {
 
       {/* Main Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        {/* Live Notification & Market Signal Scroller */}
+        <NotificationScroller
+          stocks={stocks}
+          onSelectStockDetail={setSelectedDetailStock}
+        />
 
         {/* Protected Dhan Setup Banner when not configured */}
         {!credentials.isConfigured && (
@@ -861,7 +868,7 @@ export default function App() {
       <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            Gannformula-app &bull; Powered by Dhan HQ Data API & Nifty F&O Master List
+            StockMarket ATM &bull; Powered by Dhan HQ Data API & Nifty F&O Master List
           </div>
           <div className="text-slate-400 font-mono text-[11px]">
             Protected Access System

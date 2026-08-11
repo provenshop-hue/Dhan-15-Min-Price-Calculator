@@ -21,7 +21,7 @@ export const GannFormulaCard: React.FC = () => {
           </div>
           <div>
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <span>Gann 15-Minute Square Root Formula Reference</span>
+              <span>15-Minute Square Root Formula Reference</span>
               <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full font-mono">
                 Exact User Specified Formula
               </span>
@@ -41,7 +41,7 @@ export const GannFormulaCard: React.FC = () => {
         {/* Open Price Formula Box */}
         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
           <div className="text-xs font-semibold text-blue-700 mb-1 flex items-center justify-between">
-            <span>Open Price Gann Calculation</span>
+            <span>Open Price Calculation</span>
             <span className="text-[10px] text-slate-500 font-mono">matchOpenPrice</span>
           </div>
           <code className="block bg-white text-slate-900 p-2 rounded text-xs font-mono border border-slate-200 overflow-x-auto shadow-2xs">
@@ -52,7 +52,7 @@ export const GannFormulaCard: React.FC = () => {
         {/* Close Price Formula Box */}
         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
           <div className="text-xs font-semibold text-blue-700 mb-1 flex items-center justify-between">
-            <span>Close Price Gann Calculation</span>
+            <span>Close Price Calculation</span>
             <span className="text-[10px] text-slate-500 font-mono">matchClosePrice</span>
           </div>
           <code className="block bg-white text-slate-900 p-2 rounded text-xs font-mono border border-slate-200 overflow-x-auto shadow-2xs">
@@ -96,7 +96,7 @@ export const GannFormulaCard: React.FC = () => {
               <div className="text-sm font-mono font-bold text-slate-900">₹{testOpen.toFixed(2)}</div>
             </div>
             <div className="bg-blue-50/60 p-2.5 rounded border border-blue-200/80">
-              <div className="text-[11px] text-blue-700 font-medium">Open Gann Output</div>
+              <div className="text-[11px] text-blue-700 font-medium">Open Calc Output</div>
               <div className="text-sm font-mono font-bold text-blue-700">{calc.openCalc.toFixed(4)}</div>
             </div>
             <div className="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
@@ -104,7 +104,7 @@ export const GannFormulaCard: React.FC = () => {
               <div className="text-sm font-mono font-bold text-slate-900">₹{testClose.toFixed(2)}</div>
             </div>
             <div className="bg-blue-50/60 p-2.5 rounded border border-blue-200/80">
-              <div className="text-[11px] text-blue-700 font-medium">Close Gann Output</div>
+              <div className="text-[11px] text-blue-700 font-medium">Close Calc Output</div>
               <div className="text-sm font-mono font-bold text-blue-700">{calc.closeCalc.toFixed(4)}</div>
             </div>
           </div>
@@ -112,7 +112,7 @@ export const GannFormulaCard: React.FC = () => {
           <div className="text-[11px] text-slate-500 flex items-start space-x-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
             <Info className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
             <span>
-              <strong>Note:</strong> Mathematical square root of Open or Close price is multiplied by 15, subtracted by 15, and the modulo 15 remainder is returned as the Gann Square Root value.
+              <strong>Note:</strong> Mathematical square root of Open or Close price is multiplied by 15, subtracted by 15, and the modulo 15 remainder is returned as the Square Root calculated value.
             </span>
           </div>
         </div>

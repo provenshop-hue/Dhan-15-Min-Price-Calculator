@@ -250,11 +250,11 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
-              <span>🏛️ Gann Month High/Low Dashboard</span>
+              <span>🏛️ Month High/Low Dashboard</span>
             </h1>
             
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Analyzes previous month's exact High &amp; Low prices and their appearance dates ({bounds.prevMonthName}). Features Gann Square of 9 breakout triggers, 50% midpoint retracements, and 8-Level Gann Octaves for {bounds.targetMonthName}.
+              Analyzes previous month's exact High &amp; Low prices and their appearance dates ({bounds.prevMonthName}). Features Square of 9 breakout triggers, 50% midpoint retracements, and 8-Level Octaves for {bounds.targetMonthName}.
             </p>
           </div>
 
@@ -310,7 +310,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
               Ready to Load {bounds.prevMonthName} High &amp; Low Analysis
             </h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Click the activation button above to fetch previous month high/low prices, exact appearance calendar dates, 50% Gann midpoints, and Square of 9 breakout targets for all F&amp;O stocks.
+              Click the activation button above to fetch previous month high/low prices, exact appearance calendar dates, 50% midpoints, and Square of 9 breakout targets for all F&amp;O stocks.
             </p>
           </div>
 
@@ -342,7 +342,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                     </span>
                   </h2>
                   <p className="text-xs text-slate-300">
-                    {bounds.prevMonthName} High/Low Dates &amp; {bounds.targetMonthName} Gann Breakout Triggers for Nifty 50 &amp; Bank Nifty Spot
+                    {bounds.prevMonthName} High/Low Dates &amp; {bounds.targetMonthName} Breakout Triggers for Nifty 50 &amp; Bank Nifty Spot
                   </p>
                 </div>
               </div>
@@ -483,7 +483,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between text-slate-300 pb-1.5 border-b border-slate-800">
-                      <span className="font-bold text-blue-400">Gann 50% Midpoint:</span>
+                      <span className="font-bold text-blue-400">50% Midpoint:</span>
                       <div className="flex items-center space-x-2">
                         <span className="font-black text-blue-300">
                           ₹{idxItem.gannMidpoint.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -514,7 +514,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                     className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-md"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>View {idxItem.symbol} Gann Octaves &amp; Dates</span>
+                    <span>View {idxItem.symbol} Octaves &amp; Dates</span>
                   </button>
                 </div>
               ))}
@@ -805,9 +805,9 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                       </div>
                     </div>
 
-                    {/* Gann 50% Midpoint */}
+                    {/* 50% Midpoint */}
                     <div className="flex items-center justify-between text-slate-700 text-[11px]">
-                      <span className="font-bold text-blue-700">Gann 50% Midpoint:</span>
+                      <span className="font-bold text-blue-700">50% Midpoint:</span>
                       <div className="text-right">
                         <span className="font-black text-blue-800">₹{item.gannMidpoint.toFixed(2)}</span>
                         <span className="text-[9px] font-extrabold text-blue-600 bg-blue-100/80 px-1 py-0.2 rounded ml-1 border border-blue-200">
@@ -817,7 +817,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                     </div>
                   </div>
 
-                  {/* Gann Breakout Levels */}
+                  {/* Breakout Levels */}
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
                     <div className="bg-emerald-50/70 p-2 rounded-xl border border-emerald-200">
                       <div className="text-[10px] font-bold text-emerald-800">Buy Breakout &gt;</div>
@@ -835,7 +835,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                     className="w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5 text-blue-400" />
-                    <span>View Full Gann Analysis &amp; Dates</span>
+                    <span>View Full Analysis &amp; Dates</span>
                   </button>
                 </div>
               ))}
@@ -856,7 +856,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                     <th className="p-3.5">High-Low Days &amp; Degrees</th>
                     <th className="p-3.5">3-Degrees Min / Max</th>
                     <th className="p-3.5">50% Midpoint</th>
-                    <th className="p-3.5">Gann Buy Trigger</th>
+                    <th className="p-3.5">Buy Trigger</th>
                     <th className="p-3.5">Status</th>
                     <th className="p-3.5 text-right">Action</th>
                   </tr>
@@ -1065,7 +1065,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                 <div className="flex items-center space-x-2">
                   <Zap className="w-4 h-4 text-cyan-400" />
                   <h3 className="text-xs font-black text-white uppercase tracking-wider">
-                    3-Degrees Comparison (Calendar Days, Trading Days &amp; Range Gann Degree)
+                    3-Degrees Comparison (Calendar Days, Trading Days &amp; Range Degree)
                   </h3>
                 </div>
                 <div className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 rounded text-[10px] font-mono font-bold">
@@ -1076,7 +1076,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
               {/* 3 Individual Degrees Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-center">
                 <div className="bg-slate-950/80 p-3 rounded-xl border border-amber-500/40 space-y-1">
-                  <div className="text-[10px] text-amber-400 font-extrabold uppercase">1. Range Gann Degree (C4)</div>
+                  <div className="text-[10px] text-amber-400 font-extrabold uppercase">1. Range Degree (C4)</div>
                   <div className="text-2xl font-black text-amber-300">{selectedStockData.prevMonthRangeAngle}°</div>
                   <div className="text-[9px] text-slate-400">Range: ₹{selectedStockData.prevMonthRange.toFixed(2)}</div>
                 </div>
@@ -1124,7 +1124,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                 <div className="flex items-center space-x-2">
                   <Activity className="w-4 h-4 text-amber-400" />
                   <h3 className="text-xs font-black text-white uppercase tracking-wider">
-                    7-Iteration Gann Level &amp; Projected Target Dates
+                    7-Iteration Projected Target Dates
                   </h3>
                 </div>
                 <div className="px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-mono font-bold">
@@ -1263,13 +1263,13 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
               </div>
             </div>
 
-            {/* Gann Square of 9 Degree / Angle Matrix */}
+            {/* Square of 9 Degree / Angle Matrix */}
             <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4 rounded-2xl border border-indigo-500/30 text-white space-y-3 shadow-md">
               <div className="flex flex-wrap items-center justify-between border-b border-indigo-800/60 pb-2 gap-2">
                 <div className="flex items-center space-x-2">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                   <h3 className="text-xs font-black text-white uppercase tracking-wider">
-                    Gann Square of 9 Degree / Angle Matrix
+                    Square of 9 Degree / Angle Matrix
                   </h3>
                 </div>
                 <div className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 rounded text-[10px] font-mono font-bold">
@@ -1289,7 +1289,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider">Range Gann Degree (C4)</div>
+                  <div className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider">Range Degree (C4)</div>
                   <div className="text-2xl font-black text-amber-300 bg-amber-500/20 px-3.5 py-1 rounded-xl border border-amber-400/40 inline-block shadow-sm">
                     {selectedStockData.prevMonthRangeAngle}° Degree
                   </div>
@@ -1335,10 +1335,10 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
               </div>
             </div>
 
-            {/* 8-Level Gann Octave Ladder */}
+            {/* 8-Level Octave Ladder */}
             <div className="space-y-2">
               <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between">
-                <span>Gann 8-Octave Retracement Levels ({selectedStockData.prevMonthName})</span>
+                <span>8-Octave Retracement Levels ({selectedStockData.prevMonthName})</span>
                 <span className="text-indigo-600">Midpoint 50%: ₹{selectedStockData.gannMidpoint.toFixed(2)}</span>
               </h3>
 
@@ -1357,7 +1357,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
                   <span>62.5% Level: ₹{selectedStockData.gannOctaves.level625.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between py-1 border-b border-slate-800 text-blue-400 font-extrabold bg-blue-950/40 px-2 rounded">
-                  <span>50.0% Level (Gann Midpoint): ₹{selectedStockData.gannOctaves.level500.toFixed(2)}</span>
+                  <span>50.0% Level (Midpoint): ₹{selectedStockData.gannOctaves.level500.toFixed(2)}</span>
                   <span className="text-[10px] text-blue-300">Crucial Pivot</span>
                 </div>
                 <div className="flex items-center justify-between py-1 border-b border-slate-800 text-slate-300">
@@ -1376,10 +1376,10 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
               </div>
             </div>
 
-            {/* Gann Square of 9 Breakout Targets */}
+            {/* Square of 9 Breakout Targets */}
             <div className="space-y-2">
               <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                Gann Square of 9 Targets ({selectedStockData.targetMonth})
+                Square of 9 Targets ({selectedStockData.targetMonth})
               </h3>
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="bg-emerald-50 p-3 rounded-2xl border border-emerald-200 space-y-1">

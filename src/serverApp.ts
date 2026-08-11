@@ -1037,15 +1037,15 @@ export function createExpressApp() {
             .join('\n');
 
           const prompt = `
-You are a senior algorithmic trader and technical analyst specializing in intraday RSI momentum, VWAP interaction, and Gann Square of 9 levels on NSE/BSE stocks.
+You are a senior algorithmic trader and technical analyst specializing in intraday RSI momentum, VWAP interaction, and Square of 9 levels on NSE/BSE stocks.
 
 Analyze the intraday 15-minute RSI progression data starting from 09:15 AM to the current time for the stock:
 Stock Symbol: ${symbol} (${companyName || symbol})
 Current Market Price: ₹${closePrice}
 Session Open: ₹${openPrice}, High: ₹${highPrice}, Low: ₹${lowPrice}
 VWAP: ₹${vwap || 'N/A'}
-Gann Buy Above Level: ₹${buyAbove || 'N/A'}
-Gann Sell Below Level: ₹${sellBelow || 'N/A'}
+Buy Above Level: ₹${buyAbove || 'N/A'}
+Sell Below Level: ₹${sellBelow || 'N/A'}
 Targets Up: ${targetsUp?.map((t: number) => '₹' + t.toFixed(2)).join(', ') || 'N/A'}
 Targets Down: ${targetsDown?.map((t: number) => '₹' + t.toFixed(2)).join(', ') || 'N/A'}
 
@@ -1066,10 +1066,10 @@ Return ONLY a valid JSON object matching this schema:
   "confidencePct": 85,
   "gradualIncreaseDetected": true | false,
   "rsiTrendSummary": "Detailed summary of how RSI progressed from 09:15 AM to current time",
-  "analysisDetails": "In-depth analysis of momentum, RSI levels, VWAP position, and Gann levels",
+  "analysisDetails": "In-depth analysis of momentum, RSI levels, VWAP position, and key breakout levels",
   "entryPoint": "Specific recommended entry price or condition (e.g. Buy at CMP ₹1,245 or on pullback to ₹1,240 near VWAP)",
   "exitTargets": ["Target 1: ₹1,260.00 (+1.2%)", "Target 2: ₹1,275.00 (+2.4%)", "Target 3: ₹1,290.00 (+3.6%)"],
-  "stopLoss": "Strict Stop Loss at ₹1,232.00 (below Gann Sell level)",
+  "stopLoss": "Strict Stop Loss at ₹1,232.00 (below Sell level)",
   "riskRewardRatio": "1 : 2.5",
   "actionableAdvice": "Direct advice for the trader right now"
 }
@@ -1129,10 +1129,10 @@ Return ONLY a valid JSON object matching this schema:
           confidencePct: isPositive ? 86 : isNegative ? 80 : 65,
           gradualIncreaseDetected: gradualIncrease,
           rsiTrendSummary: `RSI started at ${startRsi.toFixed(1)} at 09:15 AM and moved to ${endRsi.toFixed(1)} at ${points[points.length - 1]?.timeStr || 'Current Time'} (${rsiDiff >= 0 ? '+' : ''}${rsiDiff.toFixed(1)} pts). ${gradualIncrease ? 'Confirmed a steady, step-by-step gradual rise across 15-minute candles.' : 'RSI showed fluctuating momentum.'}`,
-          analysisDetails: `The stock is currently trading at ₹${cmp.toFixed(2)}. ${vwap ? `Intraday VWAP is ₹${vwap.toFixed(2)}.` : ''} ${buyAbove ? `Gann Square of 9 Buy Above trigger is ₹${buyAbove.toFixed(2)}.` : ''} RSI value of ${endRsi.toFixed(1)} indicates ${endRsi > 55 ? 'bullish momentum expansion' : endRsi < 45 ? 'bearish pressure' : 'neutral range'}.`,
+          analysisDetails: `The stock is currently trading at ₹${cmp.toFixed(2)}. ${vwap ? `Intraday VWAP is ₹${vwap.toFixed(2)}.` : ''} ${buyAbove ? `Square of 9 Buy Above trigger is ₹${buyAbove.toFixed(2)}.` : ''} RSI value of ${endRsi.toFixed(1)} indicates ${endRsi > 55 ? 'bullish momentum expansion' : endRsi < 45 ? 'bearish pressure' : 'neutral range'}.`,
           entryPoint: isPositive
             ? `Buy around CMP ₹${cmp.toFixed(2)} or near VWAP pullback (₹${vwap?.toFixed(2) || cmp.toFixed(2)})`
-            : `Wait for breakout above Gann Buy level ₹${buyAbove?.toFixed(2) || 'N/A'} with RSI > 52`,
+            : `Wait for breakout above Buy level ₹${buyAbove?.toFixed(2) || 'N/A'} with RSI > 52`,
           exitTargets: [
             `Target 1: ₹${t1.toFixed(2)} (+${(((t1 - cmp)/cmp)*100).toFixed(1)}%)`,
             `Target 2: ₹${t2.toFixed(2)} (+${(((t2 - cmp)/cmp)*100).toFixed(1)}%)`,
@@ -1141,8 +1141,8 @@ Return ONLY a valid JSON object matching this schema:
           stopLoss: `Strict Stop Loss at ₹${sl.toFixed(2)} (-${(((cmp - sl)/cmp)*100).toFixed(1)}%)`,
           riskRewardRatio: '1 : 2.4',
           actionableAdvice: isPositive
-            ? 'Favorable risk-reward entry setup. Maintain strict stop loss below Gann support.'
-            : 'Do not initiate new long positions until RSI rises above 50 and price crosses Gann Buy level.',
+            ? 'Favorable risk-reward entry setup. Maintain strict stop loss below support level.'
+            : 'Do not initiate new long positions until RSI rises above 50 and price crosses Buy level.',
           analyzedAt: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) + ' IST'
         };
       }

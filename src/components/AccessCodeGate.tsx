@@ -66,7 +66,7 @@ export const AccessCodeGate: React.FC<AccessCodeGateProps> = ({ onUnlock }) => {
           </div>
 
           <h1 className="text-2xl font-black text-white tracking-tight mb-1">
-            Gannformula-app
+            StockMarket ATM
           </h1>
           <p className="text-xs text-slate-400 mb-6 font-medium">
             Protected Application. Enter your 4-digit access code to continue.
