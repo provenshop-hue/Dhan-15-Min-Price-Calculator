@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles } from 'lucide-react';
+import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
-import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle } from '../utils/gann';
+import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
 
 interface StockTableProps {
   stocks: StockCalculated[];
@@ -128,6 +128,10 @@ export const StockTable: React.FC<StockTableProps> = ({
   const openLowCount = stocks.filter(isStockOpenEqualLow).length;
   const openHighCount = stocks.filter(isStockOpenEqualHigh).length;
   const fib382Count = stocks.filter(isStockFib382Retrace).length;
+  const gannCalcLess3Count = stocks.filter(isGannCalcLessThan3).length;
+  const bothCalcLess3Count = stocks.filter(isBothCalcLessThan3).length;
+  const openCalcLess3Count = stocks.filter(isOpenCalcLessThan3).length;
+  const closeCalcLess3Count = stocks.filter(isCloseCalcLessThan3).length;
   const veryBullishCount = stocks.filter((s) => s.trend === 'Very Bullish').length;
   const bullishCount = stocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish').length;
   const veryBearishCount = stocks.filter((s) => s.trend === 'Very Bearish').length;
@@ -144,6 +148,10 @@ export const StockTable: React.FC<StockTableProps> = ({
     if (trendFilter === 'OPEN_LOW') return isStockOpenEqualLow(s);
     if (trendFilter === 'OPEN_HIGH') return isStockOpenEqualHigh(s);
     if (trendFilter === 'FIB_382_RETRACE') return isStockFib382Retrace(s);
+    if (trendFilter === 'GANN_CALC_LESS_3') return isGannCalcLessThan3(s);
+    if (trendFilter === 'BOTH_CALC_LESS_3') return isBothCalcLessThan3(s);
+    if (trendFilter === 'OPEN_CALC_LESS_3') return isOpenCalcLessThan3(s);
+    if (trendFilter === 'CLOSE_CALC_LESS_3') return isCloseCalcLessThan3(s);
     if (trendFilter === 'VERY_BULLISH') return s.trend === 'Very Bullish';
     if (trendFilter === 'BULLISH') return s.trend === 'Bullish' || s.trend === 'Very Bullish';
     if (trendFilter === 'VERY_BEARISH') return s.trend === 'Very Bearish';
@@ -286,6 +294,30 @@ export const StockTable: React.FC<StockTableProps> = ({
               Fib 38.2% Retrace ({fib382Count})
             </button>
             <button
+              onClick={() => { setTrendFilter('BOTH_CALC_LESS_3'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-black transition-all flex items-center gap-1 ${
+                trendFilter === 'BOTH_CALC_LESS_3'
+                  ? 'bg-purple-700 text-white shadow-2xs ring-2 ring-purple-300'
+                  : 'text-purple-950 bg-purple-200/90 hover:bg-purple-300 border border-purple-400/80 shadow-2xs'
+              }`}
+              title="Filter stocks where BOTH Gann Open AND Close modulo calculations are less than 3 (< 3)"
+            >
+              <Zap className="w-3.5 h-3.5 text-yellow-500 dark:text-yellow-300 fill-current animate-pulse" />
+              Both Calc &lt; 3 ({bothCalcLess3Count})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('GANN_CALC_LESS_3'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
+                trendFilter === 'GANN_CALC_LESS_3' || trendFilter === 'OPEN_CALC_LESS_3' || trendFilter === 'CLOSE_CALC_LESS_3'
+                  ? 'bg-purple-600 text-white shadow-2xs ring-2 ring-purple-300'
+                  : 'text-purple-900 bg-purple-100/80 hover:bg-purple-200 border border-purple-300/70'
+              }`}
+              title="Filter stocks where Gann Open or Close modulo calculation is less than 3"
+            >
+              <Zap className="w-3.5 h-3.5 text-purple-600 dark:text-purple-300 fill-current" />
+              Gann Calc &lt; 3 ({gannCalcLess3Count})
+            </button>
+            <button
               onClick={() => { setTrendFilter('VERY_BULLISH'); setCurrentPage(1); }}
               className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
                 trendFilter === 'VERY_BULLISH' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:bg-emerald-100'
@@ -344,6 +376,55 @@ export const StockTable: React.FC<StockTableProps> = ({
               </button>
             ))}
           </div>
+
+          {/* Sub-filter chips for Gann Calc < 3 */}
+          {(trendFilter === 'GANN_CALC_LESS_3' || trendFilter === 'BOTH_CALC_LESS_3' || trendFilter === 'OPEN_CALC_LESS_3' || trendFilter === 'CLOSE_CALC_LESS_3') && (
+            <div className="flex items-center gap-1 bg-purple-100 p-1 rounded-xl border border-purple-300 text-xs shadow-2xs overflow-x-auto">
+              <span className="text-[10px] font-black text-purple-950 px-1.5 flex items-center gap-1 whitespace-nowrap">
+                <Zap className="w-3 h-3 text-purple-700 fill-current" /> Gann Calc Mode:
+              </span>
+              <button
+                onClick={() => { setTrendFilter('BOTH_CALC_LESS_3'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-black transition-all whitespace-nowrap flex items-center gap-1 ${
+                  trendFilter === 'BOTH_CALC_LESS_3'
+                    ? 'bg-purple-800 text-yellow-300 shadow-2xs ring-1 ring-purple-400'
+                    : 'bg-white text-purple-950 hover:bg-purple-50 border border-purple-300'
+                }`}
+              >
+                🔥 Both Open &amp; Close &lt; 3 ({bothCalcLess3Count})
+              </button>
+              <button
+                onClick={() => { setTrendFilter('GANN_CALC_LESS_3'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold transition-all whitespace-nowrap ${
+                  trendFilter === 'GANN_CALC_LESS_3'
+                    ? 'bg-purple-700 text-white shadow-2xs'
+                    : 'bg-white text-purple-900 hover:bg-purple-50 border border-purple-200'
+                }`}
+              >
+                Open OR Close &lt; 3 ({gannCalcLess3Count})
+              </button>
+              <button
+                onClick={() => { setTrendFilter('OPEN_CALC_LESS_3'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold transition-all whitespace-nowrap ${
+                  trendFilter === 'OPEN_CALC_LESS_3'
+                    ? 'bg-purple-700 text-white shadow-2xs'
+                    : 'bg-white text-purple-900 hover:bg-purple-50 border border-purple-200'
+                }`}
+              >
+                Open Calc &lt; 3 ({openCalcLess3Count})
+              </button>
+              <button
+                onClick={() => { setTrendFilter('CLOSE_CALC_LESS_3'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold transition-all whitespace-nowrap ${
+                  trendFilter === 'CLOSE_CALC_LESS_3'
+                    ? 'bg-purple-700 text-white shadow-2xs'
+                    : 'bg-white text-purple-900 hover:bg-purple-50 border border-purple-200'
+                }`}
+              >
+                Close Calc &lt; 3 ({closeCalcLess3Count})
+              </button>
+            </div>
+          )}
 
         </div>
 
@@ -525,8 +606,16 @@ export const StockTable: React.FC<StockTableProps> = ({
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-500 truncate max-w-[180px]">
-                        {stock.companyName}
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5 font-mono">
+                        <span className="truncate max-w-[130px]">{stock.companyName}</span>
+                        {stock.candleTimestamp && (
+                          <span
+                            title="Signal / 15-min Candle Timestamp"
+                            className="text-[9.5px] font-extrabold text-blue-900 bg-blue-100/90 border border-blue-300 px-1 py-0.2 rounded shrink-0 flex items-center gap-0.5 shadow-2xs"
+                          >
+                            🕒 {stock.candleTimestamp}
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -575,18 +664,32 @@ export const StockTable: React.FC<StockTableProps> = ({
                     </td>
 
                     {/* Open Calculation Output */}
-                    <td className="py-2.5 px-3 text-right font-mono font-extrabold text-blue-700 text-sm bg-blue-50/50">
+                    <td className={`py-2.5 px-3 text-right font-mono font-extrabold text-sm ${
+                      stock.openCalc !== undefined && stock.openCalc !== null && stock.openCalc < 3
+                        ? 'bg-purple-100 text-purple-950 border border-purple-300 font-black'
+                        : 'text-blue-700 bg-blue-50/50'
+                    }`}>
                       {stock.openCalc !== undefined && stock.openCalc !== null ? (
-                        <span>{stock.openCalc.toFixed(4)}</span>
+                        <div className="flex items-center justify-end gap-1">
+                          {stock.openCalc < 3 && <span className="text-[10px] bg-purple-700 text-white px-1 rounded font-sans uppercase font-black">Open &lt; 3</span>}
+                          <span>{stock.openCalc.toFixed(4)}</span>
+                        </div>
                       ) : (
                         <span className="text-slate-400 font-normal text-xs">-</span>
                       )}
                     </td>
 
                     {/* Close Calculation Output */}
-                    <td className="py-2.5 px-3 text-right font-mono font-extrabold text-blue-700 text-sm bg-blue-50/50">
+                    <td className={`py-2.5 px-3 text-right font-mono font-extrabold text-sm ${
+                      stock.closeCalc !== undefined && stock.closeCalc !== null && stock.closeCalc < 3
+                        ? 'bg-purple-100 text-purple-950 border border-purple-300 font-black'
+                        : 'text-blue-700 bg-blue-50/50'
+                    }`}>
                       {stock.closeCalc !== undefined && stock.closeCalc !== null ? (
-                        <span>{stock.closeCalc.toFixed(4)}</span>
+                        <div className="flex items-center justify-end gap-1">
+                          {stock.closeCalc < 3 && <span className="text-[10px] bg-purple-700 text-white px-1 rounded font-sans uppercase font-black">Close &lt; 3</span>}
+                          <span>{stock.closeCalc.toFixed(4)}</span>
+                        </div>
                       ) : (
                         <span className="text-slate-400 font-normal text-xs">-</span>
                       )}
@@ -633,18 +736,34 @@ export const StockTable: React.FC<StockTableProps> = ({
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white shadow-2xs border border-emerald-300">
                             <ShieldCheck className="w-3 h-3 text-white" />
                             <span>OPEN = LOW</span>
+                            {stock.candleTimestamp && <span className="text-[9px] text-emerald-100 font-mono font-bold">({stock.candleTimestamp})</span>}
                           </span>
                         )}
                         {isStockOpenEqualHigh(stock) && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-2xs border border-rose-300">
                             <Target className="w-3 h-3 text-white" />
                             <span>OPEN = HIGH</span>
+                            {stock.candleTimestamp && <span className="text-[9px] text-rose-100 font-mono font-bold">({stock.candleTimestamp})</span>}
                           </span>
                         )}
                         {isAboveFirst15mCandle(stock) && (
                           <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-blue-600 text-white shadow-2xs border border-blue-300" title="Price is trading above the first 15-minute candle high">
                             <Sparkles className="w-2.5 h-2.5 text-yellow-300" />
                             <span>Above 15m High</span>
+                            {stock.candleTimestamp && <span className="text-[9px] text-blue-100 font-mono font-bold">({stock.candleTimestamp})</span>}
+                          </span>
+                        )}
+                        {isGannCalcLessThan3(stock) && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9.5px] font-black bg-purple-700 text-white shadow-2xs border border-purple-300 animate-pulse" title={`Gann Open or Close calc < 3 (Open: ${stock.openCalc?.toFixed(2) ?? '-'}, Close: ${stock.closeCalc?.toFixed(2) ?? '-'})`}>
+                            <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
+                            <span>
+                              {isOpenCalcLessThan3(stock) && isCloseCalcLessThan3(stock)
+                                ? 'BOTH CALC < 3'
+                                : isOpenCalcLessThan3(stock)
+                                ? 'OPEN CALC < 3'
+                                : 'CLOSE CALC < 3'}
+                            </span>
+                            {stock.candleTimestamp && <span className="text-[9px] text-purple-200 font-mono font-bold">({stock.candleTimestamp})</span>}
                           </span>
                         )}
 
@@ -663,6 +782,9 @@ export const StockTable: React.FC<StockTableProps> = ({
                             {(stock.trend === 'Very Bullish' || stock.trend === 'Bullish') && <TrendingUp className="w-3 h-3" />}
                             {(stock.trend === 'Very Bearish' || stock.trend === 'Bearish') && <TrendingDown className="w-3 h-3" />}
                             <span>{stock.trend}</span>
+                            {stock.candleTimestamp && (
+                              <span className="text-[9px] font-mono font-bold opacity-90">({stock.candleTimestamp})</span>
+                            )}
                           </span>
                         ) : (
                           !isStockOpenEqualLow(stock) && !isStockOpenEqualHigh(stock) && <span className="text-slate-400">-</span>

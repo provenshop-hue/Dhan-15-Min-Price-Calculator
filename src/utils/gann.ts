@@ -532,3 +532,32 @@ export function isBelowFirst15mCandle(stock: { closePrice?: number | null; first
   return cmp < candleLow;
 }
 
+/**
+ * Checks if a stock's Gann Open Calc value is less than 3 (< 3).
+ */
+export function isOpenCalcLessThan3(stock: { openCalc?: number | null }): boolean {
+  return stock.openCalc !== undefined && stock.openCalc !== null && stock.openCalc < 3;
+}
+
+/**
+ * Checks if a stock's Gann Close Calc value is less than 3 (< 3).
+ */
+export function isCloseCalcLessThan3(stock: { closeCalc?: number | null }): boolean {
+  return stock.closeCalc !== undefined && stock.closeCalc !== null && stock.closeCalc < 3;
+}
+
+/**
+ * Checks if BOTH stock's Gann Open Calc AND Close Calc values are less than 3 (< 3).
+ */
+export function isBothCalcLessThan3(stock: { openCalc?: number | null; closeCalc?: number | null }): boolean {
+  return isOpenCalcLessThan3(stock) && isCloseCalcLessThan3(stock);
+}
+
+/**
+ * Checks if a stock's Gann Open Calc OR Close Calc value is less than 3 (< 3).
+ */
+export function isGannCalcLessThan3(stock: { openCalc?: number | null; closeCalc?: number | null }): boolean {
+  return isOpenCalcLessThan3(stock) || isCloseCalcLessThan3(stock);
+}
+
+

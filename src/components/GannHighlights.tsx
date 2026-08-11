@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, Target, ShieldCheck, Percent } from 'lucide-react';
 import { StockCalculated, TrendFilterType } from '../types';
-import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle } from '../utils/gann';
+import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
 
 interface GannHighlightsProps {
   stocks: StockCalculated[];
@@ -84,6 +84,10 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
     return fibData?.isFib382Retraced ?? false;
   });
 
+  // Gann Calc < 3 stocks
+  const gannCalcLess3Count = calculatedStocks.filter((s) => isGannCalcLessThan3(s)).length;
+  const bothCalcLess3Count = calculatedStocks.filter((s) => isBothCalcLessThan3(s)).length;
+
   return (
     <div className="mb-6 space-y-4">
       {/* Top Banner Header */}
@@ -107,6 +111,24 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
 
         {/* Quick Signal Filter Buttons */}
         <div className="flex items-center gap-2 self-stretch md:self-auto overflow-x-auto pb-1 md:pb-0">
+          <button
+            onClick={() => handleFilterClick('BOTH_CALC_LESS_3')}
+            className="flex items-center space-x-1.5 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/80 px-3 py-1.5 rounded-xl text-xs font-black text-purple-200 transition-all cursor-pointer whitespace-nowrap shadow-xs ring-1 ring-purple-400/40 animate-pulse"
+            title="Filter stocks where BOTH Gann Open AND Close modulo calculations are less than 3"
+          >
+            <Zap className="w-3.5 h-3.5 text-yellow-300 fill-current" />
+            <span>🔥 Both Calc &lt; 3 ({bothCalcLess3Count})</span>
+          </button>
+
+          <button
+            onClick={() => handleFilterClick('GANN_CALC_LESS_3')}
+            className="flex items-center space-x-1.5 bg-purple-500/20 hover:bg-purple-500/35 border border-purple-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-purple-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+            title="Filter stocks where Gann Open or Close modulo calculation is less than 3"
+          >
+            <Zap className="w-3.5 h-3.5 text-purple-300" />
+            <span>Gann Calc &lt; 3 ({gannCalcLess3Count})</span>
+          </button>
+
           <button
             onClick={() => handleFilterClick('OPEN_LOW')}
             className="flex items-center space-x-1.5 bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-emerald-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
@@ -269,6 +291,11 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
                             <span className="text-[10px] font-bold bg-emerald-600 text-white px-1.5 py-0.2 rounded">
                               {stock.trend}
                             </span>
+                            {stock.candleTimestamp && (
+                              <span className="text-[10px] font-black bg-blue-100 text-blue-950 px-1.5 py-0.2 rounded border border-blue-300 shadow-2xs flex items-center gap-0.5" title="Bullish Signal Timestamp">
+                                🕒 {stock.candleTimestamp}
+                              </span>
+                            )}
                             {stock.rsi !== undefined && stock.rsi !== null && (
                               <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-900 px-1.5 py-0.2 rounded border border-emerald-300">
                                 RSI {stock.rsi.toFixed(1)}

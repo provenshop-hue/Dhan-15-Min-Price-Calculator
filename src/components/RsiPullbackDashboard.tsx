@@ -1222,32 +1222,45 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                           </span>
                         )}
                         {analysis.is100PercentBullish && (
-                          <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-400 shadow-2xs animate-pulse" title="Close > Open & Prev Close, Close >= High - 0.2*Range, Body/Range >= 0.6">
-                            💯 100% BULLISH
+                          <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-400 shadow-2xs animate-pulse flex items-center gap-1" title="Close > Open & Prev Close, Close >= High - 0.2*Range, Body/Range >= 0.6">
+                            <span>💯 100% BULLISH</span>
+                            <span className="bg-emerald-950/80 text-yellow-300 font-mono text-[9px] px-1 py-0.2 rounded font-black">
+                              🕒 {analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' ? analysis.intradayConfluence.bullishConfluenceTime : stock.candleTimestamp || '09:15 AM'}
+                            </span>
                           </span>
                         )}
                         {analysis.is100PercentBearish && (
-                          <span className="bg-rose-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-rose-400 shadow-2xs animate-pulse" title="Close < Open & Prev Close, Close <= Low + 0.2*Range, Body/Range >= 0.6">
-                            💥 100% BEARISH
+                          <span className="bg-rose-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-rose-400 shadow-2xs animate-pulse flex items-center gap-1" title="Close < Open & Prev Close, Close <= Low + 0.2*Range, Body/Range >= 0.6">
+                            <span>💥 100% BEARISH</span>
+                            <span className="bg-rose-950/80 text-white font-mono text-[9px] px-1 py-0.2 rounded font-black">
+                              🕒 {analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met' ? analysis.intradayConfluence.bearishConfluenceTime : stock.candleTimestamp || '09:15 AM'}
+                            </span>
                           </span>
                         )}
                         {((stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
                           ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
                           : false) && (
-                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-300">
-                            OPEN=LOW
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-300 flex items-center gap-1">
+                            <span>OPEN=LOW</span>
+                            {stock.candleTimestamp && <span className="text-[9px] font-mono font-bold text-emerald-950">({stock.candleTimestamp})</span>}
                           </span>
                         )}
                         {((stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
                           ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
                           : false) && (
-                          <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300">
-                            OPEN=HIGH
+                          <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300 flex items-center gap-1">
+                            <span>OPEN=HIGH</span>
+                            {stock.candleTimestamp && <span className="text-[9px] font-mono font-bold text-rose-950">({stock.candleTimestamp})</span>}
                           </span>
                         )}
                       </div>
-                      <div className="text-xs font-medium text-slate-500 truncate max-w-[220px]">
-                        {stock.companyName}
+                      <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5 font-mono">
+                        <span className="truncate max-w-[150px]">{stock.companyName}</span>
+                        {stock.candleTimestamp && (
+                          <span className="text-[9.5px] font-extrabold text-blue-900 bg-blue-50 border border-blue-200 px-1 py-0.2 rounded shrink-0 flex items-center gap-0.5" title="15m Candle / Signal Timestamp">
+                            🕒 {stock.candleTimestamp}
+                          </span>
+                        )}
                       </div>
                     </div>
 

@@ -68,6 +68,10 @@ export type TrendFilterType =
   | 'OPEN_LOW'
   | 'OPEN_HIGH'
   | 'FIB_382_RETRACE'
+  | 'GANN_CALC_LESS_3'
+  | 'BOTH_CALC_LESS_3'
+  | 'OPEN_CALC_LESS_3'
+  | 'CLOSE_CALC_LESS_3'
   | 'CALCULATED';
 
 export interface DhanApiCredentials {
