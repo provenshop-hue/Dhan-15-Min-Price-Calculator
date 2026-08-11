@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, ShieldAlert, Calendar, Lock } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -18,6 +18,13 @@ interface HeaderProps {
   onLock?: () => void;
   activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback';
   onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback') => void;
+  // Auto-Fetch Props
+  isAutoFetchEnabled?: boolean;
+  onToggleAutoFetch?: () => void;
+  nextFetchSeconds?: number;
+  lastFetchTime?: string | null;
+  autoFetchIntervalMinutes?: number;
+  onChangeAutoFetchInterval?: (mins: number) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,14 +36,24 @@ export const Header: React.FC<HeaderProps> = ({
   onExportCsv,
   totalStocks,
   calculatedCount,
-  onSimulateAll,
   isBulkLoading,
   onFetchAll,
   onDateChange,
   onLock,
   activeDashboardTab,
-  onChangeDashboardTab
+  onChangeDashboardTab,
+  isAutoFetchEnabled = true,
+  onToggleAutoFetch,
+  nextFetchSeconds = 900,
+  lastFetchTime,
+  autoFetchIntervalMinutes = 15,
+  onChangeAutoFetchInterval
 }) => {
+  const formatCountdown = (totalSeconds: number) => {
+    const mins = Math.floor(Math.max(0, totalSeconds) / 60);
+    const secs = Math.max(0, totalSeconds) % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
   return (
     <header className="bg-white border-b border-slate-200/80 text-slate-800 sticky top-0 z-30 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -120,6 +137,58 @@ export const Header: React.FC<HeaderProps> = ({
               <RefreshCw className={`w-3.5 h-3.5 ${isBulkLoading ? 'animate-spin' : ''}`} />
               <span>{isBulkLoading ? 'Fetching Dhan Data...' : 'Fetch All 15m Candles'}</span>
             </button>
+
+            {/* 15-Min Auto-Fetch Toggle & Live Countdown */}
+            {onToggleAutoFetch && (
+              <div className="flex items-center space-x-1 bg-purple-50/90 border border-purple-200/90 rounded-lg p-0.5 shadow-2xs">
+                <button
+                  onClick={onToggleAutoFetch}
+                  className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-extrabold transition-all ${
+                    isAutoFetchEnabled
+                      ? 'bg-purple-700 text-white shadow-2xs'
+                      : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                  }`}
+                  title={
+                    isAutoFetchEnabled
+                      ? 'Auto-Fetch is ACTIVE. Automatically fetches 15m candles every 15 minutes.'
+                      : 'Auto-Fetch is PAUSED. Click to activate automatic 15-minute fetching.'
+                  }
+                >
+                  {isAutoFetchEnabled ? (
+                    <>
+                      <Clock className="w-3.5 h-3.5 text-yellow-300 animate-pulse fill-current" />
+                      <span>Auto 15m:</span>
+                      <span className="font-mono text-yellow-200 font-black">{formatCountdown(nextFetchSeconds)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <PauseCircle className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Auto-Fetch: Off</span>
+                    </>
+                  )}
+                </button>
+
+                {isAutoFetchEnabled && onChangeAutoFetchInterval && (
+                  <select
+                    value={autoFetchIntervalMinutes}
+                    onChange={(e) => onChangeAutoFetchInterval(Number(e.target.value))}
+                    className="bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-[11px] rounded px-1 py-1 outline-none cursor-pointer border border-purple-300 transition-colors"
+                    title="Select Auto-Fetch Interval"
+                  >
+                    <option value={15}>15m</option>
+                    <option value={10}>10m</option>
+                    <option value={5}>5m</option>
+                    <option value={30}>30m</option>
+                  </select>
+                )}
+
+                {lastFetchTime && (
+                  <span className="text-[10px] text-purple-900 font-mono font-bold px-1 hidden lg:inline" title="Last Auto/Manual Fetch Time">
+                    Last: {lastFetchTime}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Export Report */}
             <button

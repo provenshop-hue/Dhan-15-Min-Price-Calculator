@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { AccessCodeGate } from './components/AccessCodeGate';
 import { DhanApiGateModal } from './components/DhanApiGateModal';
@@ -85,6 +85,28 @@ export default function App() {
   const [isBulkLoading, setIsBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
   const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
+
+  // Auto-Fetch State (Default: 15 minutes)
+  const [autoFetchIntervalMinutes, setAutoFetchIntervalMinutes] = useState<number>(() => {
+    const saved = localStorage.getItem('dhan_auto_fetch_interval_mins');
+    return saved ? Number(saved) : 15;
+  });
+  const [isAutoFetchEnabled, setIsAutoFetchEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('dhan_auto_fetch_enabled') !== 'false';
+  });
+  const [nextFetchSeconds, setNextFetchSeconds] = useState<number>(() => {
+    const savedMins = localStorage.getItem('dhan_auto_fetch_interval_mins');
+    return (savedMins ? Number(savedMins) : 15) * 60;
+  });
+  const [lastFetchTime, setLastFetchTime] = useState<string | null>(null);
+
+  const isBulkLoadingRef = useRef(isBulkLoading);
+  isBulkLoadingRef.current = isBulkLoading;
+
+  const credentialsRef = useRef(credentials);
+  credentialsRef.current = credentials;
+
+  const handleFetchAllRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   // Auto-hide notification
   useEffect(() => {
@@ -513,11 +535,56 @@ export default function App() {
     }
 
     setIsBulkLoading(false);
+    const nowTimeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLastFetchTime(nowTimeStr);
+    setNextFetchSeconds(autoFetchIntervalMinutes * 60);
     setNotification({
       type: 'success',
       message: 'Completed fetching 15-minute candles for all stocks from Dhan API!'
     });
   };
+
+  handleFetchAllRef.current = handleFetchAllDhan;
+
+  const handleToggleAutoFetch = () => {
+    setIsAutoFetchEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem('dhan_auto_fetch_enabled', String(next));
+      if (next) {
+        setNextFetchSeconds(autoFetchIntervalMinutes * 60);
+      }
+      return next;
+    });
+  };
+
+  const handleChangeAutoFetchInterval = (mins: number) => {
+    setAutoFetchIntervalMinutes(mins);
+    localStorage.setItem('dhan_auto_fetch_interval_mins', String(mins));
+    setNextFetchSeconds(mins * 60);
+  };
+
+  // 15-Minute Auto-Fetch Interval Effect
+  useEffect(() => {
+    if (!isAutoFetchEnabled) return;
+
+    const intervalId = setInterval(() => {
+      setNextFetchSeconds((prev) => {
+        if (prev <= 1) {
+          if (credentialsRef.current.isConfigured && !isBulkLoadingRef.current) {
+            handleFetchAllRef.current();
+            setNotification({
+              type: 'info',
+              message: `⏱️ Auto-Fetch triggered (${autoFetchIntervalMinutes}m interval)! Updating 15m candles...`
+            });
+          }
+          return autoFetchIntervalMinutes * 60;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [isAutoFetchEnabled, autoFetchIntervalMinutes]);
 
   // Add/edit manual stock entry
   const handleAddOrEditManualStock = (manualStock: StockCalculated) => {
@@ -671,6 +738,12 @@ export default function App() {
         }}
         activeDashboardTab={activeDashboardTab}
         onChangeDashboardTab={setActiveDashboardTab}
+        isAutoFetchEnabled={isAutoFetchEnabled}
+        onToggleAutoFetch={handleToggleAutoFetch}
+        nextFetchSeconds={nextFetchSeconds}
+        lastFetchTime={lastFetchTime}
+        autoFetchIntervalMinutes={autoFetchIntervalMinutes}
+        onChangeAutoFetchInterval={handleChangeAutoFetchInterval}
       />
 
       {/* Main Body */}
