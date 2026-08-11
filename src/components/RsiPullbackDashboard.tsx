@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { StockCalculated } from '../types';
 import { analyzeRsiPullback, RsiPullbackAnalysis, is100PercentBullishMove, is100PercentBearishMove } from '../utils/rsiPullback';
-import { calculateRSI, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
+import { calculateRSI, isOpenLowPattern, isOpenHighPattern, isHighClosePattern } from '../utils/gann';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -54,7 +54,9 @@ type PullbackFilterType =
   | 'HIGH_SCORE'
   | 'VOL_INCREASING'
   | 'OPEN_LOW'
-  | 'OPEN_HIGH';
+  | 'OPEN_HIGH'
+  | 'HIGH_CLOSE'
+  | 'PULLBACK_15M_BOUNCE';
 
 type SortOption = 'SCORE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
 
@@ -124,6 +126,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let highScore = 0;
     let openLowCount = 0;
     let openHighCount = 0;
+    let highCloseCount = 0;
+    let pullback15mBounceCount = 0;
 
     analyzedStocks.forEach(({ stock, analysis }) => {
       if (analysis.confluenceValidation.status === 'HIGH_CONFLUENCE') highConfluenceCount++;
@@ -138,6 +142,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (analysis.pullbackCategory === 'BULLISH_MOMENTUM') bullishMomentum++;
       if (analysis.pullbackCategory === 'OVERSOLD_BOUNCE') oversold++;
       if (analysis.pullbackScore >= 75) highScore++;
+      if (analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce) pullback15mBounceCount++;
 
       const isOL = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
         ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
@@ -145,9 +150,13 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       const isOH = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
         ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
         : false;
+      const isHC = (stock.closePrice !== undefined && stock.closePrice !== null && stock.closePrice > 0)
+        ? isHighClosePattern(stock.closePrice, stock.highPrice, stock.first15mHigh, stock.openPrice)
+        : false;
 
       if (isOL) openLowCount++;
       if (isOH) openHighCount++;
+      if (isHC) highCloseCount++;
     });
 
     return {
@@ -164,7 +173,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       oversold,
       highScore,
       openLowCount,
-      openHighCount
+      openHighCount,
+      highCloseCount,
+      pullback15mBounceCount
     };
   }, [analyzedStocks, stocks.length]);
 
@@ -222,6 +233,15 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         return (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
           ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
           : false;
+      }
+      if (activeFilter === 'HIGH_CLOSE') {
+        const cmp = stock.closePrice || stock.openPrice;
+        return (cmp !== undefined && cmp !== null && cmp > 0)
+          ? isHighClosePattern(cmp, stock.highPrice, stock.first15mHigh, stock.openPrice)
+          : false;
+      }
+      if (activeFilter === 'PULLBACK_15M_BOUNCE') {
+        return analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce;
       }
 
       return true;
@@ -623,10 +643,34 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* NIFTY 50 INDEX CARD */}
             {niftyIndex && (
-              <div className="bg-slate-900 text-white rounded-2xl p-4 border-2 border-amber-400/80 shadow-md space-y-3 relative overflow-hidden group">
+              <div className={`bg-slate-900 text-white rounded-2xl p-4 border-2 shadow-md space-y-3 relative overflow-hidden group transition-all ${
+                niftyIndex.analysis.pullback15mBounce?.isPullbackBounce
+                  ? 'border-purple-400 ring-2 ring-purple-500/80 shadow-purple-500/30'
+                  : 'border-amber-400/80'
+              }`}>
                 <div className="absolute top-0 right-0 bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-bl-lg tracking-wider uppercase shadow-2xs">
                   📌 PINNED INDEX BENCHMARK
                 </div>
+
+                {/* 15m High Retest & Bounce Special Highlight Banner */}
+                {niftyIndex.analysis.pullback15mBounce?.isPullbackBounce && (
+                  <div className="bg-gradient-to-r from-purple-950 via-purple-900 to-indigo-950 text-white p-3 rounded-xl border-2 border-purple-400/90 shadow-lg space-y-1.5 animate-pulse">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs text-purple-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Target className="w-4 h-4 text-purple-300 shrink-0" />
+                        🎯 NIFTY 50: 15m High Retested &amp; Bounced!
+                      </span>
+                      <span className="bg-purple-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded shadow-xs font-mono">
+                        BOUNCE @ {niftyIndex.analysis.pullback15mBounce.bounceTime}
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-purple-100 flex items-center justify-between pt-1 border-t border-purple-800/80">
+                      <span>15m High: <strong>₹{niftyIndex.analysis.pullback15mBounce.first15mHigh.toFixed(2)}</strong></span>
+                      <span>Retest Low: <strong>₹{niftyIndex.analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong></span>
+                      <span className="text-emerald-300 font-extrabold">Gain: +{niftyIndex.analysis.pullback15mBounce.bouncePct.toFixed(2)}%</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Top Row: Symbol, Price, Change */}
                 <div className="flex items-start justify-between border-b border-slate-800 pb-2.5">
@@ -724,10 +768,34 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
             {/* BANK NIFTY INDEX CARD */}
             {bankNiftyIndex && (
-              <div className="bg-slate-900 text-white rounded-2xl p-4 border-2 border-amber-400/80 shadow-md space-y-3 relative overflow-hidden group">
+              <div className={`bg-slate-900 text-white rounded-2xl p-4 border-2 shadow-md space-y-3 relative overflow-hidden group transition-all ${
+                bankNiftyIndex.analysis.pullback15mBounce?.isPullbackBounce
+                  ? 'border-purple-400 ring-2 ring-purple-500/80 shadow-purple-500/30'
+                  : 'border-amber-400/80'
+              }`}>
                 <div className="absolute top-0 right-0 bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-bl-lg tracking-wider uppercase shadow-2xs">
                   📌 PINNED INDEX BENCHMARK
                 </div>
+
+                {/* 15m High Retest & Bounce Special Highlight Banner */}
+                {bankNiftyIndex.analysis.pullback15mBounce?.isPullbackBounce && (
+                  <div className="bg-gradient-to-r from-purple-950 via-purple-900 to-indigo-950 text-white p-3 rounded-xl border-2 border-purple-400/90 shadow-lg space-y-1.5 animate-pulse">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs text-purple-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Target className="w-4 h-4 text-purple-300 shrink-0" />
+                        🎯 BANK NIFTY: 15m High Retested &amp; Bounced!
+                      </span>
+                      <span className="bg-purple-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded shadow-xs font-mono">
+                        BOUNCE @ {bankNiftyIndex.analysis.pullback15mBounce.bounceTime}
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-purple-100 flex items-center justify-between pt-1 border-t border-purple-800/80">
+                      <span>15m High: <strong>₹{bankNiftyIndex.analysis.pullback15mBounce.first15mHigh.toFixed(2)}</strong></span>
+                      <span>Retest Low: <strong>₹{bankNiftyIndex.analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong></span>
+                      <span className="text-emerald-300 font-extrabold">Gain: +{bankNiftyIndex.analysis.pullback15mBounce.bouncePct.toFixed(2)}%</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Top Row: Symbol, Price, Change */}
                 <div className="flex items-start justify-between border-b border-slate-800 pb-2.5">
@@ -1130,6 +1198,29 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           >
             <span>🔴 Open = High ({stats.openHighCount})</span>
           </button>
+
+          <button
+            onClick={() => setActiveFilter(activeFilter === 'HIGH_CLOSE' ? 'ALL' : 'HIGH_CLOSE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
+              activeFilter === 'HIGH_CLOSE'
+                ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border-blue-200'
+            }`}
+          >
+            <span>🔵 High = Close ({stats.highCloseCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveFilter(activeFilter === 'PULLBACK_15M_BOUNCE' ? 'ALL' : 'PULLBACK_15M_BOUNCE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1.5 ${
+              activeFilter === 'PULLBACK_15M_BOUNCE'
+                ? 'bg-purple-700 text-white border-purple-800 shadow-2xs ring-2 ring-purple-400/50'
+                : 'bg-purple-50 text-purple-950 hover:bg-purple-100 border-purple-300'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+            <span>🎯 15m High Retest &amp; Bounce ({stats.pullback15mBounceCount})</span>
+          </button>
         </div>
 
         {/* Search, Sort, View Controls */}
@@ -1253,6 +1344,23 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                             {stock.candleTimestamp && <span className="text-[9px] font-mono font-bold text-rose-950">({stock.candleTimestamp})</span>}
                           </span>
                         )}
+                        {(((stock.closePrice || stock.openPrice) !== undefined && (stock.closePrice || stock.openPrice)! > 0)
+                          ? isHighClosePattern(stock.closePrice || stock.openPrice, stock.highPrice, stock.first15mHigh, stock.openPrice)
+                          : false) && (
+                          <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-blue-300 flex items-center gap-1">
+                            <span>HIGH=CLOSE</span>
+                            {stock.candleTimestamp && <span className="text-[9px] font-mono font-bold text-blue-950">({stock.candleTimestamp})</span>}
+                          </span>
+                        )}
+                        {analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce && (
+                          <span 
+                            title={analysis.pullback15mBounce.detail}
+                            className="bg-purple-100 text-purple-900 text-[10px] font-black px-1.5 py-0.5 rounded border border-purple-300 flex items-center gap-1 shadow-2xs"
+                          >
+                            <Target className="w-3 h-3 text-purple-600 shrink-0" />
+                            <span>15M BOUNCE ({analysis.pullback15mBounce.bounceTime})</span>
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5 font-mono">
                         <span className="truncate max-w-[150px]">{stock.companyName}</span>
@@ -1371,6 +1479,40 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* 15M HIGH RETEST & BULLISH BOUNCE STRATEGY CARD BANNER */}
+                {analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce && (
+                  <div className="bg-purple-950/95 text-purple-100 p-3 rounded-xl border border-purple-500/70 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wide border-b border-purple-800/80 pb-1.5 text-purple-200">
+                      <div className="flex items-center space-x-1.5">
+                        <Target className="w-4 h-4 text-purple-400 shrink-0 animate-pulse" />
+                        <span>🎯 15m High Retest &amp; Bullish Bounce</span>
+                      </div>
+                      <span className="bg-purple-500 text-slate-950 px-2 py-0.5 rounded text-[10px] font-black shadow-xs">
+                        BOUNCE TIME: {analysis.pullback15mBounce.bounceTime}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono pt-0.5">
+                      <div className="bg-purple-900/50 p-1.5 rounded border border-purple-800/60">
+                        <span className="text-purple-300 text-[9.5px] block">15m High:</span>
+                        <strong className="text-white text-xs">₹{analysis.pullback15mBounce.first15mHigh.toFixed(2)}</strong>
+                      </div>
+                      <div className="bg-purple-900/50 p-1.5 rounded border border-purple-800/60">
+                        <span className="text-purple-300 text-[9.5px] block">Retest Price:</span>
+                        <strong className="text-amber-300 text-xs">₹{analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong>
+                      </div>
+                      <div className="bg-purple-900/50 p-1.5 rounded border border-purple-800/60">
+                        <span className="text-purple-300 text-[9.5px] block">Bounce Gain:</span>
+                        <strong className="text-emerald-300 text-xs">+{analysis.pullback15mBounce.bouncePct.toFixed(2)}%</strong>
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-purple-200/90 leading-snug font-sans">
+                      {analysis.pullback15mBounce.detail}
+                    </p>
+                  </div>
+                )}
 
                 {/* 3. SIGNAL VERIFICATION & FALSE BREAKOUT RISK BAR */}
                 <div className="bg-slate-900 text-white p-3 rounded-xl border border-slate-800 space-y-2 shadow-2xs">

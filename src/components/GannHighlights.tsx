@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, Target, ShieldCheck, Percent } from 'lucide-react';
 import { StockCalculated, TrendFilterType } from '../types';
-import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
+import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
 
 interface GannHighlightsProps {
   stocks: StockCalculated[];
@@ -75,6 +75,13 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
     }
     return false;
   });
+  const highCloseStocks = calculatedStocks.filter((s) => {
+    const cmp = s.closePrice || s.openPrice;
+    if (cmp !== undefined && cmp !== null && cmp > 0) {
+      return isHighClosePattern(cmp, s.highPrice, s.first15mHigh, s.openPrice);
+    }
+    return false;
+  });
   
   // 38.2% Fibonacci Retracements
   const fibRetraceStocks = calculatedStocks.filter((s) => {
@@ -143,6 +150,14 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           >
             <Target className="w-3.5 h-3.5 text-rose-400" />
             <span>Open = High ({openHighStocks.length})</span>
+          </button>
+
+          <button
+            onClick={() => handleFilterClick('HIGH_CLOSE')}
+            className="flex items-center space-x-1.5 bg-blue-500/20 hover:bg-blue-500/35 border border-blue-400/50 px-3 py-1.5 rounded-xl text-xs font-black text-blue-300 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+            <span>High = Close ({highCloseStocks.length})</span>
           </button>
 
           <button

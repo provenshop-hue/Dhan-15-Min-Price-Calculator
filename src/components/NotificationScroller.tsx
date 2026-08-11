@@ -1,7 +1,7 @@
 import React from 'react';
-import { Bell, Flame, TrendingUp, TrendingDown, Zap, ShieldAlert, Sparkles, ChevronRight, Activity } from 'lucide-react';
+import { Bell, Flame, TrendingUp, TrendingDown, Zap, ShieldAlert, Sparkles, ChevronRight, Activity, Target } from 'lucide-react';
 import { StockCalculated } from '../types';
-import { is100PercentBullishMove, is100PercentBearishMove } from '../utils/rsiPullback';
+import { is100PercentBullishMove, is100PercentBearishMove, detect15mHighPullbackBounce } from '../utils/rsiPullback';
 import { isOpenLowPattern, isOpenHighPattern, isBothCalcLessThan3, isGannCalcLessThan3 } from '../utils/gann';
 
 interface NotificationScrollerProps {
@@ -93,7 +93,25 @@ export const NotificationScroller: React.FC<NotificationScrollerProps> = ({
     stock?: StockCalculated;
   }> = [];
 
+  // 15m High Retest & Bounce checks for Nifty & Bank Nifty
+  const nifty15mBounce = niftyStock ? detect15mHighPullbackBounce(niftyStock) : null;
+  const bankNifty15mBounce = bankNiftyStock ? detect15mHighPullbackBounce(bankNiftyStock) : null;
+
   // Add Index Alerts
+  if (niftyStock && nifty15mBounce && nifty15mBounce.isPullbackBounce) {
+    items.push({
+      id: 'nifty-15m-bounce-alert',
+      type: 'INDEX_ALERT',
+      title: `NIFTY 50 15m High Bounce!`,
+      subtitle: `Retested ₹${nifty15mBounce.retestPrice.toFixed(2)} @ ${nifty15mBounce.bounceTime} & Bounced +${nifty15mBounce.bouncePct.toFixed(2)}% Bullish!`,
+      badgeText: `🎯 NIFTY 15M BOUNCE`,
+      bgColor: 'bg-purple-950/95 text-purple-100',
+      borderColor: 'border-purple-500/80 shadow-purple-500/30',
+      textColor: 'text-purple-300',
+      stock: niftyStock
+    });
+  }
+
   if (niftyStock && (niftyOpenLow || niftyOpenHigh)) {
     const alertType = niftyOpenLow ? 'OPEN = LOW (BULLISH)' : 'OPEN = HIGH (BEARISH)';
     items.push({
@@ -106,6 +124,20 @@ export const NotificationScroller: React.FC<NotificationScrollerProps> = ({
       borderColor: niftyOpenLow ? 'border-emerald-500/70 shadow-emerald-500/20' : 'border-rose-500/70 shadow-rose-500/20',
       textColor: niftyOpenLow ? 'text-emerald-300' : 'text-rose-300',
       stock: niftyStock
+    });
+  }
+
+  if (bankNiftyStock && bankNifty15mBounce && bankNifty15mBounce.isPullbackBounce) {
+    items.push({
+      id: 'banknifty-15m-bounce-alert',
+      type: 'INDEX_ALERT',
+      title: `BANK NIFTY 15m High Bounce!`,
+      subtitle: `Retested ₹${bankNifty15mBounce.retestPrice.toFixed(2)} @ ${bankNifty15mBounce.bounceTime} & Bounced +${bankNifty15mBounce.bouncePct.toFixed(2)}% Bullish!`,
+      badgeText: `🎯 BANKNIFTY 15M BOUNCE`,
+      bgColor: 'bg-purple-950/95 text-purple-100',
+      borderColor: 'border-purple-500/80 shadow-purple-500/30',
+      textColor: 'text-purple-300',
+      stock: bankNiftyStock
     });
   }
 

@@ -38,9 +38,10 @@ export interface StockCalculated {
   vwap?: number | null;
   vwapStatus?: 'Above' | 'Below' | 'At' | null;
 
-  // Open = Low / Open = High Intraday Pattern Flags
+  // Open = Low / Open = High / High = Close Intraday Pattern Flags
   isOpenEqualLow?: boolean;
   isOpenEqualHigh?: boolean;
+  isHighEqualClose?: boolean;
   openLowDiffPct?: number | null;
   openHighDiffPct?: number | null;
 
@@ -67,6 +68,7 @@ export type TrendFilterType =
   | 'BEARISH'
   | 'OPEN_LOW'
   | 'OPEN_HIGH'
+  | 'HIGH_CLOSE'
   | 'FIB_382_RETRACE'
   | 'GANN_CALC_LESS_3'
   | 'BOTH_CALC_LESS_3'
@@ -100,6 +102,7 @@ export interface GannCalcResult {
   vwapStatus?: 'Above' | 'Below' | 'At' | null;
   isOpenEqualLow?: boolean;
   isOpenEqualHigh?: boolean;
+  isHighEqualClose?: boolean;
   openLowDiffPct?: number | null;
   openHighDiffPct?: number | null;
   fib382Bull?: number | null;

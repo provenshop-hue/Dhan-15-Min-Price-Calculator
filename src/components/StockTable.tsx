@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
-import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
+import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
+import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
 
 interface StockTableProps {
   stocks: StockCalculated[];
@@ -116,6 +117,14 @@ export const StockTable: React.FC<StockTableProps> = ({
     return false;
   };
 
+  const isStockHighEqualClose = (s: StockCalculated) => {
+    const cmp = s.closePrice || s.openPrice;
+    if (cmp !== undefined && cmp !== null && cmp > 0) {
+      return isHighClosePattern(cmp, s.highPrice, s.first15mHigh, s.openPrice);
+    }
+    return false;
+  };
+
   // Helper check for Fibonacci 38.2% Retracement
   const isStockFib382Retrace = (s: StockCalculated) => {
     if (s.isFib382Retrace) return true;
@@ -127,6 +136,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   // Count metrics
   const openLowCount = stocks.filter(isStockOpenEqualLow).length;
   const openHighCount = stocks.filter(isStockOpenEqualHigh).length;
+  const highCloseCount = stocks.filter(isStockHighEqualClose).length;
   const fib382Count = stocks.filter(isStockFib382Retrace).length;
   const gannCalcLess3Count = stocks.filter(isGannCalcLessThan3).length;
   const bothCalcLess3Count = stocks.filter(isBothCalcLessThan3).length;
@@ -147,6 +157,7 @@ export const StockTable: React.FC<StockTableProps> = ({
 
     if (trendFilter === 'OPEN_LOW') return isStockOpenEqualLow(s);
     if (trendFilter === 'OPEN_HIGH') return isStockOpenEqualHigh(s);
+    if (trendFilter === 'HIGH_CLOSE') return isStockHighEqualClose(s);
     if (trendFilter === 'FIB_382_RETRACE') return isStockFib382Retrace(s);
     if (trendFilter === 'GANN_CALC_LESS_3') return isGannCalcLessThan3(s);
     if (trendFilter === 'BOTH_CALC_LESS_3') return isBothCalcLessThan3(s);
@@ -281,6 +292,17 @@ export const StockTable: React.FC<StockTableProps> = ({
             >
               <Target className="w-3.5 h-3.5 text-rose-600 dark:text-rose-300" />
               Open = High ({openHighCount})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('HIGH_CLOSE'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
+                trendFilter === 'HIGH_CLOSE'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-blue-800 bg-blue-100/80 hover:bg-blue-200 border border-blue-300/60'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-300" />
+              High = Close ({highCloseCount})
             </button>
             <button
               onClick={() => { setTrendFilter('FIB_382_RETRACE'); setCurrentPage(1); }}
@@ -587,6 +609,24 @@ export const StockTable: React.FC<StockTableProps> = ({
                           >
                             <Target className="w-3 h-3 text-rose-600" />
                             O=H
+                          </span>
+                        )}
+                        {isStockHighEqualClose(stock) && (
+                          <span
+                            title="High = Close pattern detected (Strong Bullish Closing Setup)"
+                            className="text-[10px] font-black text-blue-800 bg-blue-100 border border-blue-300 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-2xs"
+                          >
+                            <Sparkles className="w-3 h-3 text-blue-600" />
+                            H=C
+                          </span>
+                        )}
+                        {detect15mHighPullbackBounce(stock).isPullbackBounce && (
+                          <span
+                            title={detect15mHighPullbackBounce(stock).detail}
+                            className="text-[10px] font-black text-purple-900 bg-purple-100 border border-purple-300 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-2xs"
+                          >
+                            <Target className="w-3 h-3 text-purple-600 shrink-0" />
+                            15M BOUNCE ({detect15mHighPullbackBounce(stock).bounceTime})
                           </span>
                         )}
                         {stock.error && (

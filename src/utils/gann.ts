@@ -206,6 +206,53 @@ export function isOpenHighPattern(
   return matches15m || matchesSessionHigh;
 }
 
+/**
+ * Checks if High equals Close strictly & accurately (where close price == high price).
+ * Indicates strong bullish closing momentum (closing at or near session high).
+ * Accounts for 15-min candle high, session high, NSE tick size (₹0.05), and 0.05% tolerance.
+ * Must be a green / positive candle (close >= open).
+ */
+export function isHighClosePattern(
+  closePrice?: number | null,
+  highPrice?: number | null,
+  first15mHigh?: number | null,
+  openPrice?: number | null
+): boolean {
+  if (closePrice === undefined || closePrice === null || closePrice <= 0) return false;
+
+  // Bullish / Green candle check: Close must be >= Open (if open provided)
+  if (openPrice !== undefined && openPrice !== null && openPrice > 0 && closePrice < openPrice) {
+    return false;
+  }
+
+  const validHigh = (highPrice !== undefined && highPrice !== null && highPrice > 0) ? highPrice : null;
+  const valid15mHigh = (first15mHigh !== undefined && first15mHigh !== null && first15mHigh > 0) ? first15mHigh : null;
+
+  if (validHigh === null && valid15mHigh === null) return false;
+
+  // Maximum allowed price match tolerance:
+  // 1 NSE tick size (₹0.05) or 0.05% of close price (whichever is larger)
+  const tolerance = Math.max(0.05, closePrice * 0.0005);
+
+  // High should not have spiked far above close (i.e. close must be at or near high)
+  if (validHigh !== null && validHigh > closePrice + tolerance) {
+    return false;
+  }
+
+  // Check if close price matches 15m candle high or session high
+  const matches15m = valid15mHigh !== null && (
+    Math.abs(closePrice - valid15mHigh) <= tolerance ||
+    Math.round(closePrice * 100) === Math.round(valid15mHigh * 100)
+  );
+
+  const matchesSessionHigh = validHigh !== null && (
+    Math.abs(closePrice - validHigh) <= tolerance ||
+    Math.round(closePrice * 100) === Math.round(validHigh * 100)
+  );
+
+  return matches15m || matchesSessionHigh;
+}
+
 export type Fib382Status = 'Retraced Yes' | 'Approaching 38.2%' | 'No Retracement';
 
 export interface Fib382Result {
@@ -365,9 +412,10 @@ export function calculateGann15Min(
 
   const pctChange = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
 
-  // Pattern detection: Open = Low and Open = High (Strict Exact Match)
+  // Pattern detection: Open = Low, Open = High, High = Close (Strict Exact Match)
   const isOpenEqualLow = isOpenLowPattern(openPrice, lowPrice, first15mLow);
   const isOpenEqualHigh = isOpenHighPattern(openPrice, highPrice, first15mHigh);
+  const isHighEqualClose = isHighClosePattern(closePrice, highPrice, first15mHigh, openPrice);
 
   const openLowDiffPct = openPrice > 0 && lowPrice && lowPrice > 0
     ? Math.abs(openPrice - lowPrice) / openPrice * 100
@@ -449,6 +497,7 @@ export function calculateGann15Min(
     vwapStatus,
     isOpenEqualLow,
     isOpenEqualHigh,
+    isHighEqualClose,
     openLowDiffPct,
     openHighDiffPct,
     fib382Bull: fibData?.fib382Bull ?? null,
