@@ -23,15 +23,40 @@ export interface GlobalSettingsData {
 }
 
 function loadGlobalSettings(): GlobalSettingsData {
+  let settings: GlobalSettingsData = {};
   try {
     if (fs.existsSync(SETTINGS_FILE_PATH)) {
       const raw = fs.readFileSync(SETTINGS_FILE_PATH, 'utf-8');
-      return JSON.parse(raw);
+      settings = JSON.parse(raw);
     }
   } catch (err) {
     console.error('Error reading global_settings.json:', err);
   }
-  return {};
+
+  const envClientId = process.env.DHAN_CLIENT_ID;
+  const envAccessToken = process.env.DHAN_ACCESS_TOKEN;
+
+  if (!settings.dhanCredentials) {
+    settings.dhanCredentials = {
+      clientId: envClientId || '',
+      accessToken: envAccessToken || '',
+      segment: 'NSE_EQ',
+      isConfigured: Boolean(envClientId && envAccessToken)
+    };
+  } else {
+    if (!settings.dhanCredentials.clientId && envClientId) {
+      settings.dhanCredentials.clientId = envClientId;
+    }
+    if (!settings.dhanCredentials.accessToken && envAccessToken) {
+      settings.dhanCredentials.accessToken = envAccessToken;
+    }
+    settings.dhanCredentials.isConfigured = Boolean(
+      (settings.dhanCredentials.clientId || envClientId) &&
+      (settings.dhanCredentials.accessToken || envAccessToken)
+    );
+  }
+
+  return settings;
 }
 
 function saveGlobalSettings(newSettings: Partial<GlobalSettingsData>): GlobalSettingsData {

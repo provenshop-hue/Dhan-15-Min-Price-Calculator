@@ -341,15 +341,6 @@ export default function App() {
 
   // Fetch single stock candle from Dhan API
   const handleFetchSingleDhan = async (stock: StockCalculated) => {
-    if (!credentials.isConfigured || !credentials.clientId || !credentials.accessToken) {
-      setIsSettingsOpen(true);
-      setNotification({
-        type: 'error',
-        message: 'Dhan API Credentials required! Please enter your Client ID and Access Token in Dhan Settings.'
-      });
-      return;
-    }
-
     setStocks((prev) =>
       prev.map((s) => (s.id === stock.id ? { ...s, isLoading: true, error: null } : s))
     );
@@ -416,6 +407,9 @@ export default function App() {
         message: `Fetched 15-min candle for ${stock.symbol}! Open: ₹${openPrice}, Close: ₹${closePrice}`
       });
     } else {
+      if (result.error && (result.error.toLowerCase().includes('missing dhan credentials') || result.error.toLowerCase().includes('client id and access token'))) {
+        setIsSettingsOpen(true);
+      }
       setStocks((prev) =>
         prev.map((s) =>
           s.id === stock.id ? { ...s, isLoading: false, error: result.error || 'Fetch failed' } : s
@@ -430,15 +424,6 @@ export default function App() {
 
   // Fetch all stocks via Dhan API
   const handleFetchAllDhan = async () => {
-    if (!credentials.isConfigured || !credentials.clientId || !credentials.accessToken) {
-      setIsSettingsOpen(true);
-      setNotification({
-        type: 'error',
-        message: 'Dhan API credentials required! Please enter your Client ID and Access Token to fetch real live market candles.'
-      });
-      return;
-    }
-
     setIsBulkLoading(true);
     setBulkProgress({ current: 0, total: stocks.length });
 
@@ -449,6 +434,7 @@ export default function App() {
 
     const CONCURRENCY = 3;
     let completed = 0;
+    let authErrorOccurred = false;
 
     for (let i = 0; i < stocks.length; i += CONCURRENCY) {
       const chunk = stocks.slice(i, i + CONCURRENCY);
@@ -517,6 +503,9 @@ export default function App() {
               )
             );
           } else {
+            if (result.error && (result.error.toLowerCase().includes('missing dhan credentials') || result.error.toLowerCase().includes('client id and access token'))) {
+              authErrorOccurred = true;
+            }
             setStocks((prev) =>
               prev.map((s) =>
                 s.id === stock.id
@@ -530,6 +519,16 @@ export default function App() {
           setBulkProgress({ current: completed, total: stocks.length });
         })
       );
+
+      if (authErrorOccurred) {
+        setIsSettingsOpen(true);
+        setNotification({
+          type: 'error',
+          message: 'Dhan API credentials required! Please enter your Client ID and Access Token in Settings.'
+        });
+        setIsBulkLoading(false);
+        return;
+      }
 
       await new Promise((resolve) => setTimeout(resolve, 80));
     }
