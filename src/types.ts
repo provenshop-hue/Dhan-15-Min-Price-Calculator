@@ -140,6 +140,28 @@ export interface RsiAiAnalysisReport {
   analyzedAt: string;
 }
 
+export interface AiConfluenceBrainReport {
+  aiConfluenceScore: number;
+  aiVerdict: '100% BULLISH CONFLUENCE' | '100% BEARISH CONFLUENCE' | 'HIGH PROBABILITY SETUP' | 'FALSE BREAKOUT RISK';
+  profitAccuracyPct: number;
+  confidenceGrade: string;
+  aiTrapCheck: {
+    isTrapDetected: boolean;
+    trapType: string;
+    details: string;
+  };
+  accuracyEnhancements: string[];
+  precisionEntry: string;
+  precisionStopLoss: string;
+  precisionTargets: Array<{
+    target: string;
+    price: number;
+    expectedProfitPct: number;
+  }>;
+  institutionalSummary: string;
+  analyzedAt: string;
+}
+
 export interface FadedStockRecord {
   id: string;
   symbol: string;

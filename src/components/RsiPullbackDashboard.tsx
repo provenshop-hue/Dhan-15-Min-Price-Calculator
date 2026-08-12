@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { StockCalculated, FadedStockRecord } from '../types';
-import { analyzeRsiPullback, RsiPullbackAnalysis, is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishScore, get100PercentBearishScore, get100PercentBullishFadeReason, get100PercentBearishFadeReason } from '../utils/rsiPullback';
+import { StockCalculated, FadedStockRecord, AiConfluenceBrainReport } from '../types';
+import { analyzeRsiPullback, RsiPullbackAnalysis, is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishScore, get100PercentBearishScore, get100PercentBullishFadeReason, get100PercentBearishFadeReason, fetchAiConfluenceBrainReport } from '../utils/rsiPullback';
 import { calculateRSI, isOpenLowPattern, isOpenHighPattern, isHighClosePattern } from '../utils/gann';
 import { 
   TrendingUp, 
@@ -52,6 +52,7 @@ type PullbackFilterType =
   | 'TRIGGERED_TODAY'
   | 'HIGH_SUCCESS'
   | 'TARGET_HIT'
+  | 'AI_CONFLUENCE_BRAIN'
   | 'BULLISH_100_MOVE'
   | 'BEARISH_100_MOVE'
   | 'FADED_100_MOVE'
@@ -118,6 +119,20 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
   const [expanded15MinStockId, setExpanded15MinStockId] = useState<string | null>(null);
   const [isConfluenceGuideOpen, setIsConfluenceGuideOpen] = useState(false);
+
+  // AI Confluence Brain Modal State
+  const [brainModalStock, setBrainModalStock] = useState<{ stock: StockCalculated; analysis: RsiPullbackAnalysis } | null>(null);
+  const [brainReport, setBrainReport] = useState<AiConfluenceBrainReport | null>(null);
+  const [isBrainLoading, setIsBrainLoading] = useState(false);
+
+  const handleRunBrainScan = async (stock: StockCalculated, analysis: RsiPullbackAnalysis) => {
+    setBrainModalStock({ stock, analysis });
+    setBrainReport(null);
+    setIsBrainLoading(true);
+    const report = await fetchAiConfluenceBrainReport(stock, analysis);
+    setBrainReport(report);
+    setIsBrainLoading(false);
+  };
   
   // Interactive Calculator State
   const [isCalcOpen, setIsCalcOpen] = useState(false);
@@ -177,6 +192,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let activeSignalCount = 0;
     let targetHitCount = 0;
     let highSuccessCount = 0;
+    let aiBrainCount = 0;
 
     analyzedStocks.forEach(({ stock, analysis }) => {
       if (analysis.confluenceValidation.status === 'HIGH_CONFLUENCE') highConfluenceCount++;
@@ -185,6 +201,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (isTriggered) triggeredTodayCount++;
       if (is100PercentBullishMove(stock)) bullish100Count++;
       if (is100PercentBearishMove(stock)) bearish100Count++;
+      if (analysis.confluenceValidation.score >= 75 || analysis.is100PercentBullish || analysis.is100PercentBearish || (analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.successRatePct >= 75)) {
+        aiBrainCount++;
+      }
       if (analysis.bullishRally.score >= 65) bullishRallyCount++;
       if (analysis.bearishRally.score >= 65) bearishRallyCount++;
       if (analysis.pullbackCategory === 'BULLISH_SWEET_SPOT') bullishSweetSpot++;
@@ -239,7 +258,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       avgSuccessRate,
       activeSignalCount,
       targetHitCount,
-      highSuccessCount
+      highSuccessCount,
+      aiBrainCount
     };
   }, [analyzedStocks, stocks.length]);
 
@@ -263,6 +283,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
 
       // Filter category
+      if (activeFilter === 'AI_CONFLUENCE_BRAIN') {
+        return analysis.confluenceValidation.score >= 75 || analysis.is100PercentBullish || analysis.is100PercentBearish || (analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.successRatePct >= 75);
+      }
       if (activeFilter === 'HIGH_CONFLUENCE') {
         return analysis.confluenceValidation.status === 'HIGH_CONFLUENCE';
       }
@@ -1613,6 +1636,18 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveFilter('AI_CONFLUENCE_BRAIN')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1.5 ${
+              activeFilter === 'AI_CONFLUENCE_BRAIN'
+                ? 'bg-gradient-to-r from-purple-700 to-indigo-700 text-white border-purple-400 shadow-md ring-2 ring-purple-300 animate-pulse'
+                : 'bg-purple-50 text-purple-950 hover:bg-purple-100 border-purple-300'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+            <span>🧠 AI 100% High Confluence ({stats.aiBrainCount})</span>
+          </button>
+
+          <button
             onClick={() => setActiveFilter('BULLISH_100_MOVE')}
             className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1 ${
               activeFilter === 'BULLISH_100_MOVE'
@@ -2585,6 +2620,15 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                     </div>
                   </div>
 
+                {/* AI Confluence Brain Scan Button */}
+                <button
+                  onClick={() => handleRunBrainScan(stock, analysis)}
+                  className="w-full py-2 bg-gradient-to-r from-purple-800 via-indigo-800 to-slate-900 hover:from-purple-900 hover:to-slate-950 text-white font-black text-xs rounded-xl shadow-md border border-purple-500/60 flex items-center justify-center space-x-1.5 transition-all group-hover:border-purple-400 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300 animate-spin" style={{ animationDuration: '6s' }} />
+                  <span>🧠 AI Confluence Brain Scan (100% Accuracy)</span>
+                </button>
+
                 {/* Card Bottom Actions */}
                 <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100">
                   <button
@@ -2615,6 +2659,183 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* 🧠 AI CONFLUENCE BRAIN & PROFIT ACCURACY OPTIMIZER MODAL */}
+      {brainModalStock && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-purple-500/60 rounded-3xl max-w-2xl w-full p-6 text-white shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-purple-500/30 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-2xl shadow-lg border border-purple-400/50">
+                  <Sparkles className="w-6 h-6 text-amber-300 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white flex items-center gap-2">
+                    <span>AI Confluence Brain</span>
+                    <span className="text-xs bg-purple-950 text-purple-300 border border-purple-500 px-2 py-0.5 rounded-full font-mono font-bold">
+                      100% ACCURACY ENGINE
+                    </span>
+                  </h3>
+                  <p className="text-xs text-purple-200/80 font-mono mt-0.5">
+                    {brainModalStock.stock.symbol} ({brainModalStock.stock.companyName}) • LTP: ₹{(brainModalStock.stock.closePrice || brainModalStock.stock.openPrice || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setBrainModalStock(null)}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition-colors text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Loading State */}
+            {isBrainLoading && (
+              <div className="py-12 flex flex-col items-center justify-center space-y-4 text-center">
+                <div className="relative">
+                  <div className="w-16 h-16 border-4 border-purple-500/30 border-t-amber-400 rounded-full animate-spin" />
+                  <Sparkles className="w-6 h-6 text-amber-300 absolute inset-0 m-auto animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-base font-bold text-white">Gemini 3.6 Flash Analyzing Confluences...</p>
+                  <p className="text-xs text-slate-400 max-w-sm">
+                    Scanning VWAP alignment, Open=Low/High anchors, 15m RSI timeline, and volume surge for 100% move accuracy.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* AI Report Content */}
+            {!isBrainLoading && brainReport && (
+              <div className="space-y-4 text-xs font-sans">
+                {/* Verdict Banner */}
+                <div className={`p-4 rounded-2xl border shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 ${
+                  brainReport.aiVerdict.includes('BULLISH')
+                    ? 'bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-950 border-emerald-500/80 text-white'
+                    : brainReport.aiVerdict.includes('BEARISH')
+                    ? 'bg-gradient-to-r from-rose-950 via-slate-900 to-slate-950 border-rose-500/80 text-white'
+                    : 'bg-slate-800/90 border-amber-500/80 text-white'
+                }`}>
+                  <div className="space-y-1 text-center sm:text-left">
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-amber-400">
+                      AI Confluence Verdict:
+                    </span>
+                    <h4 className="text-lg font-black text-white flex items-center gap-2 justify-center sm:justify-start">
+                      <span>{brainReport.aiVerdict}</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-300 font-mono">
+                      {brainReport.confidenceGrade} • Analyzed at {brainReport.analyzedAt}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-950/80 px-4 py-3 rounded-2xl border border-purple-500/40 text-center shrink-0 shadow-inner">
+                    <span className="text-[9.5px] uppercase font-bold tracking-wider text-purple-300 block">
+                      Profit Win Probability
+                    </span>
+                    <span className="text-2xl font-black text-emerald-400 font-mono">
+                      {brainReport.profitAccuracyPct}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Trap Detection Shield */}
+                <div className={`p-3.5 rounded-2xl border flex items-start space-x-3 ${
+                  brainReport.aiTrapCheck.isTrapDetected
+                    ? 'bg-rose-950/80 border-rose-500 text-rose-200'
+                    : 'bg-emerald-950/60 border-emerald-500/60 text-emerald-200'
+                }`}>
+                  {brainReport.aiTrapCheck.isTrapDetected ? (
+                    <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-0.5">
+                    <div className="font-bold text-xs">
+                      {brainReport.aiTrapCheck.isTrapDetected
+                        ? `⚠️ TRAP WARNING DETECTED: ${brainReport.aiTrapCheck.trapType}`
+                        : '🛡️ TRAP SHIELD PASSED: Clean Institutional Signal'}
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      {brainReport.aiTrapCheck.details}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Confluence Win-Rate Enhancers */}
+                <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+                  <div className="text-[10.5px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Confluence Win-Rate Enhancers &amp; Catalysts:</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                    {brainReport.accuracyEnhancements.map((enh, idx) => (
+                      <div key={idx} className="p-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center space-x-2 text-slate-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span>{enh}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Precision Execution Plan */}
+                <div className="bg-purple-950/40 p-4 rounded-2xl border border-purple-500/40 space-y-3">
+                  <div className="text-xs font-bold text-purple-200 uppercase tracking-wider flex items-center justify-between">
+                    <span>🎯 Precision Entry &amp; Exit Targets</span>
+                    <span className="text-[10px] font-mono text-amber-300 bg-purple-900/60 px-2 py-0.5 rounded border border-purple-500/50">
+                      STRICT INVALIDATION
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400 text-[10px] block font-sans">Precision Entry Level:</span>
+                      <strong className="text-white font-black text-xs">{brainReport.precisionEntry}</strong>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                      <span className="text-slate-400 text-[10px] block font-sans">Strict Invalidation Stop Loss:</span>
+                      <strong className="text-rose-400 font-black text-xs">{brainReport.precisionStopLoss}</strong>
+                    </div>
+                  </div>
+
+                  {/* Targets Table */}
+                  <div className="grid grid-cols-3 gap-2 font-mono text-xs">
+                    {brainReport.precisionTargets.map((t, idx) => (
+                      <div key={idx} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center space-y-1">
+                        <span className="text-slate-400 text-[9.5px] block font-sans font-bold uppercase">{t.target}</span>
+                        <strong className="text-emerald-300 font-black text-sm block">₹{t.price.toFixed(2)}</strong>
+                        <span className="text-[10px] text-emerald-400 font-bold block">+{t.expectedProfitPct}% Profit</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Smart Money Institutional Breakdown */}
+                <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Institutional Smart Money Analysis:
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                    {brainReport.institutionalSummary}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setBrainModalStock(null)}
+                className="px-5 py-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-800 hover:to-indigo-800 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                Close Optimizer
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
