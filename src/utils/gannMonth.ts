@@ -369,6 +369,8 @@ export function calculateGannMonthData(
     defaultPrice = 52420;
   } else if (symUpper.includes('NIFTY')) {
     defaultPrice = 24850;
+  } else if (symUpper.includes('SENSEX')) {
+    defaultPrice = 81500;
   }
 
   const cmp = stock.closePrice || stock.openPrice || defaultPrice;
@@ -402,6 +404,12 @@ export function calculateGannMonthData(
       pml = 51080.40;
       pmlDate = `03 ${bounds.shortMonth} ${bounds.prevYear}`;
       pmc = 52300.00;
+    } else if (cleanSym === 'SENSEX' || cleanSym === 'BSESENSEX' || cleanSym === 'SENSEX50') {
+      pmh = 82500.00;
+      pmhDate = `16 ${bounds.shortMonth} ${bounds.prevYear}`;
+      pml = 79500.00;
+      pmlDate = `03 ${bounds.shortMonth} ${bounds.prevYear}`;
+      pmc = 81200.00;
     } else {
       // Deterministic realistic previous month High / Low and dates based on symbol hash & current price
       let hash = 0;

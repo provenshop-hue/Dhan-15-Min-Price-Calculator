@@ -6,6 +6,9 @@ export const DHAN_SECURITY_MAP: Record<string, string> = {
   "NIFTY50": "13",
   "BANKNIFTY": "25",
   "NIFTYBANK": "25",
+  "SENSEX": "51",
+  "BSESENSEX": "51",
+  "SENSEX50": "51",
   "ABB": "13",
   "ABCAPITAL": "21614",
   "ADANIENSOL": "10217",
@@ -253,6 +256,10 @@ export function isIndexSymbol(symbol: string): boolean {
     clean === 'BANKNIFTY' ||
     clean === 'NIFTYBANK' ||
     clean === 'BANKNIFTYINDEX' ||
+    clean === 'SENSEX' ||
+    clean === 'BSESENSEX' ||
+    clean === 'SENSEX50' ||
+    clean === 'BSEINDEX' ||
     clean === 'FINNIFTY' ||
     clean === 'MIDCPNIFTY'
   );
@@ -267,6 +274,9 @@ export function getDhanSecurityId(symbol: string): string | undefined {
   }
   if (cleanSymbol === 'BANKNIFTY' || cleanSymbol === 'NIFTYBANK' || cleanSymbol === 'BANKNIFTYINDEX') {
     return '25';
+  }
+  if (cleanSymbol === 'SENSEX' || cleanSymbol === 'BSESENSEX' || cleanSymbol === 'SENSEX50') {
+    return '51';
   }
 
   // Direct match

@@ -15,12 +15,57 @@ export const RsiAnalystModal: React.FC<RsiAnalystModalProps> = ({ stock, onClose
   const [report, setReport] = useState<RsiAiAnalysisReport | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const fetchLive15mCandles = async (targetStock: StockCalculated): Promise<RsiIntradayPoint[] | null> => {
+    try {
+      let clientId = '';
+      let accessToken = '';
+      const savedSettings = localStorage.getItem('dhan_gann_creds') || localStorage.getItem('dhan_settings');
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings);
+          clientId = parsed.clientId || '';
+          accessToken = parsed.accessToken || '';
+        } catch (e) {}
+      }
+
+      const response = await fetch('/api/dhan/intraday-15m', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: targetStock.symbol,
+          securityId: targetStock.securityId,
+          clientId,
+          accessToken,
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && Array.isArray(data.rsiTimeline) && data.rsiTimeline.length > 0) {
+          return data.rsiTimeline;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch live Dhan 15m candles in RSI Analyst modal:', e);
+    }
+    return null;
+  };
+
   useEffect(() => {
     if (stock) {
       // Auto generate timeline preview or reset
       const initialTimeline = generateIntradayRsiTimeline(stock);
       setTimeline(initialTimeline);
       setReport(null);
+
+      // Fetch live Dhan 15m candles if rsiTimeline is not already populated
+      if (!stock.rsiTimeline || stock.rsiTimeline.length === 0) {
+        fetchLive15mCandles(stock).then((liveTimeline) => {
+          if (liveTimeline) {
+            setTimeline(liveTimeline);
+          }
+        });
+      }
     }
   }, [stock]);
 
@@ -28,15 +73,17 @@ export const RsiAnalystModal: React.FC<RsiAnalystModalProps> = ({ stock, onClose
 
   const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
-    setAnalysisProgress('1/3: Fetching 15m intraday candles from 09:15 AM...');
+    setAnalysisProgress('1/3: Fetching 15m intraday candles & volume from 09:15 AM...');
     
     try {
-      await new Promise((r) => setTimeout(r, 400));
-      const currentTimeline = generateIntradayRsiTimeline(stock);
+      let currentTimeline = await fetchLive15mCandles(stock);
+      if (!currentTimeline || currentTimeline.length === 0) {
+        currentTimeline = generateIntradayRsiTimeline(stock);
+      }
       setTimeline(currentTimeline);
 
-      setAnalysisProgress('2/3: Calculating 14-period RSI progression sequence...');
-      await new Promise((r) => setTimeout(r, 400));
+      setAnalysisProgress('2/3: Calculating 14-period RSI & volume shift sequence...');
+      await new Promise((r) => setTimeout(r, 300));
 
       setAnalysisProgress('3/3: Evaluating momentum & generating AI entry/exit report...');
       const aiReport = await analyzeRsiProgressWithAi(stock, currentTimeline);

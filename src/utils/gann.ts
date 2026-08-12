@@ -460,17 +460,17 @@ export function calculateGann15Min(
   // Confluence rules: Very Bullish requires RSI > 58 and Open = Low or Gann Breakout (ADX rule removed as requested)
   const isRsiVeryBullish = rsiVal !== undefined && rsiVal !== null ? rsiVal > 58 : false;
 
-  if (isBullishCandle || pctChange >= 0) {
+  if (isBullishCandle && pctChange > 0 && vwapBullish) {
     if (isRsiVeryBullish && (isOpenEqualLow || gannBreakout)) {
       trend = 'Very Bullish';
-    } else if ((gannBreakout || isOpenEqualLow || (rsiVal !== undefined && rsiVal !== null && rsiVal > 50)) && vwapBullish) {
+    } else if (gannBreakout || isOpenEqualLow || (rsiVal !== undefined && rsiVal !== null && rsiVal >= 50)) {
       trend = 'Bullish';
     }
-  } else if (isBearishCandle || pctChange < 0) {
+  } else if (isBearishCandle && pctChange < 0 && vwapBearish) {
     const isRsiVeryBearish = rsiVal !== undefined && rsiVal !== null ? rsiVal < 42 : false;
     if (isRsiVeryBearish && (isOpenEqualHigh || gannBreakdown)) {
       trend = 'Very Bearish';
-    } else if ((gannBreakdown || isOpenEqualHigh || (rsiVal !== undefined && rsiVal !== null && rsiVal < 50)) && vwapBearish) {
+    } else if (gannBreakdown || isOpenEqualHigh || (rsiVal !== undefined && rsiVal !== null && rsiVal <= 50)) {
       trend = 'Bearish';
     }
   }

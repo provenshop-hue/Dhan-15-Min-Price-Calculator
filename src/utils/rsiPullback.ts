@@ -36,12 +36,12 @@ export function is100PercentBullishMove(stock: StockCalculated): boolean {
   if (high === undefined || high === null || high <= 0) return false;
   if (low === undefined || low === null || low <= 0) return false;
 
-  // 1. Must have positive percent change on the session (> 0%)
+  // 1. Must have positive percent change on the session (>= 0.15% to avoid flat noise)
   if (stock.pctChange !== undefined && stock.pctChange !== null) {
-    if (stock.pctChange <= 0) return false;
+    if (stock.pctChange < 0.15) return false;
   } else {
     const ref = (stock.previousClose && stock.previousClose > 0) ? stock.previousClose : open;
-    if (close <= ref) return false;
+    if (close <= ref * 1.0015) return false;
   }
 
   // 2. Close > Open (Green candle)
@@ -55,21 +55,21 @@ export function is100PercentBullishMove(stock: StockCalculated): boolean {
   const range = high - low;
   if (range <= 0) return false;
 
-  // 4. Close >= High - (Range × 0.20) (Closes in top 20% of High-Low range)
-  if (close < high - (range * 0.20) - 0.0001) return false;
+  // 4. Closes in top 15% of High-Low range (Close >= High - (Range × 0.15))
+  if (close < high - (range * 0.15) - 0.0001) return false;
 
-  // 5. Body / Range >= 0.55 (Strong candle body)
+  // 5. Body / Range >= 0.58 (Strong candle body)
   const body = Math.abs(close - open);
-  if ((body / range) < 0.55 - 0.0001) return false;
+  if ((body / range) < 0.58 - 0.0001) return false;
 
   // 6. VWAP Filter: price must be >= VWAP if present
   if (stock.vwap && stock.vwap > 0 && close < stock.vwap - 0.0001) {
     return false;
   }
 
-  // 7. RSI Filter: RSI must be >= 50 if present
-  if (stock.rsi !== undefined && stock.rsi !== null && stock.rsi < 50) {
-    return false;
+  // 7. RSI Filter: RSI must be >= 51 and <= 82 if present
+  if (stock.rsi !== undefined && stock.rsi !== null) {
+    if (stock.rsi < 51 || stock.rsi > 82) return false;
   }
 
   // 8. Trend Filter: Must NOT be Bearish or Very Bearish
@@ -81,15 +81,15 @@ export function is100PercentBullishMove(stock: StockCalculated): boolean {
 }
 
 /**
- * 100% Bearish Move Criteria:
- * 1. Close < Open (Red Candle)
- * 2. Close < Previous Close AND pctChange < 0 (Negative Day Change)
- * 3. Close <= Low + (Range × 0.20) (Closes in bottom 20% of High-Low range)
- * 4. Body / Range >= 0.55 (Strong candle body)
- * 5. Price <= VWAP (Below VWAP resistance if VWAP exists)
- * 6. RSI <= 50 (if RSI exists)
- * 7. Trend must NOT be Bullish
- */
+  * 100% Bearish Move Criteria:
+  * 1. Close < Open (Red Candle)
+  * 2. Close < Previous Close AND pctChange <= -0.15% (Negative Day Change)
+  * 3. Close <= Low + (Range × 0.15) (Closes in bottom 15% of High-Low range)
+  * 4. Body / Range >= 0.58 (Strong candle body)
+  * 5. Price <= VWAP (Below VWAP resistance if VWAP exists)
+  * 6. RSI <= 49 (if RSI exists)
+  * 7. Trend must NOT be Bullish or Very Bullish
+  */
 export function is100PercentBearishMove(stock: StockCalculated): boolean {
   const open = stock.openPrice;
   const close = stock.closePrice;
@@ -101,12 +101,12 @@ export function is100PercentBearishMove(stock: StockCalculated): boolean {
   if (high === undefined || high === null || high <= 0) return false;
   if (low === undefined || low === null || low <= 0) return false;
 
-  // 1. Must have negative percent change on the session (< 0%)
+  // 1. Must have negative percent change on the session (<= -0.15%)
   if (stock.pctChange !== undefined && stock.pctChange !== null) {
-    if (stock.pctChange >= 0) return false;
+    if (stock.pctChange > -0.15) return false;
   } else {
     const ref = (stock.previousClose && stock.previousClose > 0) ? stock.previousClose : open;
-    if (close >= ref) return false;
+    if (close >= ref * 0.9985) return false;
   }
 
   // 2. Close < Open (Red candle)
@@ -120,21 +120,21 @@ export function is100PercentBearishMove(stock: StockCalculated): boolean {
   const range = high - low;
   if (range <= 0) return false;
 
-  // 4. Close <= Low + (Range × 0.20)
-  if (close > low + (range * 0.20) + 0.0001) return false;
+  // 4. Closes in bottom 15% of High-Low range (Close <= Low + (Range × 0.15))
+  if (close > low + (range * 0.15) + 0.0001) return false;
 
-  // 5. Body / Range >= 0.55
+  // 5. Body / Range >= 0.58 (Strong candle body)
   const body = Math.abs(close - open);
-  if ((body / range) < 0.55 - 0.0001) return false;
+  if ((body / range) < 0.58 - 0.0001) return false;
 
   // 6. VWAP Filter: price must be <= VWAP if present
   if (stock.vwap && stock.vwap > 0 && close > stock.vwap + 0.0001) {
     return false;
   }
 
-  // 7. RSI Filter: RSI must be <= 50 if present
-  if (stock.rsi !== undefined && stock.rsi !== null && stock.rsi > 50) {
-    return false;
+  // 7. RSI Filter: RSI must be <= 49 and >= 18 if present
+  if (stock.rsi !== undefined && stock.rsi !== null) {
+    if (stock.rsi > 49 || stock.rsi < 18) return false;
   }
 
   // 8. Trend Filter: Must NOT be Bullish or Very Bullish
@@ -143,6 +143,76 @@ export function is100PercentBearishMove(stock: StockCalculated): boolean {
   }
 
   return true;
+}
+
+/**
+ * Calculates a 100% Bullish Conviction Score (50 - 100) for ranking top 100% Bullish moves
+ */
+export function get100PercentBullishScore(stock: StockCalculated): number {
+  if (!is100PercentBullishMove(stock)) return 0;
+
+  const open = stock.openPrice || 0;
+  const close = stock.closePrice || 0;
+  const high = stock.highPrice || close;
+  const low = stock.lowPrice || open;
+  const range = high - low;
+  if (range <= 0) return 0;
+
+  let score = 50;
+
+  // 1. % Gain component (up to +25)
+  const pct = Math.max(0, stock.pctChange || 0);
+  score += Math.min(25, pct * 6);
+
+  // 2. Proximity to High component (up to +15)
+  const distFromHighRatio = (high - close) / range;
+  score += Math.max(0, 15 * (1 - distFromHighRatio / 0.15));
+
+  // 3. Body ratio component (up to +15)
+  const bodyRatio = (close - open) / range;
+  score += Math.min(15, Math.max(0, (bodyRatio - 0.58) * 35));
+
+  // 4. Open = Low exactness bonus (+10)
+  const openLowDiffPct = ((open - low) / open) * 100;
+  if (openLowDiffPct <= 0.1) score += 10;
+  else if (openLowDiffPct <= 0.25) score += 5;
+
+  return Math.min(100, Math.round(score));
+}
+
+/**
+ * Calculates a 100% Bearish Conviction Score (50 - 100) for ranking top 100% Bearish moves
+ */
+export function get100PercentBearishScore(stock: StockCalculated): number {
+  if (!is100PercentBearishMove(stock)) return 0;
+
+  const open = stock.openPrice || 0;
+  const close = stock.closePrice || 0;
+  const high = stock.highPrice || open;
+  const low = stock.lowPrice || close;
+  const range = high - low;
+  if (range <= 0) return 0;
+
+  let score = 50;
+
+  // 1. % Loss component (up to +25)
+  const pct = Math.abs(Math.min(0, stock.pctChange || 0));
+  score += Math.min(25, pct * 6);
+
+  // 2. Proximity to Low component (up to +15)
+  const distFromLowRatio = (close - low) / range;
+  score += Math.max(0, 15 * (1 - distFromLowRatio / 0.15));
+
+  // 3. Body ratio component (up to +15)
+  const bodyRatio = (open - close) / range;
+  score += Math.min(15, Math.max(0, (bodyRatio - 0.58) * 35));
+
+  // 4. Open = High exactness bonus (+10)
+  const openHighDiffPct = ((high - open) / open) * 100;
+  if (openHighDiffPct <= 0.1) score += 10;
+  else if (openHighDiffPct <= 0.25) score += 5;
+
+  return Math.min(100, Math.round(score));
 }
 
 /**

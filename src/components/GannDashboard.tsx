@@ -53,7 +53,7 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
     setIsSyncingIndices(true);
 
     try {
-      const [niftyRes, bankRes] = await Promise.allSettled([
+      const [niftyRes, bankRes, sensexRes] = await Promise.allSettled([
         fetch('/api/dhan/prev-month-ohlc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -77,6 +77,18 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
             fromDate: bounds.fromDateStr,
             toDate: bounds.toDateStr
           })
+        }),
+        fetch('/api/dhan/prev-month-ohlc', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: credentials.clientId,
+            accessToken: credentials.accessToken,
+            symbol: 'SENSEX',
+            securityId: '51',
+            fromDate: bounds.fromDateStr,
+            toDate: bounds.toDateStr
+          })
         })
       ]);
 
@@ -95,6 +107,14 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
         if (json?.success) {
           newMap['BANKNIFTY'] = json;
           newMap['BANK NIFTY'] = json;
+        }
+      }
+
+      if (sensexRes.status === 'fulfilled') {
+        const json = await sensexRes.value.json().catch(() => null);
+        if (json?.success) {
+          newMap['SENSEX'] = json;
+          newMap['BSE SENSEX'] = json;
         }
       }
 
@@ -159,7 +179,24 @@ export const GannDashboard: React.FC<GannDashboardProps> = ({
       bankNiftyRealData
     );
 
-    return [nifty, bankNifty];
+    const sensexRealData = indexDhanData['SENSEX'] || indexDhanData['BSE SENSEX'];
+    const sensex = calculateGannMonthData(
+      {
+        id: 'idx_sensex',
+        symbol: 'SENSEX',
+        companyName: 'BSE Sensex Benchmark Index',
+        screenerUrl: '',
+        lotSizeJun2026: 10,
+        lotSizeJul2026: 10,
+        lotSizeAug2026: 10,
+        closePrice: sensexRealData?.cmp || 81500.0,
+        openPrice: sensexRealData?.cmp || 81200.0
+      },
+      targetDateStr,
+      sensexRealData
+    );
+
+    return [nifty, bankNifty, sensex];
   }, [isActivated, indexDhanData, targetDateStr]);
 
   // Statistics

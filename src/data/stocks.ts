@@ -18,6 +18,7 @@ export interface StockItem {
 export const RAW_NIFTY_FUTURES_CSV = `All Companies,Screener,Symbol,Lot Size (Jun 2026),Lot Size (Jul 2026),Lot Size (Aug 2026)
 Nifty 50,https://scanx.trade/company/nifty-50,NIFTY,75,75,75
 Bank Nifty,https://scanx.trade/company/bank-nifty,BANKNIFTY,15,15,15
+BSE Sensex,https://scanx.trade/company/bse-sensex,SENSEX,10,10,10
 ABB,https://scanx.trade/company/abb-ltd,ABB,125,125,125
 Aditya Birla Capital,https://scanx.trade/company/aditya-birla-capital-ltd,ABCAPITAL,3100,3100,3100
 Adani Energy Solutions,https://scanx.trade/company/adani-transmission-ltd,ADANIENSOL,675,675,675

@@ -263,7 +263,7 @@ export function createExpressApp() {
         });
       }
 
-      const isIndex = isIndexSymbol(symbol || '') || secId === '13' || secId === '25';
+      const isIndex = isIndexSymbol(symbol || '') || secId === '13' || secId === '25' || secId === '51';
       const exchangeSegment = isIndex ? 'IDX_I' : 'NSE_EQ';
       const instrument = isIndex ? 'INDEX' : 'EQUITY';
 
@@ -304,11 +304,12 @@ export function createExpressApp() {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'client-id': clientId,
                 'access-token': accessToken,
               },
               body: JSON.stringify(payloadMultiDay),
-              signal: AbortSignal.timeout(3000)
+              signal: AbortSignal.timeout(12000)
             });
 
             if (response.status === 401 || response.status === 403) {
@@ -317,7 +318,7 @@ export function createExpressApp() {
             }
 
             if (response.status === 429) {
-              await new Promise((r) => setTimeout(r, 200 * (retry + 1)));
+              await new Promise((r) => setTimeout(r, 300 * (retry + 1)));
               continue;
             }
 
@@ -332,11 +333,12 @@ export function createExpressApp() {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'client-id': clientId,
                 'access-token': accessToken,
               },
               body: JSON.stringify(payloadSingleDay),
-              signal: AbortSignal.timeout(3000)
+              signal: AbortSignal.timeout(12000)
             });
 
             if (responseSingle.status === 401 || responseSingle.status === 403) {
@@ -352,7 +354,7 @@ export function createExpressApp() {
             return { ok: response.ok, status: response.status, data: data || dataSingle };
           } catch (e: any) {
             if (retry === 0) {
-              await new Promise((r) => setTimeout(r, 150));
+              await new Promise((r) => setTimeout(r, 250));
             } else {
               return { ok: false, status: 500, data: { error: String(e?.message || e) } };
             }
@@ -376,11 +378,11 @@ export function createExpressApp() {
       let foundDate = targetDate;
       let openCandles = result.data?.open;
 
-      // If no candle data found on targetDate, automatically attempt previous trading days (up to 2 days back)
+      // If no candle data found on targetDate, automatically attempt previous trading days (up to 5 days back)
       if (!openCandles || !Array.isArray(openCandles) || openCandles.length === 0) {
         const dt = new Date(targetDate);
 
-        for (let attempt = 1; attempt <= 2; attempt++) {
+        for (let attempt = 1; attempt <= 5; attempt++) {
           dt.setDate(dt.getDate() - 1);
           // Skip weekends automatically
           if (dt.getDay() === 0) dt.setDate(dt.getDate() - 2); // Sunday -> Friday
@@ -483,7 +485,7 @@ export function createExpressApp() {
             const rawH = Number(data.high?.[i]) || 0;
             const rawL = Number(data.low?.[i]) || 0;
             const rawC = Number(data.close?.[i]) || 0;
-            const rawV = Number(data.volume?.[i]) || 0;
+            const rawV = Number(data.volume?.[i] ?? data.v?.[i] ?? data.vol?.[i]) || 0;
             const rawTs = timestamps?.[i];
 
             const parsed = getISTDateTime(rawTs);
@@ -726,7 +728,9 @@ export function createExpressApp() {
           low: Math.round(sessionLow * 100) / 100,
           first15mHigh: Math.round(first15MinHigh * 100) / 100,
           first15mLow: Math.round(first15MinLow * 100) / 100,
-          volume: first15MinVol,
+          volume: sessionTotalVol > 0 ? sessionTotalVol : first15MinVol,
+          first15mVolume: first15MinVol,
+          totalVolume: sessionTotalVol,
           rsi,
           adx,
           vwap: sessionVWAP,
@@ -763,14 +767,18 @@ export function createExpressApp() {
         isIndexSymbol(symbol || '') ||
         symUpper.includes('NIFTY') ||
         symUpper.includes('BANKNIFTY') ||
+        symUpper.includes('SENSEX') ||
         securityId === '13' ||
-        securityId === '25';
+        securityId === '25' ||
+        securityId === '51';
 
       let secId = securityId;
       if (symUpper === 'NIFTY' || symUpper === 'NIFTY50' || symUpper === 'NIFTY50INDEX') {
         secId = '13';
       } else if (symUpper === 'BANKNIFTY' || symUpper === 'NIFTYBANK' || symUpper === 'BANKNIFTYINDEX') {
         secId = '25';
+      } else if (symUpper === 'SENSEX' || symUpper === 'BSESENSEX' || symUpper === 'SENSEX50') {
+        secId = '51';
       } else if (!secId) {
         secId = getDhanSecurityId(symbol);
       }
@@ -838,11 +846,12 @@ export function createExpressApp() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
               'client-id': clientId,
               'access-token': accessToken,
             },
             body: JSON.stringify(payloadHistorical),
-            signal: AbortSignal.timeout(4000)
+            signal: AbortSignal.timeout(12000)
           });
 
           if (response.ok) {
@@ -876,11 +885,12 @@ export function createExpressApp() {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'client-id': clientId,
                 'access-token': accessToken,
               },
               body: JSON.stringify(payloadIntraday),
-              signal: AbortSignal.timeout(4000)
+              signal: AbortSignal.timeout(12000)
             });
 
             if (response.ok) {
@@ -1084,7 +1094,7 @@ Return ONLY a valid JSON object matching this schema:
           });
 
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Gemini API timeout')), 2000)
+            setTimeout(() => reject(new Error('Gemini API timeout')), 12000)
           );
 
           const geminiRes: any = await Promise.race([geminiPromise, timeoutPromise]);

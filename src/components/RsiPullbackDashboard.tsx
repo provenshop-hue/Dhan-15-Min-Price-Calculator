@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { StockCalculated, FadedStockRecord } from '../types';
-import { analyzeRsiPullback, RsiPullbackAnalysis, is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishFadeReason, get100PercentBearishFadeReason } from '../utils/rsiPullback';
+import { analyzeRsiPullback, RsiPullbackAnalysis, is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishScore, get100PercentBearishScore, get100PercentBullishFadeReason, get100PercentBearishFadeReason } from '../utils/rsiPullback';
 import { calculateRSI, isOpenLowPattern, isOpenHighPattern, isHighClosePattern } from '../utils/gann';
 import { 
   TrendingUp, 
@@ -140,13 +140,17 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     });
   }, [stocks, selectedDate]);
 
-  // Extract NIFTY and BANKNIFTY for top pinned section
+  // Extract NIFTY, BANKNIFTY, and SENSEX for top pinned section
   const niftyIndex = useMemo(() => {
     return analyzedStocks.find((s) => s.stock.symbol === 'NIFTY');
   }, [analyzedStocks]);
 
   const bankNiftyIndex = useMemo(() => {
     return analyzedStocks.find((s) => s.stock.symbol === 'BANKNIFTY');
+  }, [analyzedStocks]);
+
+  const sensexIndex = useMemo(() => {
+    return analyzedStocks.find((s) => s.stock.symbol === 'SENSEX');
   }, [analyzedStocks]);
 
   // Statistics
@@ -285,17 +289,29 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       return true;
     });
 
-    // Sorting (NIFTY & BANKNIFTY pinned at top unless searching specific query)
+    // Sorting (NIFTY, BANKNIFTY & SENSEX pinned at top unless searching specific query)
     list.sort((a, b) => {
       if (!searchQuery.trim()) {
-        const isAIndex = a.stock.symbol === 'NIFTY' || a.stock.symbol === 'BANKNIFTY';
-        const isBIndex = b.stock.symbol === 'NIFTY' || b.stock.symbol === 'BANKNIFTY';
+        const isAIndex = a.stock.symbol === 'NIFTY' || a.stock.symbol === 'BANKNIFTY' || a.stock.symbol === 'SENSEX';
+        const isBIndex = b.stock.symbol === 'NIFTY' || b.stock.symbol === 'BANKNIFTY' || b.stock.symbol === 'SENSEX';
         if (isAIndex && !isBIndex) return -1;
         if (!isAIndex && isBIndex) return 1;
         if (isAIndex && isBIndex) {
-          if (a.stock.symbol === 'NIFTY') return -1;
-          return 1;
+          const order: Record<string, number> = { 'NIFTY': 1, 'BANKNIFTY': 2, 'SENSEX': 3 };
+          return (order[a.stock.symbol] || 9) - (order[b.stock.symbol] || 9);
         }
+      }
+
+      if (activeFilter === 'BULLISH_100_MOVE') {
+        const scoreA = get100PercentBullishScore(a.stock);
+        const scoreB = get100PercentBullishScore(b.stock);
+        if (scoreB !== scoreA) return scoreB - scoreA;
+      }
+
+      if (activeFilter === 'BEARISH_100_MOVE') {
+        const scoreA = get100PercentBearishScore(a.stock);
+        const scoreB = get100PercentBearishScore(b.stock);
+        if (scoreB !== scoreA) return scoreB - scoreA;
       }
 
       if (sortBy === 'SCORE_DESC') return b.analysis.pullbackScore - a.analysis.pullbackScore;
@@ -660,8 +676,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         </div>
       )}
 
-      {/* PINNED BENCHMARK INDICES AT VERY TOP: NIFTY 50 & BANK NIFTY */}
-      {(niftyIndex || bankNiftyIndex) && (
+      {/* PINNED BENCHMARK INDICES AT VERY TOP: NIFTY 50, BANK NIFTY & BSE SENSEX */}
+      {(niftyIndex || bankNiftyIndex || sensexIndex) && (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -670,7 +686,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
               </span>
               <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                📌 Pinned Benchmark Indices Snapshot (NIFTY 50 &amp; BANK NIFTY)
+                📌 Pinned Benchmark Indices Snapshot (NIFTY 50, BANK NIFTY &amp; BSE SENSEX)
               </h3>
             </div>
             <span className="text-[11px] text-slate-500 font-bold hidden sm:inline">
@@ -678,7 +694,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* NIFTY 50 INDEX CARD */}
             {niftyIndex && (
               <div className={`bg-slate-900 text-white rounded-2xl p-4 border-2 shadow-md space-y-3 relative overflow-hidden group transition-all ${
@@ -924,6 +940,131 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                   </div>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${bankNiftyIndex.analysis.confluenceValidation.badgeColor}`}>
                     {bankNiftyIndex.analysis.confluenceValidation.statusLabel}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* BSE SENSEX INDEX CARD */}
+            {sensexIndex && (
+              <div className={`bg-slate-900 text-white rounded-2xl p-4 border-2 shadow-md space-y-3 relative overflow-hidden group transition-all ${
+                sensexIndex.analysis.pullback15mBounce?.isPullbackBounce
+                  ? 'border-purple-400 ring-2 ring-purple-500/80 shadow-purple-500/30'
+                  : 'border-amber-400/80'
+              }`}>
+                <div className="absolute top-0 right-0 bg-amber-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-bl-lg tracking-wider uppercase shadow-2xs">
+                  📌 PINNED INDEX BENCHMARK
+                </div>
+
+                {/* 15m High Retest & Bounce Special Highlight Banner */}
+                {sensexIndex.analysis.pullback15mBounce?.isPullbackBounce && (
+                  <div className="bg-gradient-to-r from-purple-950 via-purple-900 to-indigo-950 text-white p-3 rounded-xl border-2 border-purple-400/90 shadow-lg space-y-1.5 animate-pulse">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs text-purple-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Target className="w-4 h-4 text-purple-300 shrink-0" />
+                        🎯 BSE SENSEX: 15m High Retested &amp; Bounced!
+                      </span>
+                      <span className="bg-purple-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded shadow-xs font-mono">
+                        BOUNCE @ {sensexIndex.analysis.pullback15mBounce.bounceTime}
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-purple-100 flex items-center justify-between pt-1 border-t border-purple-800/80">
+                      <span>15m High: <strong>₹{sensexIndex.analysis.pullback15mBounce.first15mHigh.toFixed(2)}</strong></span>
+                      <span>Retest Low: <strong>₹{sensexIndex.analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong></span>
+                      <span className="text-emerald-300 font-extrabold">Gain: +{sensexIndex.analysis.pullback15mBounce.bouncePct.toFixed(2)}%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Row: Symbol, Price, Change */}
+                <div className="flex items-start justify-between border-b border-slate-800 pb-2.5">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-black text-xl text-white tracking-wide">
+                        {sensexIndex.stock.companyName || 'BSE SENSEX'}
+                      </span>
+                      <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10.5px] font-mono font-bold px-2 py-0.5 rounded-full">
+                        Lot: {sensexIndex.stock.lotSizeAug2026 || sensexIndex.stock.lotSizeJul2026 || 10} shares
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 font-medium">Symbol: {sensexIndex.stock.symbol}</span>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-xl font-black text-white font-mono">
+                      {sensexIndex.stock.closePrice !== undefined && sensexIndex.stock.closePrice !== null ? `₹${sensexIndex.stock.closePrice.toFixed(2)}` : 'N/A'}
+                    </div>
+                    <div className={`text-xs font-black ${
+                      (sensexIndex.stock.pctChange || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {(sensexIndex.stock.pctChange || 0) >= 0 ? '+' : ''}{(sensexIndex.stock.pctChange || 0).toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Middle Row: Bullish vs Bearish Rally Status & Trigger Times */}
+                <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                  {/* Bullish Rally Box */}
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                    sensexIndex.analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met'
+                      ? 'bg-emerald-950/90 border-emerald-500 text-white ring-1 ring-emerald-400'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                  }`}>
+                    <div className="flex items-center justify-between font-extrabold text-[10px] uppercase text-emerald-400 border-b border-slate-700/60 pb-1">
+                      <span>🔥 Bullish Rally</span>
+                      <span className="font-mono text-white">RSI {sensexIndex.analysis.rsiVal.toFixed(1)}</span>
+                    </div>
+                    <div className="font-mono mt-1 space-y-0.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Trigger Time:</span>
+                        <strong className={sensexIndex.analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' ? 'text-amber-300' : 'text-slate-400'}>
+                          {sensexIndex.analysis.intradayConfluence.bullishConfluenceTime}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Right Entry:</span>
+                        <strong className="text-emerald-300 font-extrabold">
+                          ₹{sensexIndex.analysis.intradayConfluence.bullishEntryPoint || sensexIndex.analysis.idealEntry}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bearish Rally Box */}
+                  <div className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+                    sensexIndex.analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met'
+                      ? 'bg-rose-950/90 border-rose-500 text-white ring-1 ring-rose-400'
+                      : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                  }`}>
+                    <div className="flex items-center justify-between font-extrabold text-[10px] uppercase text-rose-400 border-b border-slate-700/60 pb-1">
+                      <span>🔻 Bearish Rally</span>
+                      <span className="font-mono text-white">RSI {sensexIndex.analysis.rsiVal.toFixed(1)}</span>
+                    </div>
+                    <div className="font-mono mt-1 space-y-0.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Trigger Time:</span>
+                        <strong className={sensexIndex.analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met' ? 'text-amber-300' : 'text-slate-400'}>
+                          {sensexIndex.analysis.intradayConfluence.bearishConfluenceTime}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Right Entry:</span>
+                        <strong className="text-rose-300 font-extrabold">
+                          ₹{sensexIndex.analysis.intradayConfluence.bearishEntryPoint || sensexIndex.analysis.idealEntry}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row: 5 Confluence Validation */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[10.5px]">
+                  <div className="flex items-center space-x-1.5 font-bold text-slate-300">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Confluence Signal Quality:</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${sensexIndex.analysis.confluenceValidation.badgeColor}`}>
+                    {sensexIndex.analysis.confluenceValidation.statusLabel}
                   </span>
                 </div>
               </div>
@@ -1539,7 +1680,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                         <span className="font-black text-slate-900 text-lg group-hover:text-blue-600 transition-colors">
                           {stock.symbol}
                         </span>
-                        {(stock.symbol === 'NIFTY' || stock.symbol === 'BANKNIFTY') && (
+                        {(stock.symbol === 'NIFTY' || stock.symbol === 'BANKNIFTY' || stock.symbol === 'SENSEX') && (
                           <span className="bg-amber-100 text-amber-900 text-[10px] font-black px-1.5 py-0.5 rounded border border-amber-300 shadow-2xs">
                             📌 PINNED INDEX
                           </span>

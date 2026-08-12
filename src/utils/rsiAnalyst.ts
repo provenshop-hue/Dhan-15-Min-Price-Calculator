@@ -158,7 +158,7 @@ export async function analyzeRsiProgressWithAi(
         targetsDown: stock.targetsDown,
         rsiTimeline: timeline
       }),
-      signal: AbortSignal.timeout(4000)
+      signal: AbortSignal.timeout(12000)
     });
 
     if (response.ok) {
