@@ -426,6 +426,26 @@ export interface Pullback15mBounceInfo {
   detail: string;
 }
 
+export interface SignalSuccessMetrics {
+  hasSignal: boolean;
+  signalType: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  signalName: string;            // e.g. "100% Bullish Move", "Bullish Rally Confluence", "15m High Bounce", "Open = Low"
+  firstShownTime: string;        // Time signal first shown in app (e.g. "09:30 AM")
+  firstShownPrice: number;       // Price at time signal was first shown (e.g. ₹450.00)
+  latestFetchTime: string;       // Timestamp of new user fetch (e.g. "02:15 PM")
+  latestPrice: number;           // Current price (LTP) at latest fetch (e.g. ₹458.50)
+  priceChangeAbs: number;        // ₹ change from signal entry to latest fetch price
+  priceChangePct: number;        // % change from signal entry to latest fetch price
+  targetPrice: number;           // Target 1 level
+  stopLossPrice: number;         // Stop loss level
+  timeElapsedStr: string;        // Time elapsed between signal first shown and latest fetch (e.g. "2h 45m")
+  successRatePct: number;        // 0.0% to 100.0% (Signal Success Percentage Rate)
+  ratingTier: 'TARGET_HIT' | 'HIGH_SUCCESS' | 'MODERATE_SUCCESS' | 'NEUTRAL' | 'DRAWDOWN';
+  statusBadgeText: string;       // e.g. "🎯 94.5% Success (+1.89%)"
+  statusBadgeClass: string;      // Tailwind class string
+  summaryText: string;           // Human-readable summary sentence
+}
+
 export interface RsiPullbackAnalysis {
   rsiVal: number;
   pullbackCategory: 'BULLISH_RALLY' | 'BEARISH_RALLY' | 'BULLISH_SWEET_SPOT' | 'BULLISH_MOMENTUM' | 'OVERSOLD_BOUNCE' | 'OVERBOUGHT' | 'NEUTRAL';
@@ -452,6 +472,7 @@ export interface RsiPullbackAnalysis {
   is100PercentBullish: boolean;
   is100PercentBearish: boolean;
   pullback15mBounce: Pullback15mBounceInfo;
+  signalSuccessMetrics: SignalSuccessMetrics;
 }
 
 /**
@@ -805,7 +826,7 @@ export function calculate15MinIntradayConfluence(
 /**
  * Calculates comprehensive RSI Pullback & First-Candle Rally strategy metrics for a stock
  */
-export function analyzeRsiPullback(stock: StockCalculated, tradingDate?: string): RsiPullbackAnalysis {
+export function analyzeRsiPullback(stock: StockCalculated, tradingDate?: string, userFetchTime?: string): RsiPullbackAnalysis {
   const open = stock.openPrice || 100;
   const close = stock.closePrice || open;
   const high = stock.highPrice || Math.max(open, close);
@@ -976,6 +997,23 @@ export function analyzeRsiPullback(stock: StockCalculated, tradingDate?: string)
   // Calculate 15-Min High Pullback & Bounce Strategy
   const pullback15mBounce = detect15mHighPullbackBounce(stock, tradingDate);
 
+  const signalSuccessMetrics = calculateSignalSuccessMetrics(
+    stock,
+    {
+      idealEntry,
+      stopLoss,
+      target1,
+      intradayConfluence,
+      pullback15mBounce,
+      pullbackCategory,
+      bullishRally,
+      bearishRally,
+      is100PercentBullish: is100Bullish,
+      is100PercentBearish: is100Bearish
+    },
+    userFetchTime
+  );
+
   return {
     rsiVal: currentRsi,
     pullbackCategory,
@@ -1001,7 +1039,8 @@ export function analyzeRsiPullback(stock: StockCalculated, tradingDate?: string)
     confluenceValidation,
     is100PercentBullish: is100Bullish,
     is100PercentBearish: is100Bearish,
-    pullback15mBounce
+    pullback15mBounce,
+    signalSuccessMetrics
   };
 }
 
@@ -1273,5 +1312,284 @@ export function validateConfluenceAndFalseBreakoutRisk(
     score,
     checks
   };
+}
+
+/**
+ * Calculates signal success percentage rate based on signal first shown time/price vs new user fetch time/price.
+ */
+export function calculateSignalSuccessMetrics(
+  stock: StockCalculated,
+  analysisPartial: {
+    idealEntry: number;
+    stopLoss: number;
+    target1: number;
+    intradayConfluence: IntradayConfluenceInfo;
+    pullback15mBounce: Pullback15mBounceInfo;
+    pullbackCategory: string;
+    bullishRally: RallyScoreResult;
+    bearishRally: RallyScoreResult;
+    is100PercentBullish: boolean;
+    is100PercentBearish: boolean;
+  },
+  userFetchTime?: string
+): SignalSuccessMetrics {
+  const open = stock.openPrice || 100;
+  const cmp = stock.closePrice || open;
+
+  // Derive latest fetch time string
+  let latestFetchTimeStr = userFetchTime || '';
+  if (!latestFetchTimeStr) {
+    if (stock.candleTimestamp) {
+      if (stock.candleTimestamp.includes('T')) {
+        const d = new Date(stock.candleTimestamp);
+        latestFetchTimeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      } else {
+        latestFetchTimeStr = stock.candleTimestamp;
+      }
+    } else {
+      latestFetchTimeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+  }
+
+  // 1. Determine Signal Type, Name, First Shown Time, and First Shown Price
+  let hasSignal = false;
+  let signalType: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
+  let signalName = 'No Active Signal';
+  let firstShownTime = '09:15 AM';
+  let firstShownPrice = analysisPartial.idealEntry || cmp;
+
+  const isBull100 = analysisPartial.is100PercentBullish;
+  const isBear100 = analysisPartial.is100PercentBearish;
+  const bullTime = analysisPartial.intradayConfluence.bullishConfluenceTime;
+  const bearTime = analysisPartial.intradayConfluence.bearishConfluenceTime;
+  const bounce15m = analysisPartial.pullback15mBounce;
+
+  if (isBull100) {
+    hasSignal = true;
+    signalType = 'BULLISH';
+    signalName = '100% Bullish Move';
+    firstShownTime = bullTime !== 'Not Met' ? bullTime : (stock.candleTimestamp || '09:15 AM');
+    firstShownPrice = analysisPartial.intradayConfluence.bullishEntryPoint || open;
+  } else if (isBear100) {
+    hasSignal = true;
+    signalType = 'BEARISH';
+    signalName = '100% Bearish Move';
+    firstShownTime = bearTime !== 'Not Met' ? bearTime : (stock.candleTimestamp || '09:15 AM');
+    firstShownPrice = analysisPartial.intradayConfluence.bearishEntryPoint || open;
+  } else if (bounce15m && bounce15m.isPullbackBounce) {
+    hasSignal = true;
+    signalType = 'BULLISH';
+    signalName = '15m High Bounce';
+    firstShownTime = bounce15m.bounceTime || '09:45 AM';
+    firstShownPrice = bounce15m.retestPrice || open;
+  } else if (bullTime !== 'Not Met') {
+    hasSignal = true;
+    signalType = 'BULLISH';
+    signalName = 'Bullish Rally Confluence';
+    firstShownTime = bullTime;
+    firstShownPrice = analysisPartial.intradayConfluence.bullishEntryPoint || analysisPartial.idealEntry;
+  } else if (bearTime !== 'Not Met') {
+    hasSignal = true;
+    signalType = 'BEARISH';
+    signalName = 'Bearish Rally Confluence';
+    firstShownTime = bearTime;
+    firstShownPrice = analysisPartial.intradayConfluence.bearishEntryPoint || analysisPartial.idealEntry;
+  } else if (isOpenLowPattern(open, stock.lowPrice || open, stock.first15mLow)) {
+    hasSignal = true;
+    signalType = 'BULLISH';
+    signalName = 'Open = Low (Bullish)';
+    firstShownTime = '09:15 AM';
+    firstShownPrice = open;
+  } else if (isOpenHighPattern(open, stock.highPrice || open, stock.first15mHigh)) {
+    hasSignal = true;
+    signalType = 'BEARISH';
+    signalName = 'Open = High (Bearish)';
+    firstShownTime = '09:15 AM';
+    firstShownPrice = open;
+  } else if (analysisPartial.pullbackCategory === 'BULLISH_SWEET_SPOT' || analysisPartial.pullbackCategory === 'BULLISH_MOMENTUM') {
+    hasSignal = true;
+    signalType = 'BULLISH';
+    signalName = 'RSI Bullish Dip';
+    firstShownTime = '09:30 AM';
+    firstShownPrice = analysisPartial.idealEntry;
+  } else if (analysisPartial.pullbackCategory === 'BEARISH_RALLY') {
+    hasSignal = true;
+    signalType = 'BEARISH';
+    signalName = 'RSI Bearish Counter';
+    firstShownTime = '09:30 AM';
+    firstShownPrice = analysisPartial.idealEntry;
+  } else if (['NIFTY', 'BANKNIFTY', 'SENSEX', 'NIFTY50'].includes(stock.symbol.toUpperCase())) {
+    hasSignal = true;
+    signalType = cmp >= open ? 'BULLISH' : 'BEARISH';
+    signalName = cmp >= open ? 'Index Bullish Trend' : 'Index Bearish Trend';
+    firstShownTime = '09:15 AM';
+    firstShownPrice = open;
+  }
+
+  if (firstShownPrice <= 0) firstShownPrice = cmp || 100;
+
+  // 2. Price change calculations
+  let priceChangeAbs = 0;
+  let priceChangePct = 0;
+
+  if (signalType === 'BULLISH') {
+    priceChangeAbs = cmp - firstShownPrice;
+    priceChangePct = ((cmp - firstShownPrice) / firstShownPrice) * 100;
+  } else if (signalType === 'BEARISH') {
+    priceChangeAbs = firstShownPrice - cmp;
+    priceChangePct = ((firstShownPrice - cmp) / firstShownPrice) * 100;
+  } else {
+    priceChangeAbs = cmp - open;
+    priceChangePct = ((cmp - open) / open) * 100;
+  }
+
+  priceChangeAbs = Math.round(priceChangeAbs * 100) / 100;
+  priceChangePct = Math.round(priceChangePct * 100) / 100;
+
+  // 3. Targets and Stop Loss
+  let targetPrice = analysisPartial.target1;
+  let stopLossPrice = analysisPartial.stopLoss;
+
+  if (signalType === 'BULLISH') {
+    if (!targetPrice || targetPrice <= firstShownPrice) targetPrice = Math.round(firstShownPrice * 1.015 * 100) / 100;
+    if (!stopLossPrice || stopLossPrice >= firstShownPrice) stopLossPrice = Math.round(firstShownPrice * 0.992 * 100) / 100;
+  } else if (signalType === 'BEARISH') {
+    if (!targetPrice || targetPrice >= firstShownPrice) targetPrice = Math.round(firstShownPrice * 0.985 * 100) / 100;
+    if (!stopLossPrice || stopLossPrice <= firstShownPrice) stopLossPrice = Math.round(firstShownPrice * 1.008 * 100) / 100;
+  }
+
+  // 4. Success Percentage Rate Math (0.0% to 100.0%)
+  let successRatePct = 50;
+
+  if (!hasSignal) {
+    successRatePct = 0;
+  } else if (signalType === 'BULLISH') {
+    const targetGainPct = ((targetPrice - firstShownPrice) / firstShownPrice) * 100;
+    const stopLossPct = ((firstShownPrice - stopLossPrice) / firstShownPrice) * 100;
+
+    if (priceChangePct >= targetGainPct && targetGainPct > 0) {
+      successRatePct = 100; // Target 1 achieved!
+    } else if (priceChangePct > 0) {
+      const progressRatio = targetGainPct > 0 ? (priceChangePct / targetGainPct) : 0.5;
+      successRatePct = 50 + Math.min(49, progressRatio * 50);
+    } else {
+      const drawdownRatio = stopLossPct > 0 ? (Math.abs(priceChangePct) / stopLossPct) : 1;
+      if (drawdownRatio >= 1) {
+        successRatePct = 0; // Stopped out
+      } else {
+        successRatePct = Math.max(5, 50 - drawdownRatio * 45);
+      }
+    }
+  } else if (signalType === 'BEARISH') {
+    const targetDropPct = ((firstShownPrice - targetPrice) / firstShownPrice) * 100;
+    const stopLossPct = ((stopLossPrice - firstShownPrice) / firstShownPrice) * 100;
+
+    if (priceChangePct >= targetDropPct && targetDropPct > 0) {
+      successRatePct = 100; // Target 1 achieved!
+    } else if (priceChangePct > 0) {
+      const progressRatio = targetDropPct > 0 ? (priceChangePct / targetDropPct) : 0.5;
+      successRatePct = 50 + Math.min(49, progressRatio * 50);
+    } else {
+      const drawdownRatio = stopLossPct > 0 ? (Math.abs(priceChangePct) / stopLossPct) : 1;
+      if (drawdownRatio >= 1) {
+        successRatePct = 0; // Stopped out
+      } else {
+        successRatePct = Math.max(5, 50 - drawdownRatio * 45);
+      }
+    }
+  }
+
+  successRatePct = Math.round(successRatePct * 10) / 10;
+
+  // 5. Time Elapsed
+  const timeElapsedStr = getTimeElapsedStr(firstShownTime, latestFetchTimeStr);
+
+  // 6. Rating Tiers and Status Badge styling
+  let ratingTier: SignalSuccessMetrics['ratingTier'] = 'NEUTRAL';
+  let statusBadgeText = '';
+  let statusBadgeClass = '';
+
+  if (!hasSignal) {
+    ratingTier = 'NEUTRAL';
+    statusBadgeText = '⚡ No Active Signal';
+    statusBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+  } else if (successRatePct >= 95) {
+    ratingTier = 'TARGET_HIT';
+    statusBadgeText = `🎯 ${successRatePct}% SUCCESS (TARGET HIT! +${priceChangePct.toFixed(2)}%)`;
+    statusBadgeClass = 'bg-emerald-500 text-slate-950 font-black border-emerald-300 shadow-emerald-500/30 shadow-md animate-pulse';
+  } else if (successRatePct >= 70) {
+    ratingTier = 'HIGH_SUCCESS';
+    statusBadgeText = `🚀 ${successRatePct}% SUCCESS (+${priceChangePct.toFixed(2)}%)`;
+    statusBadgeClass = 'bg-emerald-950 text-emerald-300 border-emerald-500/80 shadow-emerald-500/20';
+  } else if (successRatePct >= 50) {
+    ratingTier = 'MODERATE_SUCCESS';
+    statusBadgeText = `📈 ${successRatePct}% SUCCESS (+${priceChangePct.toFixed(2)}%)`;
+    statusBadgeClass = 'bg-teal-950 text-teal-300 border-teal-500/80';
+  } else if (successRatePct >= 30) {
+    ratingTier = 'NEUTRAL';
+    statusBadgeText = `⏳ ${successRatePct}% Rate (${priceChangePct >= 0 ? '+' : ''}${priceChangePct.toFixed(2)}%)`;
+    statusBadgeClass = 'bg-amber-950 text-amber-300 border-amber-500/80';
+  } else {
+    ratingTier = 'DRAWDOWN';
+    statusBadgeText = `⚠️ ${successRatePct}% Rate (${priceChangePct.toFixed(2)}% Drawdown)`;
+    statusBadgeClass = 'bg-rose-950 text-rose-300 border-rose-500/80';
+  }
+
+  const summaryText = hasSignal
+    ? `Signal "${signalName}" first shown at ${firstShownTime} (₹${firstShownPrice.toFixed(2)}). New fetch at ${latestFetchTimeStr} (₹${cmp.toFixed(2)}) shows ${priceChangePct >= 0 ? '+' : ''}${priceChangePct.toFixed(2)}% net move (${timeElapsedStr} elapsed). Success Rate: ${successRatePct}%.`
+    : `No active directional signal for ${stock.symbol} as of ${latestFetchTimeStr}.`;
+
+  return {
+    hasSignal,
+    signalType,
+    signalName,
+    firstShownTime,
+    firstShownPrice: Math.round(firstShownPrice * 100) / 100,
+    latestFetchTime: latestFetchTimeStr,
+    latestPrice: Math.round(cmp * 100) / 100,
+    priceChangeAbs,
+    priceChangePct,
+    targetPrice: Math.round(targetPrice * 100) / 100,
+    stopLossPrice: Math.round(stopLossPrice * 100) / 100,
+    timeElapsedStr,
+    successRatePct,
+    ratingTier,
+    statusBadgeText,
+    statusBadgeClass,
+    summaryText
+  };
+}
+
+function getTimeElapsedStr(startTimeStr: string, endTimeStr: string): string {
+  function parseTimeToMinutes(tStr: string): number | null {
+    if (!tStr || tStr === 'Not Met') return null;
+    const clean = tStr.trim().toUpperCase();
+    const isPm = clean.includes('PM');
+    const isAm = clean.includes('AM');
+    const timeOnly = clean.replace(/AM|PM/g, '').trim();
+    const parts = timeOnly.split(':');
+    if (parts.length < 2) return null;
+    let hrs = parseInt(parts[0], 10);
+    const mins = parseInt(parts[1], 10);
+    if (isNaN(hrs) || isNaN(mins)) return null;
+    if (isPm && hrs < 12) hrs += 12;
+    if (isAm && hrs === 12) hrs = 0;
+    return hrs * 60 + mins;
+  }
+
+  const startMins = parseTimeToMinutes(startTimeStr);
+  const endMins = parseTimeToMinutes(endTimeStr);
+
+  if (startMins === null || endMins === null) return 'active session';
+
+  let diff = endMins - startMins;
+  if (diff < 0) diff += 24 * 60;
+  if (diff === 0) return '0m';
+
+  const h = Math.floor(diff / 60);
+  const m = diff % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
 }
 

@@ -50,6 +50,8 @@ type PullbackFilterType =
   | 'ALL' 
   | 'HIGH_CONFLUENCE'
   | 'TRIGGERED_TODAY'
+  | 'HIGH_SUCCESS'
+  | 'TARGET_HIT'
   | 'BULLISH_100_MOVE'
   | 'BEARISH_100_MOVE'
   | 'FADED_100_MOVE'
@@ -65,7 +67,7 @@ type PullbackFilterType =
   | 'HIGH_CLOSE'
   | 'PULLBACK_15M_BOUNCE';
 
-type SortOption = 'SCORE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
+type SortOption = 'SCORE_DESC' | 'SUCCESS_RATE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
 
 export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   stocks,
@@ -171,6 +173,11 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let highCloseCount = 0;
     let pullback15mBounceCount = 0;
 
+    let totalSuccessPctSum = 0;
+    let activeSignalCount = 0;
+    let targetHitCount = 0;
+    let highSuccessCount = 0;
+
     analyzedStocks.forEach(({ stock, analysis }) => {
       if (analysis.confluenceValidation.status === 'HIGH_CONFLUENCE') highConfluenceCount++;
       if (analysis.confluenceValidation.status === 'FALSE_BREAKOUT_RISK') falseSignalRiskCount++;
@@ -186,6 +193,13 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (analysis.pullbackScore >= 75) highScore++;
       if (analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce) pullback15mBounceCount++;
 
+      if (analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.hasSignal) {
+        activeSignalCount++;
+        totalSuccessPctSum += analysis.signalSuccessMetrics.successRatePct;
+        if (analysis.signalSuccessMetrics.successRatePct >= 95) targetHitCount++;
+        if (analysis.signalSuccessMetrics.successRatePct >= 70) highSuccessCount++;
+      }
+
       const isOL = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
         ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
         : false;
@@ -200,6 +214,10 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (isOH) openHighCount++;
       if (isHC) highCloseCount++;
     });
+
+    const avgSuccessRate = activeSignalCount > 0
+      ? Math.round((totalSuccessPctSum / activeSignalCount) * 10) / 10
+      : 0;
 
     return {
       total: stocks.length,
@@ -217,9 +235,21 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       openLowCount,
       openHighCount,
       highCloseCount,
-      pullback15mBounceCount
+      pullback15mBounceCount,
+      avgSuccessRate,
+      activeSignalCount,
+      targetHitCount,
+      highSuccessCount
     };
   }, [analyzedStocks, stocks.length]);
+
+  // Top 10 stocks by signal success rate
+  const topSuccessStocks = useMemo(() => {
+    return analyzedStocks
+      .filter(item => item.analysis.signalSuccessMetrics && item.analysis.signalSuccessMetrics.hasSignal)
+      .sort((a, b) => (b.analysis.signalSuccessMetrics?.successRatePct || 0) - (a.analysis.signalSuccessMetrics?.successRatePct || 0))
+      .slice(0, 10);
+  }, [analyzedStocks]);
 
   // Filtered & Sorted list
   const filteredStocks = useMemo(() => {
@@ -238,6 +268,12 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
       if (activeFilter === 'TRIGGERED_TODAY') {
         return analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' || analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met';
+      }
+      if (activeFilter === 'HIGH_SUCCESS') {
+        return analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.successRatePct >= 70;
+      }
+      if (activeFilter === 'TARGET_HIT') {
+        return analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.successRatePct >= 95;
       }
       if (activeFilter === 'BULLISH_100_MOVE') {
         return is100PercentBullishMove(stock);
@@ -315,6 +351,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
 
       if (sortBy === 'SCORE_DESC') return b.analysis.pullbackScore - a.analysis.pullbackScore;
+      if (sortBy === 'SUCCESS_RATE_DESC') return (b.analysis.signalSuccessMetrics?.successRatePct || 0) - (a.analysis.signalSuccessMetrics?.successRatePct || 0);
       if (sortBy === 'RSI_ASC') return a.analysis.rsiVal - b.analysis.rsiVal;
       if (sortBy === 'RSI_DESC') return b.analysis.rsiVal - a.analysis.rsiVal;
       if (sortBy === 'PCT_CHANGE_DESC') return (b.stock.pctChange || 0) - (a.stock.pctChange || 0);
@@ -807,6 +844,68 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                   </div>
                 </div>
 
+                {/* 🎯 NIFTY SIGNAL SUCCESS PERCENTAGE RATE & FETCH TIME COMPARISON */}
+                {niftyIndex.analysis.signalSuccessMetrics && niftyIndex.analysis.signalSuccessMetrics.hasSignal && (
+                  <div className="bg-slate-950/90 text-white p-3 rounded-xl border border-slate-700 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                        <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate">{niftyIndex.analysis.signalSuccessMetrics.signalName}</span>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shrink-0 ${niftyIndex.analysis.signalSuccessMetrics.statusBadgeClass}`}>
+                        {niftyIndex.analysis.signalSuccessMetrics.statusBadgeText}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10.5px] font-mono bg-slate-900 p-2 rounded-lg border border-slate-800">
+                      <div>
+                        <div className="text-slate-400 text-[9px] font-sans font-bold uppercase tracking-wider flex items-center gap-1 mb-0.5">
+                          <Clock className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+                          <span>1st Triggered Time</span>
+                        </div>
+                        <div className="font-extrabold text-amber-300">{niftyIndex.analysis.signalSuccessMetrics.firstShownTime}</div>
+                        <div className="text-slate-300 text-[10px]">Entry: ₹{niftyIndex.analysis.signalSuccessMetrics.firstShownPrice.toFixed(2)}</div>
+                      </div>
+
+                      <div className="text-right border-l border-slate-800 pl-2">
+                        <div className="text-slate-400 text-[9px] font-sans font-bold uppercase tracking-wider flex items-center gap-1 justify-end mb-0.5">
+                          <RefreshCw className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                          <span>New Fetch Time</span>
+                        </div>
+                        <div className="font-extrabold text-emerald-300">{niftyIndex.analysis.signalSuccessMetrics.latestFetchTime}</div>
+                        <div className="text-white text-[10px]">
+                          LTP: ₹{niftyIndex.analysis.signalSuccessMetrics.latestPrice.toFixed(2)}
+                          <span className={`ml-1 font-bold ${niftyIndex.analysis.signalSuccessMetrics.priceChangePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            ({niftyIndex.analysis.signalSuccessMetrics.priceChangePct >= 0 ? '+' : ''}{niftyIndex.analysis.signalSuccessMetrics.priceChangePct.toFixed(2)}%)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 pt-0.5">
+                      <div className="flex items-center justify-between text-[9.5px] text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <span>Target 1: ₹{niftyIndex.analysis.signalSuccessMetrics.targetPrice.toFixed(2)}</span>
+                          <span className="text-[9px] text-slate-500">({niftyIndex.analysis.signalSuccessMetrics.timeElapsedStr} elapsed)</span>
+                        </span>
+                        <span className="font-bold text-emerald-300 font-mono">{niftyIndex.analysis.signalSuccessMetrics.successRatePct}% Success Rate</span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden border border-slate-700/50">
+                        <div 
+                          className={`h-full transition-all duration-500 rounded-full ${
+                            niftyIndex.analysis.signalSuccessMetrics.successRatePct >= 80 
+                              ? 'bg-gradient-to-r from-emerald-500 to-green-400' 
+                              : niftyIndex.analysis.signalSuccessMetrics.successRatePct >= 50 
+                                ? 'bg-gradient-to-r from-teal-500 to-amber-400' 
+                                : 'bg-rose-500'
+                          }`}
+                          style={{ width: `${Math.min(100, Math.max(5, niftyIndex.analysis.signalSuccessMetrics.successRatePct))}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Bottom Row: 5 Confluence Validation */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[10.5px]">
                   <div className="flex items-center space-x-1.5 font-bold text-slate-300">
@@ -931,6 +1030,68 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* 🎯 BANK NIFTY SIGNAL SUCCESS PERCENTAGE RATE & FETCH TIME COMPARISON */}
+                {bankNiftyIndex.analysis.signalSuccessMetrics && bankNiftyIndex.analysis.signalSuccessMetrics.hasSignal && (
+                  <div className="bg-slate-950/90 text-white p-3 rounded-xl border border-slate-700 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                        <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate">{bankNiftyIndex.analysis.signalSuccessMetrics.signalName}</span>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shrink-0 ${bankNiftyIndex.analysis.signalSuccessMetrics.statusBadgeClass}`}>
+                        {bankNiftyIndex.analysis.signalSuccessMetrics.statusBadgeText}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10.5px] font-mono bg-slate-900 p-2 rounded-lg border border-slate-800">
+                      <div>
+                        <div className="text-slate-400 text-[9px] font-sans font-bold uppercase tracking-wider flex items-center gap-1 mb-0.5">
+                          <Clock className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+                          <span>1st Triggered Time</span>
+                        </div>
+                        <div className="font-extrabold text-amber-300">{bankNiftyIndex.analysis.signalSuccessMetrics.firstShownTime}</div>
+                        <div className="text-slate-300 text-[10px]">Entry: ₹{bankNiftyIndex.analysis.signalSuccessMetrics.firstShownPrice.toFixed(2)}</div>
+                      </div>
+
+                      <div className="text-right border-l border-slate-800 pl-2">
+                        <div className="text-slate-400 text-[9px] font-sans font-bold uppercase tracking-wider flex items-center gap-1 justify-end mb-0.5">
+                          <RefreshCw className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                          <span>New Fetch Time</span>
+                        </div>
+                        <div className="font-extrabold text-emerald-300">{bankNiftyIndex.analysis.signalSuccessMetrics.latestFetchTime}</div>
+                        <div className="text-white text-[10px]">
+                          LTP: ₹{bankNiftyIndex.analysis.signalSuccessMetrics.latestPrice.toFixed(2)}
+                          <span className={`ml-1 font-bold ${bankNiftyIndex.analysis.signalSuccessMetrics.priceChangePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            ({bankNiftyIndex.analysis.signalSuccessMetrics.priceChangePct >= 0 ? '+' : ''}{bankNiftyIndex.analysis.signalSuccessMetrics.priceChangePct.toFixed(2)}%)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 pt-0.5">
+                      <div className="flex items-center justify-between text-[9.5px] text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <span>Target 1: ₹{bankNiftyIndex.analysis.signalSuccessMetrics.targetPrice.toFixed(2)}</span>
+                          <span className="text-[9px] text-slate-500">({bankNiftyIndex.analysis.signalSuccessMetrics.timeElapsedStr} elapsed)</span>
+                        </span>
+                        <span className="font-bold text-emerald-300 font-mono">{bankNiftyIndex.analysis.signalSuccessMetrics.successRatePct}% Success Rate</span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden border border-slate-700/50">
+                        <div 
+                          className={`h-full transition-all duration-500 rounded-full ${
+                            bankNiftyIndex.analysis.signalSuccessMetrics.successRatePct >= 80 
+                              ? 'bg-gradient-to-r from-emerald-500 to-green-400' 
+                              : bankNiftyIndex.analysis.signalSuccessMetrics.successRatePct >= 50 
+                                ? 'bg-gradient-to-r from-teal-500 to-amber-400' 
+                                : 'bg-rose-500'
+                          }`}
+                          style={{ width: `${Math.min(100, Math.max(5, bankNiftyIndex.analysis.signalSuccessMetrics.successRatePct))}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Bottom Row: 5 Confluence Validation */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[10.5px]">
@@ -1057,6 +1218,68 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                   </div>
                 </div>
 
+                {/* 🎯 SENSEX SIGNAL SUCCESS PERCENTAGE RATE & FETCH TIME COMPARISON */}
+                {sensexIndex.analysis.signalSuccessMetrics && sensexIndex.analysis.signalSuccessMetrics.hasSignal && (
+                  <div className="bg-slate-950/90 text-white p-3 rounded-xl border border-slate-700 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                        <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate">{sensexIndex.analysis.signalSuccessMetrics.signalName}</span>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shrink-0 ${sensexIndex.analysis.signalSuccessMetrics.statusBadgeClass}`}>
+                        {sensexIndex.analysis.signalSuccessMetrics.statusBadgeText}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10.5px] font-mono bg-slate-900 p-2 rounded-lg border border-slate-800">
+                      <div>
+                        <div className="text-slate-400 text-[9px] font-sans font-bold uppercase tracking-wider flex items-center gap-1 mb-0.5">
+                          <Clock className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+                          <span>1st Triggered Time</span>
+                        </div>
+                        <div className="font-extrabold text-amber-300">{sensexIndex.analysis.signalSuccessMetrics.firstShownTime}</div>
+                        <div className="text-slate-300 text-[10px]">Entry: ₹{sensexIndex.analysis.signalSuccessMetrics.firstShownPrice.toFixed(2)}</div>
+                      </div>
+
+                      <div className="text-right border-l border-slate-800 pl-2">
+                        <div className="text-slate-400 text-[9px] font-sans font-bold uppercase tracking-wider flex items-center gap-1 justify-end mb-0.5">
+                          <RefreshCw className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                          <span>New Fetch Time</span>
+                        </div>
+                        <div className="font-extrabold text-emerald-300">{sensexIndex.analysis.signalSuccessMetrics.latestFetchTime}</div>
+                        <div className="text-white text-[10px]">
+                          LTP: ₹{sensexIndex.analysis.signalSuccessMetrics.latestPrice.toFixed(2)}
+                          <span className={`ml-1 font-bold ${sensexIndex.analysis.signalSuccessMetrics.priceChangePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            ({sensexIndex.analysis.signalSuccessMetrics.priceChangePct >= 0 ? '+' : ''}{sensexIndex.analysis.signalSuccessMetrics.priceChangePct.toFixed(2)}%)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 pt-0.5">
+                      <div className="flex items-center justify-between text-[9.5px] text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <span>Target 1: ₹{sensexIndex.analysis.signalSuccessMetrics.targetPrice.toFixed(2)}</span>
+                          <span className="text-[9px] text-slate-500">({sensexIndex.analysis.signalSuccessMetrics.timeElapsedStr} elapsed)</span>
+                        </span>
+                        <span className="font-bold text-emerald-300 font-mono">{sensexIndex.analysis.signalSuccessMetrics.successRatePct}% Success Rate</span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden border border-slate-700/50">
+                        <div 
+                          className={`h-full transition-all duration-500 rounded-full ${
+                            sensexIndex.analysis.signalSuccessMetrics.successRatePct >= 80 
+                              ? 'bg-gradient-to-r from-emerald-500 to-green-400' 
+                              : sensexIndex.analysis.signalSuccessMetrics.successRatePct >= 50 
+                                ? 'bg-gradient-to-r from-teal-500 to-amber-400' 
+                                : 'bg-rose-500'
+                          }`}
+                          style={{ width: `${Math.min(100, Math.max(5, sensexIndex.analysis.signalSuccessMetrics.successRatePct))}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Bottom Row: 5 Confluence Validation */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[10.5px]">
                   <div className="flex items-center space-x-1.5 font-bold text-slate-300">
@@ -1075,6 +1298,32 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
       {/* Stats Overview Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        {/* Signal Success Rate KPI Card */}
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'HIGH_SUCCESS' ? 'ALL' : 'HIGH_SUCCESS')}
+          className={`p-4 rounded-2xl border text-left transition-all col-span-2 sm:col-span-2 ${
+            activeFilter === 'HIGH_SUCCESS'
+              ? 'bg-emerald-800 text-white border-emerald-900 ring-2 ring-emerald-400/50 shadow-md'
+              : 'bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white border-emerald-500/60 hover:border-emerald-400 shadow-2xs'
+          }`}
+        >
+          <div className="text-[11px] font-black uppercase tracking-wider text-emerald-300 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>🎯 Signal Success Rate</span>
+            </span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+          <div className="flex items-baseline space-x-2 mt-1">
+            <span className="text-2xl font-black text-white font-mono">{stats.avgSuccessRate}%</span>
+            <span className="text-xs text-emerald-300 font-bold font-mono">Avg Performance</span>
+          </div>
+          <div className="text-[10.5px] mt-1 font-bold text-slate-300 flex items-center justify-between border-t border-slate-800 pt-1">
+            <span>{stats.highSuccessCount} High Success</span>
+            <span className="text-emerald-400">({stats.targetHitCount} Target Hits)</span>
+          </div>
+        </button>
+
         {/* Total Scanned */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Scanned</div>
@@ -1266,6 +1515,86 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </div>
         </button>
       </div>
+
+      {/* 🏆 LEADERBOARD: HIGHEST SIGNAL SUCCESS PERCENTAGE STOCKS */}
+      {topSuccessStocks.length > 0 && (
+        <div className="bg-slate-900 text-white rounded-2xl p-4 border border-emerald-500/40 shadow-md space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+                <Zap className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-black text-base text-white tracking-wide flex items-center gap-2">
+                  <span>🏆 Leaderboard: Top Signal Success Percentage Stocks</span>
+                  <span className="text-xs bg-emerald-950 text-emerald-300 font-mono px-2 py-0.5 rounded-full border border-emerald-600">
+                    {topSuccessStocks.length} Ranked
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Ranked by highest success rate from signal first triggered time (09:15 AM/confluence) to current user fetch time.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setActiveFilter('HIGH_SUCCESS');
+                setSortBy('SUCCESS_RATE_DESC');
+              }}
+              className="text-xs font-bold text-emerald-300 hover:text-emerald-200 bg-emerald-950/80 hover:bg-emerald-900 px-3 py-1.5 rounded-xl border border-emerald-500/50 flex items-center gap-1.5 self-start sm:self-auto transition-all"
+            >
+              <span>View All ({stats.highSuccessCount}) High Success</span>
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+            {topSuccessStocks.slice(0, 5).map(({ stock, analysis }, idx) => {
+              const m = analysis.signalSuccessMetrics;
+              if (!m) return null;
+              return (
+                <div 
+                  key={stock.symbol}
+                  className="bg-slate-950 p-3 rounded-xl border border-slate-800 hover:border-emerald-500/60 transition-all flex flex-col justify-between space-y-2"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-black text-amber-400 font-mono">#{idx + 1}</span>
+                        <span className="font-black text-sm text-white">{stock.symbol}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 truncate max-w-[120px]">
+                        {m.signalName}
+                      </div>
+                    </div>
+                    <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded border ${m.statusBadgeClass}`}>
+                      {m.successRatePct}%
+                    </span>
+                  </div>
+
+                  <div className="text-[10px] font-mono bg-slate-900/90 p-1.5 rounded border border-slate-800 space-y-0.5">
+                    <div className="flex justify-between text-slate-400">
+                      <span>1st Shown:</span>
+                      <span className="text-amber-300 font-bold">{m.firstShownTime} (₹{m.firstShownPrice.toFixed(1)})</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span>New Fetch:</span>
+                      <span className="text-emerald-300 font-bold">{m.latestFetchTime} (₹{m.latestPrice.toFixed(1)})</span>
+                    </div>
+                    <div className="flex justify-between font-bold pt-0.5 border-t border-slate-800">
+                      <span>Net Gain:</span>
+                      <span className={m.priceChangePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                        {m.priceChangePct >= 0 ? '+' : ''}{m.priceChangePct.toFixed(2)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filter Toolbar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-4">
@@ -1852,6 +2181,70 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* 🎯 SIGNAL SUCCESS PERCENTAGE RATE & NEW USER FETCH TIME COMPARISON */}
+                {analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.hasSignal && (
+                  <div className="bg-slate-900 text-white p-3 rounded-xl border border-slate-700 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                        <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate max-w-[170px]">{analysis.signalSuccessMetrics.signalName}</span>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border shrink-0 ${analysis.signalSuccessMetrics.statusBadgeClass}`}>
+                        {analysis.signalSuccessMetrics.statusBadgeText}
+                      </span>
+                    </div>
+
+                    {/* Time & Price Comparison Timeline */}
+                    <div className="grid grid-cols-2 gap-2 text-[10.5px] font-mono bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+                      <div>
+                        <div className="text-slate-400 text-[9px] font-sans font-bold uppercase tracking-wider flex items-center gap-1 mb-0.5">
+                          <Clock className="w-2.5 h-2.5 text-blue-400 shrink-0" />
+                          <span>1st Shown Time</span>
+                        </div>
+                        <div className="font-extrabold text-amber-300">{analysis.signalSuccessMetrics.firstShownTime}</div>
+                        <div className="text-slate-300 text-[10px]">Entry: ₹{analysis.signalSuccessMetrics.firstShownPrice.toFixed(2)}</div>
+                      </div>
+
+                      <div className="text-right border-l border-slate-800 pl-2">
+                        <div className="text-slate-400 text-[9px] font-sans font-bold uppercase tracking-wider flex items-center gap-1 justify-end mb-0.5">
+                          <RefreshCw className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                          <span>New Fetch Time</span>
+                        </div>
+                        <div className="font-extrabold text-emerald-300">{analysis.signalSuccessMetrics.latestFetchTime}</div>
+                        <div className="text-white text-[10px]">
+                          LTP: ₹{analysis.signalSuccessMetrics.latestPrice.toFixed(2)}
+                          <span className={`ml-1 font-bold ${analysis.signalSuccessMetrics.priceChangePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            ({analysis.signalSuccessMetrics.priceChangePct >= 0 ? '+' : ''}{analysis.signalSuccessMetrics.priceChangePct.toFixed(2)}%)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Success Rate Progress Bar */}
+                    <div className="space-y-1 pt-0.5">
+                      <div className="flex items-center justify-between text-[9.5px] text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <span>Target 1: ₹{analysis.signalSuccessMetrics.targetPrice.toFixed(2)}</span>
+                          <span className="text-[9px] text-slate-500">({analysis.signalSuccessMetrics.timeElapsedStr} elapsed)</span>
+                        </span>
+                        <span className="font-bold text-emerald-300 font-mono">{analysis.signalSuccessMetrics.successRatePct}% Success</span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden border border-slate-700/50">
+                        <div 
+                          className={`h-full transition-all duration-500 rounded-full ${
+                            analysis.signalSuccessMetrics.successRatePct >= 80 
+                              ? 'bg-gradient-to-r from-emerald-500 to-green-400' 
+                              : analysis.signalSuccessMetrics.successRatePct >= 50 
+                                ? 'bg-gradient-to-r from-teal-500 to-amber-400' 
+                                : 'bg-rose-500'
+                          }`}
+                          style={{ width: `${Math.min(100, Math.max(5, analysis.signalSuccessMetrics.successRatePct))}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* 15M HIGH RETEST & BULLISH BOUNCE STRATEGY CARD BANNER */}
                 {analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce && (
