@@ -140,3 +140,20 @@ export interface RsiAiAnalysisReport {
   analyzedAt: string;
 }
 
+export interface FadedStockRecord {
+  id: string;
+  symbol: string;
+  companyName: string;
+  fadeType: '100% Bullish Move' | '100% Bearish Move';
+  fadedAtTime: string; // e.g. "10:25:14 AM"
+  fadedAtIso: string;  // ISO timestamp for sorting
+  reason: string;      // Detailed explanation of why it faded
+  lastLtp: number;
+  openPrice: number;
+  highPrice: number;
+  lowPrice: number;
+  pctChange: number;
+  vwap?: number | null;
+  rsi?: number | null;
+}
+

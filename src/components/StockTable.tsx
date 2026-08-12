@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap } from 'lucide-react';
-import { StockCalculated, DhanApiCredentials, TrendFilterType } from '../types';
+import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, AlertTriangle } from 'lucide-react';
+import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
 import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
 
 interface StockTableProps {
   stocks: StockCalculated[];
+  faded100Log?: FadedStockRecord[];
   onUpdateStockPrices: (stockId: string, openPrice: number, closePrice: number, highPrice?: number | null, lowPrice?: number | null) => void;
   onFetchSingleStock: (stock: StockCalculated) => void;
   onSelectStockDetail: (stock: StockCalculated) => void;
@@ -19,6 +20,7 @@ interface StockTableProps {
 
 export const StockTable: React.FC<StockTableProps> = ({
   stocks,
+  faded100Log = [],
   onUpdateStockPrices,
   onFetchSingleStock,
   onSelectStockDetail,
@@ -29,6 +31,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   activeTrendFilter,
   onTrendFilterChange
 }) => {
+
   const [searchTerm, setSearchTerm] = useState('');
   const [internalTrendFilter, setInternalTrendFilter] = useState<TrendFilterType>('ALL');
   

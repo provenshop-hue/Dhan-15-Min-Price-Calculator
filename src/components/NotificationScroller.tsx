@@ -1,18 +1,21 @@
 import React from 'react';
-import { Bell, Flame, TrendingUp, TrendingDown, Zap, ShieldAlert, Sparkles, ChevronRight, Activity, Target } from 'lucide-react';
-import { StockCalculated } from '../types';
+import { Bell, Flame, TrendingUp, TrendingDown, Zap, ShieldAlert, Sparkles, ChevronRight, Activity, Target, AlertTriangle } from 'lucide-react';
+import { StockCalculated, FadedStockRecord } from '../types';
 import { is100PercentBullishMove, is100PercentBearishMove, detect15mHighPullbackBounce } from '../utils/rsiPullback';
 import { isOpenLowPattern, isOpenHighPattern, isBothCalcLessThan3, isGannCalcLessThan3 } from '../utils/gann';
 
 interface NotificationScrollerProps {
   stocks: StockCalculated[];
+  faded100Log?: FadedStockRecord[];
   onSelectStockDetail: (stock: StockCalculated) => void;
 }
 
 export const NotificationScroller: React.FC<NotificationScrollerProps> = ({
   stocks,
+  faded100Log = [],
   onSelectStockDetail
 }) => {
+
   // 1. Find NIFTY and BANKNIFTY stocks
   const niftyStock = stocks.find((s) => s.symbol === 'NIFTY' || s.symbol === 'NIFTY 50' || s.symbol.includes('NIFTY'));
   const bankNiftyStock = stocks.find((s) => s.symbol === 'BANKNIFTY' || s.symbol === 'BANK NIFTY' || s.symbol.includes('BANKNIFTY'));
@@ -235,8 +238,27 @@ export const NotificationScroller: React.FC<NotificationScrollerProps> = ({
     });
   });
 
+  // Add Faded 100% Moves Alerts
+  if (faded100Log && faded100Log.length > 0) {
+    faded100Log.slice(0, 3).forEach((faded) => {
+      const matchStock = stocks.find((s) => s.symbol === faded.symbol);
+      items.push({
+        id: `faded-alert-${faded.id}`,
+        type: 'INDEX_ALERT',
+        title: `⚠️ ${faded.symbol} Disappeared from ${faded.fadeType}!`,
+        subtitle: `@ ${faded.fadedAtTime} • ${faded.reason}`,
+        badgeText: `⚠️ FADED 100%`,
+        bgColor: 'bg-amber-950/95 text-amber-100',
+        borderColor: 'border-amber-500/80 shadow-amber-500/30',
+        textColor: 'text-amber-300',
+        stock: matchStock
+      });
+    });
+  }
+
   // Duplicate items array to create seamless loop marquee
   const displayItems = [...items, ...items];
+
 
   return (
     <div className="bg-slate-950 border-y border-amber-500/30 text-white overflow-hidden relative shadow-lg my-3 rounded-xl">
@@ -292,6 +314,12 @@ export const NotificationScroller: React.FC<NotificationScrollerProps> = ({
             <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
             <span className="text-slate-400">100% Bear:</span>
             <span className="font-bold text-rose-400">{exact100Bearish.length}</span>
+          </div>
+          <div className="w-px h-3 bg-slate-800"></div>
+          <div className="flex items-center space-x-1" title="Disappeared / Faded 100% Moves Count">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-slate-400">Faded 100%:</span>
+            <span className="font-bold text-amber-400">{faded100Log.length}</span>
           </div>
           <div className="w-px h-3 bg-slate-800"></div>
           <div className="flex items-center space-x-1" title="Both Open & Close Calc < 3 Count">

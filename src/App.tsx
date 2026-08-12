@@ -15,8 +15,10 @@ import { RsiAnalystModal } from './components/RsiAnalystModal';
 import { NotificationScroller } from './components/NotificationScroller';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
-import { StockCalculated, DhanApiCredentials, TrendFilterType } from './types';
+import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord } from './types';
 import { calculateGann15Min } from './utils/gann';
+import { is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishFadeReason, get100PercentBearishFadeReason, detectHistorical100Fades } from './utils/rsiPullback';
+
 import { Download, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
 
 export default function App() {
@@ -54,8 +56,123 @@ export default function App() {
     }));
   });
 
+  // Faded 100% Moves Disappearance Log State
+  const [faded100Log, setFaded100Log] = useState<FadedStockRecord[]>(() => {
+    const saved = localStorage.getItem('dhan_faded_100_moves_log');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse faded 100 moves log', e);
+      }
+    }
+    return [];
+  });
+
+  const prevActive100MapRef = useRef<Record<string, '100% Bullish Move' | '100% Bearish Move'>>({});
+
+  // Persist faded100Log to localStorage
+  useEffect(() => {
+    localStorage.setItem('dhan_faded_100_moves_log', JSON.stringify(faded100Log));
+  }, [faded100Log]);
+
+  const handleClearFadedLog = () => {
+    setFaded100Log([]);
+    localStorage.removeItem('dhan_faded_100_moves_log');
+  };
+
+  // Monitor stock state transitions to capture 100% Bullish / Bearish disappearances
+  useEffect(() => {
+    if (!stocks || stocks.length === 0) return;
+
+    const newFades: FadedStockRecord[] = [];
+    const currentActiveMap: Record<string, '100% Bullish Move' | '100% Bearish Move'> = {};
+
+    stocks.forEach((stock) => {
+      if (!stock.isFetched) return;
+
+      const isBull = is100PercentBullishMove(stock);
+      const isBear = is100PercentBearishMove(stock);
+      const prevStatus = prevActive100MapRef.current[stock.symbol];
+
+      if (isBull) {
+        currentActiveMap[stock.symbol] = '100% Bullish Move';
+      } else if (isBear) {
+        currentActiveMap[stock.symbol] = '100% Bearish Move';
+      } else {
+        if (prevStatus === '100% Bullish Move') {
+          const now = new Date();
+          const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+          const reason = get100PercentBullishFadeReason(stock);
+
+          newFades.push({
+            id: `${stock.symbol}-bullish-${Date.now()}`,
+            symbol: stock.symbol,
+            companyName: stock.companyName,
+            fadeType: '100% Bullish Move',
+            fadedAtTime: timeStr,
+            fadedAtIso: now.toISOString(),
+            reason,
+            lastLtp: stock.closePrice || 0,
+            openPrice: stock.openPrice || 0,
+            highPrice: stock.highPrice || 0,
+            lowPrice: stock.lowPrice || 0,
+            pctChange: stock.pctChange || 0,
+            vwap: stock.vwap,
+            rsi: stock.rsi
+          });
+        } else if (prevStatus === '100% Bearish Move') {
+          const now = new Date();
+          const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+          const reason = get100PercentBearishFadeReason(stock);
+
+          newFades.push({
+            id: `${stock.symbol}-bearish-${Date.now()}`,
+            symbol: stock.symbol,
+            companyName: stock.companyName,
+            fadeType: '100% Bearish Move',
+            fadedAtTime: timeStr,
+            fadedAtIso: now.toISOString(),
+            reason,
+            lastLtp: stock.closePrice || 0,
+            openPrice: stock.openPrice || 0,
+            highPrice: stock.highPrice || 0,
+            lowPrice: stock.lowPrice || 0,
+            pctChange: stock.pctChange || 0,
+            vwap: stock.vwap,
+            rsi: stock.rsi
+          });
+        } else {
+          const histFades = detectHistorical100Fades(stock);
+          histFades.forEach((hf) => {
+            if (!faded100Log.some((item) => item.symbol === hf.symbol && item.fadeType === hf.fadeType)) {
+              newFades.push(hf);
+            }
+          });
+        }
+      }
+    });
+
+    prevActive100MapRef.current = currentActiveMap;
+
+    if (newFades.length > 0) {
+      setFaded100Log((prev) => {
+        const combined = [...newFades, ...prev];
+        const uniqueMap = new Map<string, FadedStockRecord>();
+        combined.forEach((item) => {
+          const key = `${item.symbol}-${item.fadeType}`;
+          if (!uniqueMap.has(key)) {
+            uniqueMap.set(key, item);
+          }
+        });
+        return Array.from(uniqueMap.values()).slice(0, 100);
+      });
+    }
+  }, [stocks]);
+
   // Active filter state
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
+
 
   // Active Dashboard View Tab ('gann', 'gann_dashboard', or 'rsi_pullback')
   const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback'>('gann');
@@ -752,6 +869,7 @@ export default function App() {
         {/* Live Notification & Market Signal Scroller */}
         <NotificationScroller
           stocks={stocks}
+          faded100Log={faded100Log}
           onSelectStockDetail={setSelectedDetailStock}
         />
 
@@ -824,6 +942,7 @@ export default function App() {
             <div id="stock-table-section">
               <StockTable
                 stocks={stocks}
+                faded100Log={faded100Log}
                 onUpdateStockPrices={handleUpdateStockPrices}
                 onFetchSingleStock={handleFetchSingleDhan}
                 onSelectStockDetail={(s) => setSelectedDetailStock(s)}
@@ -851,6 +970,8 @@ export default function App() {
           /* Dedicated RSI Pullback Dashboard */
           <RsiPullbackDashboard
             stocks={stocks}
+            faded100Log={faded100Log}
+            onClearFadedLog={handleClearFadedLog}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
@@ -861,6 +982,7 @@ export default function App() {
             isBulkLoading={isBulkLoading}
           />
         )}
+
 
       </main>
 

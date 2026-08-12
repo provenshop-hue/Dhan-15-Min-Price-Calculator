@@ -1,4 +1,4 @@
-import { StockCalculated } from '../types';
+import { StockCalculated, FadedStockRecord } from '../types';
 import { isOpenLowPattern, isOpenHighPattern } from './gann';
 
 export function checkStockOpenLow(stock: StockCalculated): boolean {
@@ -144,6 +144,149 @@ export function is100PercentBearishMove(stock: StockCalculated): boolean {
 
   return true;
 }
+
+/**
+ * Explains the exact reason why a stock faded from 100% Bullish Move
+ */
+export function get100PercentBullishFadeReason(stock: StockCalculated): string {
+  const open = stock.openPrice || 0;
+  const close = stock.closePrice || 0;
+  const high = stock.highPrice || 0;
+  const low = stock.lowPrice || 0;
+  const range = high - low;
+
+  const reasons: string[] = [];
+
+  if (close <= open) {
+    reasons.push(`Candle turned Red (Close ₹${close.toFixed(2)} <= Open ₹${open.toFixed(2)})`);
+  }
+  if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange <= 0) {
+    reasons.push(`Session gain lost (${stock.pctChange.toFixed(2)}%)`);
+  }
+  if (range > 0 && close < high - (range * 0.20)) {
+    reasons.push(`LTP dropped below top 20% high range (LTP: ₹${close.toFixed(2)}, High: ₹${high.toFixed(2)})`);
+  }
+  if (range > 0 && (Math.abs(close - open) / range) < 0.55) {
+    const bodyPct = ((Math.abs(close - open) / range) * 100).toFixed(1);
+    reasons.push(`Candle body shrunk below 55% (${bodyPct}%)`);
+  }
+  if (stock.vwap && stock.vwap > 0 && close < stock.vwap) {
+    reasons.push(`Price fell below VWAP (LTP: ₹${close.toFixed(2)} vs VWAP: ₹${stock.vwap.toFixed(2)})`);
+  }
+  if (stock.rsi !== undefined && stock.rsi !== null && stock.rsi < 50) {
+    reasons.push(`RSI dropped below 50 (RSI: ${stock.rsi.toFixed(1)})`);
+  }
+  if (stock.trend === 'Bearish' || stock.trend === 'Very Bearish') {
+    reasons.push(`Gann Trend flipped to ${stock.trend}`);
+  }
+
+  return reasons.length > 0 ? reasons.join(' • ') : 'Lost high-range momentum & buying volume support.';
+}
+
+/**
+ * Explains the exact reason why a stock faded from 100% Bearish Move
+ */
+export function get100PercentBearishFadeReason(stock: StockCalculated): string {
+  const open = stock.openPrice || 0;
+  const close = stock.closePrice || 0;
+  const high = stock.highPrice || 0;
+  const low = stock.lowPrice || 0;
+  const range = high - low;
+
+  const reasons: string[] = [];
+
+  if (close >= open) {
+    reasons.push(`Candle turned Green (Close ₹${close.toFixed(2)} >= Open ₹${open.toFixed(2)})`);
+  }
+  if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange >= 0) {
+    reasons.push(`Session loss reversed (+${stock.pctChange.toFixed(2)}%)`);
+  }
+  if (range > 0 && close > low + (range * 0.20)) {
+    reasons.push(`LTP bounced above bottom 20% low range (LTP: ₹${close.toFixed(2)}, Low: ₹${low.toFixed(2)})`);
+  }
+  if (range > 0 && (Math.abs(close - open) / range) < 0.55) {
+    const bodyPct = ((Math.abs(close - open) / range) * 100).toFixed(1);
+    reasons.push(`Candle body shrunk below 55% (${bodyPct}%)`);
+  }
+  if (stock.vwap && stock.vwap > 0 && close > stock.vwap) {
+    reasons.push(`Price rallied above VWAP (LTP: ₹${close.toFixed(2)} vs VWAP: ₹${stock.vwap.toFixed(2)})`);
+  }
+  if (stock.rsi !== undefined && stock.rsi !== null && stock.rsi > 50) {
+    reasons.push(`RSI rose above 50 (RSI: ${stock.rsi.toFixed(1)})`);
+  }
+  if (stock.trend === 'Bullish' || stock.trend === 'Very Bullish') {
+    reasons.push(`Gann Trend flipped to ${stock.trend}`);
+  }
+
+  return reasons.length > 0 ? reasons.join(' • ') : 'Bounced off session lows & lost selling pressure.';
+}
+
+/**
+ * Detects whether a stock had qualified for 100% Bullish or 100% Bearish earlier in the session and subsequently faded.
+ */
+export function detectHistorical100Fades(stock: StockCalculated): FadedStockRecord[] {
+  const records: FadedStockRecord[] = [];
+  if (!stock.isFetched || !stock.openPrice || !stock.closePrice) return records;
+
+  const isCurrentBullish = is100PercentBullishMove(stock);
+  const isCurrentBearish = is100PercentBearishMove(stock);
+
+  // If current is NOT 100% Bullish, check if earlier timeline points indicated 100% Bullish
+  if (!isCurrentBullish && stock.rsiTimeline && stock.rsiTimeline.length > 1) {
+    for (let i = 0; i < stock.rsiTimeline.length - 1; i++) {
+      const pt = stock.rsiTimeline[i];
+      if (pt.rsi >= 52 && pt.close > (stock.openPrice || 0) && (stock.closePrice || 0) < pt.close) {
+        records.push({
+          id: `${stock.symbol}-hist-bullish-${pt.timeStr}`,
+          symbol: stock.symbol,
+          companyName: stock.companyName,
+          fadeType: '100% Bullish Move',
+          fadedAtTime: pt.timeStr,
+          fadedAtIso: new Date().toISOString(),
+          reason: get100PercentBullishFadeReason(stock),
+          lastLtp: stock.closePrice || 0,
+          openPrice: stock.openPrice || 0,
+          highPrice: stock.highPrice || 0,
+          lowPrice: stock.lowPrice || 0,
+          pctChange: stock.pctChange || 0,
+          vwap: stock.vwap,
+          rsi: stock.rsi
+        });
+        break; // Add max once per stock
+      }
+    }
+  }
+
+  // If current is NOT 100% Bearish, check if earlier timeline points indicated 100% Bearish
+  if (!isCurrentBearish && stock.rsiTimeline && stock.rsiTimeline.length > 1) {
+    for (let i = 0; i < stock.rsiTimeline.length - 1; i++) {
+      const pt = stock.rsiTimeline[i];
+      if (pt.rsi <= 48 && pt.close < (stock.openPrice || 0) && (stock.closePrice || 0) > pt.close) {
+        records.push({
+          id: `${stock.symbol}-hist-bearish-${pt.timeStr}`,
+          symbol: stock.symbol,
+          companyName: stock.companyName,
+          fadeType: '100% Bearish Move',
+          fadedAtTime: pt.timeStr,
+          fadedAtIso: new Date().toISOString(),
+          reason: get100PercentBearishFadeReason(stock),
+          lastLtp: stock.closePrice || 0,
+          openPrice: stock.openPrice || 0,
+          highPrice: stock.highPrice || 0,
+          lowPrice: stock.lowPrice || 0,
+          pctChange: stock.pctChange || 0,
+          vwap: stock.vwap,
+          rsi: stock.rsi
+        });
+        break;
+      }
+    }
+  }
+
+  return records;
+}
+
+
 
 export interface RallyConfluenceFactor {
   id: string;
