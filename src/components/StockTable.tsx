@@ -1332,6 +1332,26 @@ export const StockTable: React.FC<StockTableProps> = ({
                           </span>
                         )}
 
+                        {(() => {
+                          const comboAnalysis = analyzeBullishCombinations(stock);
+                          if (comboAnalysis.isAnyComboMet) {
+                            const hitTime = comboAnalysis.isAllCombosMet 
+                              ? comboAnalysis.firstTripleHitTime 
+                              : comboAnalysis.firstAnyHitTime;
+                            return (
+                              <span 
+                                title={`Bullish Combinations: ${comboAnalysis.summaryBadge}. First triggered at ${hitTime}`}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black shadow-2xs border ${comboAnalysis.badgeClass}`}
+                              >
+                                <Flame className="w-3 h-3 fill-current text-amber-300 animate-pulse" />
+                                <span>{comboAnalysis.isAllCombosMet ? 'TRIPLE POWER' : 'COMBO SIGNAL'}</span>
+                                {hitTime && <span className="font-mono text-[9px] font-black underline">(@ {hitTime})</span>}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+
                         {stock.trend ? (
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] ${
                             stock.trend === 'Very Bullish'

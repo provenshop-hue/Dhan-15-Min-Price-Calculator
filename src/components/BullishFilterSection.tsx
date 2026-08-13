@@ -18,7 +18,9 @@ import {
   CheckSquare,
   Square,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Clock,
+  ArrowUpDown
 } from 'lucide-react';
 
 interface BullishFilterSectionProps {
@@ -39,6 +41,7 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
   const [selectedComboFilter, setSelectedComboFilter] = useState<'ALL' | 'COMBO_1' | 'COMBO_2' | 'COMBO_3' | 'ALL_THREE'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedStockId, setExpandedStockId] = useState<string | null>(null);
+  const [timeSortOrder, setTimeSortOrder] = useState<'EARLIEST' | 'LATEST' | 'DEFAULT'>('EARLIEST');
 
   // Compute analyses for all stocks
   const analyzedStocks = useMemo(() => {
@@ -67,9 +70,9 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
     return { combo1Count, combo2Count, combo3Count, triplePowerCount, anyCount };
   }, [analyzedStocks]);
 
-  // Filtered list
+  // Filtered and Sorted list
   const filteredList = useMemo(() => {
-    return analyzedStocks.filter(({ stock, analysis }) => {
+    const list = analyzedStocks.filter(({ stock, analysis }) => {
       // Search text
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -86,7 +89,39 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
       // Default 'ALL': show stocks that match at least 1 combination
       return analysis.isAnyComboMet;
     });
-  }, [analyzedStocks, selectedComboFilter, searchQuery]);
+
+    if (timeSortOrder !== 'DEFAULT') {
+      list.sort((a, b) => {
+        let timeA = '09:15 AM';
+        let timeB = '09:15 AM';
+
+        if (selectedComboFilter === 'COMBO_1') {
+          timeA = a.analysis.combo1.firstHitTime || '11:59 PM';
+          timeB = b.analysis.combo1.firstHitTime || '11:59 PM';
+        } else if (selectedComboFilter === 'COMBO_2') {
+          timeA = a.analysis.combo2.firstHitTime || '11:59 PM';
+          timeB = b.analysis.combo2.firstHitTime || '11:59 PM';
+        } else if (selectedComboFilter === 'COMBO_3') {
+          timeA = a.analysis.combo3.firstHitTime || '11:59 PM';
+          timeB = b.analysis.combo3.firstHitTime || '11:59 PM';
+        } else if (selectedComboFilter === 'ALL_THREE') {
+          timeA = a.analysis.firstTripleHitTime || '11:59 PM';
+          timeB = b.analysis.firstTripleHitTime || '11:59 PM';
+        } else {
+          timeA = a.analysis.firstAnyHitTime || '11:59 PM';
+          timeB = b.analysis.firstAnyHitTime || '11:59 PM';
+        }
+
+        if (timeSortOrder === 'EARLIEST') {
+          return timeA.localeCompare(timeB);
+        } else {
+          return timeB.localeCompare(timeA);
+        }
+      });
+    }
+
+    return list;
+  }, [analyzedStocks, selectedComboFilter, searchQuery, timeSortOrder]);
 
   return (
     <div className="bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-2xl text-slate-100 my-6">
@@ -358,13 +393,32 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
           </button>
         </div>
 
-        <input
-          type="text"
-          placeholder="Search symbol..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full sm:w-48 bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500"
-        />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Time Sort Toggle */}
+          <button
+            onClick={() => {
+              if (timeSortOrder === 'EARLIEST') setTimeSortOrder('LATEST');
+              else if (timeSortOrder === 'LATEST') setTimeSortOrder('DEFAULT');
+              else setTimeSortOrder('EARLIEST');
+            }}
+            className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors"
+            title="Sort by exact signal hit time"
+          >
+            <Clock className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Signal Time:</span>
+            <span className="text-amber-300 font-mono">
+              {timeSortOrder === 'EARLIEST' ? 'Earliest First ⬆' : timeSortOrder === 'LATEST' ? 'Latest First ⬇' : 'Default'}
+            </span>
+          </button>
+
+          <input
+            type="text"
+            placeholder="Search symbol..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full sm:w-48 bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500"
+          />
+        </div>
       </div>
 
       {/* Stock Cards List */}
@@ -382,6 +436,10 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
             const close = stock.closePrice || 0;
             const pct = stock.pctChange || 0;
 
+            const displayTime = analysis.isAllCombosMet 
+              ? analysis.firstTripleHitTime 
+              : analysis.firstAnyHitTime;
+
             return (
               <div 
                 key={stock.id}
@@ -394,7 +452,7 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
                       {stock.symbol.slice(0, 3)}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-black text-base text-white tracking-wide">{stock.symbol}</span>
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${analysis.badgeClass}`}>
                           {analysis.summaryBadge}
@@ -402,6 +460,13 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
                         {analysis.isAllCombosMet && (
                           <span className="px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px] font-extrabold border border-amber-400/30 flex items-center gap-1">
                             <Flame className="w-3 h-3 text-amber-400 fill-current" /> TRIPLE
+                          </span>
+                        )}
+                        {/* Prominent Signal First Hit Time Pill */}
+                        {displayTime && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-amber-400" />
+                            Signal Hit @ {displayTime}
                           </span>
                         )}
                       </div>
@@ -430,6 +495,11 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
                         <XCircle className="w-3.5 h-3.5 text-slate-600" />
                       )}
                       <span>Combo 1: 9/20/50 EMA</span>
+                      {analysis.combo1.isMatch && analysis.combo1.firstHitTime && (
+                        <span className="ml-1 text-[10px] font-black bg-emerald-900/80 text-emerald-200 px-1.5 py-0.2 rounded border border-emerald-700">
+                          {analysis.combo1.firstHitTime}
+                        </span>
+                      )}
                     </div>
 
                     {/* Combo 2 Badge */}
@@ -444,6 +514,11 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
                         <XCircle className="w-3.5 h-3.5 text-slate-600" />
                       )}
                       <span>Combo 2: RSI 55-70</span>
+                      {analysis.combo2.isMatch && analysis.combo2.firstHitTime && (
+                        <span className="ml-1 text-[10px] font-black bg-blue-900/80 text-blue-200 px-1.5 py-0.2 rounded border border-blue-700">
+                          {analysis.combo2.firstHitTime}
+                        </span>
+                      )}
                     </div>
 
                     {/* Combo 3 Badge */}
@@ -458,6 +533,11 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
                         <XCircle className="w-3.5 h-3.5 text-slate-600" />
                       )}
                       <span>Combo 3: MACD</span>
+                      {analysis.combo3.isMatch && analysis.combo3.firstHitTime && (
+                        <span className="ml-1 text-[10px] font-black bg-purple-900/80 text-purple-200 px-1.5 py-0.2 rounded border border-purple-700">
+                          {analysis.combo3.firstHitTime}
+                        </span>
+                      )}
                     </div>
 
                     {/* Toggle Breakdown */}
@@ -476,12 +556,19 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
                   <div className="mt-4 pt-3 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs bg-slate-900/60 p-3 rounded-xl">
                     {/* Combo 1 Breakdown */}
                     <div className="space-y-1">
-                      <div className="font-bold text-emerald-400 flex items-center gap-1">
-                        <Layers className="w-3.5 h-3.5" /> Combo 1 Details:
+                      <div className="font-bold text-emerald-400 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Layers className="w-3.5 h-3.5" /> Combo 1 Details:
+                        </span>
+                        {analysis.combo1.firstHitTime && (
+                          <span className="text-[10px] text-emerald-300 font-mono bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800">
+                            ⏱️ Hit @ {analysis.combo1.firstHitTime}
+                          </span>
+                        )}
                       </div>
                       <div className="text-slate-300 space-y-0.5 font-mono text-[11px]">
                         <div>9 EMA: ₹{analysis.combo1.ema9.toFixed(1)}</div>
-                        <div>20 EMA: ₹{analysis.combo2.isMatch ? analysis.combo1.ema20.toFixed(1) : analysis.combo1.ema20.toFixed(1)}</div>
+                        <div>20 EMA: ₹{analysis.combo1.ema20.toFixed(1)}</div>
                         <div>50 EMA: ₹{analysis.combo1.ema50.toFixed(1)}</div>
                         <div className="text-slate-400 mt-1">{analysis.combo1.details}</div>
                       </div>
@@ -489,8 +576,15 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
 
                     {/* Combo 2 Breakdown */}
                     <div className="space-y-1">
-                      <div className="font-bold text-blue-400 flex items-center gap-1">
-                        <Activity className="w-3.5 h-3.5" /> Combo 2 Details:
+                      <div className="font-bold text-blue-400 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Activity className="w-3.5 h-3.5" /> Combo 2 Details:
+                        </span>
+                        {analysis.combo2.firstHitTime && (
+                          <span className="text-[10px] text-blue-300 font-mono bg-blue-950 px-1.5 py-0.5 rounded border border-blue-800">
+                            ⏱️ Hit @ {analysis.combo2.firstHitTime}
+                          </span>
+                        )}
                       </div>
                       <div className="text-slate-300 space-y-0.5 font-mono text-[11px]">
                         <div>Current RSI: {analysis.combo2.rsi.toFixed(1)}</div>
@@ -502,8 +596,15 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
 
                     {/* Combo 3 Breakdown */}
                     <div className="space-y-1">
-                      <div className="font-bold text-purple-400 flex items-center gap-1">
-                        <BarChart2 className="w-3.5 h-3.5" /> Combo 3 Details:
+                      <div className="font-bold text-purple-400 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <BarChart2 className="w-3.5 h-3.5" /> Combo 3 Details:
+                        </span>
+                        {analysis.combo3.firstHitTime && (
+                          <span className="text-[10px] text-purple-300 font-mono bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800">
+                            ⏱️ Hit @ {analysis.combo3.firstHitTime}
+                          </span>
+                        )}
                       </div>
                       <div className="text-slate-300 space-y-0.5 font-mono text-[11px]">
                         <div>MACD: {analysis.combo3.macd.toFixed(2)}</div>

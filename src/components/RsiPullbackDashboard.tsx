@@ -2483,6 +2483,25 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                             <span>15M BOUNCE ({analysis.pullback15mBounce.bounceTime})</span>
                           </span>
                         )}
+                        {(() => {
+                          const comboAnalysis = analyzeBullishCombinations(stock);
+                          if (comboAnalysis.isAnyComboMet) {
+                            const hitTime = comboAnalysis.isAllCombosMet 
+                              ? comboAnalysis.firstTripleHitTime 
+                              : comboAnalysis.firstAnyHitTime;
+                            return (
+                              <span 
+                                title={`Bullish Combinations: ${comboAnalysis.summaryBadge}. First triggered at ${hitTime}`}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black shadow-2xs border ${comboAnalysis.badgeClass}`}
+                              >
+                                <Flame className="w-3 h-3 fill-current text-amber-300 animate-pulse" />
+                                <span>{comboAnalysis.isAllCombosMet ? 'TRIPLE POWER' : 'COMBO SIGNAL'}</span>
+                                {hitTime && <span className="font-mono text-[9px] font-black underline">(@ {hitTime})</span>}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                       <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5 font-mono">
                         <span className="truncate max-w-[150px]">{stock.companyName}</span>
@@ -2601,6 +2620,50 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* 🎯 BULLISH COMBINATIONS SIGNAL TRIGGER TIMES BAR */}
+                {(() => {
+                  const comboAnalysis = analyzeBullishCombinations(stock);
+                  if (comboAnalysis.isAnyComboMet) {
+                    return (
+                      <div className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 text-white p-3 rounded-xl border border-emerald-500/50 shadow-2xs space-y-2">
+                        <div className="flex items-center justify-between text-xs font-black uppercase border-b border-slate-800 pb-1.5">
+                          <div className="flex items-center gap-1.5 text-emerald-400">
+                            <Flame className="w-4 h-4 text-amber-400 fill-current animate-pulse" />
+                            <span>🔥 Bullish Combos Signal</span>
+                          </div>
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${comboAnalysis.badgeClass}`}>
+                            {comboAnalysis.summaryBadge}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1.5 text-[10px] font-mono">
+                          <div className={`p-1.5 rounded border ${comboAnalysis.combo1.isMatch ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-200' : 'bg-slate-900/60 border-slate-800 text-slate-500'}`}>
+                            <div className="font-bold text-[9px] uppercase tracking-wide truncate">1. 9/20/50 EMA</div>
+                            <div className="font-black text-amber-300 mt-0.5">
+                              {comboAnalysis.combo1.isMatch ? `⏱️ ${comboAnalysis.combo1.firstHitTime}` : 'Not Met'}
+                            </div>
+                          </div>
+
+                          <div className={`p-1.5 rounded border ${comboAnalysis.combo2.isMatch ? 'bg-blue-950/80 border-blue-700/80 text-blue-200' : 'bg-slate-900/60 border-slate-800 text-slate-500'}`}>
+                            <div className="font-bold text-[9px] uppercase tracking-wide truncate">2. RSI 55-70</div>
+                            <div className="font-black text-amber-300 mt-0.5">
+                              {comboAnalysis.combo2.isMatch ? `⏱️ ${comboAnalysis.combo2.firstHitTime}` : 'Not Met'}
+                            </div>
+                          </div>
+
+                          <div className={`p-1.5 rounded border ${comboAnalysis.combo3.isMatch ? 'bg-purple-950/80 border-purple-700/80 text-purple-200' : 'bg-slate-900/60 border-slate-800 text-slate-500'}`}>
+                            <div className="font-bold text-[9px] uppercase tracking-wide truncate">3. MACD</div>
+                            <div className="font-black text-amber-300 mt-0.5">
+                              {comboAnalysis.combo3.isMatch ? `⏱️ ${comboAnalysis.combo3.firstHitTime}` : 'Not Met'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* 🎯 SIGNAL SUCCESS PERCENTAGE RATE & NEW USER FETCH TIME COMPARISON */}
                 {analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.hasSignal && (

@@ -12,6 +12,7 @@ export interface BullishCombo1Result {
   isPullbackRespected: boolean; // Pullback respects 9/20 EMA
   score: number; // 0 - 100
   details: string;
+  firstHitTime?: string | null; // Exact 15m candle timestamp when signal first triggered
 }
 
 export interface BullishCombo2Result {
@@ -22,6 +23,7 @@ export interface BullishCombo2Result {
   isRsiHigherHighs: boolean; // RSI also making higher highs
   score: number; // 0 - 100
   details: string;
+  firstHitTime?: string | null; // Exact 15m candle timestamp when signal first triggered
 }
 
 export interface BullishCombo3Result {
@@ -35,6 +37,7 @@ export interface BullishCombo3Result {
   isPriceAboveMajorMAs: boolean; // Price above major moving averages
   score: number; // 0 - 100
   details: string;
+  firstHitTime?: string | null; // Exact 15m candle timestamp when signal first triggered
 }
 
 export interface BullishSectionAnalysis {
@@ -47,6 +50,8 @@ export interface BullishSectionAnalysis {
   bullishConfluenceScore: number; // Overall 0 - 100 score
   summaryBadge: string;
   badgeClass: string;
+  firstTripleHitTime?: string | null; // Timestamp when all 3 combinations met concurrently
+  firstAnyHitTime?: string | null;    // Earliest timestamp when any combination met
 }
 
 /**
@@ -304,7 +309,7 @@ export function analyzeBullishCombo3(stock: StockCalculated, timeline: RsiIntrad
 }
 
 /**
- * Main analyzer function for all 3 Bullish Combinations
+ * Main analyzer function for all 3 Bullish Combinations with First Hit Timestamp tracking
  */
 export function analyzeBullishCombinations(stock: StockCalculated): BullishSectionAnalysis {
   const timeline = generateIntradayRsiTimeline(stock);
@@ -313,6 +318,45 @@ export function analyzeBullishCombinations(stock: StockCalculated): BullishSecti
   const combo2 = analyzeBullishCombo2(stock, timeline);
   const combo3 = analyzeBullishCombo3(stock, timeline);
 
+  let combo1HitTime: string | null = null;
+  let combo2HitTime: string | null = null;
+  let combo3HitTime: string | null = null;
+  let tripleHitTime: string | null = null;
+  let anyHitTime: string | null = null;
+
+  // Step through intraday timeline to record the exact 15-minute candle timestamp when signal FIRST hit
+  if (timeline && timeline.length > 0) {
+    for (let i = 0; i < timeline.length; i++) {
+      const subTimeline = timeline.slice(0, i + 1);
+      const currentTimeStr = subTimeline[subTimeline.length - 1].timeStr;
+
+      const sub1 = analyzeBullishCombo1(stock, subTimeline);
+      const sub2 = analyzeBullishCombo2(stock, subTimeline);
+      const sub3 = analyzeBullishCombo3(stock, subTimeline);
+
+      if (sub1.isMatch && !combo1HitTime) {
+        combo1HitTime = currentTimeStr;
+      }
+      if (sub2.isMatch && !combo2HitTime) {
+        combo2HitTime = currentTimeStr;
+      }
+      if (sub3.isMatch && !combo3HitTime) {
+        combo3HitTime = currentTimeStr;
+      }
+      if (sub1.isMatch && sub2.isMatch && sub3.isMatch && !tripleHitTime) {
+        tripleHitTime = currentTimeStr;
+      }
+      if ((sub1.isMatch || sub2.isMatch || sub3.isMatch) && !anyHitTime) {
+        anyHitTime = currentTimeStr;
+      }
+    }
+  }
+
+  // Fallback defaults if matched on full set
+  combo1.firstHitTime = combo1.isMatch ? (combo1HitTime || (timeline.length > 0 ? timeline[timeline.length - 1].timeStr : '09:15 AM')) : null;
+  combo2.firstHitTime = combo2.isMatch ? (combo2HitTime || (timeline.length > 0 ? timeline[timeline.length - 1].timeStr : '09:15 AM')) : null;
+  combo3.firstHitTime = combo3.isMatch ? (combo3HitTime || (timeline.length > 0 ? timeline[timeline.length - 1].timeStr : '09:15 AM')) : null;
+
   let totalCombosMet = 0;
   if (combo1.isMatch) totalCombosMet++;
   if (combo2.isMatch) totalCombosMet++;
@@ -320,6 +364,9 @@ export function analyzeBullishCombinations(stock: StockCalculated): BullishSecti
 
   const isAllCombosMet = combo1.isMatch && combo2.isMatch && combo3.isMatch;
   const isAnyComboMet = combo1.isMatch || combo2.isMatch || combo3.isMatch;
+
+  const firstTripleHitTime = isAllCombosMet ? (tripleHitTime || combo3.firstHitTime || combo1.firstHitTime || '09:15 AM') : null;
+  const firstAnyHitTime = isAnyComboMet ? (anyHitTime || combo1.firstHitTime || combo2.firstHitTime || combo3.firstHitTime || '09:15 AM') : null;
 
   const bullishConfluenceScore = Math.round((combo1.score + combo2.score + combo3.score) / 3);
 
@@ -346,6 +393,8 @@ export function analyzeBullishCombinations(stock: StockCalculated): BullishSecti
     isAnyComboMet,
     bullishConfluenceScore,
     summaryBadge,
-    badgeClass
+    badgeClass,
+    firstTripleHitTime,
+    firstAnyHitTime
   };
 }
