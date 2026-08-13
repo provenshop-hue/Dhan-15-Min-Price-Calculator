@@ -1814,6 +1814,13 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         </div>
       )}
 
+      {/* 🚀 BULLISH COMBINATIONS SCREENER */}
+      <BullishFilterSection
+        stocks={stocks}
+        onSelectStockDetail={onSelectStockDetail}
+        onOpenPositionSizer={onOpenPositionSizer}
+      />
+
       {/* 🧪 FILTER RECIPE BUILDER PANEL */}
       <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-indigo-500/40 shadow-lg space-y-4">
         {/* Header */}
