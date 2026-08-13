@@ -645,4 +645,25 @@ export function isOpenCalc2DecGreaterThanClose(stock: { openCalc?: number | null
   return openDec > closeDec;
 }
 
+/**
+ * Checks if Gann Open Calc < 3 AND Gann Close Calc > 10.
+ */
+export function isOpenCalcLessThan3AndCloseGreaterThan10(stock: { openCalc?: number | null; closeCalc?: number | null; openPrice?: number | null; closePrice?: number | null }): boolean {
+  const openVal = (stock.openCalc !== undefined && stock.openCalc !== null) ? stock.openCalc : stock.openPrice;
+  const closeVal = (stock.closeCalc !== undefined && stock.closeCalc !== null) ? stock.closeCalc : stock.closePrice;
+  if (openVal === undefined || openVal === null || closeVal === undefined || closeVal === null) return false;
+  return openVal < 3 && closeVal > 10;
+}
+
+/**
+ * Checks if Gann Open Calc > 10 AND Gann Close Calc < 3.
+ */
+export function isOpenCalcGreaterThan10AndCloseLessThan3(stock: { openCalc?: number | null; closeCalc?: number | null; openPrice?: number | null; closePrice?: number | null }): boolean {
+  const openVal = (stock.openCalc !== undefined && stock.openCalc !== null) ? stock.openCalc : stock.openPrice;
+  const closeVal = (stock.closeCalc !== undefined && stock.closeCalc !== null) ? stock.closeCalc : stock.closePrice;
+  if (openVal === undefined || openVal === null || closeVal === undefined || closeVal === null) return false;
+  return openVal > 10 && closeVal < 3;
+}
+
+
 

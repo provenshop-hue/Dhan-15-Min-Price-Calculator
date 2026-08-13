@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord } from '../types';
-import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3, isOpenCalc2DecLesserThanClose, isOpenCalc2DecGreaterThanClose } from '../utils/gann';
+import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3, isOpenCalc2DecLesserThanClose, isOpenCalc2DecGreaterThanClose, isOpenCalcLessThan3AndCloseGreaterThan10, isOpenCalcGreaterThan10AndCloseLessThan3 } from '../utils/gann';
 import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
 
 export interface RecipeOption15m {
@@ -35,6 +35,8 @@ export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
   { id: 'CLOSE_CALC_LESS_3', label: '📈 Close Calc < 3%', category: 'Gann & Range Calculations', description: 'Close Price Calc <= 3%' },
   { id: 'OPEN_2DEC_LESS_CLOSE', label: '📉 Open 1st 2-Dec < Close 1st 2-Dec', category: 'Gann & Range Calculations', description: 'Gann Open Calc first two decimals < Close Calc first two decimals' },
   { id: 'OPEN_2DEC_GREATER_CLOSE', label: '📈 Open 1st 2-Dec > Close 1st 2-Dec', category: 'Gann & Range Calculations', description: 'Gann Open Calc first two decimals > Close Calc first two decimals' },
+  { id: 'OPEN_LESS_3_CLOSE_GREATER_10', label: '⚡ Open Calc < 3 & Close Calc > 10', category: 'Gann & Range Calculations', description: 'Gann Open Calc < 3 AND Gann Close Calc > 10' },
+  { id: 'OPEN_GREATER_10_CLOSE_LESS_3', label: '⚡ Open Calc > 10 & Close Calc < 3', category: 'Gann & Range Calculations', description: 'Gann Open Calc > 10 AND Gann Close Calc < 3' },
 
   // Trend & Market Sentiment
   { id: 'VERY_BULLISH', label: '🚀 Very Bullish Trend', category: 'Trend & Market Sentiment', description: 'Strong bullish trend momentum' },
@@ -253,6 +255,10 @@ export const StockTable: React.FC<StockTableProps> = ({
         return isOpenCalc2DecLesserThanClose(s);
       case 'OPEN_2DEC_GREATER_CLOSE':
         return isOpenCalc2DecGreaterThanClose(s);
+      case 'OPEN_LESS_3_CLOSE_GREATER_10':
+        return isOpenCalcLessThan3AndCloseGreaterThan10(s);
+      case 'OPEN_GREATER_10_CLOSE_LESS_3':
+        return isOpenCalcGreaterThan10AndCloseLessThan3(s);
       case 'VERY_BULLISH':
         return s.trend === 'Very Bullish';
       case 'BULLISH':
@@ -312,6 +318,8 @@ export const StockTable: React.FC<StockTableProps> = ({
   const closeCalcLess3Count = stocks.filter(isCloseCalcLessThan3).length;
   const open2DecLessCount = stocks.filter(isOpenCalc2DecLesserThanClose).length;
   const open2DecGreaterCount = stocks.filter(isOpenCalc2DecGreaterThanClose).length;
+  const openLess3CloseGreater10Count = stocks.filter(isOpenCalcLessThan3AndCloseGreaterThan10).length;
+  const openGreater10CloseLess3Count = stocks.filter(isOpenCalcGreaterThan10AndCloseLessThan3).length;
   const veryBullishCount = stocks.filter((s) => s.trend === 'Very Bullish').length;
   const bullishCount = stocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish').length;
   const veryBearishCount = stocks.filter((s) => s.trend === 'Very Bearish').length;
@@ -335,6 +343,8 @@ export const StockTable: React.FC<StockTableProps> = ({
     if (trendFilter === 'CLOSE_CALC_LESS_3' && !isCloseCalcLessThan3(s)) return false;
     if (trendFilter === 'OPEN_2DEC_LESS_CLOSE' && !isOpenCalc2DecLesserThanClose(s)) return false;
     if (trendFilter === 'OPEN_2DEC_GREATER_CLOSE' && !isOpenCalc2DecGreaterThanClose(s)) return false;
+    if (trendFilter === 'OPEN_LESS_3_CLOSE_GREATER_10' && !isOpenCalcLessThan3AndCloseGreaterThan10(s)) return false;
+    if (trendFilter === 'OPEN_GREATER_10_CLOSE_LESS_3' && !isOpenCalcGreaterThan10AndCloseLessThan3(s)) return false;
     if (trendFilter === 'VERY_BULLISH' && s.trend !== 'Very Bullish') return false;
     if (trendFilter === 'BULLISH' && s.trend !== 'Bullish' && s.trend !== 'Very Bullish') return false;
     if (trendFilter === 'VERY_BEARISH' && s.trend !== 'Very Bearish') return false;
@@ -785,7 +795,7 @@ export const StockTable: React.FC<StockTableProps> = ({
           </div>
 
           {/* Sub-filter chips for Calc Modes & Decimal Filters */}
-          {(trendFilter === 'GANN_CALC_LESS_3' || trendFilter === 'BOTH_CALC_LESS_3' || trendFilter === 'OPEN_CALC_LESS_3' || trendFilter === 'CLOSE_CALC_LESS_3' || trendFilter === 'OPEN_2DEC_LESS_CLOSE' || trendFilter === 'OPEN_2DEC_GREATER_CLOSE') && (
+          {(trendFilter === 'GANN_CALC_LESS_3' || trendFilter === 'BOTH_CALC_LESS_3' || trendFilter === 'OPEN_CALC_LESS_3' || trendFilter === 'CLOSE_CALC_LESS_3' || trendFilter === 'OPEN_2DEC_LESS_CLOSE' || trendFilter === 'OPEN_2DEC_GREATER_CLOSE' || trendFilter === 'OPEN_LESS_3_CLOSE_GREATER_10' || trendFilter === 'OPEN_GREATER_10_CLOSE_LESS_3') && (
             <div className="flex items-center gap-1 bg-purple-100 p-1 rounded-xl border border-purple-300 text-xs shadow-2xs overflow-x-auto">
               <span className="text-[10px] font-black text-purple-950 px-1.5 flex items-center gap-1 whitespace-nowrap">
                 <Zap className="w-3 h-3 text-purple-700 fill-current" /> Calc Mode:
@@ -851,6 +861,28 @@ export const StockTable: React.FC<StockTableProps> = ({
                 title="Filter stocks where Gann Open Calc (or Open Price) first two decimals > Close Calc first two decimals"
               >
                 📈 Open 1st 2-Dec &gt; Close ({open2DecGreaterCount})
+              </button>
+              <button
+                onClick={() => { setTrendFilter('OPEN_LESS_3_CLOSE_GREATER_10'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold transition-all whitespace-nowrap flex items-center gap-1 ${
+                  trendFilter === 'OPEN_LESS_3_CLOSE_GREATER_10'
+                    ? 'bg-purple-800 text-yellow-300 shadow-2xs ring-1 ring-purple-400'
+                    : 'bg-white text-purple-900 hover:bg-purple-50 border border-purple-200'
+                }`}
+                title="Gann Open Calc < 3 AND Gann Close Calc > 10"
+              >
+                ⚡ Open &lt; 3 &amp; Close &gt; 10 ({openLess3CloseGreater10Count})
+              </button>
+              <button
+                onClick={() => { setTrendFilter('OPEN_GREATER_10_CLOSE_LESS_3'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold transition-all whitespace-nowrap flex items-center gap-1 ${
+                  trendFilter === 'OPEN_GREATER_10_CLOSE_LESS_3'
+                    ? 'bg-purple-800 text-yellow-300 shadow-2xs ring-1 ring-purple-400'
+                    : 'bg-white text-purple-900 hover:bg-purple-50 border border-purple-200'
+                }`}
+                title="Gann Open Calc > 10 AND Gann Close Calc < 3"
+              >
+                ⚡ Open &gt; 10 &amp; Close &lt; 3 ({openGreater10CloseLess3Count})
               </button>
             </div>
           )}
