@@ -609,4 +609,40 @@ export function isGannCalcLessThan3(stock: { openCalc?: number | null; closeCalc
   return isOpenCalcLessThan3(stock) || isCloseCalcLessThan3(stock);
 }
 
+/**
+ * Gets the first 2 decimal digits of a number as an integer (0 to 99).
+ * e.g., 12.3456 -> 34, 100.081 -> 8, 5.0 -> 0
+ */
+export function getFirstTwoDecimals(val?: number | null): number | null {
+  if (val === undefined || val === null || isNaN(val)) return null;
+  const str = Math.abs(val).toFixed(2);
+  const parts = str.split('.');
+  if (parts.length < 2) return 0;
+  return parseInt(parts[1], 10);
+}
+
+/**
+ * Checks if Gann calculation (or Open Price) first two decimals < Close calculation (or Close Price) first two decimals.
+ */
+export function isOpenCalc2DecLesserThanClose(stock: { openCalc?: number | null; closeCalc?: number | null; openPrice?: number | null; closePrice?: number | null }): boolean {
+  const openVal = (stock.openCalc !== undefined && stock.openCalc !== null) ? stock.openCalc : stock.openPrice;
+  const closeVal = (stock.closeCalc !== undefined && stock.closeCalc !== null) ? stock.closeCalc : stock.closePrice;
+  const openDec = getFirstTwoDecimals(openVal);
+  const closeDec = getFirstTwoDecimals(closeVal);
+  if (openDec === null || closeDec === null) return false;
+  return openDec < closeDec;
+}
+
+/**
+ * Checks if Gann calculation (or Open Price) first two decimals > Close calculation (or Close Price) first two decimals.
+ */
+export function isOpenCalc2DecGreaterThanClose(stock: { openCalc?: number | null; closeCalc?: number | null; openPrice?: number | null; closePrice?: number | null }): boolean {
+  const openVal = (stock.openCalc !== undefined && stock.openCalc !== null) ? stock.openCalc : stock.openPrice;
+  const closeVal = (stock.closeCalc !== undefined && stock.closeCalc !== null) ? stock.closeCalc : stock.closePrice;
+  const openDec = getFirstTwoDecimals(openVal);
+  const closeDec = getFirstTwoDecimals(closeVal);
+  if (openDec === null || closeDec === null) return false;
+  return openDec > closeDec;
+}
+
 

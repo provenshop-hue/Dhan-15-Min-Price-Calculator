@@ -74,6 +74,8 @@ export type TrendFilterType =
   | 'BOTH_CALC_LESS_3'
   | 'OPEN_CALC_LESS_3'
   | 'CLOSE_CALC_LESS_3'
+  | 'OPEN_2DEC_LESS_CLOSE'
+  | 'OPEN_2DEC_GREATER_CLOSE'
   | 'CALCULATED';
 
 export interface DhanApiCredentials {
