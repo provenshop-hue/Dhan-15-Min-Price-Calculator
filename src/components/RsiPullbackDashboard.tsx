@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { StockCalculated, FadedStockRecord } from '../types';
 import { analyzeRsiPullback, RsiPullbackAnalysis, is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishScore, get100PercentBearishScore, get100PercentBullishFadeReason, get100PercentBearishFadeReason } from '../utils/rsiPullback';
+import { analyzeBullishCombinations } from '../utils/bullishCombinations';
+import { BullishFilterSection } from './BullishFilterSection';
 import { calculateRSI, isOpenLowPattern, isOpenHighPattern, isHighClosePattern } from '../utils/gann';
 import { 
   TrendingUp, 
@@ -104,6 +106,10 @@ export const RECIPE_OPTIONS: RecipeOption[] = [
   { id: 'PULLBACK_15M_BOUNCE', label: '⏳ 15m Pullback Bounce', category: 'RSI & Pullback Setup', description: '15-min price bouncing off VWAP/EMA' },
 
   // Moving Averages & Indicators
+  { id: 'BULLISH_COMBO_1', label: '🔥 Combo 1: 9/20/50 EMA Stack', category: 'Moving Averages & Indicators', description: '9 EMA > 20 EMA > 50 EMA, Price above all, EMAs rising & Pullback respects 9/20 EMA' },
+  { id: 'BULLISH_COMBO_2', label: '🚀 Combo 2: RSI 55-70 Higher Highs', category: 'Moving Averages & Indicators', description: 'RSI 55–70, Price higher highs & RSI higher highs' },
+  { id: 'BULLISH_COMBO_3', label: '⚡ Combo 3: MACD Crossover & Zero Line', category: 'Moving Averages & Indicators', description: 'MACD bullish crossover, MACD > 0, Histogram increasing & Price > 20/50 EMA' },
+  { id: 'BULLISH_COMBO_ALL', label: '🏆 Triple Bullish Power (All 3 Met)', category: 'Moving Averages & Indicators', description: 'Stock satisfies Combination 1, Combination 2, AND Combination 3 concurrently' },
   { id: 'ABOVE_50_SMA', label: '📈 Price Above 50 SMA', category: 'Moving Averages & Indicators', description: 'LTP trading above Daily 50 SMA' },
   { id: 'SUPERTREND_BUY', label: '🟢 Supertrend BUY Signal', category: 'Moving Averages & Indicators', description: 'Supertrend indicator is Bullish (Green)' },
   { id: 'VWAP_ABOVE', label: '📊 Price Above VWAP', category: 'Moving Averages & Indicators', description: 'LTP above Volume Weighted Avg Price' },
@@ -205,6 +211,16 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         return analysis.pullbackScore >= 75;
       case 'PULLBACK_15M_BOUNCE':
         return !!(analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce);
+      case 'BULLISH_COMBO_1':
+        return analyzeBullishCombinations(stock).combo1.isMatch;
+      case 'BULLISH_COMBO_2':
+        return analyzeBullishCombinations(stock).combo2.isMatch;
+      case 'BULLISH_COMBO_3':
+        return analyzeBullishCombinations(stock).combo3.isMatch;
+      case 'BULLISH_COMBO_ALL':
+        return analyzeBullishCombinations(stock).isAllCombosMet;
+      case 'BULLISH_COMBO_ANY':
+        return analyzeBullishCombinations(stock).isAnyComboMet;
       case 'ABOVE_50_SMA':
         return stock.trend === 'Very Bullish' || stock.trend === 'Bullish' || (stock.pctChange || 0) >= 0;
       case 'SUPERTREND_BUY':
@@ -701,6 +717,20 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Bullish Filter Section */}
+      <BullishFilterSection
+        stocks={stocks}
+        onSelectStockDetail={onSelectStockDetail}
+        onOpenPositionSizer={onOpenPositionSizer}
+        onSelectFilter={(fKey) => {
+          if (fKey === 'BULLISH_COMBO_1') toggleRecipeOption('BULLISH_COMBO_1');
+          else if (fKey === 'BULLISH_COMBO_2') toggleRecipeOption('BULLISH_COMBO_2');
+          else if (fKey === 'BULLISH_COMBO_3') toggleRecipeOption('BULLISH_COMBO_3');
+          else if (fKey === 'BULLISH_COMBO_ALL') toggleRecipeOption('BULLISH_COMBO_ALL');
+          else if (fKey === 'BULLISH_COMBO_ANY') toggleRecipeOption('BULLISH_COMBO_ANY');
+        }}
+      />
 
       {/* Trading Date Selector Control Bar */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">

@@ -78,6 +78,11 @@ export type TrendFilterType =
   | 'OPEN_2DEC_GREATER_CLOSE'
   | 'OPEN_LESS_3_CLOSE_GREATER_10'
   | 'OPEN_GREATER_10_CLOSE_LESS_3'
+  | 'BULLISH_COMBO_1'
+  | 'BULLISH_COMBO_2'
+  | 'BULLISH_COMBO_3'
+  | 'BULLISH_COMBO_ALL'
+  | 'BULLISH_COMBO_ANY'
   | 'CALCULATED';
 
 export interface DhanApiCredentials {

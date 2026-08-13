@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, Flame, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3, isOpenCalc2DecLesserThanClose, isOpenCalc2DecGreaterThanClose, isOpenCalcLessThan3AndCloseGreaterThan10, isOpenCalcGreaterThan10AndCloseLessThan3 } from '../utils/gann';
 import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
+import { analyzeBullishCombinations } from '../utils/bullishCombinations';
 
 export interface RecipeOption15m {
   id: string;
@@ -39,6 +40,10 @@ export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
   { id: 'OPEN_GREATER_10_CLOSE_LESS_3', label: '⚡ Open Calc > 10 & Close Calc < 3', category: 'Gann & Range Calculations', description: 'Gann Open Calc > 10 AND Gann Close Calc < 3' },
 
   // Trend & Market Sentiment
+  { id: 'BULLISH_COMBO_1', label: '🔥 Combo 1: 9/20/50 EMA Stack', category: 'Trend & Market Sentiment', description: '9 EMA > 20 EMA > 50 EMA, Price above all, EMAs rising & Pullback respects 9/20 EMA' },
+  { id: 'BULLISH_COMBO_2', label: '🚀 Combo 2: RSI 55-70 Higher Highs', category: 'Trend & Market Sentiment', description: 'RSI 55–70, Price higher highs & RSI higher highs' },
+  { id: 'BULLISH_COMBO_3', label: '⚡ Combo 3: MACD Crossover & Zero Line', category: 'Trend & Market Sentiment', description: 'MACD bullish crossover, MACD > 0, Histogram increasing & Price > 20/50 EMA' },
+  { id: 'BULLISH_COMBO_ALL', label: '🏆 Triple Bullish Power (All 3 Met)', category: 'Trend & Market Sentiment', description: 'Stock satisfies Combination 1, Combination 2, AND Combination 3 concurrently' },
   { id: 'VERY_BULLISH', label: '🚀 Very Bullish Trend', category: 'Trend & Market Sentiment', description: 'Strong bullish trend momentum' },
   { id: 'BULLISH', label: '📈 Bullish / Very Bullish', category: 'Trend & Market Sentiment', description: 'Overall positive trend directional bias' },
   { id: 'VERY_BEARISH', label: '💥 Very Bearish Trend', category: 'Trend & Market Sentiment', description: 'Strong bearish breakdown trend' },
@@ -259,6 +264,16 @@ export const StockTable: React.FC<StockTableProps> = ({
         return isOpenCalcLessThan3AndCloseGreaterThan10(s);
       case 'OPEN_GREATER_10_CLOSE_LESS_3':
         return isOpenCalcGreaterThan10AndCloseLessThan3(s);
+      case 'BULLISH_COMBO_1':
+        return analyzeBullishCombinations(s).combo1.isMatch;
+      case 'BULLISH_COMBO_2':
+        return analyzeBullishCombinations(s).combo2.isMatch;
+      case 'BULLISH_COMBO_3':
+        return analyzeBullishCombinations(s).combo3.isMatch;
+      case 'BULLISH_COMBO_ALL':
+        return analyzeBullishCombinations(s).isAllCombosMet;
+      case 'BULLISH_COMBO_ANY':
+        return analyzeBullishCombinations(s).isAnyComboMet;
       case 'VERY_BULLISH':
         return s.trend === 'Very Bullish';
       case 'BULLISH':
@@ -320,6 +335,11 @@ export const StockTable: React.FC<StockTableProps> = ({
   const open2DecGreaterCount = stocks.filter(isOpenCalc2DecGreaterThanClose).length;
   const openLess3CloseGreater10Count = stocks.filter(isOpenCalcLessThan3AndCloseGreaterThan10).length;
   const openGreater10CloseLess3Count = stocks.filter(isOpenCalcGreaterThan10AndCloseLessThan3).length;
+  const combo1Count = stocks.filter((s) => analyzeBullishCombinations(s).combo1.isMatch).length;
+  const combo2Count = stocks.filter((s) => analyzeBullishCombinations(s).combo2.isMatch).length;
+  const combo3Count = stocks.filter((s) => analyzeBullishCombinations(s).combo3.isMatch).length;
+  const comboAllCount = stocks.filter((s) => analyzeBullishCombinations(s).isAllCombosMet).length;
+  const comboAnyCount = stocks.filter((s) => analyzeBullishCombinations(s).isAnyComboMet).length;
   const veryBullishCount = stocks.filter((s) => s.trend === 'Very Bullish').length;
   const bullishCount = stocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish').length;
   const veryBearishCount = stocks.filter((s) => s.trend === 'Very Bearish').length;
@@ -345,6 +365,11 @@ export const StockTable: React.FC<StockTableProps> = ({
     if (trendFilter === 'OPEN_2DEC_GREATER_CLOSE' && !isOpenCalc2DecGreaterThanClose(s)) return false;
     if (trendFilter === 'OPEN_LESS_3_CLOSE_GREATER_10' && !isOpenCalcLessThan3AndCloseGreaterThan10(s)) return false;
     if (trendFilter === 'OPEN_GREATER_10_CLOSE_LESS_3' && !isOpenCalcGreaterThan10AndCloseLessThan3(s)) return false;
+    if (trendFilter === 'BULLISH_COMBO_1' && !analyzeBullishCombinations(s).combo1.isMatch) return false;
+    if (trendFilter === 'BULLISH_COMBO_2' && !analyzeBullishCombinations(s).combo2.isMatch) return false;
+    if (trendFilter === 'BULLISH_COMBO_3' && !analyzeBullishCombinations(s).combo3.isMatch) return false;
+    if (trendFilter === 'BULLISH_COMBO_ALL' && !analyzeBullishCombinations(s).isAllCombosMet) return false;
+    if (trendFilter === 'BULLISH_COMBO_ANY' && !analyzeBullishCombinations(s).isAnyComboMet) return false;
     if (trendFilter === 'VERY_BULLISH' && s.trend !== 'Very Bullish') return false;
     if (trendFilter === 'BULLISH' && s.trend !== 'Bullish' && s.trend !== 'Very Bullish') return false;
     if (trendFilter === 'VERY_BEARISH' && s.trend !== 'Very Bearish') return false;
@@ -735,6 +760,18 @@ export const StockTable: React.FC<StockTableProps> = ({
               Calc &lt; 3 ({gannCalcLess3Count})
             </button>
             <button
+              onClick={() => { setTrendFilter('BULLISH_COMBO_ANY'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-black transition-all flex items-center gap-1 ${
+                trendFilter === 'BULLISH_COMBO_ANY' || trendFilter === 'BULLISH_COMBO_1' || trendFilter === 'BULLISH_COMBO_2' || trendFilter === 'BULLISH_COMBO_3' || trendFilter === 'BULLISH_COMBO_ALL'
+                  ? 'bg-emerald-600 text-white shadow-2xs ring-2 ring-emerald-300'
+                  : 'text-emerald-900 bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300/80 shadow-2xs'
+              }`}
+              title="Bullish Technical Filter Section (Combos 1, 2, 3)"
+            >
+              <Flame className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300 fill-current animate-pulse" />
+              Bullish Combos ({comboAnyCount})
+            </button>
+            <button
               onClick={() => { setTrendFilter('VERY_BULLISH'); setCurrentPage(1); }}
               className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
                 trendFilter === 'VERY_BULLISH' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:bg-emerald-100'
@@ -793,6 +830,55 @@ export const StockTable: React.FC<StockTableProps> = ({
               </button>
             ))}
           </div>
+
+          {/* Sub-filter chips for Bullish Combinations */}
+          {(trendFilter === 'BULLISH_COMBO_ANY' || trendFilter === 'BULLISH_COMBO_1' || trendFilter === 'BULLISH_COMBO_2' || trendFilter === 'BULLISH_COMBO_3' || trendFilter === 'BULLISH_COMBO_ALL') && (
+            <div className="flex items-center gap-1 bg-emerald-100 p-1 rounded-xl border border-emerald-300 text-xs shadow-2xs overflow-x-auto">
+              <span className="text-[10px] font-black text-emerald-950 px-1.5 flex items-center gap-1 whitespace-nowrap">
+                <Flame className="w-3 h-3 text-emerald-600 fill-current" /> Bullish Section:
+              </span>
+              <button
+                onClick={() => { setTrendFilter('BULLISH_COMBO_ANY'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-extrabold whitespace-nowrap ${
+                  trendFilter === 'BULLISH_COMBO_ANY' ? 'bg-emerald-700 text-white shadow-2xs' : 'text-emerald-900 hover:bg-emerald-200'
+                }`}
+              >
+                All Combos ({comboAnyCount})
+              </button>
+              <button
+                onClick={() => { setTrendFilter('BULLISH_COMBO_1'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-extrabold whitespace-nowrap ${
+                  trendFilter === 'BULLISH_COMBO_1' ? 'bg-emerald-700 text-white shadow-2xs' : 'text-emerald-900 hover:bg-emerald-200'
+                }`}
+              >
+                Combo 1: 9/20/50 EMA ({combo1Count})
+              </button>
+              <button
+                onClick={() => { setTrendFilter('BULLISH_COMBO_2'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-extrabold whitespace-nowrap ${
+                  trendFilter === 'BULLISH_COMBO_2' ? 'bg-blue-700 text-white shadow-2xs' : 'text-blue-900 hover:bg-blue-200'
+                }`}
+              >
+                Combo 2: RSI 55-70 ({combo2Count})
+              </button>
+              <button
+                onClick={() => { setTrendFilter('BULLISH_COMBO_3'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-extrabold whitespace-nowrap ${
+                  trendFilter === 'BULLISH_COMBO_3' ? 'bg-purple-700 text-white shadow-2xs' : 'text-purple-900 hover:bg-purple-200'
+                }`}
+              >
+                Combo 3: MACD ({combo3Count})
+              </button>
+              <button
+                onClick={() => { setTrendFilter('BULLISH_COMBO_ALL'); setCurrentPage(1); }}
+                className={`px-2 py-0.5 rounded text-[11px] font-extrabold whitespace-nowrap ${
+                  trendFilter === 'BULLISH_COMBO_ALL' ? 'bg-amber-500 text-slate-950 font-black shadow-2xs' : 'text-amber-900 hover:bg-amber-200'
+                }`}
+              >
+                🔥 Triple Power ({comboAllCount})
+              </button>
+            </div>
+          )}
 
           {/* Sub-filter chips for Calc Modes & Decimal Filters */}
           {(trendFilter === 'GANN_CALC_LESS_3' || trendFilter === 'BOTH_CALC_LESS_3' || trendFilter === 'OPEN_CALC_LESS_3' || trendFilter === 'CLOSE_CALC_LESS_3' || trendFilter === 'OPEN_2DEC_LESS_CLOSE' || trendFilter === 'OPEN_2DEC_GREATER_CLOSE' || trendFilter === 'OPEN_LESS_3_CLOSE_GREATER_10' || trendFilter === 'OPEN_GREATER_10_CLOSE_LESS_3') && (
