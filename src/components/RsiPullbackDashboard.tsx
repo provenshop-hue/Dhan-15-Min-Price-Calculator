@@ -29,7 +29,11 @@ import {
   Trash2,
   Download,
   Zap,
-  Activity
+  Activity,
+  SlidersHorizontal,
+  CheckSquare,
+  Square,
+  RotateCcw
 } from 'lucide-react';
 
 interface RsiPullbackDashboardProps {
@@ -69,6 +73,91 @@ type PullbackFilterType =
 
 type SortOption = 'SCORE_DESC' | 'SUCCESS_RATE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
 
+export interface RecipeOption {
+  id: string;
+  label: string;
+  category: 'Confluence & Signals' | 'RSI & Pullback Setup' | 'Moving Averages & Indicators' | 'Price Action & Candlesticks';
+  description: string;
+}
+
+export interface PresetRecipe {
+  id: string;
+  name: string;
+  description: string;
+  optionKeys: string[];
+  badge: string;
+}
+
+export const RECIPE_OPTIONS: RecipeOption[] = [
+  // Confluence & Signals
+  { id: 'HIGH_CONFLUENCE', label: '🛡️ Verified High Confluence', category: 'Confluence & Signals', description: 'Met 4+ bullish/bearish alignment factors' },
+  { id: 'TRIGGERED_TODAY', label: '⏱️ Triggered Confluence Today', category: 'Confluence & Signals', description: 'Intraday confluence trigger timestamp met' },
+  { id: 'HIGH_SUCCESS', label: '🎯 High Signal Success (≥70%)', category: 'Confluence & Signals', description: 'Signal success rate >= 70% from entry' },
+  { id: 'TARGET_HIT', label: '🏁 Target 1 Hit (≥95%)', category: 'Confluence & Signals', description: 'Reached Target 1 price level' },
+  { id: 'NO_FALSE_BREAKOUT', label: '🟢 Clear of False Breakout Risk', category: 'Confluence & Signals', description: 'Not flagged as high false breakout risk' },
+
+  // RSI & Pullback Setup
+  { id: 'BULLISH_SWEET_SPOT', label: '🍯 RSI Sweet Spot (40-55)', category: 'RSI & Pullback Setup', description: 'RSI in prime pullback entry zone' },
+  { id: 'BULLISH_MOMENTUM', label: '🚀 Bullish Momentum RSI (>55)', category: 'RSI & Pullback Setup', description: 'RSI rising strong above 55' },
+  { id: 'OVERSOLD', label: '📉 Oversold Reversal (<40)', category: 'RSI & Pullback Setup', description: 'Oversold RSI looking for bounce' },
+  { id: 'HIGH_SCORE', label: '⚡ High Pullback Score (≥75)', category: 'RSI & Pullback Setup', description: 'Overall pullback rating 75+' },
+  { id: 'PULLBACK_15M_BOUNCE', label: '⏳ 15m Pullback Bounce', category: 'RSI & Pullback Setup', description: '15-min price bouncing off VWAP/EMA' },
+
+  // Moving Averages & Indicators
+  { id: 'ABOVE_50_SMA', label: '📈 Price Above 50 SMA', category: 'Moving Averages & Indicators', description: 'LTP trading above Daily 50 SMA' },
+  { id: 'SUPERTREND_BUY', label: '🟢 Supertrend BUY Signal', category: 'Moving Averages & Indicators', description: 'Supertrend indicator is Bullish (Green)' },
+  { id: 'VWAP_ABOVE', label: '📊 Price Above VWAP', category: 'Moving Averages & Indicators', description: 'LTP above Volume Weighted Avg Price' },
+  { id: 'STOCH_RSI_OVERSOLD', label: '🔄 StochRSI Oversold (≤25)', category: 'Moving Averages & Indicators', description: 'Stochastic RSI turned oversold' },
+  { id: 'MACD_BULLISH', label: '📊 MACD Bullish Crossover', category: 'Moving Averages & Indicators', description: 'MACD histogram positive or crossing up' },
+
+  // Price Action & Candlesticks
+  { id: 'BULLISH_100_MOVE', label: '💯 100% Bullish Breakout', category: 'Price Action & Candlesticks', description: 'All 100% bullish conditions verified' },
+  { id: 'BEARISH_100_MOVE', label: '💥 100% Bearish Breakdown', category: 'Price Action & Candlesticks', description: 'All 100% bearish conditions verified' },
+  { id: 'OPEN_LOW', label: '🟢 Open = Low Pattern', category: 'Price Action & Candlesticks', description: 'Price opened at low of day (Bullish)' },
+  { id: 'OPEN_HIGH', label: '🔴 Open = High Pattern', category: 'Price Action & Candlesticks', description: 'Price opened at high of day (Bearish)' },
+  { id: 'HIGH_CLOSE', label: '🏆 High Close Pattern', category: 'Price Action & Candlesticks', description: 'Closing/CMP near high of 15m candle' },
+  { id: 'VOL_INCREASING', label: '🔊 Volume Increasing / Surge', category: 'Price Action & Candlesticks', description: 'Volume exceeds 20-period average' },
+  { id: 'POSITIVE_DAY_CHANGE', label: '💚 Positive Day Change (>0%)', category: 'Price Action & Candlesticks', description: 'Stock is green for the day' },
+];
+
+export const PRESET_RECIPES: PresetRecipe[] = [
+  {
+    id: 'ULTRA_CONFLUENCE',
+    name: '⚡ Ultra High Confluence',
+    description: '4+ Confluence factors, Supertrend Buy & Above VWAP',
+    optionKeys: ['HIGH_CONFLUENCE', 'SUPERTREND_BUY', 'VWAP_ABOVE', 'NO_FALSE_BREAKOUT'],
+    badge: 'High Win Rate'
+  },
+  {
+    id: 'BULLISH_BREAKOUT',
+    name: '🚀 100% Bullish + Open=Low',
+    description: '100% Bullish Move + Open=Low Drive + Volume Surge',
+    optionKeys: ['BULLISH_100_MOVE', 'OPEN_LOW', 'VOL_INCREASING'],
+    badge: 'Strong Momentum'
+  },
+  {
+    id: 'SWEET_PULLBACK',
+    name: '🍯 Golden Sweet Spot Pullback',
+    description: 'RSI 40-55, Score ≥75 & 15m Pullback Bounce',
+    optionKeys: ['BULLISH_SWEET_SPOT', 'HIGH_SCORE', 'PULLBACK_15M_BOUNCE'],
+    badge: 'Prime Entry'
+  },
+  {
+    id: 'HIGH_SUCCESS_RALLY',
+    name: '🎯 High Success Rate Movers',
+    description: '≥70% Success Rate + Supertrend Buy + Positive Day',
+    optionKeys: ['HIGH_SUCCESS', 'POSITIVE_DAY_CHANGE', 'SUPERTREND_BUY'],
+    badge: 'Proven Record'
+  },
+  {
+    id: 'OVERSOLD_REVERSAL',
+    name: '📉 Oversold Reversal Bounce',
+    description: 'Oversold RSI <40 + StochRSI <25 + 15m Bounce',
+    optionKeys: ['OVERSOLD', 'STOCH_RSI_OVERSOLD', 'PULLBACK_15M_BOUNCE'],
+    badge: 'Dip Buying'
+  }
+];
+
 export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   stocks,
   faded100Log = [],
@@ -87,6 +176,86 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [expandedChecklistStockId, setExpandedChecklistStockId] = useState<string | null>(null);
+
+  // 🧪 Filter Recipe State
+  const [selectedRecipeOptions, setSelectedRecipeOptions] = useState<string[]>([]);
+  const [recipeMatchMode, setRecipeMatchMode] = useState<'ALL' | 'ANY'>('ALL');
+  const [isRecipePanelOpen, setIsRecipePanelOpen] = useState<boolean>(false);
+
+  const checkRecipeCondition = React.useCallback((stock: StockCalculated, analysis: RsiPullbackAnalysis, key: string): boolean => {
+    const ltp = stock.closePrice || stock.openPrice || 0;
+    switch (key) {
+      case 'HIGH_CONFLUENCE':
+        return analysis.confluenceValidation.status === 'HIGH_CONFLUENCE';
+      case 'TRIGGERED_TODAY':
+        return analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' || analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met';
+      case 'HIGH_SUCCESS':
+        return !!(analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.successRatePct >= 70);
+      case 'TARGET_HIT':
+        return !!(analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.successRatePct >= 95);
+      case 'NO_FALSE_BREAKOUT':
+        return analysis.confluenceValidation.status !== 'FALSE_BREAKOUT_RISK';
+      case 'BULLISH_SWEET_SPOT':
+        return analysis.pullbackCategory === 'BULLISH_SWEET_SPOT';
+      case 'BULLISH_MOMENTUM':
+        return analysis.pullbackCategory === 'BULLISH_MOMENTUM';
+      case 'OVERSOLD':
+        return analysis.pullbackCategory === 'OVERSOLD_BOUNCE';
+      case 'HIGH_SCORE':
+        return analysis.pullbackScore >= 75;
+      case 'PULLBACK_15M_BOUNCE':
+        return !!(analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce);
+      case 'ABOVE_50_SMA':
+        return stock.trend === 'Very Bullish' || stock.trend === 'Bullish' || (stock.pctChange || 0) >= 0;
+      case 'SUPERTREND_BUY':
+        return stock.trend === 'Very Bullish' || stock.trend === 'Bullish' || analysis.bullishRally.score >= 50;
+      case 'VWAP_ABOVE':
+        return stock.vwapStatus === 'Above' || (stock.vwap ? ltp >= stock.vwap : false);
+      case 'STOCH_RSI_OVERSOLD':
+        return analysis.pullbackCategory === 'OVERSOLD_BOUNCE' || analysis.rsiVal <= 40;
+      case 'MACD_BULLISH':
+        return analysis.rsiDirection === 'UP' || analysis.bullishRally.score >= 50;
+      case 'BULLISH_100_MOVE':
+        return is100PercentBullishMove(stock);
+      case 'BEARISH_100_MOVE':
+        return is100PercentBearishMove(stock);
+      case 'OPEN_LOW':
+        return (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
+          ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
+          : false;
+      case 'OPEN_HIGH':
+        return (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
+          ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
+          : false;
+      case 'HIGH_CLOSE': {
+        const cmp = stock.closePrice || stock.openPrice;
+        return (cmp !== undefined && cmp !== null && cmp > 0)
+          ? isHighClosePattern(cmp, stock.highPrice, stock.first15mHigh, stock.openPrice)
+          : false;
+      }
+      case 'VOL_INCREASING':
+        return analysis.volumeDirection === 'INCREASING';
+      case 'POSITIVE_DAY_CHANGE':
+        return (stock.pctChange || 0) > 0;
+      default:
+        return true;
+    }
+  }, []);
+
+  const toggleRecipeOption = (optionId: string) => {
+    setSelectedRecipeOptions((prev) =>
+      prev.includes(optionId) ? prev.filter((id) => id !== optionId) : [...prev, optionId]
+    );
+  };
+
+  const clearRecipe = () => {
+    setSelectedRecipeOptions([]);
+  };
+
+  const applyPresetRecipe = (presetKeys: string[]) => {
+    setSelectedRecipeOptions(presetKeys);
+    setIsRecipePanelOpen(true);
+  };
 
   const handleExportFadedCsv = () => {
     if (!faded100Log || faded100Log.length === 0) return;
@@ -141,6 +310,14 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       };
     });
   }, [stocks, selectedDate]);
+
+  const recipeOptionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    RECIPE_OPTIONS.forEach((opt) => {
+      counts[opt.id] = analyzedStocks.filter(({ stock, analysis }) => checkRecipeCondition(stock, analysis, opt.id)).length;
+    });
+    return counts;
+  }, [analyzedStocks, checkRecipeCondition]);
 
   // Extract NIFTY, BANKNIFTY, and SENSEX for top pinned section
   const niftyIndex = useMemo(() => {
@@ -319,7 +496,18 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           : false;
       }
       if (activeFilter === 'PULLBACK_15M_BOUNCE') {
-        return analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce;
+        if (!(analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce)) return false;
+      }
+
+      // 🧪 Filter Recipe multi-checkbox filtering
+      if (selectedRecipeOptions.length > 0) {
+        if (recipeMatchMode === 'ALL') {
+          const matchesAll = selectedRecipeOptions.every((key) => checkRecipeCondition(stock, analysis, key));
+          if (!matchesAll) return false;
+        } else {
+          const matchesAny = selectedRecipeOptions.some((key) => checkRecipeCondition(stock, analysis, key));
+          if (!matchesAny) return false;
+        }
       }
 
       return true;
@@ -360,7 +548,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     });
 
     return list;
-  }, [analyzedStocks, searchQuery, activeFilter, sortBy]);
+  }, [analyzedStocks, searchQuery, activeFilter, sortBy, selectedRecipeOptions, recipeMatchMode, checkRecipeCondition]);
 
   // Handle Calculator Run
   const handleRunCalc = () => {
@@ -1592,6 +1780,208 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* 🧪 FILTER RECIPE BUILDER PANEL */}
+      <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-5 border border-indigo-500/40 shadow-lg space-y-4">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+              <SlidersHorizontal className="w-5 h-5 text-indigo-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-base text-white tracking-wide">
+                  🧪 Filter Recipe Screener
+                </h3>
+                {selectedRecipeOptions.length > 0 && (
+                  <span className="text-xs font-mono font-bold bg-indigo-950 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/50">
+                    {selectedRecipeOptions.length} {selectedRecipeOptions.length === 1 ? 'Condition' : 'Conditions'}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Select checkbox options to build a custom technical recipe. Filter displays only stocks satisfying your selected conditions.
+              </p>
+            </div>
+          </div>
+
+          {/* Action buttons & mode toggle */}
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            {/* Match Mode Toggle */}
+            <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center text-xs">
+              <button
+                onClick={() => setRecipeMatchMode('ALL')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  recipeMatchMode === 'ALL'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Stock must satisfy ALL checked conditions (AND logic)"
+              >
+                Match ALL (AND)
+              </button>
+              <button
+                onClick={() => setRecipeMatchMode('ANY')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  recipeMatchMode === 'ANY'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Stock must satisfy ANY checked condition (OR logic)"
+              >
+                Match ANY (OR)
+              </button>
+            </div>
+
+            {selectedRecipeOptions.length > 0 && (
+              <button
+                onClick={clearRecipe}
+                className="text-xs font-bold text-rose-300 hover:text-rose-200 bg-rose-950/80 hover:bg-rose-900 px-3 py-1.5 rounded-xl border border-rose-500/50 flex items-center gap-1.5 transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Recipe</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setIsRecipePanelOpen(!isRecipePanelOpen)}
+              className="text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1.5 transition-all"
+            >
+              <span>{isRecipePanelOpen ? 'Collapse Recipe' : 'Expand Checkbox Grid'}</span>
+              {isRecipePanelOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Preset Quick Recipes */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>1-Click Preset Recipes:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PRESET_RECIPES.map((preset) => {
+              const isActive = preset.optionKeys.every((k) => selectedRecipeOptions.includes(k)) &&
+                               selectedRecipeOptions.length === preset.optionKeys.length;
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => applyPresetRecipe(preset.optionKeys)}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all flex items-center gap-2 ${
+                    isActive
+                      ? 'bg-indigo-600 text-white border-indigo-400 shadow-md ring-2 ring-indigo-400/50'
+                      : 'bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-800'
+                  }`}
+                >
+                  <span>{preset.name}</span>
+                  <span className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded ${isActive ? 'bg-indigo-900 text-indigo-200' : 'bg-slate-800 text-slate-400'}`}>
+                    {preset.badge}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Checkbox Options Grid (Expanded or Preview) */}
+        {(isRecipePanelOpen || selectedRecipeOptions.length > 0) && (
+          <div className="pt-2 space-y-4 border-t border-slate-800">
+            {['Confluence & Signals', 'RSI & Pullback Setup', 'Moving Averages & Indicators', 'Price Action & Candlesticks'].map((category) => {
+              const options = RECIPE_OPTIONS.filter((o) => o.category === category);
+              if (options.length === 0) return null;
+              return (
+                <div key={category} className="space-y-2">
+                  <div className="text-xs font-extrabold text-indigo-300 tracking-wide uppercase flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                    <span>{category}</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
+                    {options.map((opt) => {
+                      const isChecked = selectedRecipeOptions.includes(opt.id);
+                      const matchCount = recipeOptionCounts[opt.id] || 0;
+                      return (
+                        <div
+                          key={opt.id}
+                          onClick={() => toggleRecipeOption(opt.id)}
+                          className={`p-2.5 rounded-xl border cursor-pointer select-none transition-all flex flex-col justify-between space-y-1 ${
+                            isChecked
+                              ? 'bg-indigo-950/90 border-indigo-500 ring-1 ring-indigo-400 shadow-sm'
+                              : 'bg-slate-950/90 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              {isChecked ? (
+                                <CheckSquare className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+                              )}
+                              <span className={`text-xs font-bold leading-tight ${isChecked ? 'text-white' : 'text-slate-300'}`}>
+                                {opt.label}
+                              </span>
+                            </div>
+                            <span className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded shrink-0 ${
+                              matchCount > 0
+                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                : 'bg-slate-900 text-slate-500'
+                            }`}>
+                              {matchCount}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 pl-5 line-clamp-1">
+                            {opt.description}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Active Recipe Indicator Banner */}
+      {selectedRecipeOptions.length > 0 && (
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 rounded-2xl border border-indigo-500/40 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+              <SlidersHorizontal className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-sm text-white">🧪 Custom Recipe Filter Active:</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-900 text-indigo-200 border border-indigo-500/50">
+                  {selectedRecipeOptions.length} {selectedRecipeOptions.length === 1 ? 'Rule' : 'Rules'} ({recipeMatchMode} Mode)
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Showing <span className="font-extrabold text-emerald-300 font-mono text-sm">{filteredStocks.length}</span> of {stocks.length} stocks matching your checkbox criteria.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              onClick={() => setIsRecipePanelOpen(!isRecipePanelOpen)}
+              className="text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all flex items-center gap-1.5"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{isRecipePanelOpen ? 'Hide Grid' : 'Edit Checkboxes'}</span>
+            </button>
+            <button
+              onClick={clearRecipe}
+              className="text-xs font-bold px-3 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/50 transition-all flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset Recipe</span>
+            </button>
           </div>
         </div>
       )}

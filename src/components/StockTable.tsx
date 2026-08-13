@@ -1,8 +1,90 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
 import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
+
+export interface RecipeOption15m {
+  id: string;
+  label: string;
+  category: '15m Candlestick & Price Patterns' | 'Gann & Range Calculations' | 'Trend & Market Sentiment' | 'VWAP & Pullback Indicators';
+  description: string;
+}
+
+export interface PresetRecipe15m {
+  id: string;
+  name: string;
+  description: string;
+  optionKeys: string[];
+  badge: string;
+}
+
+export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
+  // 15m Candlestick & Price Patterns
+  { id: 'OPEN_LOW', label: '🟢 Open = Low Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at low of first 15m candle' },
+  { id: 'OPEN_HIGH', label: '🔴 Open = High Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at high of first 15m candle' },
+  { id: 'HIGH_CLOSE', label: '🏆 High = Close Pattern', category: '15m Candlestick & Price Patterns', description: 'Closing/CMP near high of 15m candle' },
+  { id: 'ABOVE_15M_HIGH', label: '🚀 Above First 15m High', category: '15m Candlestick & Price Patterns', description: 'LTP breached above initial 15-min high' },
+  { id: 'BELOW_15M_LOW', label: '📉 Below First 15m Low', category: '15m Candlestick & Price Patterns', description: 'LTP breached below initial 15-min low' },
+  { id: 'FIB_382', label: '🌀 Fibonacci 38.2% Retrace', category: '15m Candlestick & Price Patterns', description: 'Price retraced to Fib 38.2% support/resistance' },
+
+  // Gann & Range Calculations
+  { id: 'GANN_CALC_LESS_3', label: '⚡ Gann Calc < 3% Range', category: 'Gann & Range Calculations', description: 'Gann volatility calculation range under 3%' },
+  { id: 'BOTH_CALC_LESS_3', label: '🎯 Open & Close Calc < 3%', category: 'Gann & Range Calculations', description: 'Both Open and Close Calc <= 3%' },
+  { id: 'OPEN_CALC_LESS_3', label: '📊 Open Calc < 3%', category: 'Gann & Range Calculations', description: 'Open Price Calc <= 3%' },
+  { id: 'CLOSE_CALC_LESS_3', label: '📈 Close Calc < 3%', category: 'Gann & Range Calculations', description: 'Close Price Calc <= 3%' },
+
+  // Trend & Market Sentiment
+  { id: 'VERY_BULLISH', label: '🚀 Very Bullish Trend', category: 'Trend & Market Sentiment', description: 'Strong bullish trend momentum' },
+  { id: 'BULLISH', label: '📈 Bullish / Very Bullish', category: 'Trend & Market Sentiment', description: 'Overall positive trend directional bias' },
+  { id: 'VERY_BEARISH', label: '💥 Very Bearish Trend', category: 'Trend & Market Sentiment', description: 'Strong bearish breakdown trend' },
+  { id: 'BEARISH', label: '📉 Bearish / Very Bearish', category: 'Trend & Market Sentiment', description: 'Overall negative trend directional bias' },
+  { id: 'POSITIVE_DAY', label: '💚 Positive Day Change (>0%)', category: 'Trend & Market Sentiment', description: 'Stock gainers in green territory' },
+
+  // VWAP & Pullback Indicators
+  { id: 'VWAP_ABOVE', label: '📊 Price Above VWAP', category: 'VWAP & Pullback Indicators', description: 'LTP trading above Volume Weighted Avg Price' },
+  { id: 'VWAP_BELOW', label: '📉 Price Below VWAP', category: 'VWAP & Pullback Indicators', description: 'LTP trading below Volume Weighted Avg Price' },
+  { id: 'PULLBACK_15M_BOUNCE', label: '⏳ 15m Pullback Bounce', category: 'VWAP & Pullback Indicators', description: 'Bouncing off 15m EMA / VWAP support' },
+  { id: 'CALCULATED_DATA', label: '✅ Dhan 15m Data Fetched', category: 'VWAP & Pullback Indicators', description: '15-minute live candles active' },
+];
+
+export const PRESET_RECIPES_15M: PresetRecipe15m[] = [
+  {
+    id: 'ULTRA_15M_BULL',
+    name: '⚡ Ultra 15m Bullish Breakout',
+    description: 'Open = Low + Very Bullish + Above 15m High',
+    optionKeys: ['OPEN_LOW', 'VERY_BULLISH', 'ABOVE_15M_HIGH'],
+    badge: 'Strong Momentum'
+  },
+  {
+    id: 'GANN_TIGHT_RALLY',
+    name: '🎯 Tight Gann Calc Rally',
+    description: 'Gann Calc < 3% + High=Close + Positive Day',
+    optionKeys: ['GANN_CALC_LESS_3', 'HIGH_CLOSE', 'POSITIVE_DAY'],
+    badge: 'Low Risk Entry'
+  },
+  {
+    id: 'VWAP_PULLBACK_BOUNCE',
+    name: '🍯 VWAP 15m Pullback',
+    description: '15m Pullback Bounce + Above VWAP + Bullish',
+    optionKeys: ['PULLBACK_15M_BOUNCE', 'VWAP_ABOVE', 'BULLISH'],
+    badge: 'Prime Entry'
+  },
+  {
+    id: 'FIB_RETRACE_RALLY',
+    name: '🌀 Fib 38.2% Support Bounce',
+    description: 'Fib 38.2% Retrace + Bullish + Above 15m High',
+    optionKeys: ['FIB_382', 'BULLISH', 'ABOVE_15M_HIGH'],
+    badge: 'Key Level'
+  },
+  {
+    id: 'BEARISH_15M_BREAKDOWN',
+    name: '💥 Open=High Bearish Breakdown',
+    description: 'Open = High + Below 15m Low + Very Bearish',
+    optionKeys: ['OPEN_HIGH', 'BELOW_15M_LOW', 'VERY_BEARISH'],
+    badge: 'Shorting Signal'
+  }
+];
 
 interface StockTableProps {
   stocks: StockCalculated[];
@@ -48,10 +130,15 @@ export const StockTable: React.FC<StockTableProps> = ({
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Automatically reset to Page 1 when filter or search changes
+  // 🧪 Filter Recipe State for 15m Scanner
+  const [selectedRecipeOptions, setSelectedRecipeOptions] = useState<string[]>([]);
+  const [recipeMatchMode, setRecipeMatchMode] = useState<'ALL' | 'ANY'>('ALL');
+  const [isRecipePanelOpen, setIsRecipePanelOpen] = useState<boolean>(false);
+
+  // Automatically reset to Page 1 when filter, search, or recipe changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [trendFilter, searchTerm]);
+  }, [trendFilter, searchTerm, selectedRecipeOptions, recipeMatchMode]);
 
   const [lotMonth, setLotMonth] = useState<'Jun' | 'Jul' | 'Aug'>('Jun');
 
@@ -136,6 +223,78 @@ export const StockTable: React.FC<StockTableProps> = ({
     return fibData?.isFib382Retraced ?? false;
   };
 
+  // 🧪 Check condition for 15m Filter Recipe
+  const checkRecipeCondition15m = React.useCallback((s: StockCalculated, key: string): boolean => {
+    const cmp = s.closePrice || s.openPrice || 0;
+    switch (key) {
+      case 'OPEN_LOW':
+        return isStockOpenEqualLow(s);
+      case 'OPEN_HIGH':
+        return isStockOpenEqualHigh(s);
+      case 'HIGH_CLOSE':
+        return isStockHighEqualClose(s);
+      case 'ABOVE_15M_HIGH':
+        return isAboveFirst15mCandle(s);
+      case 'BELOW_15M_LOW':
+        return isBelowFirst15mCandle(s);
+      case 'FIB_382':
+        return isStockFib382Retrace(s);
+      case 'GANN_CALC_LESS_3':
+        return isGannCalcLessThan3(s);
+      case 'BOTH_CALC_LESS_3':
+        return isBothCalcLessThan3(s);
+      case 'OPEN_CALC_LESS_3':
+        return isOpenCalcLessThan3(s);
+      case 'CLOSE_CALC_LESS_3':
+        return isCloseCalcLessThan3(s);
+      case 'VERY_BULLISH':
+        return s.trend === 'Very Bullish';
+      case 'BULLISH':
+        return s.trend === 'Bullish' || s.trend === 'Very Bullish';
+      case 'VERY_BEARISH':
+        return s.trend === 'Very Bearish';
+      case 'BEARISH':
+        return s.trend === 'Bearish' || s.trend === 'Very Bearish';
+      case 'POSITIVE_DAY':
+        return (s.pctChange || 0) > 0;
+      case 'VWAP_ABOVE':
+        return s.vwapStatus === 'Above' || (s.vwap ? cmp >= s.vwap : false);
+      case 'VWAP_BELOW':
+        return s.vwapStatus === 'Below' || (s.vwap ? cmp < s.vwap : false);
+      case 'PULLBACK_15M_BOUNCE': {
+        const bounce = detect15mHighPullbackBounce(s);
+        return bounce.isPullbackBounce;
+      }
+      case 'CALCULATED_DATA':
+        return s.isFetched || (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0);
+      default:
+        return true;
+    }
+  }, []);
+
+  const recipeOptionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    RECIPE_OPTIONS_15M.forEach((opt) => {
+      counts[opt.id] = stocks.filter((s) => checkRecipeCondition15m(s, opt.id)).length;
+    });
+    return counts;
+  }, [stocks, checkRecipeCondition15m]);
+
+  const toggleRecipeOption = (optionId: string) => {
+    setSelectedRecipeOptions((prev) =>
+      prev.includes(optionId) ? prev.filter((id) => id !== optionId) : [...prev, optionId]
+    );
+  };
+
+  const clearRecipe = () => {
+    setSelectedRecipeOptions([]);
+  };
+
+  const applyPresetRecipe = (presetKeys: string[]) => {
+    setSelectedRecipeOptions(presetKeys);
+    setIsRecipePanelOpen(true);
+  };
+
   // Count metrics
   const openLowCount = stocks.filter(isStockOpenEqualLow).length;
   const openHighCount = stocks.filter(isStockOpenEqualHigh).length;
@@ -158,19 +317,30 @@ export const StockTable: React.FC<StockTableProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (trendFilter === 'OPEN_LOW') return isStockOpenEqualLow(s);
-    if (trendFilter === 'OPEN_HIGH') return isStockOpenEqualHigh(s);
-    if (trendFilter === 'HIGH_CLOSE') return isStockHighEqualClose(s);
-    if (trendFilter === 'FIB_382_RETRACE') return isStockFib382Retrace(s);
-    if (trendFilter === 'GANN_CALC_LESS_3') return isGannCalcLessThan3(s);
-    if (trendFilter === 'BOTH_CALC_LESS_3') return isBothCalcLessThan3(s);
-    if (trendFilter === 'OPEN_CALC_LESS_3') return isOpenCalcLessThan3(s);
-    if (trendFilter === 'CLOSE_CALC_LESS_3') return isCloseCalcLessThan3(s);
-    if (trendFilter === 'VERY_BULLISH') return s.trend === 'Very Bullish';
-    if (trendFilter === 'BULLISH') return s.trend === 'Bullish' || s.trend === 'Very Bullish';
-    if (trendFilter === 'VERY_BEARISH') return s.trend === 'Very Bearish';
-    if (trendFilter === 'BEARISH') return s.trend === 'Bearish' || s.trend === 'Very Bearish';
-    if (trendFilter === 'CALCULATED') return s.isFetched || (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0);
+    if (trendFilter === 'OPEN_LOW' && !isStockOpenEqualLow(s)) return false;
+    if (trendFilter === 'OPEN_HIGH' && !isStockOpenEqualHigh(s)) return false;
+    if (trendFilter === 'HIGH_CLOSE' && !isStockHighEqualClose(s)) return false;
+    if (trendFilter === 'FIB_382_RETRACE' && !isStockFib382Retrace(s)) return false;
+    if (trendFilter === 'GANN_CALC_LESS_3' && !isGannCalcLessThan3(s)) return false;
+    if (trendFilter === 'BOTH_CALC_LESS_3' && !isBothCalcLessThan3(s)) return false;
+    if (trendFilter === 'OPEN_CALC_LESS_3' && !isOpenCalcLessThan3(s)) return false;
+    if (trendFilter === 'CLOSE_CALC_LESS_3' && !isCloseCalcLessThan3(s)) return false;
+    if (trendFilter === 'VERY_BULLISH' && s.trend !== 'Very Bullish') return false;
+    if (trendFilter === 'BULLISH' && s.trend !== 'Bullish' && s.trend !== 'Very Bullish') return false;
+    if (trendFilter === 'VERY_BEARISH' && s.trend !== 'Very Bearish') return false;
+    if (trendFilter === 'BEARISH' && s.trend !== 'Bearish' && s.trend !== 'Very Bearish') return false;
+    if (trendFilter === 'CALCULATED' && !(s.isFetched || (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0))) return false;
+
+    // 🧪 Filter Recipe multi-checkbox filtering
+    if (selectedRecipeOptions.length > 0) {
+      if (recipeMatchMode === 'ALL') {
+        const matchesAll = selectedRecipeOptions.every((key) => checkRecipeCondition15m(s, key));
+        if (!matchesAll) return false;
+      } else {
+        const matchesAny = selectedRecipeOptions.some((key) => checkRecipeCondition15m(s, key));
+        if (!matchesAny) return false;
+      }
+    }
 
     return true;
   });
@@ -231,6 +401,208 @@ export const StockTable: React.FC<StockTableProps> = ({
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
       
+      {/* 🧪 15M FILTER RECIPE BUILDER PANEL */}
+      <div className="p-4 sm:p-5 bg-slate-900 text-white border-b border-slate-800 space-y-4">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+              <SlidersHorizontal className="w-5 h-5 text-indigo-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-base text-white tracking-wide">
+                  🧪 15m Scanner Filter Recipe Screener
+                </h3>
+                {selectedRecipeOptions.length > 0 && (
+                  <span className="text-xs font-mono font-bold bg-indigo-950 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/50">
+                    {selectedRecipeOptions.length} {selectedRecipeOptions.length === 1 ? 'Condition' : 'Conditions'}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Select checkbox options to build a custom technical recipe for 15-minute stocks. Filter displays only stocks satisfying your selected conditions.
+              </p>
+            </div>
+          </div>
+
+          {/* Action buttons & mode toggle */}
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            {/* Match Mode Toggle */}
+            <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center text-xs">
+              <button
+                onClick={() => setRecipeMatchMode('ALL')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  recipeMatchMode === 'ALL'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Stock must satisfy ALL checked conditions (AND logic)"
+              >
+                Match ALL (AND)
+              </button>
+              <button
+                onClick={() => setRecipeMatchMode('ANY')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  recipeMatchMode === 'ANY'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Stock must satisfy ANY checked condition (OR logic)"
+              >
+                Match ANY (OR)
+              </button>
+            </div>
+
+            {selectedRecipeOptions.length > 0 && (
+              <button
+                onClick={clearRecipe}
+                className="text-xs font-bold text-rose-300 hover:text-rose-200 bg-rose-950/80 hover:bg-rose-900 px-3 py-1.5 rounded-xl border border-rose-500/50 flex items-center gap-1.5 transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Recipe</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setIsRecipePanelOpen(!isRecipePanelOpen)}
+              className="text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1.5 transition-all"
+            >
+              <span>{isRecipePanelOpen ? 'Collapse Recipe' : 'Expand Checkbox Grid'}</span>
+              {isRecipePanelOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Preset Quick Recipes */}
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>1-Click 15m Preset Recipes:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PRESET_RECIPES_15M.map((preset) => {
+              const isActive = preset.optionKeys.every((k) => selectedRecipeOptions.includes(k)) &&
+                               selectedRecipeOptions.length === preset.optionKeys.length;
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => applyPresetRecipe(preset.optionKeys)}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all flex items-center gap-2 ${
+                    isActive
+                      ? 'bg-indigo-600 text-white border-indigo-400 shadow-md ring-2 ring-indigo-400/50'
+                      : 'bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-800'
+                  }`}
+                >
+                  <span>{preset.name}</span>
+                  <span className={`text-[9.5px] font-mono px-1.5 py-0.2 rounded ${isActive ? 'bg-indigo-900 text-indigo-200' : 'bg-slate-800 text-slate-400'}`}>
+                    {preset.badge}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Checkbox Options Grid (Expanded or Preview) */}
+        {(isRecipePanelOpen || selectedRecipeOptions.length > 0) && (
+          <div className="pt-2 space-y-4 border-t border-slate-800">
+            {['15m Candlestick & Price Patterns', 'Gann & Range Calculations', 'Trend & Market Sentiment', 'VWAP & Pullback Indicators'].map((category) => {
+              const options = RECIPE_OPTIONS_15M.filter((o) => o.category === category);
+              if (options.length === 0) return null;
+              return (
+                <div key={category} className="space-y-2">
+                  <div className="text-xs font-extrabold text-indigo-300 tracking-wide uppercase flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                    <span>{category}</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
+                    {options.map((opt) => {
+                      const isChecked = selectedRecipeOptions.includes(opt.id);
+                      const matchCount = recipeOptionCounts[opt.id] || 0;
+                      return (
+                        <div
+                          key={opt.id}
+                          onClick={() => toggleRecipeOption(opt.id)}
+                          className={`p-2.5 rounded-xl border cursor-pointer select-none transition-all flex flex-col justify-between space-y-1 ${
+                            isChecked
+                              ? 'bg-indigo-950/90 border-indigo-500 ring-1 ring-indigo-400 shadow-sm'
+                              : 'bg-slate-950/90 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              {isChecked ? (
+                                <CheckSquare className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
+                              )}
+                              <span className={`text-xs font-bold leading-tight ${isChecked ? 'text-white' : 'text-slate-300'}`}>
+                                {opt.label}
+                              </span>
+                            </div>
+                            <span className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded shrink-0 ${
+                              matchCount > 0
+                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                : 'bg-slate-900 text-slate-500'
+                            }`}>
+                              {matchCount}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 pl-5 line-clamp-1">
+                            {opt.description}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Active Recipe Indicator Banner */}
+      {selectedRecipeOptions.length > 0 && (
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 border-b border-indigo-500/40 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
+              <SlidersHorizontal className="w-5 h-5 text-indigo-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-sm text-white">🧪 Custom 15m Recipe Active:</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-900 text-indigo-200 border border-indigo-500/50">
+                  {selectedRecipeOptions.length} {selectedRecipeOptions.length === 1 ? 'Rule' : 'Rules'} ({recipeMatchMode} Mode)
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Showing <span className="font-extrabold text-emerald-300 font-mono text-sm">{filteredStocks.length}</span> of {stocks.length} stocks matching your 15m checkbox criteria.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <button
+              onClick={() => setIsRecipePanelOpen(!isRecipePanelOpen)}
+              className="text-xs font-bold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all flex items-center gap-1.5"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{isRecipePanelOpen ? 'Hide Grid' : 'Edit Checkboxes'}</span>
+            </button>
+            <button
+              onClick={clearRecipe}
+              className="text-xs font-bold px-3 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-500/50 transition-all flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset Recipe</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table Controls Bar */}
       <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
         
