@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, Flame, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
-import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord } from '../types';
+import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3, isOpenCalc2DecLesserThanClose, isOpenCalc2DecGreaterThanClose, isOpenCalcLessThan3AndCloseGreaterThan10, isOpenCalcGreaterThan10AndCloseLessThan3 } from '../utils/gann';
 import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
 import { analyzeBullishCombinations } from '../utils/bullishCombinations';
+import { evaluateStockTradeJourney } from '../utils/tradeTracker';
 
 export interface RecipeOption15m {
   id: string;
@@ -105,6 +106,7 @@ interface StockTableProps {
   onOpenPositionSizer?: (stock?: StockCalculated) => void;
   onOpenRsiAnalyst?: (stock: StockCalculated) => void;
   credentials: DhanApiCredentials;
+  tradeJourneys?: Record<string, StockTradeJourney>;
   activeTrendFilter?: TrendFilterType;
   onTrendFilterChange?: (filter: TrendFilterType) => void;
 }
@@ -119,6 +121,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   onOpenPositionSizer,
   onOpenRsiAnalyst,
   credentials,
+  tradeJourneys,
   activeTrendFilter,
   onTrendFilterChange
 }) => {
@@ -1350,6 +1353,37 @@ export const StockTable: React.FC<StockTableProps> = ({
                             );
                           }
                           return null;
+                        })()}
+
+                        {/* Trade Profit & Timing Journey Pill */}
+                        {(() => {
+                          const journey = (tradeJourneys && tradeJourneys[stock.id]) || (stock.openPrice ? evaluateStockTradeJourney(stock) : null);
+                          if (!journey) return null;
+                          const isGreen = journey.currentPnLPercent >= 0;
+
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectStockDetail(stock);
+                              }}
+                              className={`text-[10px] font-black px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 shadow-2xs transition-all hover:scale-105 cursor-pointer ${
+                                journey.verdict === 'TARGET_2_HIT'
+                                  ? 'bg-purple-950 text-purple-200 border-purple-600'
+                                  : journey.verdict === 'TARGET_1_HIT'
+                                  ? 'bg-emerald-950 text-emerald-200 border-emerald-500'
+                                  : isGreen
+                                  ? 'bg-emerald-900/90 text-emerald-100 border-emerald-600'
+                                  : 'bg-rose-950 text-rose-200 border-rose-600'
+                              }`}
+                              title={`Click to view timing audit trail (${journey.fetchSnapshots.length} fetches logged)`}
+                            >
+                              <span className="opacity-80">Track:</span>
+                              <span className="font-mono">{isGreen ? '+' : ''}{journey.currentPnLPercent.toFixed(2)}%</span>
+                              <span className="text-[9px] px-1 py-0.2 rounded bg-black/40 font-mono">{journey.confidenceScore}%</span>
+                              <span className="text-[8.5px] opacity-75 font-mono">({journey.fetchSnapshots.length}f)</span>
+                            </button>
+                          );
                         })()}
 
                         {stock.trend ? (

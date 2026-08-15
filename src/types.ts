@@ -166,3 +166,60 @@ export interface FadedStockRecord {
   rsi?: number | null;
 }
 
+export type TradeTrajectoryVerdict =
+  | 'PROFIT_EXPANDING'
+  | 'TARGET_1_HIT'
+  | 'TARGET_2_HIT'
+  | 'HEALTHY_PULLBACK'
+  | 'MOMENTUM_COOLING'
+  | 'EXIT_INVALIDATED';
+
+export interface FetchSnapshot {
+  timeStr: string;
+  isoTimestamp: string;
+  price: number;
+  open: number;
+  high: number;
+  low: number;
+  trend: 'Very Bullish' | 'Bullish' | 'Very Bearish' | 'Bearish' | 'Neutral';
+  rsi?: number | null;
+  vwap?: number | null;
+  vwapStatus?: 'Above' | 'Below' | 'At' | null;
+  gannScore?: number | null;
+  pctChange?: number | null;
+  pnlFromTriggerPct: number;
+  target1Hit: boolean;
+  target2Hit: boolean;
+  stopLossBreached: boolean;
+}
+
+export interface StockTradeJourney {
+  stockId: string;
+  symbol: string;
+  companyName: string;
+  signalType: 'BULLISH' | 'BEARISH';
+  signalCategory: 'VERY_BULLISH' | 'BULLISH_COMBO' | 'OPEN_LOW' | 'VERY_BEARISH' | 'OPEN_HIGH';
+  inceptionTime: string;
+  inceptionPrice: number;
+  latestPrice: number;
+  currentPnLPercent: number;
+  currentPnLAmount: number;
+  peakPnLPercent: number;
+  maxDrawdownPercent: number;
+  entryPrice: number;
+  target1: number;
+  target2: number;
+  target3: number;
+  stopLoss: number;
+  verdict: TradeTrajectoryVerdict;
+  verdictTitle: string;
+  verdictBadgeClass: string;
+  confidenceScore: number;
+  actionableGuidance: string;
+  keySupportResistance: string;
+  fetchSnapshots: FetchSnapshot[];
+  totalFetchesTracked: number;
+  consecutiveBullishCount: number;
+  lastUpdatedTime: string;
+}
+

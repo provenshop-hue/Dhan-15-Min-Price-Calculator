@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator, Percent, Sparkles } from 'lucide-react';
-import { StockCalculated } from '../types';
+import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator, Percent, Sparkles, Clock, Compass, Zap } from 'lucide-react';
+import { StockCalculated, StockTradeJourney } from '../types';
 import { getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
+import { evaluateStockTradeJourney } from '../utils/tradeTracker';
 
 interface StockDetailModalProps {
   stock: StockCalculated | null;
+  tradeJourney?: StockTradeJourney | null;
   onClose: () => void;
   onOpenPositionSizer?: (stock?: StockCalculated) => void;
   onOpenRsiAnalyst?: (stock: StockCalculated) => void;
 }
 
-export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClose, onOpenPositionSizer, onOpenRsiAnalyst }) => {
+export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, tradeJourney, onClose, onOpenPositionSizer, onOpenRsiAnalyst }) => {
   const [selectedLotMonth, setSelectedLotMonth] = useState<'Jun' | 'Jul' | 'Aug'>('Jun');
 
   if (!stock) return null;
@@ -25,6 +27,9 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
   const activePrice = stock.closePrice || stock.openPrice || 0;
   const contractValue = lotSize && activePrice ? lotSize * activePrice : 0;
   const optionStrikes = getAtmOptionStrikes(activePrice, stock.symbol);
+
+  // Compute or use passed tradeJourney
+  const journey = tradeJourney || evaluateStockTradeJourney(stock);
 
   const isOpenLow = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
     ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
@@ -107,6 +112,116 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, onClo
                 Bearish Setup
               </span>
             </div>
+          </div>
+        )}
+
+        {/* 0. Live Trade Profit & Timing Journey Tracker */}
+        {journey && (
+          <div className="mt-4 p-4 bg-slate-900 text-white rounded-2xl border border-slate-800 shadow-md space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                  <Compass className="w-4 h-4 text-indigo-400" />
+                </span>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wider text-indigo-300 flex items-center gap-2">
+                    <span>Trade Profit &amp; Timing Journey</span>
+                    <span className={`px-2 py-0.2 rounded text-[9.5px] font-bold ${journey.verdictBadgeClass}`}>
+                      {journey.verdictTitle}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono mt-0.5 flex items-center gap-2 flex-wrap">
+                    <span>Triggered @ {journey.inceptionTime} (₹{journey.inceptionPrice.toFixed(2)})</span>
+                    <span>•</span>
+                    <span>Confidence: <strong className="text-emerald-400">{journey.confidenceScore}%</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Profit Pill */}
+              <div className={`px-3 py-1 rounded-xl font-mono text-right border ${
+                journey.currentPnLPercent >= 0 ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300' : 'bg-rose-950/80 border-rose-500 text-rose-300'
+              }`}>
+                <div className="text-xs font-black flex items-center justify-end gap-1">
+                  {journey.currentPnLPercent >= 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+                  <span>{journey.currentPnLPercent >= 0 ? '+' : ''}{journey.currentPnLPercent.toFixed(2)}%</span>
+                  <span className="text-[10px] opacity-80">({journey.currentPnLPercent >= 0 ? '+' : ''}₹{journey.currentPnLAmount.toFixed(2)})</span>
+                </div>
+                <div className="text-[9px] text-slate-400 font-sans">
+                  Peak: +{journey.peakPnLPercent.toFixed(2)}%
+                </div>
+              </div>
+            </div>
+
+            {/* Actionable Rule Directive */}
+            <div className="p-2.5 bg-slate-950/80 rounded-xl border border-slate-800 text-xs flex items-start gap-2">
+              <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-indigo-300">Actionable Rule:</strong> <span className="text-slate-200">{journey.actionableGuidance}</span>
+              </div>
+            </div>
+
+            {/* Visual Roadmap */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
+              <div className="p-2 rounded-lg bg-slate-950 border border-slate-800 text-center">
+                <span className="text-[9.5px] text-slate-400 block font-sans">Inception Trigger</span>
+                <strong className="text-white text-xs">₹{journey.inceptionPrice.toFixed(2)}</strong>
+                <span className="text-[9px] text-indigo-400 block mt-0.5">@{journey.inceptionTime}</span>
+              </div>
+              <div className={`p-2 rounded-lg border text-center ${
+                journey.latestPrice >= journey.target1 ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300' : 'bg-slate-950 border-slate-800 text-slate-300'
+              }`}>
+                <span className="text-[9.5px] text-slate-400 block font-sans">Target 1 (+1.5%)</span>
+                <strong className="text-emerald-400 text-xs">₹{journey.target1.toFixed(2)}</strong>
+                <span className="text-[9px] block mt-0.5 font-sans font-bold">
+                  {journey.latestPrice >= journey.target1 ? '✅ Target Hit' : '🎯 In Sight'}
+                </span>
+              </div>
+              <div className={`p-2 rounded-lg border text-center ${
+                journey.latestPrice >= journey.target2 ? 'bg-purple-950/80 border-purple-500 text-yellow-300 font-bold' : 'bg-slate-950 border-slate-800 text-slate-300'
+              }`}>
+                <span className="text-[9.5px] text-slate-400 block font-sans">Target 2 (+3.0%)</span>
+                <strong className="text-purple-300 text-xs">₹{journey.target2.toFixed(2)}</strong>
+                <span className="text-[9px] block mt-0.5 font-sans font-bold">
+                  {journey.latestPrice >= journey.target2 ? '🏆 Super Hit' : '🚀 Next Target'}
+                </span>
+              </div>
+              <div className="p-2 rounded-lg bg-rose-950/40 border border-rose-800/60 text-center">
+                <span className="text-[9.5px] text-rose-300 block font-sans">Stop Loss</span>
+                <strong className="text-rose-400 text-xs">₹{journey.stopLoss.toFixed(2)}</strong>
+                <span className="text-[9px] text-slate-400 block mt-0.5 font-sans">
+                  {journey.latestPrice < journey.stopLoss ? '🔴 Breached' : '🛡️ Safe'}
+                </span>
+              </div>
+            </div>
+
+            {/* Fetch Timeline Chips */}
+            {journey.fetchSnapshots.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-slate-400" />
+                  <span>Fetch Timeline History ({journey.fetchSnapshots.length} Fetches Logged)</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                  {journey.fetchSnapshots.map((snap, idx) => {
+                    const isSnapGreen = snap.pnlFromTriggerPct >= 0;
+                    return (
+                      <div
+                        key={`${snap.timeStr}-${idx}`}
+                        className="px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-[10px] font-mono flex items-center gap-1.5"
+                      >
+                        <span className="text-slate-400 font-sans">{snap.timeStr}:</span>
+                        <strong className="text-white">₹{snap.price.toFixed(1)}</strong>
+                        <span className={`font-bold ${isSnapGreen ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          ({isSnapGreen ? '+' : ''}{snap.pnlFromTriggerPct.toFixed(1)}%)
+                        </span>
+                        {snap.rsi && <span className="text-slate-400">RSI:{snap.rsi.toFixed(0)}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -13,11 +13,13 @@ import { CsvImportModal } from './components/CsvImportModal';
 import { PositionSizingModal } from './components/PositionSizingModal';
 import { RsiAnalystModal } from './components/RsiAnalystModal';
 import { NotificationScroller } from './components/NotificationScroller';
+import { TradeProfitTracker } from './components/TradeProfitTracker';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
-import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord } from './types';
+import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney } from './types';
 import { calculateGann15Min } from './utils/gann';
 import { is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishFadeReason, get100PercentBearishFadeReason, detectHistorical100Fades } from './utils/rsiPullback';
+import { getStoredTradeJourneys, updateAllTradeJourneys, clearTradeJourneys } from './utils/tradeTracker';
 
 import { Download, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
 
@@ -169,6 +171,27 @@ export default function App() {
       });
     }
   }, [stocks]);
+
+  // 🚀 Trade Confidence & Profit Trajectory Journey State (persisted across fetches)
+  const [tradeJourneys, setTradeJourneys] = useState<Record<string, StockTradeJourney>>(() => {
+    return getStoredTradeJourneys();
+  });
+
+  // Automatically update and track trade journeys on every stock price/RSI fetch
+  useEffect(() => {
+    if (stocks.length > 0) {
+      setTradeJourneys((prev) => {
+        const updated = updateAllTradeJourneys(stocks, prev);
+        return updated;
+      });
+    }
+  }, [stocks]);
+
+  const handleClearTradeJourneys = () => {
+    clearTradeJourneys();
+    setTradeJourneys({});
+    setNotification({ type: 'info', message: 'Trade journey history reset for active session.' });
+  };
 
   // Active filter state
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
@@ -938,6 +961,16 @@ export default function App() {
               onSelectTrendFilter={(f) => setActiveTrendFilter(f)}
             />
 
+            {/* 🚀 Trade Profit & Timings Journey Tracker */}
+            <TradeProfitTracker
+              tradeJourneys={tradeJourneys}
+              stocks={stocks}
+              onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+              onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+              onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+              onClearJourneys={handleClearTradeJourneys}
+            />
+
             {/* Stock Table */}
             <div id="stock-table-section">
               <StockTable
@@ -953,6 +986,7 @@ export default function App() {
                 onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
                 onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
                 credentials={credentials}
+                tradeJourneys={tradeJourneys}
                 activeTrendFilter={activeTrendFilter}
                 onTrendFilterChange={(f) => setActiveTrendFilter(f)}
               />
@@ -1024,6 +1058,7 @@ export default function App() {
 
       <StockDetailModal
         stock={selectedDetailStock}
+        tradeJourney={selectedDetailStock ? tradeJourneys[selectedDetailStock.id] || null : null}
         onClose={() => setSelectedDetailStock(null)}
         onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
         onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
