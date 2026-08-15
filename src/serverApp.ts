@@ -637,7 +637,10 @@ export function createExpressApp() {
 
           return {
             timeStr: c.timeStr,
-            close: c.close,
+            open: Math.round(c.open * 100) / 100,
+            high: Math.round(c.high * 100) / 100,
+            low: Math.round(c.low * 100) / 100,
+            close: Math.round(c.close * 100) / 100,
             volume: vol,
             rsi: candleRsi,
             rsiDirection: direction,
@@ -652,9 +655,61 @@ export function createExpressApp() {
         const latestRsiObj = rsiTimeline[rsiTimeline.length - 1];
         const rsi = latestRsiObj ? latestRsiObj.rsi : null;
 
-        // Calculate 14-period ADX from historical candles
-        const calcADXForCandles = (cList: Array<{ high: number; low: number; close: number }>, period = 14): number | null => {
-          if (!cList || cList.length < 2) return null;
+        // Calculate EMA helper
+        const calcEMAArr = (vals: number[], period: number): number[] => {
+          if (!vals || vals.length === 0) return [];
+          if (vals.length < period) {
+            const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+            return vals.map(() => avg);
+          }
+          const k = 2 / (period + 1);
+          const emaArr: number[] = [];
+          let sum = 0;
+          for (let i = 0; i < period; i++) sum += vals[i];
+          let prev = sum / period;
+          for (let i = 0; i < period - 1; i++) emaArr.push(prev);
+          emaArr.push(prev);
+          for (let i = period; i < vals.length; i++) {
+            const cur = vals[i] * k + prev * (1 - k);
+            emaArr.push(cur);
+            prev = cur;
+          }
+          return emaArr;
+        };
+
+        const allCloses = candlesList.map((c) => c.close);
+        const ema20Arr = calcEMAArr(allCloses, 20);
+        const ema50Arr = calcEMAArr(allCloses, 50);
+        const ema200Arr = calcEMAArr(allCloses, 200);
+
+        const ema20 = ema20Arr.length > 0 ? Math.round(ema20Arr[ema20Arr.length - 1] * 100) / 100 : null;
+        const ema50 = ema50Arr.length > 0 ? Math.round(ema50Arr[ema50Arr.length - 1] * 100) / 100 : null;
+        const ema200 = ema200Arr.length > 0 ? Math.round(ema200Arr[ema200Arr.length - 1] * 100) / 100 : null;
+
+        const prevEma20 = ema20Arr.length > 1 ? ema20Arr[ema20Arr.length - 2] : (ema20 || 0);
+        const prevEma50 = ema50Arr.length > 1 ? ema50Arr[ema50Arr.length - 2] : (ema50 || 0);
+        const ema20Slope = ema20 !== null ? Math.round((ema20 - prevEma20) * 100) / 100 : 0;
+        const ema50Slope = ema50 !== null ? Math.round((ema50 - prevEma50) * 100) / 100 : 0;
+
+        // MACD (12, 26, 9)
+        const fastEMA = calcEMAArr(allCloses, 12);
+        const slowEMA = calcEMAArr(allCloses, 26);
+        const macdLine = allCloses.map((c, i) => (fastEMA[i] || c) - (slowEMA[i] || c));
+        const signalLine = calcEMAArr(macdLine, 9);
+        const macd = macdLine.length > 0 ? Math.round(macdLine[macdLine.length - 1] * 100) / 100 : 0;
+        const macdSignal = signalLine.length > 0 ? Math.round(signalLine[signalLine.length - 1] * 100) / 100 : 0;
+        const macdHistogram = Math.round((macd - macdSignal) * 100) / 100;
+
+        // Volume Stats
+        const allVols = candlesList.map((c) => c.volume || 0);
+        const recent20Vols = allVols.slice(-20);
+        const avgVolume20 = recent20Vols.length > 0
+          ? Math.round(recent20Vols.reduce((a, b) => a + b, 0) / recent20Vols.length)
+          : (sessionTotalVol || 10000);
+
+        // Calculate 14-period ADX & DMI from historical candles
+        const calcADXForCandles = (cList: Array<{ high: number; low: number; close: number }>, period = 14) => {
+          if (!cList || cList.length < 2) return { adx: null, plusDI: null, minusDI: null };
           const trs: number[] = [];
           const plusDMs: number[] = [];
           const minusDMs: number[] = [];
@@ -679,7 +734,7 @@ export function createExpressApp() {
             else minusDMs.push(0);
           }
 
-          if (trs.length === 0) return null;
+          if (trs.length === 0) return { adx: null, plusDI: null, minusDI: null };
           const p = Math.min(period, trs.length);
 
           let trSmooth = 0;
@@ -692,13 +747,18 @@ export function createExpressApp() {
             minusDMSmooth += minusDMs[i];
           }
 
+          let curPlusDI = trSmooth > 0 ? 100 * (plusDMSmooth / trSmooth) : 0;
+          let curMinusDI = trSmooth > 0 ? 100 * (minusDMSmooth / trSmooth) : 0;
+
           const dxs: number[] = [];
           const getDX = (pDM: number, mDM: number, tr: number) => {
             if (tr === 0) return 0;
-            const plusDI = 100 * (pDM / tr);
-            const minusDI = 100 * (mDM / tr);
-            const diff = Math.abs(plusDI - minusDI);
-            const sum = plusDI + minusDI;
+            const plusDIVal = 100 * (pDM / tr);
+            const minusDIVal = 100 * (mDM / tr);
+            curPlusDI = plusDIVal;
+            curMinusDI = minusDIVal;
+            const diff = Math.abs(plusDIVal - minusDIVal);
+            const sum = plusDIVal + minusDIVal;
             if (sum === 0) return 0;
             return 100 * (diff / sum);
           };
@@ -712,12 +772,19 @@ export function createExpressApp() {
             dxs.push(getDX(plusDMSmooth, minusDMSmooth, trSmooth));
           }
 
-          if (dxs.length === 0) return null;
+          if (dxs.length === 0) return { adx: null, plusDI: null, minusDI: null };
           const adxVal = dxs.reduce((a, b) => a + b, 0) / dxs.length;
-          return Math.round(adxVal * 10) / 10;
+          return {
+            adx: Math.round(adxVal * 10) / 10,
+            plusDI: Math.round(curPlusDI * 10) / 10,
+            minusDI: Math.round(curMinusDI * 10) / 10
+          };
         };
 
-        const adx = calcADXForCandles(candlesList);
+        const adxResult = calcADXForCandles(candlesList);
+        const adx = adxResult.adx;
+        const plusDI = adxResult.plusDI;
+        const minusDI = adxResult.minusDI;
 
         const candleTimestamp = latestTimeStr !== '09:15 AM'
           ? `${foundDate} ${latestTimeStr} (Live | 15m)`
@@ -741,6 +808,17 @@ export function createExpressApp() {
           totalVolume: sessionTotalVol,
           rsi,
           adx,
+          plusDI,
+          minusDI,
+          ema20,
+          ema50,
+          ema200,
+          ema20Slope,
+          ema50Slope,
+          macd,
+          macdSignal,
+          macdHistogram,
+          avgVolume20,
           vwap: sessionVWAP,
           rsiTimeline,
           totalCandles: openCandles.length
