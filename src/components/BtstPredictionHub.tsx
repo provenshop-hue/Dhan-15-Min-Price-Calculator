@@ -4,7 +4,6 @@ import {
   Sun,
   TrendingUp,
   TrendingDown,
-  Sparkles,
   Zap,
   ShieldCheck,
   Target,
@@ -19,11 +18,12 @@ import {
   SlidersHorizontal,
   ChevronRight,
   AlertTriangle,
-  RefreshCw,
   Building2,
   Layers,
   BarChart3,
-  DollarSign
+  DollarSign,
+  Activity,
+  Calculator
 } from 'lucide-react';
 import { StockCalculated, BtstPredictionItem, BtstGapDirection } from '../types';
 import { analyzeAllBtstTrades } from '../utils/btstPredictor';
@@ -48,45 +48,24 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('CONVICTION_DESC');
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [isAiScanning, setIsAiScanning] = useState(false);
-  const [aiScanStatus, setAiScanStatus] = useState<string | null>(null);
-  const [aiInsightsMap, setAiInsightsMap] = useState<Record<string, { headline: string; thesis: string; convictionBoost: number; expectedGapPct: string }>>({});
   const [activeStrategyTab, setActiveStrategyTab] = useState<Record<string, 'OPTIONS' | 'CASH'>>({});
   const [viewMode, setViewMode] = useState<'GRID' | 'COMPACT'>('GRID');
 
-  // Generate base BTST predictions from all calculated stocks
-  const baseBtstItems = useMemo(() => {
+  // Generate 100% pure mathematical & quantitative BTST predictions from all calculated stock data
+  const btstItems = useMemo(() => {
     return analyzeAllBtstTrades(stocks);
   }, [stocks]);
 
-  // Apply AI Insights if available
-  const enrichedBtstItems = useMemo(() => {
-    return baseBtstItems.map((item) => {
-      const symUpper = item.symbol.toUpperCase();
-      const aiData = aiInsightsMap[item.symbol] || aiInsightsMap[symUpper] || aiInsightsMap[item.symbol.toLowerCase()];
-      if (aiData) {
-        return {
-          ...item,
-          aiHeadline: aiData.headline || item.aiHeadline,
-          aiThesis: aiData.thesis || item.aiThesis,
-          convictionScore: Math.min(99, item.convictionScore + (aiData.convictionBoost || 2)),
-          isAiVerified: true
-        };
-      }
-      return { ...item, isAiVerified: false };
-    });
-  }, [baseBtstItems, aiInsightsMap]);
-
   // Counts for badge filters
-  const gapUpCount = useMemo(() => enrichedBtstItems.filter((i) => i.predictedDirection === 'GAP_UP').length, [enrichedBtstItems]);
-  const gapDownCount = useMemo(() => enrichedBtstItems.filter((i) => i.predictedDirection === 'GAP_DOWN').length, [enrichedBtstItems]);
-  const indicesCount = useMemo(() => enrichedBtstItems.filter((i) => i.isIndex).length, [enrichedBtstItems]);
-  const ultraConvictionCount = useMemo(() => enrichedBtstItems.filter((i) => i.convictionScore >= 88).length, [enrichedBtstItems]);
-  const fnoCount = useMemo(() => enrichedBtstItems.filter((i) => !i.isIndex).length, [enrichedBtstItems]);
+  const gapUpCount = useMemo(() => btstItems.filter((i) => i.predictedDirection === 'GAP_UP').length, [btstItems]);
+  const gapDownCount = useMemo(() => btstItems.filter((i) => i.predictedDirection === 'GAP_DOWN').length, [btstItems]);
+  const indicesCount = useMemo(() => btstItems.filter((i) => i.isIndex).length, [btstItems]);
+  const ultraConvictionCount = useMemo(() => btstItems.filter((i) => i.convictionScore >= 88).length, [btstItems]);
+  const fnoCount = useMemo(() => btstItems.filter((i) => !i.isIndex).length, [btstItems]);
 
   // Filter and Sort items
   const filteredAndSortedItems = useMemo(() => {
-    let result = enrichedBtstItems.filter((item) => {
+    let result = btstItems.filter((item) => {
       // Category filter
       if (activeFilter === 'GAP_UP' && item.predictedDirection !== 'GAP_UP') return false;
       if (activeFilter === 'GAP_DOWN' && item.predictedDirection !== 'GAP_DOWN') return false;
@@ -130,52 +109,7 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
     });
 
     return result;
-  }, [enrichedBtstItems, activeFilter, searchQuery, sortBy]);
-
-  // Trigger Gemini AI Deep Overnight Scan
-  const handleRunAiBtstScan = async () => {
-    if (enrichedBtstItems.length === 0) return;
-    setIsAiScanning(true);
-    setAiScanStatus('Analyzing 3:00 PM closing volume, VWAP delta, and institutional derivatives positioning with Gemini AI...');
-
-    try {
-      const candidatesPayload = enrichedBtstItems.slice(0, 15).map((i) => ({
-        symbol: i.symbol,
-        companyName: i.companyName,
-        cmp: i.cmp,
-        dayChangePct: i.dayChangePct,
-        closeToHighPct: i.closeToHighPct,
-        vwapDistancePct: i.vwapDistancePct,
-        rsi: i.rsi,
-        predictedDirection: i.predictedDirection,
-        isOpenEqualLow: i.isOpenEqualLow,
-        isOpenEqualHigh: i.isOpenEqualHigh
-      }));
-
-      const res = await fetch('/api/ai/btst-deep-scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidates: candidatesPayload })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.aiInsights && Object.keys(data.aiInsights).length > 0) {
-          setAiInsightsMap(data.aiInsights);
-          setAiScanStatus(`✨ AI Overnight Analysis Complete: Synthesized ${Object.keys(data.aiInsights).length} institutional setups (${data.model || 'Gemini 3.7 Flash'})!`);
-        } else {
-          setAiScanStatus('AI modeling synthesized setups successfully.');
-        }
-      } else {
-        setAiScanStatus('Quantitative institutional AI modeling active.');
-      }
-    } catch (e) {
-      setAiScanStatus('Quantitative institutional AI modeling active.');
-    } finally {
-      setIsAiScanning(false);
-      setTimeout(() => setAiScanStatus(null), 7000);
-    }
-  };
+  }, [btstItems, activeFilter, searchQuery, sortBy]);
 
   const handleCopyOrder = (item: BtstPredictionItem) => {
     const isOptions = (activeStrategyTab[item.id] || 'OPTIONS') === 'OPTIONS';
@@ -190,7 +124,7 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
 
   return (
     <div className={`space-y-6 ${isStandaloneView ? 'p-1' : ''}`} id="btst-prediction-hub">
-      {/* Header Banner with High-Contrast Terminal Styling */}
+      {/* Header Banner with Pure Quantitative & Data Styling */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-6 md:p-8 text-white shadow-xl border border-indigo-500/20">
         <div className="absolute -right-12 -top-12 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
         <div className="absolute -left-12 -bottom-12 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
@@ -198,18 +132,17 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-semibold tracking-wide uppercase">
-              <Moon className="w-3.5 h-3.5 text-indigo-300 animate-pulse" />
-              <span>Institutional BTST & STBT Predictive Intelligence</span>
+              <Activity className="w-3.5 h-3.5 text-indigo-300" />
+              <span>100% Pure Data & Mathematical Analysis</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-              <span>Overnight Gap Direction Engine</span>
+              <span>Overnight Gap Direction Radar</span>
               <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                LIVE GAP RADAR
+                LIVE QUANT MODEL
               </span>
             </h1>
             <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">
-              Algorithmic closing momentum, VWAP absorption, RSI acceleration, and Gemini AI multi-factor models.
-              Strictly filtering out neutral chop to display <span className="text-emerald-300 font-semibold">high-conviction GAP UP</span> and <span className="text-rose-300 font-semibold">GAP DOWN</span> setups across <strong className="text-white">Bank Nifty, Nifty, Sensex</strong> and all active F&O stocks.
+              Real-time multi-factor data engine powered by <strong>True Settlement Net %</strong>, <strong>Gann Square of 9 angles</strong>, <strong>VWAP institutional absorption</strong>, <strong>RSI trajectories</strong>, and <strong>15-minute candle patterns</strong>. Zero AI credits consumed.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-2 text-xs text-slate-400">
@@ -220,6 +153,10 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
               <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700">
                 <Sun className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Exit Window: <strong className="text-emerald-300">9:15 AM – 9:25 AM IST</strong></span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-emerald-950/60 px-2.5 py-1 rounded-md border border-emerald-500/30 text-emerald-300">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Instant Client-Side Computation</span>
               </div>
             </div>
           </div>
@@ -251,27 +188,6 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
             </div>
           </div>
         </div>
-
-        {/* AI Scan Trigger Bar */}
-        <div className="mt-6 pt-5 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
-            {aiScanStatus ? (
-              <span className="text-amber-300 font-medium">{aiScanStatus}</span>
-            ) : (
-              <span>Ready to run Gemini 3.7 Flash AI Deep Overnight Analysis across all active candidate stocks.</span>
-            )}
-          </div>
-
-          <button
-            onClick={handleRunAiBtstScan}
-            disabled={isAiScanning || enrichedBtstItems.length === 0}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-indigo-600 hover:from-amber-400 hover:to-indigo-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isAiScanning ? 'animate-spin' : ''}`} />
-            <span>{isAiScanning ? 'AI Synthesizing Candidates...' : 'Run Gemini AI Deep Overnight Scan'}</span>
-          </button>
-        </div>
       </div>
 
       {/* Filter and Control Bar */}
@@ -288,7 +204,7 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>All Predictions ({enrichedBtstItems.length})</span>
+              <span>All Predictions ({btstItems.length})</span>
             </button>
 
             <button
@@ -335,8 +251,8 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
                   : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50'
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>💎 90%+ AI Conviction ({ultraConvictionCount})</span>
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span>⚡ 88%+ Ultra Conviction ({ultraConvictionCount})</span>
             </button>
 
             <button
@@ -374,7 +290,7 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
                 className="bg-transparent text-xs font-medium focus:outline-none cursor-pointer text-slate-800 dark:text-slate-200"
               >
-                <option value="CONVICTION_DESC">Highest AI Conviction</option>
+                <option value="CONVICTION_DESC">Highest Quant Conviction</option>
                 <option value="GAP_PCT_DESC">Largest Gap %</option>
                 <option value="DAY_GAIN_DESC">Day's % Change</option>
                 <option value="CMP_DESC">Highest CMP</option>
@@ -480,9 +396,9 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
 
                   <div className="flex items-center gap-2">
                     <div className="text-right">
-                      <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">AI CONVICTION</div>
+                      <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">QUANT CONVICTION</div>
                       <div className="text-xs font-black text-amber-600 dark:text-amber-400 flex items-center gap-1 justify-end">
-                        <Sparkles className="w-3 h-3 text-amber-500" />
+                        <Zap className="w-3 h-3 text-amber-500" />
                         <span>{item.convictionScore}%</span>
                       </div>
                     </div>
@@ -506,12 +422,7 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
                         )}
                         {item.convictionScore >= 90 && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-400/40 flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 text-amber-500" /> 90%+ ULTRA
-                          </span>
-                        )}
-                        {(item as any).isAiVerified && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-400/40 flex items-center gap-1">
-                            🤖 AI Verified
+                            <Zap className="w-3 h-3 text-amber-500" /> 90%+ ULTRA
                           </span>
                         )}
                       </div>
@@ -678,10 +589,10 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
                     )}
                   </div>
 
-                  {/* AI & Institutional Thesis */}
-                  <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 text-xs space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-bold">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  {/* Quantitative Analysis & Technical Thesis */}
+                  <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-indigo-700 dark:text-indigo-300 font-bold">
+                      <Target className="w-3.5 h-3.5 text-indigo-500" />
                       <span>{item.aiHeadline}</span>
                     </div>
                     <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
@@ -757,7 +668,7 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
               <tr>
                 <th className="py-3 px-4">Symbol & Segment</th>
                 <th className="py-3 px-3">Predicted Gap</th>
-                <th className="py-3 px-3">AI Conviction</th>
+                <th className="py-3 px-3">Quant Conviction</th>
                 <th className="py-3 px-3">CMP & Day %</th>
                 <th className="py-3 px-3">Recommended Strike</th>
                 <th className="py-3 px-3">Morning Open Target</th>
@@ -800,7 +711,7 @@ export const BtstPredictionHub: React.FC<BtstPredictionHubProps> = ({
 
                     <td className="py-3.5 px-3">
                       <div className="font-black text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-500" />
+                        <Zap className="w-3 h-3 text-amber-500" />
                         <span>{item.convictionScore}%</span>
                       </div>
                       <div className="text-[10px] text-slate-400">{item.convictionTier}</div>
