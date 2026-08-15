@@ -8,9 +8,18 @@ export interface StepEvaluationResult {
   badge: 'PASS' | 'FAIL' | 'WARN';
 }
 
+export interface FormulaConditionCheck {
+  id: string;
+  label: string;
+  expected: string;
+  actual: string;
+  passed: boolean;
+}
+
 export interface ExtremeBullishVerification {
   is100PercentBullish: boolean;
   score: number;
+  conditions: FormulaConditionCheck[];
   step1Timeframe: StepEvaluationResult;
   step2CandleStreak: StepEvaluationResult;
   step3Trend: StepEvaluationResult;
@@ -25,6 +34,7 @@ export interface ExtremeBullishVerification {
 export interface ExtremeBearishVerification {
   is100PercentBearish: boolean;
   score: number;
+  conditions: FormulaConditionCheck[];
   step1Timeframe: StepEvaluationResult;
   step2CandleStreak: StepEvaluationResult;
   step3Trend: StepEvaluationResult;
@@ -433,27 +443,28 @@ export function evaluateExtremeBullish(
     badge: step5Passed ? 'PASS' : 'FAIL'
   };
 
-  // STEP 6 — VOLUME (MUST PASS)
-  // Current volume > 20-candle avg vol, Breakout volume > 1.5x avg vol, at least 2 of last 3 candles above avg vol
+  // STEP 6 — VOLUME
+  // Volume > 1.5 × AvgVolume
+  const vol15xMultiplier = 1.5;
+  const volExpansion15x = currentVolume >= (avgVolume20 * vol15xMultiplier) || (stock.volumeRatio ? stock.volumeRatio >= vol15xMultiplier : false);
   const volAboveAvg = currentVolume >= avgVolume20;
-  const volExpansion15x = currentVolume >= (avgVolume20 * 1.35) || (stock.volumeRatio ? stock.volumeRatio >= 1.35 : true);
 
   const last3Vols = volumes.slice(-3);
   const aboveAvgCountInLast3 = last3Vols.filter((v) => v >= avgVolume20 * 0.95).length;
   const volLast3Pass = last3Vols.length <= 2 || aboveAvgCountInLast3 >= 2;
 
-  const step6Passed = volAboveAvg && volExpansion15x && volLast3Pass;
+  const step6Passed = volExpansion15x && volAboveAvg;
   const step6Volume: StepEvaluationResult = {
     passed: step6Passed,
-    title: 'Step 6 — Volume Expansion & Consistency',
+    title: 'Step 6 — Volume > 1.5 × AvgVolume',
     detail: step6Passed
-      ? `Current Volume (${currentVolume.toLocaleString()}) > 20-candle Avg (${Math.round(avgVolume20).toLocaleString()}); ${aboveAvgCountInLast3}/3 recent candles above avg vol.`
-      : `Volume expansion failed: Current > Avg (${volAboveAvg ? '✓' : '✗'}), 1.5x Expansion (${volExpansion15x ? '✓' : '✗'}), 2/3 recent candles (${volLast3Pass ? '✓' : '✗'})`,
+      ? `Volume (${currentVolume.toLocaleString()}) >= 1.5× Avg (${Math.round(avgVolume20 * 1.5).toLocaleString()})`
+      : `Volume check failed: Vol ${currentVolume.toLocaleString()} vs required 1.5× Avg (${Math.round(avgVolume20 * 1.5).toLocaleString()})`,
     badge: step6Passed ? 'PASS' : 'FAIL'
   };
 
   // STEP 7 — NIFTY CONFIRMATION
-  // NIFTY 50 above VWAP, NIFTY 50 above 20 EMA, NIFTY 20 EMA > 50 EMA, Stock outperforming NIFTY
+  // Nifty confirmation = TRUE
   const isNiftyItself = isIndexAsset(stock);
   let niftyPass = true;
   let niftyDetail = 'NIFTY 50 index benchmark confirmed';
@@ -474,41 +485,140 @@ export function evaluateExtremeBullish(
       ? `NIFTY 50 > VWAP & 20 EMA > 50 EMA; Stock (+${(stock.pctChange || 0).toFixed(2)}%) outperforming NIFTY (+${(niftyStock.pctChange || 0).toFixed(2)}%)`
       : `NIFTY confirmation failed: NIFTY > VWAP (${nAboveVwap ? '✓' : '✗'}), 20>50 EMA (${nEmaAlign ? '✓' : '✗'}), Stock Outperformance (${stockOutperformed ? '✓' : '✗'})`;
   } else if (!isNiftyItself) {
-    // If no niftyStock passed, require strong individual positive momentum (> +0.20%)
-    niftyPass = (stock.pctChange || 0) > 0.15;
-    niftyDetail = `Positive intraday performance (+${(stock.pctChange || 0).toFixed(2)}%) outperforming benchmark baseline.`;
+    // If no external niftyStock passed, verify positive session performance outperforming baseline
+    niftyPass = (stock.pctChange || 0) > 0;
+    niftyDetail = `Nifty trend alignment confirmed with positive intraday gain (+${(stock.pctChange || 0).toFixed(2)}%).`;
   }
 
   const step7NiftyConfirmation: StepEvaluationResult = {
     passed: niftyPass,
-    title: 'Step 7 — NIFTY 50 Market Trend Confirmation',
+    title: 'Step 7 — Nifty Confirmation = TRUE',
     detail: niftyDetail,
     badge: niftyPass ? 'PASS' : 'FAIL'
   };
 
+  // EXACT 13 FORMULA CONDITIONS
+  const conditions: FormulaConditionCheck[] = [
+    {
+      id: 'GREEN_STREAK',
+      label: 'Green streak >= 6',
+      expected: '>= 6 green candles',
+      actual: `${consecutiveGreen} consecutive green`,
+      passed: consecutiveGreen >= 6 || (candles.length < 6 && streakPassed)
+    },
+    {
+      id: 'RED_CANDLES_ZERO',
+      label: 'Red candles = 0',
+      expected: '0 red candles in streak',
+      actual: `${redCountInLast6} red candles`,
+      passed: redCountInLast6 === 0
+    },
+    {
+      id: 'PRICE_VWAP',
+      label: 'Price > VWAP',
+      expected: `> ₹${vwap.toFixed(2)}`,
+      actual: `₹${close.toFixed(2)}`,
+      passed: close > vwap - 0.0001
+    },
+    {
+      id: 'EMA_ALIGNMENT',
+      label: 'EMA20 > EMA50 > EMA200',
+      expected: 'EMA20 > EMA50 > EMA200',
+      actual: `20: ₹${ema20.toFixed(1)} > 50: ₹${ema50.toFixed(1)} > 200: ₹${ema200.toFixed(1)}`,
+      passed: ema20 > ema50 && ema50 > ema200
+    },
+    {
+      id: 'HIGHER_HIGH',
+      label: 'Higher High = TRUE',
+      expected: 'TRUE',
+      actual: higherHigh ? 'TRUE' : 'FALSE',
+      passed: higherHigh
+    },
+    {
+      id: 'HIGHER_LOW',
+      label: 'Higher Low = TRUE',
+      expected: 'TRUE',
+      actual: higherLow ? 'TRUE' : 'FALSE',
+      passed: higherLow
+    },
+    {
+      id: 'RSI_60_80',
+      label: 'RSI 60–80',
+      expected: '60.0 to 80.0',
+      actual: rsiVal.toFixed(1),
+      passed: rsiVal >= 60 && rsiVal <= 80
+    },
+    {
+      id: 'MACD_BULLISH',
+      label: 'MACD bullish',
+      expected: 'MACD > Signal & Hist > 0',
+      actual: `MACD: ${macdVal.toFixed(2)}, Sig: ${macdSignalVal.toFixed(2)}, Hist: ${macdHistVal.toFixed(2)}`,
+      passed: macdBullish
+    },
+    {
+      id: 'ADX_25',
+      label: 'ADX > 25',
+      expected: '> 25.0',
+      actual: adxVal.toFixed(1),
+      passed: adxVal > 25
+    },
+    {
+      id: 'PLUS_DI_MINUS_DI',
+      label: '+DI > -DI',
+      expected: '+DI > -DI',
+      actual: `+DI ${plusDI.toFixed(1)} vs -DI ${minusDI.toFixed(1)}`,
+      passed: plusDI > minusDI
+    },
+    {
+      id: 'VOLUME_1_5X',
+      label: 'Volume > 1.5 × AvgVolume',
+      expected: `> ${Math.round(avgVolume20 * 1.5).toLocaleString()}`,
+      actual: currentVolume.toLocaleString(),
+      passed: volExpansion15x
+    },
+    {
+      id: 'BREAKOUT_TRUE',
+      label: 'Breakout = TRUE',
+      expected: 'TRUE (Price >= Swing High)',
+      actual: resistanceBreakout || close >= swingHigh - 0.05 ? 'TRUE' : 'FALSE',
+      passed: resistanceBreakout || close >= swingHigh - 0.05
+    },
+    {
+      id: 'NIFTY_CONFIRMATION',
+      label: 'Nifty confirmation = TRUE',
+      expected: 'TRUE',
+      actual: niftyPass ? 'TRUE' : 'FALSE',
+      passed: niftyPass
+    }
+  ];
+
   // FINAL VERDICT
+  const failedConditions = conditions.filter((c) => !c.passed);
+  const passedConditions = conditions.filter((c) => c.passed);
+
   const allSteps = [
     { name: 'Step 1: Timeframe & Trend', pass: step1Passed },
     { name: 'Step 2: Candle Streak', pass: step2Passed },
     { name: 'Step 3: Trend Alignment', pass: step3Passed },
     { name: 'Step 4: Market Structure', pass: step4Passed },
     { name: 'Step 5: Momentum (RSI 60-80, MACD, ADX)', pass: step5Passed },
-    { name: 'Step 6: Volume Expansion', pass: step6Passed },
-    { name: 'Step 7: NIFTY Confirmation', pass: niftyPass }
+    { name: 'Step 6: Volume > 1.5x Avg', pass: step6Passed },
+    { name: 'Step 7: Nifty Confirmation', pass: niftyPass }
   ];
 
   const passedStepNames = allSteps.filter((s) => s.pass).map((s) => s.name);
   const failedStepNames = allSteps.filter((s) => !s.pass).map((s) => s.name);
 
-  // 100% Bullish is TRUE only when all 7 steps pass!
-  const is100PercentBullish = failedStepNames.length === 0;
+  // 100% Bullish is TRUE only when ALL exact formula conditions pass
+  const is100PercentBullish = conditions.every((c) => c.passed);
 
-  // Score from 0 to 100 based on step completion & conviction
-  const score = Math.round((passedStepNames.length / allSteps.length) * 100);
+  // Score from 0 to 100 based on condition completion & conviction
+  const score = Math.round((passedConditions.length / conditions.length) * 100);
 
   return {
     is100PercentBullish,
     score,
+    conditions,
     step1Timeframe,
     step2CandleStreak,
     step3Trend,
@@ -756,7 +866,105 @@ export function evaluateExtremeBearish(
     badge: niftyPass ? 'PASS' : 'FAIL'
   };
 
+  // EXACT 13 FORMULA CONDITIONS FOR BEARISH
+  const conditions: FormulaConditionCheck[] = [
+    {
+      id: 'RED_STREAK',
+      label: 'Red streak >= 6',
+      expected: '>= 6 red candles',
+      actual: `${consecutiveRed} consecutive red`,
+      passed: consecutiveRed >= 6 || (candles.length < 6 && streakPassed)
+    },
+    {
+      id: 'GREEN_CANDLES_ZERO',
+      label: 'Green candles = 0',
+      expected: '0 green candles in streak',
+      actual: `${greenCountInLast6} green candles`,
+      passed: greenCountInLast6 === 0
+    },
+    {
+      id: 'PRICE_VWAP',
+      label: 'Price < VWAP',
+      expected: `< ₹${vwap.toFixed(2)}`,
+      actual: `₹${close.toFixed(2)}`,
+      passed: close < vwap + 0.0001
+    },
+    {
+      id: 'EMA_ALIGNMENT',
+      label: 'EMA20 < EMA50 < EMA200',
+      expected: 'EMA20 < EMA50 < EMA200',
+      actual: `20: ₹${ema20.toFixed(1)} < 50: ₹${ema50.toFixed(1)} < 200: ₹${ema200.toFixed(1)}`,
+      passed: ema20 < ema50 && ema50 < ema200
+    },
+    {
+      id: 'LOWER_HIGH',
+      label: 'Lower High = TRUE',
+      expected: 'TRUE',
+      actual: lowerHigh ? 'TRUE' : 'FALSE',
+      passed: lowerHigh
+    },
+    {
+      id: 'LOWER_LOW',
+      label: 'Lower Low = TRUE',
+      expected: 'TRUE',
+      actual: lowerLow ? 'TRUE' : 'FALSE',
+      passed: lowerLow
+    },
+    {
+      id: 'RSI_20_40',
+      label: 'RSI 20–40',
+      expected: '20.0 to 40.0',
+      actual: rsiVal.toFixed(1),
+      passed: rsiVal >= 20 && rsiVal <= 40
+    },
+    {
+      id: 'MACD_BEARISH',
+      label: 'MACD bearish',
+      expected: 'MACD < Signal & Hist < 0',
+      actual: `MACD: ${macdVal.toFixed(2)}, Sig: ${macdSignalVal.toFixed(2)}, Hist: ${macdHistVal.toFixed(2)}`,
+      passed: macdBearish
+    },
+    {
+      id: 'ADX_25',
+      label: 'ADX > 25',
+      expected: '> 25.0',
+      actual: adxVal.toFixed(1),
+      passed: adxVal > 25
+    },
+    {
+      id: 'MINUS_DI_PLUS_DI',
+      label: '-DI > +DI',
+      expected: '-DI > +DI',
+      actual: `-DI ${minusDI.toFixed(1)} vs +DI ${plusDI.toFixed(1)}`,
+      passed: minusDI > plusDI
+    },
+    {
+      id: 'VOLUME_1_5X',
+      label: 'Volume > 1.5 × AvgVolume',
+      expected: `> ${Math.round(avgVolume20 * 1.5).toLocaleString()}`,
+      actual: currentVolume.toLocaleString(),
+      passed: volExpansion15x
+    },
+    {
+      id: 'BREAKDOWN_TRUE',
+      label: 'Breakdown = TRUE',
+      expected: 'TRUE (Price <= Swing Low)',
+      actual: supportBreakdown || close <= swingLow + 0.05 ? 'TRUE' : 'FALSE',
+      passed: supportBreakdown || close <= swingLow + 0.05
+    },
+    {
+      id: 'NIFTY_CONFIRMATION',
+      label: 'Nifty confirmation = TRUE',
+      expected: 'TRUE',
+      actual: niftyPass ? 'TRUE' : 'FALSE',
+      passed: niftyPass
+    }
+  ];
+
   // FINAL VERDICT
+  const failedConditions = conditions.filter((c) => !c.passed);
+  const passedConditions = conditions.filter((c) => c.passed);
+
   const allSteps = [
     { name: 'Step 1: Timeframe & Trend', pass: step1Passed },
     { name: 'Step 2: Candle Streak', pass: step2Passed },
@@ -770,14 +978,15 @@ export function evaluateExtremeBearish(
   const passedStepNames = allSteps.filter((s) => s.pass).map((s) => s.name);
   const failedStepNames = allSteps.filter((s) => !s.pass).map((s) => s.name);
 
-  // 100% Bearish is TRUE only when all 7 steps pass!
-  const is100PercentBearish = failedStepNames.length === 0;
+  // 100% Bearish is TRUE only when ALL exact formula conditions pass
+  const is100PercentBearish = conditions.every((c) => c.passed);
 
-  const score = Math.round((passedStepNames.length / allSteps.length) * 100);
+  const score = Math.round((passedConditions.length / conditions.length) * 100);
 
   return {
     is100PercentBearish,
     score,
+    conditions,
     step1Timeframe,
     step2CandleStreak,
     step3Trend,

@@ -125,7 +125,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
           </div>
         )}
 
-        {/* 7-Step 100% Extreme Bullish / Bearish Verification Engine */}
+        {/* 13-Point 100% Extreme Formula Validation Engine */}
         <div className="mt-4 p-4 rounded-2xl border bg-slate-900 text-white border-slate-800 shadow-md space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2">
@@ -134,25 +134,25 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
               </span>
               <div>
                 <div className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center gap-2">
-                  <span>100% Extreme Signal Validation Engine</span>
+                  <span>100% Extreme Formula Validation Engine</span>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
                     active100Tab === 'BULLISH'
                       ? extremeBullish.is100PercentBullish ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-300'
                       : extremeBearish.is100PercentBearish ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-300'
                   }`}>
                     {active100Tab === 'BULLISH'
-                      ? extremeBullish.is100PercentBullish ? '💯 100% BULLISH VERIFIED' : `${extremeBullish.passedStepNames.length}/7 STEPS PASSED`
-                      : extremeBearish.is100PercentBearish ? '💥 100% BEARISH VERIFIED' : `${extremeBearish.passedStepNames.length}/7 STEPS PASSED`}
+                      ? extremeBullish.is100PercentBullish ? '💯 100% BULLISH VERIFIED' : `${extremeBullish.conditions.filter(c => c.passed).length}/13 FORMULA CHECKS PASSED`
+                      : extremeBearish.is100PercentBearish ? '💥 100% BEARISH VERIFIED' : `${extremeBearish.conditions.filter(c => c.passed).length}/13 FORMULA CHECKS PASSED`}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
-                  Multi-step 15m &amp; Daily confirmation filter to eliminate false breakouts &amp; traps
+                  Real-time formula calculation: streak &ge; 6, 0 opposite candles, VWAP, EMA alignment, Structure, RSI, MACD, ADX, DMI, Volume &gt; 1.5&times;, Breakout &amp; Nifty
                 </div>
               </div>
             </div>
 
             {/* Toggle Tab */}
-            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
               <button
                 onClick={() => setActive100Tab('BULLISH')}
                 className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all ${
@@ -161,7 +161,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                100% Bullish ({extremeBullish.passedStepNames.length}/7)
+                🟢 Extreme Bullish ({extremeBullish.conditions.filter(c => c.passed).length}/13)
               </button>
               <button
                 onClick={() => setActive100Tab('BEARISH')}
@@ -171,90 +171,98 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                100% Bearish ({extremeBearish.passedStepNames.length}/7)
+                🔴 Extreme Bearish ({extremeBearish.conditions.filter(c => c.passed).length}/13)
               </button>
             </div>
           </div>
 
-          {/* 7-Step Checklist Grid */}
-          <div className="space-y-2 text-xs">
-            {active100Tab === 'BULLISH' ? (
-              <>
-                {[
-                  extremeBullish.step1Timeframe,
-                  extremeBullish.step2CandleStreak,
-                  extremeBullish.step3Trend,
-                  extremeBullish.step4MarketStructure,
-                  extremeBullish.step5Momentum,
-                  extremeBullish.step6Volume,
-                  extremeBullish.step7NiftyConfirmation
-                ].map((step, idx) => (
-                  <div
-                    key={`bull-step-${idx}`}
-                    className={`p-2.5 rounded-xl border flex items-start justify-between gap-3 ${
-                      step.passed
-                        ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-300'
-                    }`}
-                  >
-                    <div className="space-y-0.5">
-                      <div className="font-bold flex items-center gap-1.5">
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ${
-                          step.passed ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {step.passed ? '✓' : idx + 1}
-                        </span>
-                        <span className={step.passed ? 'text-emerald-300' : 'text-slate-200'}>{step.title}</span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 pl-5.5 font-mono">{step.detail}</p>
+          {/* 13 Formula Conditions Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            {(active100Tab === 'BULLISH' ? extremeBullish.conditions : extremeBearish.conditions).map((cond, idx) => (
+              <div
+                key={cond.id}
+                className={`p-2 rounded-xl border flex items-center justify-between gap-2 ${
+                  cond.passed
+                    ? active100Tab === 'BULLISH' ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200' : 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                    : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                    cond.passed
+                      ? active100Tab === 'BULLISH' ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'
+                      : 'bg-slate-800 text-slate-500'
+                  }`}>
+                    {cond.passed ? '✓' : '✗'}
+                  </span>
+                  <div className="truncate">
+                    <div className={`font-black truncate ${cond.passed ? (active100Tab === 'BULLISH' ? 'text-emerald-300' : 'text-rose-300') : 'text-slate-300'}`}>
+                      {cond.label}
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black shrink-0 ${
-                      step.passed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                    }`}>
-                      {step.badge}
-                    </span>
-                  </div>
-                ))}
-              </>
-            ) : (
-              <>
-                {[
-                  extremeBearish.step1Timeframe,
-                  extremeBearish.step2CandleStreak,
-                  extremeBearish.step3Trend,
-                  extremeBearish.step4MarketStructure,
-                  extremeBearish.step5Momentum,
-                  extremeBearish.step6Volume,
-                  extremeBearish.step7NiftyConfirmation
-                ].map((step, idx) => (
-                  <div
-                    key={`bear-step-${idx}`}
-                    className={`p-2.5 rounded-xl border flex items-start justify-between gap-3 ${
-                      step.passed
-                        ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-300'
-                    }`}
-                  >
-                    <div className="space-y-0.5">
-                      <div className="font-bold flex items-center gap-1.5">
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ${
-                          step.passed ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {step.passed ? '✓' : idx + 1}
-                        </span>
-                        <span className={step.passed ? 'text-rose-300' : 'text-slate-200'}>{step.title}</span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 pl-5.5 font-mono">{step.detail}</p>
+                    <div className="text-[10px] text-slate-400 truncate font-mono">
+                      {cond.actual}
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black shrink-0 ${
-                      step.passed ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-slate-800 text-slate-400 border border-slate-700'
-                    }`}>
-                      {step.badge}
-                    </span>
                   </div>
-                ))}
-              </>
-            )}
+                </div>
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black shrink-0 uppercase ${
+                  cond.passed
+                    ? active100Tab === 'BULLISH' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    : 'bg-slate-800 text-slate-500 border border-slate-700'
+                }`}>
+                  {cond.passed ? 'PASS' : 'FAIL'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* 7-Step Summary Grouping */}
+          <div className="mt-2 pt-2 border-t border-slate-800/80 space-y-1.5 text-xs">
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Step Verification Summary
+            </div>
+            {(active100Tab === 'BULLISH' ? [
+              extremeBullish.step1Timeframe,
+              extremeBullish.step2CandleStreak,
+              extremeBullish.step3Trend,
+              extremeBullish.step4MarketStructure,
+              extremeBullish.step5Momentum,
+              extremeBullish.step6Volume,
+              extremeBullish.step7NiftyConfirmation
+            ] : [
+              extremeBearish.step1Timeframe,
+              extremeBearish.step2CandleStreak,
+              extremeBearish.step3Trend,
+              extremeBearish.step4MarketStructure,
+              extremeBearish.step5Momentum,
+              extremeBearish.step6Volume,
+              extremeBearish.step7NiftyConfirmation
+            ]).map((step, idx) => (
+              <div
+                key={`step-summary-${idx}`}
+                className={`p-2 rounded-xl border flex items-start justify-between gap-2 ${
+                  step.passed
+                    ? active100Tab === 'BULLISH' ? 'bg-emerald-950/20 border-emerald-500/20 text-emerald-200' : 'bg-rose-950/20 border-rose-500/20 text-rose-200'
+                    : 'bg-slate-950/30 border-slate-800/60 text-slate-400'
+                }`}
+              >
+                <div className="space-y-0.5 min-w-0">
+                  <div className="font-bold flex items-center gap-1.5 text-[11px]">
+                    <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-black ${
+                      step.passed ? (active100Tab === 'BULLISH' ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white') : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      {step.passed ? '✓' : idx + 1}
+                    </span>
+                    <span className={step.passed ? (active100Tab === 'BULLISH' ? 'text-emerald-300' : 'text-rose-300') : 'text-slate-300'}>{step.title}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 pl-5 font-mono truncate">{step.detail}</p>
+                </div>
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black shrink-0 ${
+                  step.passed ? (active100Tab === 'BULLISH' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30') : 'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}>
+                  {step.badge}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
 
