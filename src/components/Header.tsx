@@ -217,7 +217,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
           
           {/* Main Dashboard Navigation Tabs */}
-          <div className="flex items-center space-x-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80">
+          <div className="flex items-center space-x-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 flex-wrap">
             <button
               onClick={() => onChangeDashboardTab('gann')}
               className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
@@ -227,6 +227,20 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <span>📊 15m Scanner</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onChangeDashboardTab('gann');
+                setTimeout(() => {
+                  const el = document.getElementById('ideal-trade-radar-hub');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 50);
+              }}
+              className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-black bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-2xs transition-all hover:scale-105"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current text-yellow-200 animate-pulse" />
+              <span>🔥 Ideal Trades NOW</span>
             </button>
 
             <button

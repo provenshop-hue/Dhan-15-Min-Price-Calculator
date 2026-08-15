@@ -223,3 +223,53 @@ export interface StockTradeJourney {
   lastUpdatedTime: string;
 }
 
+export type IdealTradeTimingStatus =
+  | 'PRIME_ENTRY_NOW'
+  | 'BREAKOUT_SURGE'
+  | 'PULLBACK_RETEST'
+  | 'TARGET_PROGRESSION';
+
+export interface IdealOptionTrade {
+  stockId: string;
+  symbol: string;
+  companyName: string;
+  spotPrice: number;
+  direction: 'BULLISH_CE' | 'BEARISH_PE';
+  convictionScore: number; // 0 to 100
+  timingStatus: IdealTradeTimingStatus;
+  timingStatusLabel: string;
+  recommendedOptionStrike: string; // e.g. "RELIANCE 2900 CE"
+  strikePrice: number;
+  strikeStep: number;
+  optionType: 'CE' | 'PE';
+  moneyness: 'ATM' | 'ITM (Delta 0.65)' | 'OTM';
+  strikeLadder: {
+    atm: number;
+    itm: number;
+    otm: number;
+    atmContract: string;
+    itmContract: string;
+    otmContract: string;
+  };
+  lotSize: number;
+  approxOptionLtp: number;
+  optionEntryRange: string;
+  optionTarget1: number;
+  optionTarget2: number;
+  optionStopLoss: number;
+  capitalRequiredPerLot: number;
+  potentialGainPerLot: number;
+  riskPerLot: number;
+  riskRewardRatio: string;
+  historicAuditConfluence: string[];
+  whyThisWillProfit: string;
+  stockAction: 'BUY (Long Cash / Futures)' | 'SELL (Short Cash / Futures)';
+  stockBuySellAbove: number;
+  stockTarget1: number;
+  stockTarget2: number;
+  stockStopLoss: number;
+  currentSpotPnLPct: number;
+  totalFetchesTracked: number;
+  lastUpdated: string;
+}
+

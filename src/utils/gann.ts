@@ -509,6 +509,8 @@ export function calculateGann15Min(
   };
 }
 
+import { getExactNseStrikeStep, roundToExactNseStrike } from './nseStrikeMaster';
+
 export interface AtmOptionStrikes {
   step: number;
   atmStrike: number;
@@ -517,39 +519,22 @@ export interface AtmOptionStrikes {
 }
 
 /**
- * Calculates 2 CE and 2 PE strike prices At-The-Money (ATM) for a stock or index based on CMP
+ * Calculates 2 CE and 2 PE strike prices At-The-Money (ATM) for a stock or index based on CMP,
+ * strictly matching NSE terminal F&O strike rules.
  */
 export function getAtmOptionStrikes(price?: number | null, symbol?: string): AtmOptionStrikes | null {
   if (!price || price <= 0) return null;
-  const sym = (symbol || '').toUpperCase();
+  const sym = symbol || '';
+  const step = getExactNseStrikeStep(sym, price);
+  const atmStrike = roundToExactNseStrike(price, sym);
 
-  let step = 10;
-  if (sym.includes('BANKNIFTY')) {
-    step = 100;
-  } else if (sym.includes('NIFTY') || sym.includes('FINNIFTY')) {
-    step = 50;
-  } else if (sym.includes('SENSEX')) {
-    step = 100;
-  } else {
-    if (price < 50) step = 1;
-    else if (price < 100) step = 2.5;
-    else if (price < 250) step = 5;
-    else if (price < 500) step = 10;
-    else if (price < 1000) step = 20;
-    else if (price < 2500) step = 25;
-    else if (price < 5000) step = 50;
-    else step = 100;
-  }
-
-  const atmStrike = Math.round(price / step) * step;
-
-  // 2 CE strikes At-The-Money: ATM CE & ATM+1 CE
+  // 2 CE strikes At-The-Money: ATM CE & ATM+1 OTM CE
   const ce1 = atmStrike;
-  const ce2 = atmStrike + step;
+  const ce2 = Math.round((atmStrike + step) * 10) / 10;
 
-  // 2 PE strikes At-The-Money: ATM PE & ATM-1 PE
+  // 2 PE strikes At-The-Money: ATM PE & ATM-1 OTM PE
   const pe1 = atmStrike;
-  const pe2 = atmStrike - step;
+  const pe2 = Math.round((atmStrike - step) * 10) / 10;
 
   return {
     step,

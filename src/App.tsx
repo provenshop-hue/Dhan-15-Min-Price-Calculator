@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Header } from './components/Header';
 import { AccessCodeGate } from './components/AccessCodeGate';
 import { DhanApiGateModal } from './components/DhanApiGateModal';
@@ -14,12 +14,14 @@ import { PositionSizingModal } from './components/PositionSizingModal';
 import { RsiAnalystModal } from './components/RsiAnalystModal';
 import { NotificationScroller } from './components/NotificationScroller';
 import { TradeProfitTracker } from './components/TradeProfitTracker';
+import { IdealTradeRadar } from './components/IdealTradeRadar';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
-import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney } from './types';
+import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
 import { calculateGann15Min } from './utils/gann';
 import { is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishFadeReason, get100PercentBearishFadeReason, detectHistorical100Fades } from './utils/rsiPullback';
 import { getStoredTradeJourneys, updateAllTradeJourneys, clearTradeJourneys } from './utils/tradeTracker';
+import { analyzeIdealOptionsAndStocks } from './utils/idealTradeAnalyzer';
 
 import { Download, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
 
@@ -176,6 +178,11 @@ export default function App() {
   const [tradeJourneys, setTradeJourneys] = useState<Record<string, StockTradeJourney>>(() => {
     return getStoredTradeJourneys();
   });
+
+  // 🎯 Top Ideal Options & Stock Trades to Trade NOW (recalculated across historical records on every fetch)
+  const idealTrades = useMemo(() => {
+    return analyzeIdealOptionsAndStocks(stocks, tradeJourneys);
+  }, [stocks, tradeJourneys]);
 
   // Automatically update and track trade journeys on every stock price/RSI fetch
   useEffect(() => {
@@ -959,6 +966,18 @@ export default function App() {
               stocks={stocks}
               onSelectStockDetail={(s) => setSelectedDetailStock(s)}
               onSelectTrendFilter={(f) => setActiveTrendFilter(f)}
+            />
+
+            {/* 🎯 Ideal Options & High-Conviction Stocks to Trade NOW (Updated on Every Fetch) */}
+            <IdealTradeRadar
+              idealTrades={idealTrades}
+              stocks={stocks}
+              tradeJourneys={tradeJourneys}
+              onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+              onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+              onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+              onRefreshAllPrices={handleFetchAllDhan}
+              isLoading={isBulkLoading}
             />
 
             {/* 🚀 Trade Profit & Timings Journey Tracker */}

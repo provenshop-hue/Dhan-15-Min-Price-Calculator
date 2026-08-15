@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator, Percent, Sparkles, Clock, Compass, Zap } from 'lucide-react';
+import { X, ExternalLink, TrendingUp, TrendingDown, Shield, Target, Award, ArrowUpRight, ArrowDownRight, Layers, ShieldCheck, Calculator, Percent, Sparkles, Clock, Compass, Zap, Flame, Check } from 'lucide-react';
 import { StockCalculated, StockTradeJourney } from '../types';
 import { getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
 import { evaluateStockTradeJourney } from '../utils/tradeTracker';
+import { evaluateIdealOptionTrade } from '../utils/idealTradeAnalyzer';
+import { formatStrikePrice } from '../utils/nseStrikeMaster';
 
 interface StockDetailModalProps {
   stock: StockCalculated | null;
@@ -526,6 +528,65 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
               </span>
             </div>
 
+            {/* If Ideal Trade Exists for this Stock */}
+            {(() => {
+              const idealOption = evaluateIdealOptionTrade(stock, journey || undefined);
+              if (!idealOption) return null;
+              const isBull = idealOption.direction === 'BULLISH_CE';
+
+              return (
+                <div className={`mb-3 p-3 rounded-xl border-2 shadow-sm ${
+                  isBull 
+                    ? 'bg-emerald-950 text-white border-emerald-500/80' 
+                    : 'bg-rose-950 text-white border-rose-500/80'
+                }`}>
+                  <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-white/10">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black px-2.5 py-0.5 rounded-lg bg-amber-400 text-slate-950 font-mono flex items-center gap-1">
+                        <Flame className="w-3.5 h-3.5" /> IDEAL OPTION TO TRADE NOW
+                      </span>
+                      <strong className="text-sm sm:text-base font-black font-mono text-yellow-300">
+                        {idealOption.recommendedOptionStrike}
+                      </strong>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs font-mono">
+                      <span className="text-emerald-300 font-bold bg-white/10 px-2 py-0.5 rounded">
+                        {idealOption.convictionScore}% Win Probability
+                      </span>
+                      <span className="text-slate-300">
+                        R:R {idealOption.riskRewardRatio}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2.5 text-xs font-mono">
+                    <div className="bg-black/30 p-2 rounded-lg">
+                      <span className="text-[10px] text-slate-300 block font-sans">Ideal Entry Range</span>
+                      <strong className="text-white text-xs">{idealOption.optionEntryRange}</strong>
+                    </div>
+                    <div className="bg-emerald-900/60 p-2 rounded-lg text-emerald-200">
+                      <span className="text-[10px] text-slate-300 block font-sans">Target 1 (+38%)</span>
+                      <strong className="text-emerald-300 text-xs">₹{idealOption.optionTarget1.toFixed(2)}</strong>
+                    </div>
+                    <div className="bg-purple-900/60 p-2 rounded-lg text-purple-200">
+                      <span className="text-[10px] text-slate-300 block font-sans">Target 2 (+78%)</span>
+                      <strong className="text-yellow-300 text-xs">₹{idealOption.optionTarget2.toFixed(2)}</strong>
+                    </div>
+                    <div className="bg-rose-900/60 p-2 rounded-lg text-rose-200">
+                      <span className="text-[10px] text-slate-300 block font-sans">Stop Loss (-28%)</span>
+                      <strong className="text-rose-300 text-xs">₹{idealOption.optionStopLoss.toFixed(2)}</strong>
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 pt-2 border-t border-white/10 text-[11px] text-slate-300 flex items-center justify-between flex-wrap gap-2">
+                    <span>Capital: <strong className="text-cyan-300 font-mono">₹{idealOption.capitalRequiredPerLot.toLocaleString()}</strong> ({idealOption.lotSize} qty/lot)</span>
+                    <span className="text-amber-300 font-semibold">{idealOption.timingStatusLabel}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Call Options (CE) */}
               <div className="bg-white p-3 rounded-lg border border-emerald-200/80 shadow-2xs">
@@ -536,11 +597,11 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
                 <div className="flex items-center space-x-2">
                   <div className="flex-1 bg-emerald-50 border border-emerald-200 p-2 rounded-lg text-center">
                     <span className="block text-[9px] text-emerald-700 font-extrabold uppercase">ATM CE Strike</span>
-                    <span className="text-sm font-mono font-black text-emerald-900">{optionStrikes.ceStrikes[0]} CE</span>
+                    <span className="text-sm font-mono font-black text-emerald-900">{formatStrikePrice(optionStrikes.ceStrikes[0])} CE</span>
                   </div>
                   <div className="flex-1 bg-emerald-50/50 border border-emerald-200/70 p-2 rounded-lg text-center">
                     <span className="block text-[9px] text-emerald-600 font-bold uppercase">ATM+1 CE Strike</span>
-                    <span className="text-sm font-mono font-bold text-emerald-800">{optionStrikes.ceStrikes[1]} CE</span>
+                    <span className="text-sm font-mono font-bold text-emerald-800">{formatStrikePrice(optionStrikes.ceStrikes[1])} CE</span>
                   </div>
                 </div>
               </div>
@@ -554,11 +615,11 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
                 <div className="flex items-center space-x-2">
                   <div className="flex-1 bg-rose-50 border border-rose-200 p-2 rounded-lg text-center">
                     <span className="block text-[9px] text-rose-700 font-extrabold uppercase">ATM PE Strike</span>
-                    <span className="text-sm font-mono font-black text-rose-900">{optionStrikes.peStrikes[0]} PE</span>
+                    <span className="text-sm font-mono font-black text-rose-900">{formatStrikePrice(optionStrikes.peStrikes[0])} PE</span>
                   </div>
                   <div className="flex-1 bg-rose-50/50 border border-rose-200/70 p-2 rounded-lg text-center">
                     <span className="block text-[9px] text-rose-600 font-bold uppercase">ATM-1 PE Strike</span>
-                    <span className="text-sm font-mono font-bold text-rose-800">{optionStrikes.peStrikes[1]} PE</span>
+                    <span className="text-sm font-mono font-bold text-rose-800">{formatStrikePrice(optionStrikes.peStrikes[1])} PE</span>
                   </div>
                 </div>
               </div>
