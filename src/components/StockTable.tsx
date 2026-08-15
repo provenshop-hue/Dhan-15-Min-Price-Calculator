@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, Flame, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown, Clock } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3, isOpenCalc2DecLesserThanClose, isOpenCalc2DecGreaterThanClose, isOpenCalcLessThan3AndCloseGreaterThan10, isOpenCalcGreaterThan10AndCloseLessThan3 } from '../utils/gann';
-import { detect15mHighPullbackBounce, is100PercentBullishMove, is100PercentBearishMove } from '../utils/rsiPullback';
+import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
 import { analyzeBullishCombinations } from '../utils/bullishCombinations';
 import { evaluateStockTradeJourney } from '../utils/tradeTracker';
 
@@ -23,8 +23,6 @@ export interface PresetRecipe15m {
 
 export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
   // 15m Candlestick & Price Patterns
-  { id: 'BULLISH_100_MOVE', label: '💯 100% Bullish Move (7-Step Verified)', category: '15m Candlestick & Price Patterns', description: 'Passes 6-candle streak, VWAP/EMA trend, RSI 60-80, MACD, ADX>25 & Vol expansion' },
-  { id: 'BEARISH_100_MOVE', label: '💥 100% Bearish Move (7-Step Verified)', category: '15m Candlestick & Price Patterns', description: 'Passes 6 red-candle streak, below VWAP/EMA, RSI 20-40, MACD, ADX>25 & Vol expansion' },
   { id: 'OPEN_LOW', label: '🟢 Open = Low Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at low of first 15m candle' },
   { id: 'OPEN_HIGH', label: '🔴 Open = High Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at high of first 15m candle' },
   { id: 'HIGH_CLOSE', label: '🏆 High = Close Pattern', category: '15m Candlestick & Price Patterns', description: 'Closing/CMP near high of 15m candle' },
@@ -62,25 +60,11 @@ export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
 
 export const PRESET_RECIPES_15M: PresetRecipe15m[] = [
   {
-    id: 'ULTRA_100_BULL',
-    name: '💯 100% Extreme Bullish (7-Step)',
-    description: '100% Bullish Move + Price > VWAP + Open=Low',
-    optionKeys: ['BULLISH_100_MOVE', 'VWAP_ABOVE', 'OPEN_LOW'],
-    badge: 'Zero False Signals'
-  },
-  {
     id: 'ULTRA_15M_BULL',
     name: '⚡ Ultra 15m Bullish Breakout',
     description: 'Open = Low + Very Bullish + Above 15m High',
     optionKeys: ['OPEN_LOW', 'VERY_BULLISH', 'ABOVE_15M_HIGH'],
     badge: 'Strong Momentum'
-  },
-  {
-    id: 'ULTRA_100_BEAR',
-    name: '💥 100% Extreme Bearish (7-Step)',
-    description: '100% Bearish Move + Price < VWAP + Open=High',
-    optionKeys: ['BEARISH_100_MOVE', 'VWAP_BELOW', 'OPEN_HIGH'],
-    badge: 'Strict Breakdown'
   },
   {
     id: 'GANN_TIGHT_RALLY',
@@ -225,14 +209,14 @@ export const StockTable: React.FC<StockTableProps> = ({
   // Helper check for O=L / O=H with strict exact match
   const isStockOpenEqualLow = (s: StockCalculated) => {
     if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
-      return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow, s.highPrice, s.closePrice);
+      return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow);
     }
     return false;
   };
 
   const isStockOpenEqualHigh = (s: StockCalculated) => {
     if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
-      return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh, s.lowPrice, s.closePrice);
+      return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh);
     }
     return false;
   };
@@ -257,10 +241,6 @@ export const StockTable: React.FC<StockTableProps> = ({
   const checkRecipeCondition15m = React.useCallback((s: StockCalculated, key: string): boolean => {
     const cmp = s.closePrice || s.openPrice || 0;
     switch (key) {
-      case 'BULLISH_100_MOVE':
-        return is100PercentBullishMove(s);
-      case 'BEARISH_100_MOVE':
-        return is100PercentBearishMove(s);
       case 'OPEN_LOW':
         return isStockOpenEqualLow(s);
       case 'OPEN_HIGH':
@@ -348,8 +328,6 @@ export const StockTable: React.FC<StockTableProps> = ({
   };
 
   // Count metrics
-  const bullish100Count = stocks.filter(is100PercentBullishMove).length;
-  const bearish100Count = stocks.filter(is100PercentBearishMove).length;
   const openLowCount = stocks.filter(isStockOpenEqualLow).length;
   const openHighCount = stocks.filter(isStockOpenEqualHigh).length;
   const highCloseCount = stocks.filter(isStockHighEqualClose).length;
@@ -380,8 +358,6 @@ export const StockTable: React.FC<StockTableProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (trendFilter === 'BULLISH_100_MOVE' && !is100PercentBullishMove(s)) return false;
-    if (trendFilter === 'BEARISH_100_MOVE' && !is100PercentBearishMove(s)) return false;
     if (trendFilter === 'OPEN_LOW' && !isStockOpenEqualLow(s)) return false;
     if (trendFilter === 'OPEN_HIGH' && !isStockOpenEqualHigh(s)) return false;
     if (trendFilter === 'HIGH_CLOSE' && !isStockHighEqualClose(s)) return false;
@@ -719,26 +695,6 @@ export const StockTable: React.FC<StockTableProps> = ({
               }`}
             >
               All ({stocks.length})
-            </button>
-            <button
-              onClick={() => { setTrendFilter('BULLISH_100_MOVE'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
-                trendFilter === 'BULLISH_100_MOVE'
-                  ? 'bg-emerald-700 text-white shadow-2xs ring-2 ring-emerald-300'
-                  : 'text-emerald-900 bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300'
-              }`}
-            >
-              <span>💯 100% Bullish ({bullish100Count})</span>
-            </button>
-            <button
-              onClick={() => { setTrendFilter('BEARISH_100_MOVE'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
-                trendFilter === 'BEARISH_100_MOVE'
-                  ? 'bg-rose-700 text-white shadow-2xs ring-2 ring-rose-300'
-                  : 'text-rose-900 bg-rose-100/90 hover:bg-rose-200 border border-rose-300'
-              }`}
-            >
-              <span>💥 100% Bearish ({bearish100Count})</span>
             </button>
             <button
               onClick={() => { setTrendFilter('OPEN_LOW'); setCurrentPage(1); }}
@@ -1167,22 +1123,6 @@ export const StockTable: React.FC<StockTableProps> = ({
                         >
                           <ExternalLink className="w-3 h-3" />
                         </a>
-                        {is100PercentBullishMove(stock) && (
-                          <span
-                            title="100% Bullish Move: Passes all 7-step criteria (6 green candle streak, EMA/VWAP trend, RSI 60-80, MACD, ADX>25 & Volume)"
-                            className="text-[10px] font-black text-emerald-950 bg-emerald-300 border border-emerald-500 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-2xs animate-pulse"
-                          >
-                            💯 100% Bull
-                          </span>
-                        )}
-                        {is100PercentBearishMove(stock) && (
-                          <span
-                            title="100% Bearish Move: Passes all 7-step criteria (6 red candle streak, below EMA/VWAP, RSI 20-40, MACD, ADX>25 & Volume)"
-                            className="text-[10px] font-black text-rose-950 bg-rose-300 border border-rose-500 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-2xs animate-pulse"
-                          >
-                            💥 100% Bear
-                          </span>
-                        )}
                         {isStockOpenEqualLow(stock) && (
                           <span
                             title="Open = Low pattern detected (Bullish Intraday Setup)"

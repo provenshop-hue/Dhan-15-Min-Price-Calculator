@@ -48,8 +48,8 @@ export function evaluateIdealOptionTrade(
   const lotSize = stock.lotSizeJun2026 || stock.lotSizeJul2026 || stock.lotSizeAug2026 || 250;
 
   // Historic Pattern Confirmations
-  const isOpenLow = isOpenLowPattern(openPrice, lowPrice, stock.first15mLow, highPrice, cmp);
-  const isOpenHigh = isOpenHighPattern(openPrice, highPrice, stock.first15mHigh, lowPrice, cmp);
+  const isOpenLow = isOpenLowPattern(openPrice, lowPrice, stock.first15mLow);
+  const isOpenHigh = isOpenHighPattern(openPrice, highPrice, stock.first15mHigh);
   const isAbove15m = isAboveFirst15mCandle(stock);
   const isBelow15m = isBelowFirst15mCandle(stock);
   const isOpenCalc3 = isOpenCalcLessThan3(stock);

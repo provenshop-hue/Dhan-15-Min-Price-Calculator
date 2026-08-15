@@ -20,35 +20,6 @@ export interface StockCalculated {
   candleTimestamp?: string | null;
   previousClose?: number | null;
 
-  // Technical Indicators for 100% Extreme Trend System
-  ema20?: number | null;
-  ema50?: number | null;
-  ema200?: number | null;
-  ema20Slope?: number | null;
-  ema50Slope?: number | null;
-  dailyEma20?: number | null;
-  dailyEma50?: number | null;
-  dailyClose?: number | null;
-  macd?: number | null;
-  macdSignal?: number | null;
-  macdHistogram?: number | null;
-  plusDI?: number | null;
-  minusDI?: number | null;
-  avgVolume20?: number | null;
-  volumeRatio?: number | null;
-  consecutiveGreenCount?: number | null;
-  consecutiveRedCount?: number | null;
-  redCountLast6?: number | null;
-  greenCountLast6?: number | null;
-  isHigherHigh?: boolean | null;
-  isHigherLow?: boolean | null;
-  isLowerLow?: boolean | null;
-  isLowerHigh?: boolean | null;
-  swingHigh?: number | null;
-  swingLow?: number | null;
-  isBreakoutResistance?: boolean | null;
-  isBreakdownSupport?: boolean | null;
-
   // Gann Calculated Values
   openCalc?: number | null; // ((sqrt(open) * 15) - 15) % 15
   closeCalc?: number | null; // ((sqrt(close) * 15) - 15) % 15
@@ -91,8 +62,6 @@ export interface StockCalculated {
 
 export type TrendFilterType =
   | 'ALL'
-  | 'BULLISH_100_MOVE'
-  | 'BEARISH_100_MOVE'
   | 'VERY_BULLISH'
   | 'BULLISH'
   | 'VERY_BEARISH'
@@ -155,9 +124,6 @@ export interface GannCalcResult {
 
 export interface RsiIntradayPoint {
   timeStr: string; // e.g. "09:15 AM", "09:30 AM", "09:45 AM", etc.
-  open?: number;
-  high?: number;
-  low?: number;
   close: number;
   volume?: number;
   rsi: number;
@@ -166,11 +132,6 @@ export interface RsiIntradayPoint {
   volumeDirection?: 'INCREASING' | 'DECREASING' | 'FLAT';
   volumeDelta?: number;
   volumeDeltaPct?: number;
-  ema20?: number;
-  ema50?: number;
-  macd?: number;
-  macdSignal?: number;
-  macdHist?: number;
 }
 
 export interface RsiAiAnalysisReport {

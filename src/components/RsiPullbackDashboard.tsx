@@ -238,11 +238,11 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         return is100PercentBearishMove(stock);
       case 'OPEN_LOW':
         return (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-          ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow, stock.highPrice, stock.closePrice)
+          ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
           : false;
       case 'OPEN_HIGH':
         return (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-          ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh, stock.lowPrice, stock.closePrice)
+          ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
           : false;
       case 'HIGH_CLOSE': {
         const cmp = stock.closePrice || stock.openPrice;
@@ -395,10 +395,10 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
 
       const isOL = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-        ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow, stock.highPrice, stock.closePrice)
+        ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
         : false;
       const isOH = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-        ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh, stock.lowPrice, stock.closePrice)
+        ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
         : false;
       const isHC = (stock.closePrice !== undefined && stock.closePrice !== null && stock.closePrice > 0)
         ? isHighClosePattern(stock.closePrice, stock.highPrice, stock.first15mHigh, stock.openPrice)
@@ -498,12 +498,12 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
       if (activeFilter === 'OPEN_LOW') {
         return (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-          ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow, stock.highPrice, stock.closePrice)
+          ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
           : false;
       }
       if (activeFilter === 'OPEN_HIGH') {
         return (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-          ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh, stock.lowPrice, stock.closePrice)
+          ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
           : false;
       }
       if (activeFilter === 'HIGH_CLOSE') {
@@ -2472,7 +2472,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                           </span>
                         )}
                         {((stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-                          ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow, stock.highPrice, stock.closePrice)
+                          ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
                           : false) && (
                           <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-300 flex items-center gap-1">
                             <span>OPEN=LOW</span>
@@ -2480,7 +2480,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                           </span>
                         )}
                         {((stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-                          ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh, stock.lowPrice, stock.closePrice)
+                          ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
                           : false) && (
                           <span className="bg-rose-100 text-rose-800 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300 flex items-center gap-1">
                             <span>OPEN=HIGH</span>
