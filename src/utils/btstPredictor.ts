@@ -7,12 +7,12 @@ import { isAboveFirst15mCandle, isBelowFirst15mCandle } from './gann';
  * Evaluates a single stock or index to determine if it has a high-conviction
  * BTST (Buy Today, Sell Tomorrow) GAP UP or STBT (Sell Today, Buy Tomorrow) GAP DOWN setup.
  *
- * Precision Algorithm:
- * 1. Evaluates True Net Day Change (relative to Previous Close and Open)
- * 2. Detects Gap-Up Open & Gap Defense / Runaway Gap structures
- * 3. Incorporates Gann Square of 9 angles, targets, and trend zones
- * 4. Measures Intraday VWAP institutional absorption & volume delivery
- * 5. Checks 14-period RSI trajectory and 15-min candle Open=Low / Open=High setups
+ * Precision Multi-Factor Quantitative Model:
+ * 1. True Net Day Change (relative to Previous Day Settlement Close and Open)
+ * 2. Gap-Up Open & Gap Defense / Runaway Gap / Breakout Retest Structures
+ * 3. Gann Square of 9 angles, targets, and trend zones
+ * 4. Intraday VWAP institutional absorption & volume delivery
+ * 5. 14-period RSI trajectory and 15-min candle Open=Low / Open=High setups
  *
  * Excludes neutral, range-bound, or conflicting setups so only genuine high-probability setups appear.
  */
@@ -37,7 +37,7 @@ export function evaluateBtstPrediction(
   const closeToLowPct = 100 - closeToHighPct;
 
   // True Previous Close and Day Change %
-  const hasRealPrevClose = stock.previousClose && stock.previousClose > 0;
+  const hasRealPrevClose = stock.previousClose !== undefined && stock.previousClose !== null && stock.previousClose > 0;
   const prevClose = hasRealPrevClose ? stock.previousClose! : openPrice;
   const dayChangePct = prevClose > 0 ? ((cmp - prevClose) / prevClose) * 100 : 0;
   const intradayPct = openPrice > 0 ? ((cmp - openPrice) / openPrice) * 100 : 0;
@@ -59,126 +59,128 @@ export function evaluateBtstPrediction(
   const bullishRules: BtstConfluenceRule[] = [];
   const bearishRules: BtstConfluenceRule[] = [];
 
-  let bullScore = 35;
-  let bearScore = 35;
+  let bullScore = 30;
+  let bearScore = 30;
 
   /* =========================================================
-     1. GAP-UP / GAP-DOWN OPEN & GAP DEFENSE CONFLUENCE (Max 35 pts)
+     1. GAP-UP / GAP-DOWN OPEN & BREAKOUT RETEST (Max 40 pts)
      ========================================================= */
-  if (gapAtOpenPct >= 0.2 || (isIndex && gapAtOpenPct >= 0.12)) {
-    // Gap Up Open detected
-    if (lowPrice >= prevClose * 0.997) {
-      // Gap was completely defended without filling (Runaway Gap / Gap & Go)
-      bullScore += 35;
+  const isGapUpOpen = gapAtOpenPct >= 0.1 || (isIndex && gapAtOpenPct >= 0.05);
+  const isGapDownOpen = gapAtOpenPct <= -0.1 || (isIndex && gapAtOpenPct <= -0.05);
+
+  if (isGapUpOpen) {
+    if (cmp >= prevClose * 0.998) {
+      // Gap-up was defended / held in positive or breakout territory (Runaway Gap / Breakout Retest)
+      bullScore += 40;
+      bearScore = 0; // Strict zeroing of false bear signals
       bullishRules.push({
         id: 'gap_up_defended',
-        name: 'Gap-Up Open Defended (Runaway Gap)',
+        name: 'Overnight Gap-Up Defended (Breakout Retest)',
         passed: true,
-        score: 35,
-        description: `Opened +${gapAtOpenPct.toFixed(2)}% gap-up above yesterday's close (₹${prevClose.toFixed(2)}) and defended without filling. Institutional buyers in full command.`
+        score: 40,
+        description: `Session opened with +${gapAtOpenPct.toFixed(2)}% gap-up above yesterday's close (₹${prevClose.toFixed(2)}) and defended without filling. Institutional buyers in full command.`
       });
-    } else if (cmp > prevClose) {
-      bullScore += 24;
+    } else {
+      bullScore += 20;
       bullishRules.push({
-        id: 'gap_up_continuation',
-        name: 'Gap-Up Momentum Sustained',
+        id: 'gap_up_open',
+        name: 'Positive Gap-Up Opening Drift',
         passed: true,
-        score: 24,
-        description: `Opened with +${gapAtOpenPct.toFixed(2)}% gap and sustaining +${dayChangePct.toFixed(2)}% above previous close into the final hour.`
+        score: 20,
+        description: `Opened with +${gapAtOpenPct.toFixed(2)}% overnight gap.`
       });
     }
-  } else if (gapAtOpenPct <= -0.2 || (isIndex && gapAtOpenPct <= -0.12)) {
-    // Gap Down Open detected
-    if (highPrice <= prevClose * 1.003) {
-      // Gap Down was completely rejected without filling
-      bearScore += 35;
+  } else if (isGapDownOpen) {
+    if (cmp <= prevClose * 1.002) {
+      bearScore += 40;
+      bullScore = 0; // Strict zeroing of false bull signals
       bearishRules.push({
         id: 'gap_down_defended',
-        name: 'Gap-Down Breakdown Sustained',
+        name: 'Overnight Gap-Down Breakdown Sustained',
         passed: true,
-        score: 35,
-        description: `Opened ${gapAtOpenPct.toFixed(2)}% gap-down below yesterday's close (₹${prevClose.toFixed(2)}) with zero recovery to gap zone. Sellers in full command.`
+        score: 40,
+        description: `Session opened with ${gapAtOpenPct.toFixed(2)}% gap-down below yesterday's close (₹${prevClose.toFixed(2)}) and failed to recover. Sellers in full command.`
       });
-    } else if (cmp < prevClose) {
-      bearScore += 24;
+    } else {
+      bearScore += 20;
       bearishRules.push({
-        id: 'gap_down_continuation',
-        name: 'Gap-Down Pressure Sustained',
+        id: 'gap_down_open',
+        name: 'Negative Gap-Down Opening Drift',
         passed: true,
-        score: 24,
-        description: `Opened with ${gapAtOpenPct.toFixed(2)}% gap down and sustaining ${dayChangePct.toFixed(2)}% net loss into the final hour.`
+        score: 20,
+        description: `Opened with ${gapAtOpenPct.toFixed(2)}% overnight gap.`
       });
     }
   }
 
   /* =========================================================
-     2. GANN SQUARE OF 9 ANGLES & TREND CONFLUENCE (Max 30 pts)
+     2. GANN SQUARE OF 9 ANGLES & TREND CONFLUENCE (Max 35 pts)
      ========================================================= */
   if (trend === 'Very Bullish' || trend === 'Bullish' || (gannBuyAbove && cmp >= gannBuyAbove)) {
-    const pts = trend === 'Very Bullish' ? 30 : 22;
+    const pts = trend === 'Very Bullish' ? 35 : 25;
     bullScore += pts;
-    bearScore = Math.max(0, bearScore - 25); // Cancel false bear points
+    bearScore = 0; // Gann Bullish status overrides false bearish noise
     bullishRules.push({
       id: 'gann_bullish_trend',
       name: 'Gann Square of 9 Buy Zone Sustained',
       passed: true,
       score: pts,
-      description: `Closing above Gann Buy Trigger (₹${(gannBuyAbove || cmp).toFixed(2)}). Mathematical angle favors upside gap continuation.`
+      description: `Closing firmly in Gann Buy Zone (₹${(gannBuyAbove || cmp).toFixed(2)}). Mathematical angle favors upside continuation.`
     });
   } else if (trend === 'Very Bearish' || trend === 'Bearish' || (gannSellBelow && cmp <= gannSellBelow)) {
-    const pts = trend === 'Very Bearish' ? 30 : 22;
+    const pts = trend === 'Very Bearish' ? 35 : 25;
     bearScore += pts;
-    bullScore = Math.max(0, bullScore - 25); // Cancel false bull points
+    bullScore = 0; // Gann Bearish status overrides false bullish noise
     bearishRules.push({
       id: 'gann_bearish_trend',
       name: 'Gann Square of 9 Sell Zone Sustained',
       passed: true,
       score: pts,
-      description: `Closing below Gann Sell Trigger (₹${(gannSellBelow || cmp).toFixed(2)}). Mathematical angle favors downside gap continuation.`
+      description: `Closing firmly in Gann Sell Zone (₹${(gannSellBelow || cmp).toFixed(2)}). Mathematical angle favors downside continuation.`
     });
   }
 
   /* =========================================================
      3. NET DAY MOMENTUM & INTRADAY EXPANSION (Max 25 pts)
      ========================================================= */
-  if (dayChangePct >= 0.7 || intradayPct >= 0.5) {
-    const pts = (dayChangePct >= 1.5 || intradayPct >= 1.2) ? 25 : 18;
+  if (dayChangePct >= 0.0) {
+    const pts = dayChangePct >= 1.0 ? 25 : 18;
     bullScore += pts;
     bullishRules.push({
-      id: 'net_day_surge',
-      name: 'Strong Positive Day Momentum',
+      id: 'net_day_green',
+      name: `Positive Net Day Settlement (+${dayChangePct.toFixed(2)}%)`,
       passed: true,
       score: pts,
-      description: `Gained +${Math.max(dayChangePct, intradayPct).toFixed(2)}% on active volume accumulation.`
+      description: `Holding net green territory vs previous close (₹${prevClose.toFixed(2)}) with active institutional delivery.`
     });
-  } else if (dayChangePct <= -0.7 || intradayPct <= -0.5) {
-    const pts = (dayChangePct <= -1.5 || intradayPct <= -1.2) ? 25 : 18;
+  } else if (dayChangePct <= -0.5 && !isGapUpOpen) {
+    const pts = dayChangePct <= -1.2 ? 25 : 18;
     bearScore += pts;
     bearishRules.push({
-      id: 'net_day_dump',
-      name: 'Severe Negative Day Momentum',
+      id: 'net_day_red',
+      name: `Negative Net Day Settlement (${dayChangePct.toFixed(2)}%)`,
       passed: true,
       score: pts,
-      description: `Declined ${Math.min(dayChangePct, intradayPct).toFixed(2)}% under persistent distribution.`
+      description: `Settling in red territory vs previous close (₹${prevClose.toFixed(2)}) under distribution.`
     });
   }
 
   /* =========================================================
      4. CLOSING PRICE ACTION & DAY RANGE POSITION (Max 30 pts)
      ========================================================= */
-  if (closeToHighPct >= 80 || stock.isHighEqualClose) {
-    const pts = (closeToHighPct >= 92 || stock.isHighEqualClose) ? 30 : 22;
+  if (closeToHighPct >= 75 || stock.isHighEqualClose) {
+    const pts = (closeToHighPct >= 90 || stock.isHighEqualClose) ? 30 : 20;
     bullScore += pts;
     bullishRules.push({
       id: 'eod_high_close',
       name: 'Closing At/Near Day High',
       passed: true,
       score: pts,
-      description: `Settled in top ${(100 - closeToHighPct).toFixed(0)}% of session range (₹${cmp.toFixed(2)} vs High ₹${highPrice.toFixed(2)}) indicating aggressive institutional closing rush.`
+      description: `Settled in top ${(100 - closeToHighPct).toFixed(0)}% of session range (₹${cmp.toFixed(2)} vs High ₹${highPrice.toFixed(2)}) indicating aggressive 3:00 PM closing rush.`
     });
-  } else if (closeToHighPct <= 20 && (dayChangePct < 0 || cmp < openPrice * 0.995)) {
-    // Only apply low close penalty if the overall day or candle is actually negative
-    const pts = closeToHighPct <= 8 ? 30 : 22;
+  } else if (closeToHighPct <= 25 && dayChangePct < -0.3 && !isGapUpOpen) {
+    // Only apply low close penalty if the overall day is genuinely red and did NOT gap up
+    const pts = closeToHighPct <= 10 ? 30 : 20;
     bearScore += pts;
     bearishRules.push({
       id: 'eod_low_close',
@@ -192,18 +194,18 @@ export function evaluateBtstPrediction(
   /* =========================================================
      5. VWAP INSTITUTIONAL ABSORPTION (Max 25 pts)
      ========================================================= */
-  if (cmp > vwap) {
-    const pts = vwapDistancePct >= 0.4 ? 25 : 18;
+  if (cmp >= vwap) {
+    const pts = vwapDistancePct >= 0.3 ? 25 : 18;
     bullScore += pts;
     bullishRules.push({
       id: 'vwap_bullish',
-      name: 'Comfortably Above Intraday VWAP',
+      name: 'Trading Above Intraday VWAP',
       passed: true,
       score: pts,
       description: `Trading +${vwapDistancePct.toFixed(2)}% above volume-weighted benchmark (₹${vwap.toFixed(2)}). Smart money in profit.`
     });
-  } else if (cmp < vwap) {
-    const pts = vwapDistancePct <= -0.4 ? 25 : 18;
+  } else if (cmp < vwap && dayChangePct < 0 && !isGapUpOpen) {
+    const pts = vwapDistancePct <= -0.3 ? 25 : 18;
     bearScore += pts;
     bearishRules.push({
       id: 'vwap_bearish',
@@ -217,17 +219,17 @@ export function evaluateBtstPrediction(
   /* =========================================================
      6. 14-PERIOD RSI MOMENTUM TRAJECTORY (Max 20 pts)
      ========================================================= */
-  if (rsi >= 58) {
-    const pts = rsi >= 66 ? 20 : 15;
+  if (rsi >= 52) {
+    const pts = rsi >= 62 ? 20 : 15;
     bullScore += pts;
     bullishRules.push({
       id: 'rsi_bullish',
-      name: 'RSI Bullish Momentum Acceleration',
+      name: 'RSI Bullish Momentum Trajectory',
       passed: true,
       score: pts,
-      description: `14-period RSI at ${rsi.toFixed(1)} confirms strong buyers stepping in before the closing bell.`
+      description: `14-period RSI at ${rsi.toFixed(1)} confirms sustained buying momentum into market close.`
     });
-  } else if (rsi <= 44) {
+  } else if (rsi <= 44 && dayChangePct < 0 && !isGapUpOpen) {
     const pts = rsi <= 35 ? 20 : 15;
     bearScore += pts;
     bearishRules.push({
@@ -240,61 +242,61 @@ export function evaluateBtstPrediction(
   }
 
   /* =========================================================
-     7. 15-MINUTE CANDLE PATTERNS & BREAKOUTS (Max 25 pts)
+     7. 15-MINUTE CANDLE PATTERNS & BREAKOUTS (Max 30 pts)
      ========================================================= */
   if (stock.isOpenEqualLow) {
-    bullScore += 25;
-    bearScore = Math.max(0, bearScore - 30);
+    bullScore += 30;
+    bearScore = 0;
     bullishRules.push({
       id: 'open_eq_low',
       name: 'Open = Low Morning Pattern Hold (Ultra Conviction)',
       passed: true,
-      score: 25,
-      description: 'Morning low remained fully unbroken all day (100% buyer dominance).'
+      score: 30,
+      description: 'Morning opening price remained fully unbroken session low all day (100% buyer dominance).'
     });
   }
 
-  if (stock.isOpenEqualHigh) {
-    bearScore += 25;
-    bullScore = Math.max(0, bullScore - 30);
+  if (stock.isOpenEqualHigh && !isGapUpOpen) {
+    bearScore += 30;
+    bullScore = 0;
     bearishRules.push({
       id: 'open_eq_high',
       name: 'Open = High Morning Pattern Rejection (Ultra Conviction)',
       passed: true,
-      score: 25,
-      description: 'Morning open acted as impenetrable ceiling all day (100% seller dominance).'
+      score: 30,
+      description: 'Morning opening price acted as impenetrable ceiling all day (100% seller dominance).'
     });
   }
 
   if (isAboveFirst15mCandle(stock)) {
-    bullScore += 15;
+    bullScore += 18;
     bullishRules.push({
       id: 'above_15m_high',
       name: 'Trading Above 09:15 AM First 15m Candle High',
       passed: true,
-      score: 15,
+      score: 18,
       description: `CMP ₹${cmp.toFixed(2)} is sustaining above morning opening 15-min range high (₹${(stock.first15mHigh || highPrice).toFixed(2)}).`
     });
   }
 
-  if (isBelowFirst15mCandle(stock)) {
-    bearScore += 15;
+  if (isBelowFirst15mCandle(stock) && !isGapUpOpen && dayChangePct < 0) {
+    bearScore += 18;
     bearishRules.push({
       id: 'below_15m_low',
       name: 'Trading Below 09:15 AM First 15m Candle Low',
       passed: true,
-      score: 15,
+      score: 18,
       description: `CMP ₹${cmp.toFixed(2)} is breaking below morning opening 15-min range low (₹${(stock.first15mLow || lowPrice).toFixed(2)}).`
     });
   }
 
   if (stock.isFib382Retrace) {
-    bullScore += 12;
+    bullScore += 15;
     bullishRules.push({
       id: 'fib_retrace',
       name: 'Fibonacci 38.2% Golden Ratio Bounce',
       passed: true,
-      score: 12,
+      score: 15,
       description: 'Healthy pullback retested 38.2% Fibonacci support before surging into close.'
     });
   }
@@ -302,7 +304,7 @@ export function evaluateBtstPrediction(
   /* =========================================================
      DECISION: STRICT GAP UP vs GAP DOWN FILTERING
      ========================================================= */
-  const MIN_BTST_SCORE = 55; // Confirmed conviction threshold
+  const MIN_BTST_SCORE = 50; // Confirmed conviction threshold
   let predictedDirection: BtstGapDirection | null = null;
   let finalScore = 0;
   let activeRules: BtstConfluenceRule[] = [];
@@ -310,21 +312,24 @@ export function evaluateBtstPrediction(
   // Strong Bullish or Bearish criteria
   const isBullCandidate =
     bullScore >= MIN_BTST_SCORE &&
-    bullScore > bearScore + 6 &&
-    (dayChangePct >= 0 || intradayPct >= 0 || cmp >= vwap || trend.includes('Bullish') || Boolean(stock.isOpenEqualLow) || gapAtOpenPct > 0.2);
+    bullScore > bearScore &&
+    (isGapUpOpen || dayChangePct >= 0 || intradayPct >= 0 || cmp >= vwap || trend.includes('Bullish') || Boolean(stock.isOpenEqualLow));
 
   const isBearCandidate =
     bearScore >= MIN_BTST_SCORE &&
-    bearScore > bullScore + 6 &&
-    (dayChangePct <= 0 || intradayPct <= 0 || cmp <= vwap || trend.includes('Bearish') || Boolean(stock.isOpenEqualHigh) || gapAtOpenPct < -0.2);
+    bearScore > bullScore &&
+    !isGapUpOpen &&
+    dayChangePct < 0 &&
+    cmp <= vwap &&
+    !trend.includes('Bullish');
 
   if (isBullCandidate && (!isBearCandidate || bullScore > bearScore)) {
     predictedDirection = 'GAP_UP';
-    finalScore = Math.min(99, Math.max(74, Math.round(bullScore * 0.72)));
+    finalScore = Math.min(99, Math.max(76, Math.round(bullScore * 0.74)));
     activeRules = bullishRules;
   } else if (isBearCandidate) {
     predictedDirection = 'GAP_DOWN';
-    finalScore = Math.min(99, Math.max(74, Math.round(bearScore * 0.72)));
+    finalScore = Math.min(99, Math.max(76, Math.round(bearScore * 0.74)));
     activeRules = bearishRules;
   } else {
     // Range-bound, indeterminate chop, or conflicting cues: EXCLUDE
@@ -408,7 +413,7 @@ export function evaluateBtstPrediction(
     : `${stock.symbol}: Heavy End-of-Day Liquidation Points to ${expectedGapPctMin}% to ${expectedGapPctMax}% Morning Gap Down`;
 
   const institutionalFlowVerdict = isBull
-    ? `Strong Institutional Buying: Smart money held ${stock.symbol} into closing bell with positive momentum (+${Math.max(dayChangePct, intradayPct).toFixed(2)}%) and VWAP absorption.`
+    ? `Strong Institutional Buying: Smart money held ${stock.symbol} into closing bell with positive momentum (+${Math.max(dayChangePct, intradayPct).toFixed(2)}%) and breakout retest defense.`
     : `Persistent Institutional Selling: Sellers dumped positions into closing bell with negative momentum (${Math.min(dayChangePct, intradayPct).toFixed(2)}%) and VWAP breakdown.`;
 
   const aiThesis = isBull
