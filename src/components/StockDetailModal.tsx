@@ -72,15 +72,15 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
 
         {/* Pattern Banner Highlights */}
         {isOpenLow && (
-          <div className="mt-4 p-3 bg-emerald-50 border-2 border-emerald-500 rounded-xl flex items-center justify-between text-emerald-900 shadow-sm">
+          <div className="mt-4 p-3 bg-emerald-50/70 border border-emerald-300/80 rounded-xl flex items-center justify-between text-emerald-900 shadow-2xs">
             <div className="flex items-center space-x-2.5">
-              <div className="p-2 bg-emerald-600 text-white rounded-lg">
+              <div className="p-2 bg-emerald-600 text-white rounded-lg shadow-2xs">
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-xs font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+                <div className="text-xs font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
                   <span>🟢 OPEN = LOW PATTERN DETECTED</span>
-                  <span className="bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded text-[10px]">High Accuracy</span>
+                  <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded text-[10px] font-bold border border-emerald-200">High Accuracy</span>
                 </div>
                 <p className="text-xs text-emerald-700 mt-0.5 font-medium">
                   Opening price (₹{stock.openPrice?.toFixed(2)}) is equal to Low (₹{(stock.first15mLow || stock.lowPrice || stock.openPrice)?.toFixed(2)}). Buyers defended opening price from 09:15 AM.
@@ -88,7 +88,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
               </div>
             </div>
             <div className="text-right">
-              <span className="text-xs font-mono font-bold bg-emerald-600 text-white px-2.5 py-1 rounded-lg">
+              <span className="text-xs font-mono font-bold bg-emerald-700 text-white px-2.5 py-1 rounded-lg shadow-2xs">
                 Bullish Setup
               </span>
             </div>
@@ -96,15 +96,15 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
         )}
 
         {isOpenHigh && (
-          <div className="mt-4 p-3 bg-rose-50 border-2 border-rose-500 rounded-xl flex items-center justify-between text-rose-900 shadow-sm">
+          <div className="mt-4 p-3 bg-rose-50/70 border border-rose-300/80 rounded-xl flex items-center justify-between text-rose-900 shadow-2xs">
             <div className="flex items-center space-x-2.5">
-              <div className="p-2 bg-rose-600 text-white rounded-lg">
+              <div className="p-2 bg-rose-600 text-white rounded-lg shadow-2xs">
                 <Target className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center gap-1">
+                <div className="text-xs font-black uppercase tracking-wider text-rose-800 flex items-center gap-1.5">
                   <span>🔴 OPEN = HIGH PATTERN DETECTED</span>
-                  <span className="bg-rose-200 text-rose-900 px-1.5 py-0.2 rounded text-[10px]">High Accuracy</span>
+                  <span className="bg-rose-100 text-rose-800 px-1.5 py-0.2 rounded text-[10px] font-bold border border-rose-200">High Accuracy</span>
                 </div>
                 <p className="text-xs text-rose-700 mt-0.5 font-medium">
                   Opening price (₹{stock.openPrice?.toFixed(2)}) is equal to High (₹{(stock.first15mHigh || stock.highPrice || stock.openPrice)?.toFixed(2)}). Sellers dominated immediately at opening bell.
@@ -112,7 +112,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
               </div>
             </div>
             <div className="text-right">
-              <span className="text-xs font-mono font-bold bg-rose-600 text-white px-2.5 py-1 rounded-lg">
+              <span className="text-xs font-mono font-bold bg-rose-700 text-white px-2.5 py-1 rounded-lg shadow-2xs">
                 Bearish Setup
               </span>
             </div>
@@ -363,17 +363,17 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
         </div>
 
         {/* Confluence Technical Indicators (Square Root + RSI + VWAP) */}
-        <div className="mt-4 p-4 bg-slate-900 text-white rounded-xl border border-slate-800 shadow-md">
-          <div className="text-xs font-bold uppercase text-blue-400 mb-3 flex items-center justify-between">
+        <div className="mt-4 p-4 bg-slate-900 text-slate-100 rounded-2xl border border-slate-800 shadow-sm">
+          <div className="text-xs font-bold uppercase text-indigo-300 mb-3 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-blue-400" /> Technical Confluence Matrix
+              <Layers className="w-4 h-4 text-indigo-400" /> Technical Confluence Matrix
             </span>
             <span className="text-[10px] text-slate-400 font-normal">Square Root + RSI + Intraday VWAP</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
             {/* Square Root Signal */}
-            <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+            <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">1. Square Root Level</div>
               <div className="mt-1 flex items-center justify-between">
                 <span className="text-xs text-slate-300">Buy/Sell Level</span>
@@ -394,7 +394,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
             </div>
 
             {/* RSI Level */}
-            <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+            <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
               <div className="flex items-center justify-between">
                 <div className="text-[10px] text-slate-400 uppercase font-semibold">2. RSI Indicator (14)</div>
                 {onOpenRsiAnalyst && (
@@ -425,7 +425,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
             </div>
 
             {/* VWAP Level */}
-            <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+            <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">3. Intraday VWAP</div>
               <div className="mt-1 flex items-center justify-between">
                 <span className="text-xs font-mono text-slate-300">
@@ -444,7 +444,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
             </div>
 
             {/* ADX Trend Strength */}
-            <div className="bg-slate-800/80 p-3 rounded-lg border border-slate-700">
+            <div className="bg-slate-800/60 p-3 rounded-xl border border-slate-700/60">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">4. ADX Strength (14)</div>
               <div className="mt-1 flex items-center justify-between">
                 <span className="text-xs font-mono text-slate-300">
@@ -467,7 +467,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
         {/* Square of 9 Trade Signals */}
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Buy Above */}
-          <div className="bg-emerald-50 p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between">
+          <div className="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200/80 flex items-center justify-between shadow-2xs">
             <div>
               <div className="text-[11px] font-bold uppercase text-emerald-800 flex items-center gap-1">
                 <ArrowUpRight className="w-4 h-4 text-emerald-600" /> Buy Above Level (+45°)
@@ -480,7 +480,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
           </div>
 
           {/* Sell Below */}
-          <div className="bg-rose-50 p-3.5 rounded-xl border border-rose-200 flex items-center justify-between">
+          <div className="bg-rose-50/70 p-3.5 rounded-xl border border-rose-200/80 flex items-center justify-between shadow-2xs">
             <div>
               <div className="text-[11px] font-bold uppercase text-rose-800 flex items-center gap-1">
                 <ArrowDownRight className="w-4 h-4 text-rose-600" /> Sell Below Level (-45°)

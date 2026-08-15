@@ -38,10 +38,23 @@ export function evaluateBtstPrediction(
 
   // True Previous Close and Day Change %
   const hasRealPrevClose = stock.previousClose !== undefined && stock.previousClose !== null && stock.previousClose > 0;
-  const prevClose = hasRealPrevClose ? stock.previousClose! : openPrice;
-  const dayChangePct = prevClose > 0 ? ((cmp - prevClose) / prevClose) * 100 : 0;
+  const directPctChange = stock.pctChange !== undefined && stock.pctChange !== null ? stock.pctChange : null;
+
+  // Determine true previous close:
+  const prevClose = hasRealPrevClose
+    ? stock.previousClose!
+    : directPctChange !== null && directPctChange !== 0
+    ? cmp / (1 + directPctChange / 100)
+    : openPrice;
+
+  const dayChangePct = directPctChange !== null
+    ? directPctChange
+    : prevClose > 0
+    ? ((cmp - prevClose) / prevClose) * 100
+    : 0;
+
   const intradayPct = openPrice > 0 ? ((cmp - openPrice) / openPrice) * 100 : 0;
-  const gapAtOpenPct = hasRealPrevClose ? ((openPrice - prevClose) / prevClose) * 100 : 0;
+  const gapAtOpenPct = prevClose > 0 ? ((openPrice - prevClose) / prevClose) * 100 : 0;
 
   // VWAP Analysis
   const vwap = stock.vwap || (highPrice + lowPrice + cmp) / 3;
