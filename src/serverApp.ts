@@ -567,6 +567,10 @@ export function createExpressApp() {
         const effectiveClose = latestCandle ? latestCandle.close : first15MinClose;
         const latestTimeStr = latestCandle ? latestCandle.timeStr : '09:15 AM';
 
+        // Calculate Previous Day Close from candle stream prior to foundDate
+        const prevSessionCandles = candlesList.filter((c) => c.dateStr && c.dateStr < foundDate);
+        const previousDayClose = prevSessionCandles.length > 0 ? prevSessionCandles[prevSessionCandles.length - 1].close : null;
+
         // Calculate 14-period RSI timeline for every candle from 09:15 AM to current time
         const calcRsiForCloses = (closes: number[]): number => {
           if (closes.length < 2) return 50;
@@ -729,6 +733,7 @@ export function createExpressApp() {
           close: Math.round(effectiveClose * 100) / 100,
           high: Math.round(sessionHigh * 100) / 100,
           low: Math.round(sessionLow * 100) / 100,
+          previousClose: previousDayClose ? Math.round(previousDayClose * 100) / 100 : null,
           first15mHigh: Math.round(first15MinHigh * 100) / 100,
           first15mLow: Math.round(first15MinLow * 100) / 100,
           volume: sessionTotalVol > 0 ? sessionTotalVol : first15MinVol,
