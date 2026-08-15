@@ -53,7 +53,7 @@ export const IdealTradeRadar: React.FC<IdealTradeRadarProps> = ({
   onRefreshAllPrices,
   isLoading
 }) => {
-  const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'ALL' | 'STOCKS_ONLY' | 'OPTIONS_ONLY' | 'CALL_CE' | 'PUT_PE' | 'PRIME_NOW'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copiedTradeId, setCopiedTradeId] = useState<string | null>(null);

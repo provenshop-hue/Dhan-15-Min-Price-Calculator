@@ -43,11 +43,11 @@ export const BullishFilterSection: React.FC<BullishFilterSectionProps> = ({
   onSelectFilter,
   activeFilter = 'ALL'
 }) => {
-  // Master & Section Collapsible States
-  const [isScreenerExpanded, setIsScreenerExpanded] = useState<boolean>(true);
-  const [isStrategyCardsExpanded, setIsStrategyCardsExpanded] = useState<boolean>(true);
-  const [isFilterToolbarExpanded, setIsFilterToolbarExpanded] = useState<boolean>(true);
-  const [isStockListExpanded, setIsStockListExpanded] = useState<boolean>(true);
+  // Master & Section Collapsible States - Default all to closed/contracted position
+  const [isScreenerExpanded, setIsScreenerExpanded] = useState<boolean>(false);
+  const [isStrategyCardsExpanded, setIsStrategyCardsExpanded] = useState<boolean>(false);
+  const [isFilterToolbarExpanded, setIsFilterToolbarExpanded] = useState<boolean>(false);
+  const [isStockListExpanded, setIsStockListExpanded] = useState<boolean>(false);
 
   // Filter & Search states
   const [selectedComboFilter, setSelectedComboFilter] = useState<'ALL' | 'COMBO_1' | 'COMBO_2' | 'COMBO_3' | 'ALL_THREE'>('ALL');

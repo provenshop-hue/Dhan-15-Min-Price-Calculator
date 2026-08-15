@@ -182,6 +182,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [expandedChecklistStockId, setExpandedChecklistStockId] = useState<string | null>(null);
+  const [isLeaderboardExpanded, setIsLeaderboardExpanded] = useState<boolean>(false);
 
   // 🧪 Filter Recipe State
   const [selectedRecipeOptions, setSelectedRecipeOptions] = useState<string[]>([]);
@@ -1755,62 +1756,75 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={() => {
-                setActiveFilter('HIGH_SUCCESS');
-                setSortBy('SUCCESS_RATE_DESC');
-              }}
-              className="text-xs font-bold text-emerald-300 hover:text-emerald-200 bg-emerald-950/80 hover:bg-emerald-900 px-3 py-1.5 rounded-xl border border-emerald-500/50 flex items-center gap-1.5 self-start sm:self-auto transition-all"
-            >
-              <span>View All ({stats.highSuccessCount}) High Success</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                onClick={() => {
+                  setActiveFilter('HIGH_SUCCESS');
+                  setSortBy('SUCCESS_RATE_DESC');
+                }}
+                className="text-xs font-bold text-emerald-300 hover:text-emerald-200 bg-emerald-950/80 hover:bg-emerald-900 px-3 py-1.5 rounded-xl border border-emerald-500/50 flex items-center gap-1.5 transition-all"
+              >
+                <span>View All ({stats.highSuccessCount}) High Success</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                onClick={() => setIsLeaderboardExpanded(!isLeaderboardExpanded)}
+                className="text-xs font-black text-emerald-200 bg-emerald-950/90 hover:bg-emerald-900 px-3 py-1.5 rounded-xl border border-emerald-500/60 flex items-center gap-1 transition-all"
+                title={isLeaderboardExpanded ? 'Collapse Leaderboard' : 'Expand Leaderboard'}
+              >
+                <span>{isLeaderboardExpanded ? 'Collapse' : 'Expand Leaderboard'}</span>
+                {isLeaderboardExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-            {topSuccessStocks.slice(0, 5).map(({ stock, analysis }, idx) => {
-              const m = analysis.signalSuccessMetrics;
-              if (!m) return null;
-              return (
-                <div 
-                  key={stock.symbol}
-                  className="bg-slate-950 p-3 rounded-xl border border-slate-800 hover:border-emerald-500/60 transition-all flex flex-col justify-between space-y-2"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-black text-amber-400 font-mono">#{idx + 1}</span>
-                        <span className="font-black text-sm text-white">{stock.symbol}</span>
+          {isLeaderboardExpanded && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 animate-fade-in">
+              {topSuccessStocks.slice(0, 5).map(({ stock, analysis }, idx) => {
+                const m = analysis.signalSuccessMetrics;
+                if (!m) return null;
+                return (
+                  <div 
+                    key={stock.symbol}
+                    className="bg-slate-950 p-3 rounded-xl border border-slate-800 hover:border-emerald-500/60 transition-all flex flex-col justify-between space-y-2"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-black text-amber-400 font-mono">#{idx + 1}</span>
+                          <span className="font-black text-sm text-white">{stock.symbol}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate max-w-[120px]">
+                          {m.signalName}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-[120px]">
-                        {m.signalName}
-                      </div>
-                    </div>
-                    <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded border ${m.statusBadgeClass}`}>
-                      {m.successRatePct}%
-                    </span>
-                  </div>
-
-                  <div className="text-[10px] font-mono bg-slate-900/90 p-1.5 rounded border border-slate-800 space-y-0.5">
-                    <div className="flex justify-between text-slate-400">
-                      <span>1st Shown:</span>
-                      <span className="text-amber-300 font-bold">{m.firstShownTime} (₹{m.firstShownPrice.toFixed(1)})</span>
-                    </div>
-                    <div className="flex justify-between text-slate-300">
-                      <span>New Fetch:</span>
-                      <span className="text-emerald-300 font-bold">{m.latestFetchTime} (₹{m.latestPrice.toFixed(1)})</span>
-                    </div>
-                    <div className="flex justify-between font-bold pt-0.5 border-t border-slate-800">
-                      <span>Net Gain:</span>
-                      <span className={m.priceChangePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                        {m.priceChangePct >= 0 ? '+' : ''}{m.priceChangePct.toFixed(2)}%
+                      <span className={`text-[9.5px] font-black px-1.5 py-0.5 rounded border ${m.statusBadgeClass}`}>
+                        {m.successRatePct}%
                       </span>
                     </div>
+
+                    <div className="text-[10px] font-mono bg-slate-900/90 p-1.5 rounded border border-slate-800 space-y-0.5">
+                      <div className="flex justify-between text-slate-400">
+                        <span>1st Shown:</span>
+                        <span className="text-amber-300 font-bold">{m.firstShownTime} (₹{m.firstShownPrice.toFixed(1)})</span>
+                      </div>
+                      <div className="flex justify-between text-slate-300">
+                        <span>New Fetch:</span>
+                        <span className="text-emerald-300 font-bold">{m.latestFetchTime} (₹{m.latestPrice.toFixed(1)})</span>
+                      </div>
+                      <div className="flex justify-between font-bold pt-0.5 border-t border-slate-800">
+                        <span>Net Gain:</span>
+                        <span className={m.priceChangePct >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                          {m.priceChangePct >= 0 ? '+' : ''}{m.priceChangePct.toFixed(2)}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
