@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, ChevronDown, ChevronUp, Maximize2, Minimize2, Target, ShieldCheck, Percent } from 'lucide-react';
+import React from 'react';
+import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, Target, ShieldCheck, Percent } from 'lucide-react';
 import { StockCalculated, TrendFilterType } from '../types';
 import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
 
@@ -14,8 +14,6 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
   onSelectStockDetail,
   onSelectTrendFilter
 }) => {
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
-
   const handleFilterClick = (filter: TrendFilterType) => {
     onSelectTrendFilter(filter);
     setTimeout(() => {
@@ -185,29 +183,19 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
             <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
             <span>Very Bearish ({exactVeryBearish.length})</span>
           </button>
-
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center space-x-1.5 bg-indigo-600/50 hover:bg-indigo-600 border border-indigo-400/60 px-3 py-1.5 rounded-xl text-xs font-black text-white transition-all cursor-pointer whitespace-nowrap shadow-sm ml-auto"
-            title={isExpanded ? 'Collapse Market Pro Signal Cards' : 'Expand Market Pro Signal Cards'}
-          >
-            <span>{isExpanded ? 'Collapse Signals' : 'Expand Signals'}</span>
-            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
         </div>
       </div>
 
-      {/* Grid of Picks - Contracted by default, only shows when expanded */}
-      {isExpanded && (
-        calculatedStocks.length === 0 ? (
-          <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-center text-amber-800 text-xs flex items-center justify-center space-x-2">
-            <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-            <span>
-              No 15-minute candle data calculated yet. Click <strong>"Fetch All 15m Candles"</strong> or enter prices manually to unlock market signals.
-            </span>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in">
+      {/* Grid of Picks */}
+      {calculatedStocks.length === 0 ? (
+        <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-center text-amber-800 text-xs flex items-center justify-center space-x-2">
+          <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>
+            No 15-minute candle data calculated yet. Click <strong>"Fetch All 15m Candles"</strong> or enter prices manually to unlock market signals.
+          </span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* FIB 38.2% RETRACED STOCKS TIME TRACKER SECTION */}
           {fibRetraceStocks.length > 0 && (
             <div className="lg:col-span-2 bg-gradient-to-br from-amber-950/10 via-amber-50/50 to-white border-2 border-amber-500/30 rounded-2xl p-4 shadow-sm">
@@ -450,7 +438,6 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           </div>
 
         </div>
-        )
       )}
     </div>
   );

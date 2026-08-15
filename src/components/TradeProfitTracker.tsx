@@ -45,7 +45,7 @@ export const TradeProfitTracker: React.FC<TradeProfitTrackerProps> = ({
   onOpenRsiAnalyst,
   onClearJourneys
 }) => {
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(true);
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'IN_PROFIT' | 'TARGET_HIT' | 'PULLBACK' | 'EXIT_ALERT'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedCardIds, setExpandedCardIds] = useState<Set<string>>(new Set());
