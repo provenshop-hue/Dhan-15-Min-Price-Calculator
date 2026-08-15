@@ -13,6 +13,7 @@ import { StockDetailModal } from './components/StockDetailModal';
 import { CsvImportModal } from './components/CsvImportModal';
 import { PositionSizingModal } from './components/PositionSizingModal';
 import { RsiAnalystModal } from './components/RsiAnalystModal';
+import { StockTimingModal } from './components/StockTimingModal';
 import { NotificationScroller } from './components/NotificationScroller';
 import { TradeProfitTracker } from './components/TradeProfitTracker';
 import { IdealTradeRadar } from './components/IdealTradeRadar';
@@ -224,6 +225,7 @@ export default function App() {
   const [selectedDetailStock, setSelectedDetailStock] = useState<StockCalculated | null>(null);
   const [editingStockManual, setEditingStockManual] = useState<StockCalculated | null>(null);
   const [rsiAnalystStock, setRsiAnalystStock] = useState<StockCalculated | null>(null);
+  const [timingModalStock, setTimingModalStock] = useState<StockCalculated | null>(null);
 
   const handleOpenPositionSizer = (stock?: StockCalculated | null) => {
     setPositionSizerStock(stock || null);
@@ -1007,6 +1009,7 @@ export default function App() {
                 }}
                 onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
                 onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+                onOpenTimingAnalysis={(s) => setTimingModalStock(s)}
                 credentials={credentials}
                 tradeJourneys={tradeJourneys}
                 activeTrendFilter={activeTrendFilter}
@@ -1097,6 +1100,12 @@ export default function App() {
       <RsiAnalystModal
         stock={rsiAnalystStock}
         onClose={() => setRsiAnalystStock(null)}
+      />
+
+      <StockTimingModal
+        stock={timingModalStock}
+        tradeJourney={timingModalStock ? tradeJourneys[timingModalStock.id] || null : null}
+        onClose={() => setTimingModalStock(null)}
       />
 
       <PositionSizingModal

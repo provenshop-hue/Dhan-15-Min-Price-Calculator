@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, Flame, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, Flame, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown, Clock } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3, isOpenCalc2DecLesserThanClose, isOpenCalc2DecGreaterThanClose, isOpenCalcLessThan3AndCloseGreaterThan10, isOpenCalcGreaterThan10AndCloseLessThan3 } from '../utils/gann';
 import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
@@ -105,6 +105,7 @@ interface StockTableProps {
   onEditStockManual: (stock: StockCalculated) => void;
   onOpenPositionSizer?: (stock?: StockCalculated) => void;
   onOpenRsiAnalyst?: (stock: StockCalculated) => void;
+  onOpenTimingAnalysis?: (stock: StockCalculated) => void;
   credentials: DhanApiCredentials;
   tradeJourneys?: Record<string, StockTradeJourney>;
   activeTrendFilter?: TrendFilterType;
@@ -120,6 +121,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   onEditStockManual,
   onOpenPositionSizer,
   onOpenRsiAnalyst,
+  onOpenTimingAnalysis,
   credentials,
   tradeJourneys,
   activeTrendFilter,
@@ -1510,6 +1512,15 @@ export const StockTable: React.FC<StockTableProps> = ({
                             <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
                           </button>
                         )}
+
+                        {/* Ideal Timing History Analysis */}
+                        <button
+                          onClick={() => onOpenTimingAnalysis ? onOpenTimingAnalysis(stock) : onSelectStockDetail(stock)}
+                          title="Analyze Ideal Time & Historical Bullish/Bearish Windows"
+                          className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 bg-amber-50/50 rounded transition-colors border border-amber-200"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        </button>
 
                         {/* View Breakdown */}
                         <button

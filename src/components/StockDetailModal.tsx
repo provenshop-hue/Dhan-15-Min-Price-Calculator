@@ -6,6 +6,7 @@ import { evaluateStockTradeJourney } from '../utils/tradeTracker';
 import { evaluateIdealOptionTrade } from '../utils/idealTradeAnalyzer';
 import { evaluateBtstPrediction } from '../utils/btstPredictor';
 import { formatStrikePrice } from '../utils/nseStrikeMaster';
+import { StockTimingHistoryAnalysis } from './StockTimingHistoryAnalysis';
 
 interface StockDetailModalProps {
   stock: StockCalculated | null;
@@ -300,6 +301,11 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
             </div>
           </div>
         )}
+
+        {/* ⏳ Ideal Time for that Stock by Analysing Whole History */}
+        <div className="mt-4">
+          <StockTimingHistoryAnalysis stock={stock} tradeJourney={journey} />
+        </div>
 
         {/* 15-Min Candle & Primary Result Banner */}
         <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200">

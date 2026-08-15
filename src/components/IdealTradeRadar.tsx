@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { IdealOptionTrade, StockCalculated, StockTradeJourney } from '../types';
+import { StockTimingHistoryAnalysis } from './StockTimingHistoryAnalysis';
 import { 
   Sparkles, 
   TrendingUp, 
@@ -664,6 +665,16 @@ export const IdealTradeRadar: React.FC<IdealTradeRadarProps> = ({
                             ))}
                           </div>
                         </div>
+
+                        {/* ⏳ Ideal Time Analysis by Analysing Whole History */}
+                        {stockObj && (
+                          <div className="pt-2">
+                            <StockTimingHistoryAnalysis 
+                              stock={stockObj} 
+                              tradeJourney={tradeJourneys[trade.stockId]} 
+                            />
+                          </div>
+                        )}
 
                       </div>
                     )}
