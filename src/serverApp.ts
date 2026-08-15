@@ -251,10 +251,13 @@ export function createExpressApp() {
 
       // Resolve Security ID & Segment Type
       let secId = securityId;
-      if (!secId || secId === '1333' || secId === 'undefined') {
+      if (!secId || secId === 'undefined' || secId === 'null') {
         if (symbol) {
           secId = getDhanSecurityId(symbol);
         }
+      }
+      if (!secId && symbol) {
+        secId = getDhanSecurityId(symbol);
       }
 
       if (!secId) {
@@ -263,9 +266,9 @@ export function createExpressApp() {
         });
       }
 
-      const isIndex = isIndexSymbol(symbol || '') || secId === '13' || secId === '25' || secId === '51';
-      const exchangeSegment = isIndex ? 'IDX_I' : 'NSE_EQ';
-      const instrument = isIndex ? 'INDEX' : 'EQUITY';
+      const isIndex = isIndexSymbol(symbol || '');
+      const exchangeSegment = isIndex ? 'IDX_I' : (req.body.exchangeSegment || 'NSE_EQ');
+      const instrument = isIndex ? 'INDEX' : (exchangeSegment === 'NSE_FNO' ? 'FUTSTK' : 'EQUITY');
 
       const targetDate = date || new Date().toISOString().split('T')[0];
 
@@ -763,14 +766,7 @@ export function createExpressApp() {
       }
 
       const symUpper = (symbol || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-      const isIndex =
-        isIndexSymbol(symbol || '') ||
-        symUpper.includes('NIFTY') ||
-        symUpper.includes('BANKNIFTY') ||
-        symUpper.includes('SENSEX') ||
-        securityId === '13' ||
-        securityId === '25' ||
-        securityId === '51';
+      const isIndex = isIndexSymbol(symbol || '');
 
       let secId = securityId;
       if (symUpper === 'NIFTY' || symUpper === 'NIFTY50' || symUpper === 'NIFTY50INDEX') {
@@ -779,7 +775,7 @@ export function createExpressApp() {
         secId = '25';
       } else if (symUpper === 'SENSEX' || symUpper === 'BSESENSEX' || symUpper === 'SENSEX50') {
         secId = '51';
-      } else if (!secId) {
+      } else if (!secId || secId === 'undefined' || secId === 'null') {
         secId = getDhanSecurityId(symbol);
       }
 
