@@ -209,14 +209,14 @@ export const StockTable: React.FC<StockTableProps> = ({
   // Helper check for O=L / O=H with strict exact match
   const isStockOpenEqualLow = (s: StockCalculated) => {
     if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
-      return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow);
+      return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow, s.highPrice, s.closePrice);
     }
     return false;
   };
 
   const isStockOpenEqualHigh = (s: StockCalculated) => {
     if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
-      return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh);
+      return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh, s.lowPrice, s.closePrice);
     }
     return false;
   };

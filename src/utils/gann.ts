@@ -124,33 +124,56 @@ export function calculateADX(
 
 /**
  * Checks if Open equals Low strictly & accurately (where opening price == low price).
- * Accounts for 15-min candle low, session low, NSE tick size (₹0.05), and 0.05% tolerance.
- * Ensures the session low has not broken below the open price.
+ * 
+ * Strict Professional Criteria:
+ * 1. Open and Low prices must be valid positive numbers (> 0).
+ * 2. Strict NSE Tick Tolerance:
+ *    - Standard equities on NSE trade in ₹0.05 increments.
+ *    - Tolerance is capped at max ₹0.05 (or 0.01% for high-value contracts), never allowing arbitrary points.
+ * 3. NO DOWNWARD BREACH (0% Breach Rule):
+ *    - If session low (`lowPrice`) exists and dropped below `openPrice - tolerance`, price broke below open -> Immediately return FALSE!
+ *    - If 15m candle low (`first15mLow`) exists and dropped below `openPrice - tolerance`, price broke below 15m open -> Immediately return FALSE!
+ * 4. Strict Match Check:
+ *    - Either session low matches open price: Math.abs(openPrice - lowPrice) <= tolerance || Math.round(openPrice * 100) === Math.round(lowPrice * 100)
+ *    - OR 15m candle low matches open price: first15mLow matches open (and session low has not breached below open).
+ * 5. Intraday Bullish Action / Non-Flat Check:
+ *    - If closePrice / CMP is provided: closePrice must be >= openPrice - tolerance (cannot be red / trading in loss).
+ *    - If highPrice is provided: highPrice must be >= openPrice (cannot be dead / unquoted).
  */
 export function isOpenLowPattern(
   openPrice?: number | null, 
   lowPrice?: number | null,
-  first15mLow?: number | null
+  first15mLow?: number | null,
+  highPrice?: number | null,
+  closePrice?: number | null
 ): boolean {
   if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
 
   const validLow = (lowPrice !== undefined && lowPrice !== null && lowPrice > 0) ? lowPrice : null;
   const valid15mLow = (first15mLow !== undefined && first15mLow !== null && first15mLow > 0) ? first15mLow : null;
 
+  // At least one valid low reference must be available
   if (validLow === null && valid15mLow === null) return false;
 
-  // Maximum allowed price match tolerance:
-  // 1 NSE tick size (₹0.05) or 0.05% of open price (whichever is larger)
-  const tolerance = Math.max(0.05, openPrice * 0.0005);
+  // Strict NSE tick size tolerance (₹0.05 or microscopic 0.01% for large indices)
+  const tolerance = Math.min(0.05, Math.max(0.01, openPrice * 0.0001));
 
-  // CRITICAL VALIDATION:
-  // If the session low exists and dropped below openPrice by more than tolerance,
-  // then price broke below open, so Open is NO LONGER Low!
+  // 1. HARD REJECTION: If session low dropped below open, Open is NOT Low!
   if (validLow !== null && validLow < openPrice - tolerance) {
     return false;
   }
 
-  // Check if open price matches 15m candle low or session low
+  // 2. HARD REJECTION: If 15m candle low dropped below open, 15m Open is NOT Low!
+  if (valid15mLow !== null && valid15mLow < openPrice - tolerance) {
+    return false;
+  }
+
+  // 3. HARD REJECTION: If current price / close is provided and is trading below open, pattern is broken!
+  if (closePrice !== undefined && closePrice !== null && closePrice > 0 && closePrice < openPrice - tolerance) {
+    return false;
+  }
+
+  // 4. Check for exact match (within NSE 1-tick tolerance or identical rounded 2 decimals)
   const matches15m = valid15mLow !== null && (
     Math.abs(openPrice - valid15mLow) <= tolerance ||
     Math.round(openPrice * 100) === Math.round(valid15mLow * 100)
@@ -161,38 +184,70 @@ export function isOpenLowPattern(
     Math.round(openPrice * 100) === Math.round(validLow * 100)
   );
 
-  return matches15m || matchesSessionLow;
+  if (!matches15m && !matchesSessionLow) {
+    return false;
+  }
+
+  // 5. Inactive / Flat Quote Protection: If high is provided and high == low == open, it's not a real trading move
+  if (highPrice !== undefined && highPrice !== null && highPrice > 0) {
+    if (highPrice < openPrice - tolerance) return false;
+  }
+
+  return true;
 }
 
 /**
  * Checks if Open equals High strictly & accurately (where opening price == high price).
- * Accounts for 15-min candle high, session high, NSE tick size (₹0.05), and 0.05% tolerance.
- * Ensures the session high has not rallied above the open price.
+ * 
+ * Strict Professional Criteria:
+ * 1. Open and High prices must be valid positive numbers (> 0).
+ * 2. Strict NSE Tick Tolerance:
+ *    - Standard equities on NSE trade in ₹0.05 increments.
+ *    - Tolerance is capped at max ₹0.05 (or 0.01% for high-value contracts), never allowing arbitrary points.
+ * 3. NO UPWARD BREACH (0% Breach Rule):
+ *    - If session high (`highPrice`) exists and rose above `openPrice + tolerance`, price broke above open -> Immediately return FALSE!
+ *    - If 15m candle high (`first15mHigh`) exists and rose above `openPrice + tolerance`, price broke above 15m open -> Immediately return FALSE!
+ * 4. Strict Match Check:
+ *    - Either session high matches open price: Math.abs(openPrice - highPrice) <= tolerance || Math.round(openPrice * 100) === Math.round(highPrice * 100)
+ *    - OR 15m candle high matches open price: first15mHigh matches open (and session high has not breached above open).
+ * 5. Intraday Bearish Action / Non-Flat Check:
+ *    - If closePrice / CMP is provided: closePrice must be <= openPrice + tolerance (cannot be green / trading in profit).
+ *    - If lowPrice is provided: lowPrice must be <= openPrice (cannot be dead / unquoted).
  */
 export function isOpenHighPattern(
   openPrice?: number | null, 
   highPrice?: number | null,
-  first15mHigh?: number | null
+  first15mHigh?: number | null,
+  lowPrice?: number | null,
+  closePrice?: number | null
 ): boolean {
   if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
 
   const validHigh = (highPrice !== undefined && highPrice !== null && highPrice > 0) ? highPrice : null;
   const valid15mHigh = (first15mHigh !== undefined && first15mHigh !== null && first15mHigh > 0) ? first15mHigh : null;
 
+  // At least one valid high reference must be available
   if (validHigh === null && valid15mHigh === null) return false;
 
-  // Maximum allowed price match tolerance:
-  // 1 NSE tick size (₹0.05) or 0.05% of open price (whichever is larger)
-  const tolerance = Math.max(0.05, openPrice * 0.0005);
+  // Strict NSE tick size tolerance (₹0.05 or microscopic 0.01% for large indices)
+  const tolerance = Math.min(0.05, Math.max(0.01, openPrice * 0.0001));
 
-  // CRITICAL VALIDATION:
-  // If the session high exists and rallied above openPrice by more than tolerance,
-  // then price broke above open, so Open is NO LONGER High!
+  // 1. HARD REJECTION: If session high rallied above open, Open is NOT High!
   if (validHigh !== null && validHigh > openPrice + tolerance) {
     return false;
   }
 
-  // Check if open price matches 15m candle high or session high
+  // 2. HARD REJECTION: If 15m candle high rallied above open, 15m Open is NOT High!
+  if (valid15mHigh !== null && valid15mHigh > openPrice + tolerance) {
+    return false;
+  }
+
+  // 3. HARD REJECTION: If current price / close is provided and is trading above open, pattern is broken!
+  if (closePrice !== undefined && closePrice !== null && closePrice > 0 && closePrice > openPrice + tolerance) {
+    return false;
+  }
+
+  // 4. Check for exact match (within NSE 1-tick tolerance or identical rounded 2 decimals)
   const matches15m = valid15mHigh !== null && (
     Math.abs(openPrice - valid15mHigh) <= tolerance ||
     Math.round(openPrice * 100) === Math.round(valid15mHigh * 100)
@@ -203,7 +258,16 @@ export function isOpenHighPattern(
     Math.round(openPrice * 100) === Math.round(validHigh * 100)
   );
 
-  return matches15m || matchesSessionHigh;
+  if (!matches15m && !matchesSessionHigh) {
+    return false;
+  }
+
+  // 5. Inactive / Flat Quote Protection: If low is provided and low == high == open, it's not a real trading move
+  if (lowPrice !== undefined && lowPrice !== null && lowPrice > 0) {
+    if (lowPrice > openPrice + tolerance) return false;
+  }
+
+  return true;
 }
 
 /**
@@ -221,7 +285,7 @@ export function isHighClosePattern(
   if (closePrice === undefined || closePrice === null || closePrice <= 0) return false;
 
   // Bullish / Green candle check: Close must be >= Open (if open provided)
-  if (openPrice !== undefined && openPrice !== null && openPrice > 0 && closePrice < openPrice) {
+  if (openPrice !== undefined && openPrice !== null && openPrice > 0 && closePrice < openPrice - 0.05) {
     return false;
   }
 
@@ -230,11 +294,10 @@ export function isHighClosePattern(
 
   if (validHigh === null && valid15mHigh === null) return false;
 
-  // Maximum allowed price match tolerance:
-  // 1 NSE tick size (₹0.05) or 0.05% of close price (whichever is larger)
-  const tolerance = Math.max(0.05, closePrice * 0.0005);
+  // Strict NSE tick size tolerance (₹0.05)
+  const tolerance = Math.min(0.05, Math.max(0.01, closePrice * 0.0001));
 
-  // High should not have spiked far above close (i.e. close must be at or near high)
+  // High should not have spiked far above close (i.e. close must be at or near session peak)
   if (validHigh !== null && validHigh > closePrice + tolerance) {
     return false;
   }
@@ -413,8 +476,8 @@ export function calculateGann15Min(
   const pctChange = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
 
   // Pattern detection: Open = Low, Open = High, High = Close (Strict Exact Match)
-  const isOpenEqualLow = isOpenLowPattern(openPrice, lowPrice, first15mLow);
-  const isOpenEqualHigh = isOpenHighPattern(openPrice, highPrice, first15mHigh);
+  const isOpenEqualLow = isOpenLowPattern(openPrice, lowPrice, first15mLow, highPrice, closePrice);
+  const isOpenEqualHigh = isOpenHighPattern(openPrice, highPrice, first15mHigh, lowPrice, closePrice);
   const isHighEqualClose = isHighClosePattern(closePrice, highPrice, first15mHigh, openPrice);
 
   const openLowDiffPct = openPrice > 0 && lowPrice && lowPrice > 0

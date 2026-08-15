@@ -51,10 +51,10 @@ export function evaluateStockTradeJourney(
   if (!cmp || cmp <= 0) return null;
 
   const isOpenLow = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-    ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
+    ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow, stock.highPrice, stock.closePrice)
     : false;
   const isOpenHigh = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-    ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)
+    ? isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh, stock.lowPrice, stock.closePrice)
     : false;
   const comboAnalysis = analyzeBullishCombinations(stock);
 

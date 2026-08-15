@@ -59,8 +59,8 @@ export function generateIntradayRsiTimeline(stock: StockCalculated): RsiIntraday
 
   const activeTimes = times.slice(0, intervalCount);
 
-  const isOL = isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow);
-  const isOH = isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh);
+  const isOL = isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow, stock.highPrice, stock.closePrice);
+  const isOH = isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh, stock.lowPrice, stock.closePrice);
 
   let baseStartRsi = 50;
   if (isOL) {

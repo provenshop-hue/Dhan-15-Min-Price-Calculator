@@ -44,14 +44,14 @@ export function isIndexAsset(stock: StockCalculated | { symbol?: string; company
 
 export function checkStockOpenLow(stock: StockCalculated): boolean {
   if (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0) {
-    return isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow);
+    return isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow, stock.highPrice, stock.closePrice);
   }
   return false;
 }
 
 export function checkStockOpenHigh(stock: StockCalculated): boolean {
   if (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0) {
-    return isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh);
+    return isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh, stock.lowPrice, stock.closePrice);
   }
   return false;
 }
@@ -1621,13 +1621,13 @@ export function calculateSignalSuccessMetrics(
     signalName = 'Bearish Rally Confluence';
     firstShownTime = bearTime;
     firstShownPrice = analysisPartial.intradayConfluence.bearishEntryPoint || analysisPartial.idealEntry;
-  } else if (isOpenLowPattern(open, stock.lowPrice || open, stock.first15mLow)) {
+  } else if (isOpenLowPattern(open, stock.lowPrice || open, stock.first15mLow, stock.highPrice || open, stock.closePrice || open)) {
     hasSignal = true;
     signalType = 'BULLISH';
     signalName = 'Open = Low (Bullish)';
     firstShownTime = '09:15 AM';
     firstShownPrice = open;
-  } else if (isOpenHighPattern(open, stock.highPrice || open, stock.first15mHigh)) {
+  } else if (isOpenHighPattern(open, stock.highPrice || open, stock.first15mHigh, stock.lowPrice || open, stock.closePrice || open)) {
     hasSignal = true;
     signalType = 'BEARISH';
     signalName = 'Open = High (Bearish)';

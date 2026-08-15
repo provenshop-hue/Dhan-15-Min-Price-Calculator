@@ -16,19 +16,19 @@ export const NotificationScroller: React.FC<NotificationScrollerProps> = ({
 }) => {
 
   // 1. Find NIFTY, BANKNIFTY, and SENSEX stocks
-  const niftyStock = stocks.find((s) => s.symbol === 'NIFTY' || s.symbol === 'NIFTY 50' || s.symbol.includes('NIFTY'));
-  const bankNiftyStock = stocks.find((s) => s.symbol === 'BANKNIFTY' || s.symbol === 'BANK NIFTY' || s.symbol.includes('BANKNIFTY'));
-  const sensexStock = stocks.find((s) => s.symbol === 'SENSEX' || s.symbol === 'BSE SENSEX' || s.symbol.includes('SENSEX'));
+  const niftyStock = stocks.find((s) => s.symbol === 'NIFTY' || s.symbol === 'NIFTY 50' || s.symbol === 'NIFTY50');
+  const bankNiftyStock = stocks.find((s) => s.symbol === 'BANKNIFTY' || s.symbol === 'BANK NIFTY' || s.symbol === 'NIFTY BANK');
+  const sensexStock = stocks.find((s) => s.symbol === 'SENSEX' || s.symbol === 'BSE SENSEX' || s.symbol === 'BSESENSEX');
 
   // Helper check for Open=Low and Open=High
   const checkOpenLow = (s?: StockCalculated | null) => {
     if (!s || s.openPrice === undefined || s.openPrice === null || s.openPrice <= 0) return false;
-    return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow);
+    return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow, s.highPrice, s.closePrice);
   };
 
   const checkOpenHigh = (s?: StockCalculated | null) => {
     if (!s || s.openPrice === undefined || s.openPrice === null || s.openPrice <= 0) return false;
-    return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh);
+    return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh, s.lowPrice, s.closePrice);
   };
 
   const niftyOpenLow = checkOpenLow(niftyStock);
