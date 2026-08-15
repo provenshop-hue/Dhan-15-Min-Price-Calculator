@@ -207,21 +207,25 @@ export function evaluateBtstPrediction(
   /* =========================================================
      DECISION: STRICT GAP UP vs GAP DOWN FILTERING
      ========================================================= */
-  const MIN_BTST_SCORE = 72; // Only high conviction
+  const MIN_BTST_SCORE = 58; // Confirmed conviction threshold
   let predictedDirection: BtstGapDirection | null = null;
   let finalScore = 0;
   let activeRules: BtstConfluenceRule[] = [];
 
-  if (bullScore >= MIN_BTST_SCORE && bullScore > bearScore + 18 && closeToHighPct >= 72) {
+  // Strong Bullish or Bearish divergence
+  const isBullCandidate = bullScore >= MIN_BTST_SCORE && bullScore > bearScore + 8 && (closeToHighPct >= 55 || cmp > vwap || (stock.trend && stock.trend.includes('Bullish')));
+  const isBearCandidate = bearScore >= MIN_BTST_SCORE && bearScore > bullScore + 8 && (closeToLowPct >= 55 || cmp < vwap || (stock.trend && stock.trend.includes('Bearish')));
+
+  if (isBullCandidate && (!isBearCandidate || bullScore > bearScore)) {
     predictedDirection = 'GAP_UP';
-    finalScore = Math.min(98, Math.max(74, Math.round(bullScore * 0.72)));
+    finalScore = Math.min(98, Math.max(72, Math.round(bullScore * 0.76)));
     activeRules = bullishRules;
-  } else if (bearScore >= MIN_BTST_SCORE && bearScore > bullScore + 18 && closeToLowPct >= 72) {
+  } else if (isBearCandidate) {
     predictedDirection = 'GAP_DOWN';
-    finalScore = Math.min(98, Math.max(74, Math.round(bearScore * 0.72)));
+    finalScore = Math.min(98, Math.max(72, Math.round(bearScore * 0.76)));
     activeRules = bearishRules;
   } else {
-    // Neutral or indecisive: EXCLUDE from display as requested
+    // Range-bound or indeterminate chop: EXCLUDE
     return null;
   }
 
