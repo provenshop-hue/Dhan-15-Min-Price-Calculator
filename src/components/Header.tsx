@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -261,16 +261,30 @@ export const Header: React.FC<HeaderProps> = ({
 
             <button
               onClick={() => onChangeDashboardTab('rsi_pullback')}
-              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeDashboardTab === 'rsi_pullback'
                   ? 'bg-blue-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
             >
               <span className="flex items-center gap-1">
-                <span>📉 RSI Pullback Dashboard</span>
-                <span className="bg-emerald-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">
-                  NEW
+                <span>📉 RSI Pullback</span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => onChangeDashboardTab('btst')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'btst'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-indigo-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                <span>🌙 BTST Gap Predictor</span>
+                <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  AI BTST
                 </span>
               </span>
             </button>

@@ -4,6 +4,7 @@ import { StockCalculated, StockTradeJourney } from '../types';
 import { getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern } from '../utils/gann';
 import { evaluateStockTradeJourney } from '../utils/tradeTracker';
 import { evaluateIdealOptionTrade } from '../utils/idealTradeAnalyzer';
+import { evaluateBtstPrediction } from '../utils/btstPredictor';
 import { formatStrikePrice } from '../utils/nseStrikeMaster';
 
 interface StockDetailModalProps {
@@ -32,6 +33,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
 
   // Compute or use passed tradeJourney
   const journey = tradeJourney || evaluateStockTradeJourney(stock);
+  const btstPrediction = evaluateBtstPrediction(stock);
 
   const isOpenLow = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
     ? isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)
@@ -224,6 +226,78 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* BTST & STBT Gap Prediction Ribbon */}
+        {btstPrediction && (
+          <div
+            className={`mt-4 p-4 rounded-2xl border shadow-sm ${
+              btstPrediction.predictedDirection === 'GAP_UP'
+                ? 'bg-emerald-950/90 text-white border-emerald-500/40'
+                : 'bg-rose-950/90 text-white border-rose-500/40'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`p-1.5 rounded-lg ${
+                    btstPrediction.predictedDirection === 'GAP_UP'
+                      ? 'bg-emerald-500/20 text-emerald-300'
+                      : 'bg-rose-500/20 text-rose-300'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                </span>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                    <span>🌙 BTST Gap Prediction</span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                        btstPrediction.predictedDirection === 'GAP_UP'
+                          ? 'bg-emerald-500 text-slate-950'
+                          : 'bg-rose-500 text-white'
+                      }`}
+                    >
+                      {btstPrediction.predictedDirection === 'GAP_UP' ? '🚀 GAP UP EXPECTED' : '🔻 GAP DOWN EXPECTED'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-300 mt-0.5">
+                    Expected Gap: <strong className="text-white">{btstPrediction.expectedGapPctMin}% to {btstPrediction.expectedGapPctMax}%</strong> • AI Conviction: <strong className="text-amber-400">{btstPrediction.convictionScore}%</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <div className="text-[10px] text-slate-300">Recommended Contract</div>
+                <div className="text-xs font-bold font-mono text-amber-300">
+                  {btstPrediction.optionsStrategy.recommendedContract}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 text-center text-xs">
+              <div className="bg-black/30 p-2 rounded-lg">
+                <span className="text-[9.5px] text-slate-400 block">Entry Window</span>
+                <strong className="text-white text-[11px]">3:15 – 3:28 PM</strong>
+              </div>
+              <div className="bg-black/30 p-2 rounded-lg">
+                <span className="text-[9.5px] text-slate-400 block">Morning Target Open</span>
+                <strong className="text-emerald-300 text-xs">₹{btstPrediction.cashStrategy.targetOpenPrice.toFixed(2)}</strong>
+              </div>
+              <div className="bg-black/30 p-2 rounded-lg">
+                <span className="text-[9.5px] text-slate-400 block">Overnight SL</span>
+                <strong className="text-rose-300 text-xs">₹{btstPrediction.cashStrategy.overnightStopLoss.toFixed(2)}</strong>
+              </div>
+              <div className="bg-black/30 p-2 rounded-lg">
+                <span className="text-[9.5px] text-slate-400 block">Est. Profit / Lot</span>
+                <strong className="text-emerald-300 text-xs">+₹{btstPrediction.optionsStrategy.estProfitPerLot.toLocaleString('en-IN')}</strong>
+              </div>
+            </div>
+
+            <div className="mt-3 p-2.5 bg-black/40 rounded-xl border border-white/10 text-xs text-slate-200">
+              <span className="text-amber-300 font-bold">Thesis:</span> {btstPrediction.aiThesis}
+            </div>
           </div>
         )}
 

@@ -1037,7 +1037,14 @@ export function createExpressApp() {
       // Try Gemini API if process.env.GEMINI_API_KEY is defined and cooloff has expired
       if (process.env.GEMINI_API_KEY && Date.now() > geminiCoolOffUntil) {
         try {
-          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+          const ai = new GoogleGenAI({
+            apiKey: process.env.GEMINI_API_KEY,
+            httpOptions: {
+              headers: {
+                'User-Agent': 'aistudio-build'
+              }
+            }
+          });
           const timelineText = points
             .map((p: any) => `Time: ${p.timeStr}, Price: ₹${p.close}, Volume: ${p.volume || 'N/A'} (${p.volumeDirection || 'N/A'}, ${p.volumeDeltaPct ? (p.volumeDeltaPct > 0 ? '+' : '') + p.volumeDeltaPct + '%' : '0%'}), RSI: ${p.rsi} (${p.rsiDirection})`)
             .join('\n');
@@ -1082,7 +1089,7 @@ Return ONLY a valid JSON object matching this schema:
 `;
 
           const geminiPromise = ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-3.7-flash',
             contents: prompt,
             config: {
               responseMimeType: 'application/json'
@@ -1103,7 +1110,6 @@ Return ONLY a valid JSON object matching this schema:
             };
           }
         } catch (e: any) {
-          // If rate limited, quota exceeded or timed out, cool off for 5 mins to prevent spamming
           geminiCoolOffUntil = Date.now() + 300000;
         }
       }
@@ -1158,6 +1164,95 @@ Return ONLY a valid JSON object matching this schema:
       res.status(500).json({ error: err.message || 'Failed to generate RSI AI report' });
     }
   });
+
+  // API Route: AI BTST Global Market & Multi-Stock Deep Scan
+  apiRouter.post('/ai/btst-deep-scan', async (req, res) => {
+    try {
+      const { candidates } = req.body; // Array of top candidate stock metrics
+      const list = Array.isArray(candidates) ? candidates.slice(0, 15) : [];
+
+      if (list.length === 0) {
+        return res.status(400).json({ success: false, error: 'No candidate stock data provided for BTST scan' });
+      }
+
+      let aiInsights: Record<string, { headline: string; thesis: string; convictionBoost: number; expectedGapPct: string }> = {};
+
+      if (process.env.GEMINI_API_KEY && Date.now() > geminiCoolOffUntil) {
+        try {
+          const ai = new GoogleGenAI({
+            apiKey: process.env.GEMINI_API_KEY,
+            httpOptions: {
+              headers: {
+                'User-Agent': 'aistudio-build'
+              }
+            }
+          });
+
+          const summaryList = list.map((c: any) =>
+            `- ${c.symbol} (${c.companyName}): CMP ₹${c.cmp}, Day %: ${c.dayChangePct}%, Close-to-High: ${c.closeToHighPct}%, VWAP Delta: ${c.vwapDistancePct}%, RSI: ${c.rsi}, Algo Direction: ${c.predictedDirection}, Open=Low: ${c.isOpenEqualLow ? 'YES' : 'NO'}, Open=High: ${c.isOpenEqualHigh ? 'YES' : 'NO'}`
+          ).join('\n');
+
+          const prompt = `
+You are an expert institutional derivatives and overnight quantitative analyst for Indian equity markets (NSE/BSE, Nifty, Bank Nifty, Sensex, and F&O stocks).
+
+Analyze these closing candidate stocks and indices for BTST (Buy Today, Sell Tomorrow) / STBT (Sell Today, Buy Tomorrow) overnight GAP UP or GAP DOWN predictions:
+
+Candidates:
+${summaryList}
+
+Evaluate institutional holding pressure, closing volume absorption, and opening probability for tomorrow 09:15 AM.
+
+Return ONLY a JSON array of objects with this schema:
+[
+  {
+    "symbol": "SYMBOL",
+    "headline": "Punchy 1-sentence prediction summary",
+    "thesis": "2-3 sentences explaining the exact structural and order flow reason for the predicted gap",
+    "convictionBoost": 0 to 5,
+    "expectedGapPct": "+1.2% to +1.8%" (or negative for Gap Down)
+  }
+]
+`;
+
+          const geminiPromise = ai.models.generateContent({
+            model: 'gemini-3.7-flash',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json'
+            }
+          });
+
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Gemini API timeout')), 14000)
+          );
+
+          const geminiRes: any = await Promise.race([geminiPromise, timeoutPromise]);
+
+          if (geminiRes.text) {
+            const parsed = JSON.parse(geminiRes.text);
+            if (Array.isArray(parsed)) {
+              for (const item of parsed) {
+                if (item.symbol) {
+                  aiInsights[item.symbol] = item;
+                }
+              }
+            }
+          }
+        } catch (e: any) {
+          geminiCoolOffUntil = Date.now() + 300000;
+        }
+      }
+
+      res.json({
+        success: true,
+        aiInsights,
+        generatedAt: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) + ' IST'
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to generate BTST AI scan' });
+    }
+  });
+
 
   // Mount API router on both /api and / (for serverless compatibility)
   app.use('/api', apiRouter);

@@ -273,3 +273,92 @@ export interface IdealOptionTrade {
   lastUpdated: string;
 }
 
+export type BtstGapDirection = 'GAP_UP' | 'GAP_DOWN';
+
+export interface BtstConfluenceRule {
+  id: string;
+  name: string;
+  passed: boolean;
+  score: number;
+  description: string;
+}
+
+export interface BtstPredictionItem {
+  id: string;
+  stockId: string;
+  symbol: string;
+  companyName: string;
+  isIndex: boolean;
+  category: 'INDEX' | 'STOCK';
+  predictedDirection: BtstGapDirection;
+  directionLabel: string;
+  convictionScore: number; // 70 - 99%
+  convictionTier: 'ULTRA_HIGH' | 'VERY_HIGH' | 'HIGH';
+  
+  // Price and Gap Metrics
+  cmp: number;
+  dayOpen: number;
+  dayHigh: number;
+  dayLow: number;
+  dayChangePct: number;
+  closeToHighPct: number; // 0-100% position in day's range
+  closeToLowPct: number;
+  
+  // Gap Estimation
+  expectedGapPctMin: number;
+  expectedGapPctMax: number;
+  expectedGapPointsMin: number;
+  expectedGapPointsMax: number;
+  estimatedOpeningPrice: number;
+  
+  // Indicators
+  vwap?: number | null;
+  vwapDistancePct?: number | null;
+  rsi?: number | null;
+  adx?: number | null;
+  gannBuyAbove?: number | null;
+  gannSellBelow?: number | null;
+  isOpenEqualLow?: boolean;
+  isOpenEqualHigh?: boolean;
+  isHighEqualClose?: boolean;
+  volumeRatio?: number | null;
+  
+  // Strategy Plans
+  cashStrategy: {
+    action: 'BUY (BTST)' | 'SELL (STBT)';
+    entryWindow: string; // e.g., "3:15 PM - 3:28 PM"
+    entryPrice: number;
+    targetOpenPrice: number;
+    overnightStopLoss: number;
+    estimatedGainPct: number;
+    riskPct: number;
+    riskRewardRatio: string;
+  };
+  
+  optionsStrategy: {
+    recommendedContract: string; // e.g. "NIFTY 24600 CE" or "HDFCBANK 1660 CE"
+    optionType: 'CE' | 'PE';
+    strikePrice: number;
+    strikeStep: number;
+    lotSize: number;
+    approxEntryPremium: number;
+    expectedGapOpenPremium: number;
+    optionStopLoss: number;
+    estProfitPerLot: number;
+    estRiskPerLot: number;
+    capitalRequiredPerLot: number;
+    riskRewardRatio: string;
+  };
+  
+  // AI & Quantitative Synthesis
+  aiHeadline: string;
+  aiThesis: string;
+  institutionalFlowVerdict: string;
+  morningExitGuidance: string;
+  confluenceRules: BtstConfluenceRule[];
+  rulesPassedCount: number;
+  rulesTotalCount: number;
+  
+  lastAnalyzedTime: string;
+}
+

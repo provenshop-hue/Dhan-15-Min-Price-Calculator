@@ -6,6 +6,7 @@ import { StockTable } from './components/StockTable';
 import { GannHighlights } from './components/GannHighlights';
 import { RsiPullbackDashboard } from './components/RsiPullbackDashboard';
 import { GannDashboard } from './components/GannDashboard';
+import { BtstPredictionHub } from './components/BtstPredictionHub';
 import { DhanSettingsModal } from './components/DhanSettingsModal';
 import { ManualCalculatorModal } from './components/ManualCalculatorModal';
 import { StockDetailModal } from './components/StockDetailModal';
@@ -204,8 +205,8 @@ export default function App() {
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
 
-  // Active Dashboard View Tab ('gann', 'gann_dashboard', or 'rsi_pullback')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback'>('gann');
+  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', or 'btst')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -1019,7 +1020,7 @@ export default function App() {
             onOpenSettings={() => setIsDhanGateOpen(true)}
             selectedDate={credentials.date}
           />
-        ) : (
+        ) : activeDashboardTab === 'rsi_pullback' ? (
           /* Dedicated RSI Pullback Dashboard */
           <RsiPullbackDashboard
             stocks={stocks}
@@ -1033,6 +1034,14 @@ export default function App() {
             onDateChange={handleDateChange}
             onFetchAll={handleFetchAllDhan}
             isBulkLoading={isBulkLoading}
+          />
+        ) : (
+          /* Dedicated AI BTST & STBT Gap Prediction Hub */
+          <BtstPredictionHub
+            stocks={stocks}
+            onSelectStock={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizing={(s) => handleOpenPositionSizer(s)}
+            isStandaloneView={true}
           />
         )}
 
