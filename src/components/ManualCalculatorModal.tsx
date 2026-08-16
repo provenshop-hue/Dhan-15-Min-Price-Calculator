@@ -87,6 +87,7 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
       lowPrice: numLow,
       openCalc: calc.openCalc,
       closeCalc: calc.closeCalc,
+      totalCalc: calc.totalCalc,
       buyAbove: calc.buyAbove,
       sellBelow: calc.sellBelow,
       targetsUp: calc.targetsUp,
@@ -289,24 +290,34 @@ export const ManualCalculatorModal: React.FC<ManualCalculatorModalProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                <div className="text-[11px] text-slate-500 mb-1">Open Calculation:</div>
-                <div className="text-lg font-mono font-extrabold text-blue-700">
+            <div className="grid grid-cols-3 gap-2.5 mb-4">
+              <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">
+                <div className="text-[10.5px] text-slate-500 mb-0.5">Open Calc:</div>
+                <div className="text-base font-mono font-extrabold text-blue-700">
                   {calc.openCalc.toFixed(4)}
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  ((√{numOpen} × 15) - 15) % 15
+                <div className="text-[9.5px] text-slate-400 font-mono mt-0.5 truncate">
+                  ((√{numOpen}×15)-15)%15
                 </div>
               </div>
 
-              <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs">
-                <div className="text-[11px] text-slate-500 mb-1">Close Calculation:</div>
-                <div className="text-lg font-mono font-extrabold text-blue-700">
+              <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs">
+                <div className="text-[10.5px] text-slate-500 mb-0.5">Close Calc:</div>
+                <div className="text-base font-mono font-extrabold text-blue-700">
                   {calc.closeCalc.toFixed(4)}
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  ((√{numClose} × 15) - 15) % 15
+                <div className="text-[9.5px] text-slate-400 font-mono mt-0.5 truncate">
+                  ((√{numClose}×15)-15)%15
+                </div>
+              </div>
+
+              <div className="bg-indigo-50/80 p-2.5 rounded-lg border border-indigo-200 shadow-2xs">
+                <div className="text-[10.5px] font-bold text-indigo-700 mb-0.5">Total:</div>
+                <div className="text-base font-mono font-black text-indigo-950">
+                  {calc.totalCalc.toFixed(4)}
+                </div>
+                <div className="text-[9.5px] text-indigo-600/80 font-sans font-semibold mt-0.5">
+                  Open + Close
                 </div>
               </div>
             </div>

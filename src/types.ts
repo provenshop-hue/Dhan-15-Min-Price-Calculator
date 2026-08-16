@@ -23,6 +23,7 @@ export interface StockCalculated {
   // Gann Calculated Values
   openCalc?: number | null; // ((sqrt(open) * 15) - 15) % 15
   closeCalc?: number | null; // ((sqrt(close) * 15) - 15) % 15
+  totalCalc?: number | null; // openCalc + closeCalc
   
   // Gann Square of 9 Levels
   buyAbove?: number | null;
@@ -98,6 +99,7 @@ export interface GannCalcResult {
   matchClosePrice: number;
   openCalc: number;
   closeCalc: number;
+  totalCalc: number;
   buyAbove: number;
   sellBelow: number;
   targetsUp: number[];

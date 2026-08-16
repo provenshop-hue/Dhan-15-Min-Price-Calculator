@@ -203,7 +203,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   const itemsPerPage = 25;
 
   // Sorting
-  const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'companyName' | 'volume' | 'pctChange'>('symbol');
+  const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'totalCalc' | 'companyName' | 'volume' | 'pctChange'>('symbol');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Helper check for O=L / O=H with strict exact match
@@ -420,6 +420,19 @@ export const StockTable: React.FC<StockTableProps> = ({
     let aVal: any = a[sortField];
     let bVal: any = b[sortField];
 
+    if (sortField === 'totalCalc') {
+      aVal = (a.totalCalc !== undefined && a.totalCalc !== null)
+        ? a.totalCalc
+        : (a.openCalc !== undefined && a.openCalc !== null && a.closeCalc !== undefined && a.closeCalc !== null)
+        ? (a.openCalc + a.closeCalc)
+        : null;
+      bVal = (b.totalCalc !== undefined && b.totalCalc !== null)
+        ? b.totalCalc
+        : (b.openCalc !== undefined && b.openCalc !== null && b.closeCalc !== undefined && b.closeCalc !== null)
+        ? (b.openCalc + b.closeCalc)
+        : null;
+    }
+
     if (aVal === undefined || aVal === null) aVal = -999999;
     if (bVal === undefined || bVal === null) bVal = -999999;
 
@@ -436,7 +449,7 @@ export const StockTable: React.FC<StockTableProps> = ({
     currentPage * itemsPerPage
   );
 
-  const toggleSort = (field: 'symbol' | 'openCalc' | 'closeCalc' | 'companyName' | 'volume') => {
+  const toggleSort = (field: 'symbol' | 'openCalc' | 'closeCalc' | 'totalCalc' | 'companyName' | 'volume') => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -1059,6 +1072,15 @@ export const StockTable: React.FC<StockTableProps> = ({
                   Close Calc <ArrowUpDown className="w-3 h-3" />
                 </button>
               </th>
+              <th className="py-3 px-3 text-right">
+                <button
+                  onClick={() => toggleSort('totalCalc')}
+                  className="flex items-center justify-end gap-1 hover:text-indigo-900 transition-colors text-indigo-700 font-black"
+                  title="Total = Gann Open Calc + Gann Close Calc"
+                >
+                  Total <ArrowUpDown className="w-3 h-3" />
+                </button>
+              </th>
               <th className="py-3 px-3 text-center bg-purple-50/80 text-purple-900 font-extrabold border-x border-purple-200/80">
                 ATM Option Strikes (CE & PE)
               </th>
@@ -1069,7 +1091,7 @@ export const StockTable: React.FC<StockTableProps> = ({
           <tbody className="divide-y divide-slate-100 text-slate-800">
             {paginatedStocks.length === 0 ? (
               <tr>
-                <td colSpan={11} className="text-center py-12 text-slate-400">
+                <td colSpan={12} className="text-center py-12 text-slate-400">
                   No stocks match the selected search or filter criteria.
                 </td>
               </tr>
@@ -1264,6 +1286,27 @@ export const StockTable: React.FC<StockTableProps> = ({
                         <span className="text-slate-400 font-normal text-xs">-</span>
                       )}
                     </td>
+
+                    {/* Total (Open Calc + Close Calc) Output */}
+                    {(() => {
+                      const total = (stock.totalCalc !== undefined && stock.totalCalc !== null)
+                        ? stock.totalCalc
+                        : (stock.openCalc !== undefined && stock.openCalc !== null && stock.closeCalc !== undefined && stock.closeCalc !== null)
+                        ? (stock.openCalc + stock.closeCalc)
+                        : null;
+                      return (
+                        <td className="py-2.5 px-3 text-right font-mono font-black text-sm bg-indigo-50/70 text-indigo-900 border-x border-indigo-100/80">
+                          {total !== null ? (
+                            <div className="flex flex-col items-end justify-center" title={`Total = Open Calc (${stock.openCalc?.toFixed(4)}) + Close Calc (${stock.closeCalc?.toFixed(4)})`}>
+                              <span className="text-indigo-950 font-black tracking-tight">{total.toFixed(4)}</span>
+                              <span className="text-[9.5px] font-sans text-indigo-600/80 font-semibold">Open + Close</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 font-normal text-xs">-</span>
+                          )}
+                        </td>
+                      );
+                    })()}
 
                     {/* ATM CE & PE Strike Prices */}
                     {(() => {

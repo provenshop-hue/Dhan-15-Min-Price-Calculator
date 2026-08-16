@@ -376,6 +376,7 @@ export function calculateGann15Min(
   // Handle modulo safely
   const openCalc = ((rawOpenCalc % 15) + 15) % 15;
   const closeCalc = ((rawCloseCalc % 15) + 15) % 15;
+  const totalCalc = openCalc + closeCalc;
 
   // Gann Square of 9 levels based on the 15-min Candle open price
   const basePrice = openPrice > 0 ? openPrice : closePrice;
@@ -484,6 +485,7 @@ export function calculateGann15Min(
     matchClosePrice: closePrice,
     openCalc,
     closeCalc,
+    totalCalc,
     buyAbove,
     sellBelow,
     targetsUp,

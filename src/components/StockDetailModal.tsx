@@ -316,7 +316,7 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center mb-4">
             <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
               <div className="text-[10px] text-slate-500 uppercase font-semibold">15-Min Open</div>
               <div className="text-xs font-mono font-bold text-slate-900 mt-0.5">
@@ -356,6 +356,20 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
               <div className="text-[10px] text-blue-700 font-bold uppercase">Close Calc</div>
               <div className="text-xs font-mono font-extrabold text-blue-700 mt-0.5">
                 {stock.closeCalc !== undefined && stock.closeCalc !== null ? stock.closeCalc.toFixed(4) : 'N/A'}
+              </div>
+            </div>
+
+            <div className="bg-indigo-50/90 p-2 rounded-lg border border-indigo-200">
+              <div className="text-[10px] text-indigo-700 font-black uppercase">Total Calc</div>
+              <div className="text-xs font-mono font-black text-indigo-950 mt-0.5">
+                {(() => {
+                  const tot = (stock.totalCalc !== undefined && stock.totalCalc !== null)
+                    ? stock.totalCalc
+                    : (stock.openCalc !== undefined && stock.openCalc !== null && stock.closeCalc !== undefined && stock.closeCalc !== null)
+                    ? stock.openCalc + stock.closeCalc
+                    : null;
+                  return tot !== null ? tot.toFixed(4) : 'N/A';
+                })()}
               </div>
             </div>
 

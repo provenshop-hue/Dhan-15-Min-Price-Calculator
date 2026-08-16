@@ -37,7 +37,7 @@ export const GannFormulaCard: React.FC = () => {
       </div>
 
       {/* Formula Detail Cards */}
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Open Price Formula Box */}
         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
           <div className="text-xs font-semibold text-blue-700 mb-1 flex items-center justify-between">
@@ -57,6 +57,17 @@ export const GannFormulaCard: React.FC = () => {
           </div>
           <code className="block bg-white text-slate-900 p-2 rounded text-xs font-mono border border-slate-200 overflow-x-auto shadow-2xs">
             ((Math.sqrt(matchClosePrice) * 15) - 15) % 15
+          </code>
+        </div>
+
+        {/* Total Formula Box */}
+        <div className="bg-indigo-50/70 p-3 rounded-lg border border-indigo-200/80">
+          <div className="text-xs font-bold text-indigo-800 mb-1 flex items-center justify-between">
+            <span>Total Calculation</span>
+            <span className="text-[10px] text-indigo-600 font-mono">Total</span>
+          </div>
+          <code className="block bg-white text-indigo-950 p-2 rounded text-xs font-mono border border-indigo-200 overflow-x-auto shadow-2xs">
+            openCalc + closeCalc
           </code>
         </div>
       </div>
@@ -90,7 +101,7 @@ export const GannFormulaCard: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 text-center">
             <div className="bg-white p-2.5 rounded border border-slate-200 shadow-2xs">
               <div className="text-[11px] text-slate-500">Open Price</div>
               <div className="text-sm font-mono font-bold text-slate-900">₹{testOpen.toFixed(2)}</div>
@@ -106,6 +117,10 @@ export const GannFormulaCard: React.FC = () => {
             <div className="bg-blue-50/60 p-2.5 rounded border border-blue-200/80">
               <div className="text-[11px] text-blue-700 font-medium">Close Calc Output</div>
               <div className="text-sm font-mono font-bold text-blue-700">{calc.closeCalc.toFixed(4)}</div>
+            </div>
+            <div className="bg-indigo-50/90 p-2.5 rounded border border-indigo-200/90">
+              <div className="text-[11px] text-indigo-700 font-bold">Total (Open + Close)</div>
+              <div className="text-sm font-mono font-black text-indigo-950">{calc.totalCalc.toFixed(4)}</div>
             </div>
           </div>
 
