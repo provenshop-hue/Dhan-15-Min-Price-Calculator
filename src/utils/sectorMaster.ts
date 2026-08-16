@@ -541,3 +541,27 @@ export function evaluateStockSectorConfluence(
     };
   }
 }
+
+/**
+ * Convenient helper to evaluate sector strength directly from a stock symbol and stock array
+ */
+export function evaluateStockSectorStrength(
+  symbol: string,
+  allStocks: StockCalculated[],
+  direction: 'BULLISH' | 'BEARISH' = 'BULLISH'
+): StockSectorAnalysis {
+  const targetStock = allStocks.find((s) => s.symbol.toUpperCase() === symbol.toUpperCase()) || ({
+    id: symbol,
+    symbol,
+    companyName: symbol,
+    lotSizeJun2026: 500,
+    lotSizeJul2026: 500,
+    lotSizeAug2026: 500,
+    screenerUrl: ''
+  } as StockCalculated);
+
+  const metricsMap = computeAllSectorStrengths(allStocks);
+
+  return evaluateStockSectorConfluence(targetStock, direction, metricsMap);
+}
+

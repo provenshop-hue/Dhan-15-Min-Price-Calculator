@@ -5,6 +5,7 @@ import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenL
 import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
 import { analyzeBullishCombinations } from '../utils/bullishCombinations';
 import { evaluateStockTradeJourney } from '../utils/tradeTracker';
+import { evaluateStockSectorStrength } from '../utils/sectorMaster';
 
 export interface RecipeOption15m {
   id: string;
@@ -41,6 +42,8 @@ export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
   { id: 'OPEN_GREATER_10_CLOSE_LESS_3', label: '⚡ Open Calc > 10 & Close Calc < 3', category: 'Gann & Range Calculations', description: 'Gann Open Calc > 10 AND Gann Close Calc < 3' },
 
   // Trend & Market Sentiment
+  { id: 'SECTOR_ENTER', label: '🛡️ Sector ENTER (High Confluence)', category: 'Trend & Market Sentiment', description: 'Stock aligns with strong parent sector breadth & momentum' },
+  { id: 'SECTOR_AVOID', label: '⚠️ Sector AVOID (Sector Conflict)', category: 'Trend & Market Sentiment', description: 'Stock movement opposes prevailing parent industry trend' },
   { id: 'BULLISH_COMBO_1', label: '🔥 Combo 1: 9/20/50 EMA Stack', category: 'Trend & Market Sentiment', description: '9 EMA > 20 EMA > 50 EMA, Price above all, EMAs rising & Pullback respects 9/20 EMA' },
   { id: 'BULLISH_COMBO_2', label: '🚀 Combo 2: RSI 55-70 Higher Highs', category: 'Trend & Market Sentiment', description: 'RSI 55–70, Price higher highs & RSI higher highs' },
   { id: 'BULLISH_COMBO_3', label: '⚡ Combo 3: MACD Crossover & Zero Line', category: 'Trend & Market Sentiment', description: 'MACD bullish crossover, MACD > 0, Histogram increasing & Price > 20/50 EMA' },
@@ -59,6 +62,13 @@ export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
 ];
 
 export const PRESET_RECIPES_15M: PresetRecipe15m[] = [
+  {
+    id: 'SECTOR_POWER_BULL',
+    name: '🛡️ Sector-Aligned Bull Power',
+    description: 'Sector ENTER + Bullish + Above 15m High',
+    optionKeys: ['SECTOR_ENTER', 'BULLISH', 'ABOVE_15M_HIGH'],
+    badge: 'High Confluence'
+  },
   {
     id: 'ULTRA_15M_BULL',
     name: '⚡ Ultra 15m Bullish Breakout',
@@ -269,6 +279,14 @@ export const StockTable: React.FC<StockTableProps> = ({
         return isOpenCalcLessThan3AndCloseGreaterThan10(s);
       case 'OPEN_GREATER_10_CLOSE_LESS_3':
         return isOpenCalcGreaterThan10AndCloseLessThan3(s);
+      case 'SECTOR_ENTER': {
+        const direction = (s.trend === 'Very Bullish' || s.trend === 'Bullish' || isStockOpenEqualLow(s) || (s.pctChange || 0) >= 0) ? 'BULLISH' : 'BEARISH';
+        return evaluateStockSectorStrength(s.symbol, stocks, direction).tradeVerdict === 'ENTER';
+      }
+      case 'SECTOR_AVOID': {
+        const direction = (s.trend === 'Very Bullish' || s.trend === 'Bullish' || isStockOpenEqualLow(s) || (s.pctChange || 0) >= 0) ? 'BULLISH' : 'BEARISH';
+        return evaluateStockSectorStrength(s.symbol, stocks, direction).tradeVerdict === 'AVOID';
+      }
       case 'BULLISH_COMBO_1':
         return analyzeBullishCombinations(s).combo1.isMatch;
       case 'BULLISH_COMBO_2':
@@ -1453,6 +1471,41 @@ export const StockTable: React.FC<StockTableProps> = ({
                         ) : (
                           !isStockOpenEqualLow(stock) && !isStockOpenEqualHigh(stock) && <span className="text-slate-400">-</span>
                         )}
+
+                        {/* Live Sector Strength & Confidence Confluence Indicator */}
+                        {(() => {
+                          const direction = (stock.trend === 'Very Bullish' || stock.trend === 'Bullish' || isStockOpenEqualLow(stock) || (stock.pctChange || 0) >= 0) ? 'BULLISH' : 'BEARISH';
+                          const sec = evaluateStockSectorStrength(stock.symbol, stocks, direction);
+                          const isGreenSector = sec.sectorAvgPct >= 0;
+
+                          return (
+                            <div 
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9.5px] font-bold border transition-all shadow-2xs ${
+                                sec.tradeVerdict === 'ENTER'
+                                  ? 'bg-emerald-950 text-emerald-300 border-emerald-500/80 ring-1 ring-emerald-500/30'
+                                  : sec.tradeVerdict === 'AVOID'
+                                  ? 'bg-rose-950 text-rose-300 border-rose-500/80'
+                                  : 'bg-slate-900 text-amber-300 border-slate-700'
+                              }`}
+                              title={`Sector: ${sec.sectorName} (${sec.categoryIcon}) | Sector Avg: ${isGreenSector ? '+' : ''}${sec.sectorAvgPct.toFixed(2)}% | Advancing: ${sec.sectorBullishBreadthPct}% | Verdict: ${sec.verdictLabel}\n${sec.verdictDescription}`}
+                            >
+                              <span className="text-[10px]">{sec.categoryIcon}</span>
+                              <span className="font-extrabold truncate max-w-[85px]">{sec.sectorName}</span>
+                              <span className={`font-mono font-black ${isGreenSector ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {isGreenSector ? '+' : ''}{sec.sectorAvgPct.toFixed(1)}%
+                              </span>
+                              <span className={`text-[8.5px] px-1 rounded font-black uppercase ${
+                                sec.tradeVerdict === 'ENTER'
+                                  ? 'bg-emerald-500 text-slate-950'
+                                  : sec.tradeVerdict === 'AVOID'
+                                  ? 'bg-rose-500 text-white'
+                                  : 'bg-amber-400 text-slate-950'
+                              }`}>
+                                {sec.tradeVerdict}
+                              </span>
+                            </div>
+                          );
+                        })()}
 
                         {stock.rsi !== undefined && stock.rsi !== null && (
                           <span className={`text-[10px] font-black px-2 py-0.2 rounded border ${

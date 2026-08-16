@@ -6,17 +6,19 @@ import { evaluateStockTradeJourney } from '../utils/tradeTracker';
 import { evaluateIdealOptionTrade } from '../utils/idealTradeAnalyzer';
 import { evaluateBtstPrediction } from '../utils/btstPredictor';
 import { formatStrikePrice } from '../utils/nseStrikeMaster';
+import { evaluateStockSectorStrength } from '../utils/sectorMaster';
 import { StockTimingHistoryAnalysis } from './StockTimingHistoryAnalysis';
 
 interface StockDetailModalProps {
   stock: StockCalculated | null;
+  allStocks?: StockCalculated[];
   tradeJourney?: StockTradeJourney | null;
   onClose: () => void;
   onOpenPositionSizer?: (stock?: StockCalculated) => void;
   onOpenRsiAnalyst?: (stock: StockCalculated) => void;
 }
 
-export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, tradeJourney, onClose, onOpenPositionSizer, onOpenRsiAnalyst }) => {
+export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, allStocks = [], tradeJourney, onClose, onOpenPositionSizer, onOpenRsiAnalyst }) => {
   const [selectedLotMonth, setSelectedLotMonth] = useState<'Jun' | 'Jul' | 'Aug'>('Jun');
 
   if (!stock) return null;
@@ -119,6 +121,90 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, trade
             </div>
           </div>
         )}
+
+        {/* 🛡️ Real-Time Sector Strength & Institutional Confluence Indicator */}
+        {(() => {
+          const pool = allStocks.length > 0 ? allStocks : [stock];
+          const direction = (stock.trend === 'Very Bullish' || stock.trend === 'Bullish' || isOpenLow || (stock.pctChange || 0) >= 0) ? 'BULLISH' : 'BEARISH';
+          const sec = evaluateStockSectorStrength(stock.symbol, pool, direction);
+          const isGreen = sec.sectorAvgPct >= 0;
+
+          return (
+            <div className={`mt-4 p-4 rounded-2xl border transition-all shadow-md ${
+              sec.tradeVerdict === 'ENTER'
+                ? 'bg-gradient-to-r from-slate-900 via-emerald-950/90 to-slate-900 border-emerald-500/50 text-white'
+                : sec.tradeVerdict === 'AVOID'
+                ? 'bg-gradient-to-r from-slate-900 via-rose-950/90 to-slate-900 border-rose-500/50 text-white'
+                : 'bg-slate-900 border-slate-800 text-slate-200'
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="text-2xl p-2 rounded-xl bg-white/10 shadow-inner">
+                    {sec.categoryIcon}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-200">
+                        {sec.sectorName} Sector Strength
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase shadow-2xs ${
+                        sec.tradeVerdict === 'ENTER'
+                          ? 'bg-emerald-500 text-slate-950 ring-2 ring-emerald-300/60'
+                          : sec.tradeVerdict === 'AVOID'
+                          ? 'bg-rose-500 text-white ring-2 ring-rose-300/60'
+                          : 'bg-amber-400 text-slate-950'
+                      }`}>
+                        {sec.verdictLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      {sec.verdictDescription}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0 bg-black/40 px-3 py-1.5 rounded-xl border border-white/10">
+                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Sector Avg Change</div>
+                  <div className={`text-base font-black font-mono ${isGreen ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {isGreen ? '+' : ''}{sec.sectorAvgPct.toFixed(2)}%
+                  </div>
+                </div>
+              </div>
+
+              {/* 4-Stat Sector Breadth Matrix */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 text-center text-xs font-mono">
+                <div className="bg-black/30 p-2 rounded-xl border border-white/5">
+                  <span className="text-[9.5px] text-slate-400 block font-sans">Bullish Breadth</span>
+                  <strong className="text-emerald-300 text-sm font-black">{sec.sectorBullishBreadthPct}%</strong>
+                  <span className="text-[8.5px] text-slate-400 block mt-0.5 font-sans">Green Stocks</span>
+                </div>
+                <div className="bg-black/30 p-2 rounded-xl border border-white/5">
+                  <span className="text-[9.5px] text-slate-400 block font-sans">Advancing vs Declining</span>
+                  <strong className="text-white text-xs font-bold">
+                    <span className="text-emerald-400">{sec.sectorAdvancing} Adv</span> / <span className="text-rose-400">{sec.sectorDeclining} Dec</span>
+                  </strong>
+                  <span className="text-[8.5px] text-slate-400 block mt-0.5 font-sans">of {sec.sectorTotalStocks} Stocks</span>
+                </div>
+                <div className="bg-black/30 p-2 rounded-xl border border-white/5">
+                  <span className="text-[9.5px] text-slate-400 block font-sans">Institutional Bias</span>
+                  <strong className={`text-xs font-black font-sans ${
+                    sec.sectorBias === 'STRONG_BULLISH' || sec.sectorBias === 'BULLISH' ? 'text-emerald-400' : sec.sectorBias === 'STRONG_BEARISH' || sec.sectorBias === 'BEARISH' ? 'text-rose-400' : 'text-amber-300'
+                  }`}>
+                    {sec.sectorBias.replace('_', ' ')}
+                  </strong>
+                  <span className="text-[8.5px] text-slate-400 block mt-0.5 font-sans">Flow Direction</span>
+                </div>
+                <div className="bg-black/30 p-2 rounded-xl border border-white/5">
+                  <span className="text-[9.5px] text-slate-400 block font-sans">Confidence Impact</span>
+                  <strong className={`text-xs font-black font-sans ${sec.scoreAdjustment >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {sec.scoreAdjustment >= 0 ? `+${sec.scoreAdjustment}% Boost` : `${sec.scoreAdjustment}% Penalty`}
+                  </strong>
+                  <span className="text-[8.5px] text-slate-400 block mt-0.5 font-sans">Algorithm Weight</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 0. Live Trade Profit & Timing Journey Tracker */}
         {journey && (

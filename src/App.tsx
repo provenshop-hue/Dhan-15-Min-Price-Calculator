@@ -1117,6 +1117,7 @@ export default function App() {
 
       <StockDetailModal
         stock={selectedDetailStock}
+        allStocks={stocks}
         tradeJourney={selectedDetailStock ? tradeJourneys[selectedDetailStock.id] || null : null}
         onClose={() => setSelectedDetailStock(null)}
         onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
