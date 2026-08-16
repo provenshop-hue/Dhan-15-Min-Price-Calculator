@@ -233,6 +233,23 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => {
                 onChangeDashboardTab('gann');
                 setTimeout(() => {
+                  const el = document.getElementById('ten-fifteen-picks-hub');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 50);
+              }}
+              className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-black bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white shadow-2xs transition-all hover:scale-105"
+            >
+              <Clock className="w-3.5 h-3.5 fill-current text-yellow-300 animate-pulse" />
+              <span>⭐ 10:15 AM Power Picks</span>
+              <span className="bg-amber-300 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">
+                3B + 3S
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                onChangeDashboardTab('gann');
+                setTimeout(() => {
                   const el = document.getElementById('ideal-trade-radar-hub');
                   if (el) el.scrollIntoView({ behavior: 'smooth' });
                 }, 50);

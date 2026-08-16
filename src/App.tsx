@@ -17,6 +17,7 @@ import { StockTimingModal } from './components/StockTimingModal';
 import { NotificationScroller } from './components/NotificationScroller';
 import { TradeProfitTracker } from './components/TradeProfitTracker';
 import { IdealTradeRadar } from './components/IdealTradeRadar';
+import { TenFifteenPicksHub } from './components/TenFifteenPicksHub';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -974,6 +975,16 @@ export default function App() {
               stocks={stocks}
               onSelectStockDetail={(s) => setSelectedDetailStock(s)}
               onSelectTrendFilter={(f) => setActiveTrendFilter(f)}
+            />
+
+            {/* ⭐ 10:15 AM Daily Power Picks (Top 3 Bullish & Top 3 Bearish for the Day) */}
+            <TenFifteenPicksHub
+              stocks={stocks}
+              onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+              onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+              onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+              onRefreshAllPrices={handleFetchAllDhan}
+              isLoading={isBulkLoading}
             />
 
             {/* 🎯 Ideal Options & High-Conviction Stocks to Trade NOW (Updated on Every Fetch) */}
