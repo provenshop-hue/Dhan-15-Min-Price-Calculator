@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -302,6 +302,23 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>🌙 BTST Gap Predictor</span>
                 <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   AI BTST
+                </span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => onChangeDashboardTab('stock_analyzer')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'stock_analyzer'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xs'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-blue-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Calculator className="w-3.5 h-3.5 text-blue-500" />
+                <span>🎯 Stock Analyzer</span>
+                <span className="bg-blue-100 text-blue-800 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">
+                  Manual + Dhan
                 </span>
               </span>
             </button>

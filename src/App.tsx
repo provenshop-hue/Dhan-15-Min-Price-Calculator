@@ -18,6 +18,7 @@ import { NotificationScroller } from './components/NotificationScroller';
 import { TradeProfitTracker } from './components/TradeProfitTracker';
 import { IdealTradeRadar } from './components/IdealTradeRadar';
 import { TenFifteenPicksHub } from './components/TenFifteenPicksHub';
+import { ManualStockAnalyzer } from './components/ManualStockAnalyzer';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -207,8 +208,8 @@ export default function App() {
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
 
-  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', or 'btst')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst'>('gann');
+  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', or 'stock_analyzer')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -1053,6 +1054,17 @@ export default function App() {
             onDateChange={handleDateChange}
             onFetchAll={handleFetchAllDhan}
             isBulkLoading={isBulkLoading}
+          />
+        ) : activeDashboardTab === 'stock_analyzer' ? (
+          /* Dedicated Manual Stock Analyzer & Gann Calculator Hub */
+          <ManualStockAnalyzer
+            stocks={stocks}
+            credentials={credentials}
+            onFetchSingleStock={handleFetchSingleDhan}
+            onUpdateStockInMaster={handleAddOrEditManualStock}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+            onOpenSettings={() => setIsDhanGateOpen(true)}
           />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */

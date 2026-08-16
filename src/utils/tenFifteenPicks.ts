@@ -225,7 +225,7 @@ export function calculate1015BearishScore(
 /**
  * Builds the exact trade targets, stop loss, and recommended ATM option contract
  */
-function buildTradeSetup(
+export function buildTradeSetup(
   stock: StockCalculated,
   direction: 'BULLISH' | 'BEARISH'
 ): TenFifteenTradePick['tradeSetup'] {

@@ -1,6 +1,6 @@
 {
   "name": "StockMarket ATM",
-  "description": "15-minute open and close price calculator with Dhan HQ Data API integration, 10:15 AM Daily Power Picks (Top 3 Bullish & Top 3 Bearish stocks with 100% move formulas), multi-fetch trade confidence timing journey tracker, live ideal options & high-conviction stock radar, and built-in Nifty Futures stock list.",
+  "description": "15-minute open and close price calculator with Dhan HQ Data API integration, Manual Stock Analyzer tab with real-time Gann calculations and manual override, 10:15 AM Daily Power Picks with sector strength percentage, multi-fetch trade confidence timing journey tracker, live ideal options radar, and built-in Nifty Futures stock list.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
