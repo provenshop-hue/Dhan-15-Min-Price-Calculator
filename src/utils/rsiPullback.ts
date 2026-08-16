@@ -16,14 +16,14 @@ export function checkStockOpenHigh(stock: StockCalculated): boolean {
 }
 
 /**
- * 100% Bullish Move Criteria:
- * 1. Close > Open (Green Candle)
- * 2. Close > Previous Close AND pctChange > 0 (Positive Day Change)
- * 3. Close >= High - (Range × 0.20) (Closes in top 20% of High-Low range)
- * 4. Body / Range >= 0.55 (Strong candle body)
- * 5. Price >= VWAP (Above VWAP support if VWAP exists)
- * 6. RSI >= 50 (if RSI exists)
- * 7. Trend must NOT be Bearish
+ * 100% Bullish Move Formula:
+ * 1. Close > Open
+ * AND
+ * 2. Close > Previous Close
+ * AND
+ * 3. Close >= High - (Range × 0.20)
+ * AND
+ * 4. Body / Range >= 0.65
  */
 export function is100PercentBullishMove(stock: StockCalculated): boolean {
   const open = stock.openPrice;
@@ -36,58 +36,39 @@ export function is100PercentBullishMove(stock: StockCalculated): boolean {
   if (high === undefined || high === null || high <= 0) return false;
   if (low === undefined || low === null || low <= 0) return false;
 
-  // 1. Must be a Green Candle (Close > Open)
+  // 1. Close > Open
   if (close <= open) return false;
 
-  // 2. Must have positive percent change on session (>= +0.20%)
-  const pct = stock.pctChange !== undefined && stock.pctChange !== null 
-    ? stock.pctChange 
-    : (stock.previousClose && stock.previousClose > 0 ? ((close - stock.previousClose) / stock.previousClose) * 100 : 0);
-  if (pct < 0.20) return false;
-
-  // 3. Close > Previous Close
-  if (stock.previousClose && stock.previousClose > 0 && close <= stock.previousClose) {
-    return false;
+  // 2. Close > Previous Close
+  if (stock.previousClose !== undefined && stock.previousClose !== null && stock.previousClose > 0) {
+    if (close <= stock.previousClose) return false;
+  } else if (stock.pctChange !== undefined && stock.pctChange !== null) {
+    if (stock.pctChange <= 0) return false;
   }
 
   const range = high - low;
   if (range <= 0) return false;
 
-  // 4. Closes in top 15% of High-Low range (Close >= High - (Range × 0.15))
-  if (close < high - (range * 0.15) - 0.0001) return false;
+  // 3. Close >= High - (Range × 0.20)
+  if (close < high - (range * 0.20) - 0.0001) return false;
 
-  // 5. Body / Range >= 0.58 (Strong candle body)
+  // 4. Body / Range >= 0.65
   const body = Math.abs(close - open);
-  if ((body / range) < 0.58 - 0.0001) return false;
-
-  // 6. VWAP Filter: price must be >= VWAP if present
-  if (stock.vwap && stock.vwap > 0 && close < stock.vwap - 0.0001) {
-    return false;
-  }
-
-  // 7. RSI Filter: RSI must be >= 52 and <= 80 if present
-  if (stock.rsi !== undefined && stock.rsi !== null) {
-    if (stock.rsi < 52 || stock.rsi > 80) return false;
-  }
-
-  // 8. Trend Filter: Must NOT be Bearish or Very Bearish
-  if (stock.trend === 'Bearish' || stock.trend === 'Very Bearish') {
-    return false;
-  }
+  if ((body / range) < 0.65 - 0.0001) return false;
 
   return true;
 }
 
 /**
-  * 100% Bearish Move Criteria:
-  * 1. Close < Open (Red Candle)
-  * 2. Close < Previous Close AND pctChange <= -0.20% (Negative Day Change)
-  * 3. Close <= Low + (Range × 0.15) (Closes in bottom 15% of High-Low range)
-  * 4. Body / Range >= 0.58 (Strong candle body)
-  * 5. Price <= VWAP (Below VWAP resistance if VWAP exists)
-  * 6. RSI <= 48 and >= 20 (if RSI exists)
-  * 7. Trend must NOT be Bullish or Very Bullish
-  */
+ * 100% Bearish Move Formula:
+ * 1. Close < Open
+ * AND
+ * 2. Close < Previous Close
+ * AND
+ * 3. Close <= Low + (Range × 0.20)
+ * AND
+ * 4. Body / Range >= 0.60
+ */
 export function is100PercentBearishMove(stock: StockCalculated): boolean {
   const open = stock.openPrice;
   const close = stock.closePrice;
@@ -99,44 +80,25 @@ export function is100PercentBearishMove(stock: StockCalculated): boolean {
   if (high === undefined || high === null || high <= 0) return false;
   if (low === undefined || low === null || low <= 0) return false;
 
-  // 1. Must be a Red Candle (Close < Open)
+  // 1. Close < Open
   if (close >= open) return false;
 
-  // 2. Must have negative percent change on session (<= -0.20%)
-  const pct = stock.pctChange !== undefined && stock.pctChange !== null 
-    ? stock.pctChange 
-    : (stock.previousClose && stock.previousClose > 0 ? ((close - stock.previousClose) / stock.previousClose) * 100 : 0);
-  if (pct > -0.20) return false;
-
-  // 3. Close < Previous Close
-  if (stock.previousClose && stock.previousClose > 0 && close >= stock.previousClose) {
-    return false;
+  // 2. Close < Previous Close
+  if (stock.previousClose !== undefined && stock.previousClose !== null && stock.previousClose > 0) {
+    if (close >= stock.previousClose) return false;
+  } else if (stock.pctChange !== undefined && stock.pctChange !== null) {
+    if (stock.pctChange >= 0) return false;
   }
 
   const range = high - low;
   if (range <= 0) return false;
 
-  // 4. Closes in bottom 15% of High-Low range (Close <= Low + (Range × 0.15))
-  if (close > low + (range * 0.15) + 0.0001) return false;
+  // 3. Close <= Low + (Range × 0.20)
+  if (close > low + (range * 0.20) + 0.0001) return false;
 
-  // 5. Body / Range >= 0.58 (Strong candle body)
+  // 4. Body / Range >= 0.60
   const body = Math.abs(close - open);
-  if ((body / range) < 0.58 - 0.0001) return false;
-
-  // 6. VWAP Filter: price must be <= VWAP if present
-  if (stock.vwap && stock.vwap > 0 && close > stock.vwap + 0.0001) {
-    return false;
-  }
-
-  // 7. RSI Filter: RSI must be <= 48 and >= 20 if present
-  if (stock.rsi !== undefined && stock.rsi !== null) {
-    if (stock.rsi > 48 || stock.rsi < 20) return false;
-  }
-
-  // 8. Trend Filter: Must NOT be Bullish or Very Bullish
-  if (stock.trend === 'Bullish' || stock.trend === 'Very Bullish') {
-    return false;
-  }
+  if ((body / range) < 0.60 - 0.0001) return false;
 
   return true;
 }
@@ -162,11 +124,11 @@ export function get100PercentBullishScore(stock: StockCalculated): number {
 
   // 2. Proximity to High component (up to +15)
   const distFromHighRatio = (high - close) / range;
-  score += Math.max(0, 15 * (1 - distFromHighRatio / 0.15));
+  score += Math.max(0, 15 * (1 - distFromHighRatio / 0.20));
 
   // 3. Body ratio component (up to +15)
   const bodyRatio = (close - open) / range;
-  score += Math.min(15, Math.max(0, (bodyRatio - 0.58) * 35));
+  score += Math.min(15, Math.max(0, (bodyRatio - 0.65) * 40));
 
   // 4. Open = Low exactness bonus (+10)
   const openLowDiffPct = ((open - low) / open) * 100;
@@ -197,11 +159,11 @@ export function get100PercentBearishScore(stock: StockCalculated): number {
 
   // 2. Proximity to Low component (up to +15)
   const distFromLowRatio = (close - low) / range;
-  score += Math.max(0, 15 * (1 - distFromLowRatio / 0.15));
+  score += Math.max(0, 15 * (1 - distFromLowRatio / 0.20));
 
   // 3. Body ratio component (up to +15)
   const bodyRatio = (open - close) / range;
-  score += Math.min(15, Math.max(0, (bodyRatio - 0.58) * 35));
+  score += Math.min(15, Math.max(0, (bodyRatio - 0.60) * 40));
 
   // 4. Open = High exactness bonus (+10)
   const openHighDiffPct = ((high - open) / open) * 100;
@@ -226,27 +188,20 @@ export function get100PercentBullishFadeReason(stock: StockCalculated): string {
   if (close <= open) {
     reasons.push(`Candle turned Red (Close ₹${close.toFixed(2)} <= Open ₹${open.toFixed(2)})`);
   }
-  if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange <= 0) {
+  if (stock.previousClose && close <= stock.previousClose) {
+    reasons.push(`Close fell below Previous Close (LTP: ₹${close.toFixed(2)} <= PDC: ₹${stock.previousClose.toFixed(2)})`);
+  } else if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange <= 0) {
     reasons.push(`Session gain lost (${stock.pctChange.toFixed(2)}%)`);
   }
   if (range > 0 && close < high - (range * 0.20)) {
-    reasons.push(`LTP dropped below top 20% high range (LTP: ₹${close.toFixed(2)}, High: ₹${high.toFixed(2)})`);
+    reasons.push(`LTP dropped below top 20% range (LTP: ₹${close.toFixed(2)} < ₹${(high - range * 0.20).toFixed(2)})`);
   }
-  if (range > 0 && (Math.abs(close - open) / range) < 0.55) {
+  if (range > 0 && (Math.abs(close - open) / range) < 0.65) {
     const bodyPct = ((Math.abs(close - open) / range) * 100).toFixed(1);
-    reasons.push(`Candle body shrunk below 55% (${bodyPct}%)`);
-  }
-  if (stock.vwap && stock.vwap > 0 && close < stock.vwap) {
-    reasons.push(`Price fell below VWAP (LTP: ₹${close.toFixed(2)} vs VWAP: ₹${stock.vwap.toFixed(2)})`);
-  }
-  if (stock.rsi !== undefined && stock.rsi !== null && stock.rsi < 50) {
-    reasons.push(`RSI dropped below 50 (RSI: ${stock.rsi.toFixed(1)})`);
-  }
-  if (stock.trend === 'Bearish' || stock.trend === 'Very Bearish') {
-    reasons.push(`Gann Trend flipped to ${stock.trend}`);
+    reasons.push(`Candle body dropped below 65% (${bodyPct}% < 65%)`);
   }
 
-  return reasons.length > 0 ? reasons.join(' • ') : 'Lost high-range momentum & buying volume support.';
+  return reasons.length > 0 ? reasons.join(' • ') : 'Lost momentum or High-range support.';
 }
 
 /**
@@ -264,24 +219,17 @@ export function get100PercentBearishFadeReason(stock: StockCalculated): string {
   if (close >= open) {
     reasons.push(`Candle turned Green (Close ₹${close.toFixed(2)} >= Open ₹${open.toFixed(2)})`);
   }
-  if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange >= 0) {
+  if (stock.previousClose && close >= stock.previousClose) {
+    reasons.push(`Close rose above Previous Close (LTP: ₹${close.toFixed(2)} >= PDC: ₹${stock.previousClose.toFixed(2)})`);
+  } else if (stock.pctChange !== undefined && stock.pctChange !== null && stock.pctChange >= 0) {
     reasons.push(`Session loss reversed (+${stock.pctChange.toFixed(2)}%)`);
   }
   if (range > 0 && close > low + (range * 0.20)) {
-    reasons.push(`LTP bounced above bottom 20% low range (LTP: ₹${close.toFixed(2)}, Low: ₹${low.toFixed(2)})`);
+    reasons.push(`LTP bounced above bottom 20% range (LTP: ₹${close.toFixed(2)} > ₹${(low + range * 0.20).toFixed(2)})`);
   }
-  if (range > 0 && (Math.abs(close - open) / range) < 0.55) {
+  if (range > 0 && (Math.abs(close - open) / range) < 0.60) {
     const bodyPct = ((Math.abs(close - open) / range) * 100).toFixed(1);
-    reasons.push(`Candle body shrunk below 55% (${bodyPct}%)`);
-  }
-  if (stock.vwap && stock.vwap > 0 && close > stock.vwap) {
-    reasons.push(`Price rallied above VWAP (LTP: ₹${close.toFixed(2)} vs VWAP: ₹${stock.vwap.toFixed(2)})`);
-  }
-  if (stock.rsi !== undefined && stock.rsi !== null && stock.rsi > 50) {
-    reasons.push(`RSI rose above 50 (RSI: ${stock.rsi.toFixed(1)})`);
-  }
-  if (stock.trend === 'Bullish' || stock.trend === 'Very Bullish') {
-    reasons.push(`Gann Trend flipped to ${stock.trend}`);
+    reasons.push(`Candle body dropped below 60% (${bodyPct}% < 60%)`);
   }
 
   return reasons.length > 0 ? reasons.join(' • ') : 'Bounced off session lows & lost selling pressure.';

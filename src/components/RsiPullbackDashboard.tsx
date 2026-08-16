@@ -117,8 +117,8 @@ export const RECIPE_OPTIONS: RecipeOption[] = [
   { id: 'MACD_BULLISH', label: '📊 MACD Bullish Crossover', category: 'Moving Averages & Indicators', description: 'MACD histogram positive or crossing up' },
 
   // Price Action & Candlesticks
-  { id: 'BULLISH_100_MOVE', label: '💯 100% Bullish Breakout', category: 'Price Action & Candlesticks', description: 'All 100% bullish conditions verified' },
-  { id: 'BEARISH_100_MOVE', label: '💥 100% Bearish Breakdown', category: 'Price Action & Candlesticks', description: 'All 100% bearish conditions verified' },
+  { id: 'BULLISH_100_MOVE', label: '💯 100% Bullish Breakout', category: 'Price Action & Candlesticks', description: 'Close > Open & PDC, Close >= High - 0.20*Range, Body/Range >= 0.65' },
+  { id: 'BEARISH_100_MOVE', label: '💥 100% Bearish Breakdown', category: 'Price Action & Candlesticks', description: 'Close < Open & PDC, Close <= Low + 0.20*Range, Body/Range >= 0.60' },
   { id: 'OPEN_LOW', label: '🟢 Open = Low Pattern', category: 'Price Action & Candlesticks', description: 'Price opened at low of day (Bullish)' },
   { id: 'OPEN_HIGH', label: '🔴 Open = High Pattern', category: 'Price Action & Candlesticks', description: 'Price opened at high of day (Bearish)' },
   { id: 'HIGH_CLOSE', label: '🏆 High Close Pattern', category: 'Price Action & Candlesticks', description: 'Closing/CMP near high of 15m candle' },
@@ -2442,7 +2442,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                           </span>
                         )}
                         {analysis.is100PercentBullish && (
-                          <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-400 shadow-2xs animate-pulse flex items-center gap-1" title="Close > Open & Prev Close, Close >= High - 0.2*Range, Body/Range >= 0.6">
+                          <span className="bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-400 shadow-2xs animate-pulse flex items-center gap-1" title="100% Bullish Formula: Close > Open, Close > Prev Close, Close >= High - 0.20*Range, Body/Range >= 0.65">
                             <span>💯 100% BULLISH</span>
                             <span className="bg-emerald-950/80 text-yellow-300 font-mono text-[9px] px-1 py-0.2 rounded font-black">
                               🕒 {analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' ? analysis.intradayConfluence.bullishConfluenceTime : stock.candleTimestamp || '09:15 AM'}
@@ -2450,7 +2450,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                           </span>
                         )}
                         {analysis.is100PercentBearish && (
-                          <span className="bg-rose-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-rose-400 shadow-2xs animate-pulse flex items-center gap-1" title="Close < Open & Prev Close, Close <= Low + 0.2*Range, Body/Range >= 0.6">
+                          <span className="bg-rose-700 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-rose-400 shadow-2xs animate-pulse flex items-center gap-1" title="100% Bearish Formula: Close < Open, Close < Prev Close, Close <= Low + 0.20*Range, Body/Range >= 0.60">
                             <span>💥 100% BEARISH</span>
                             <span className="bg-rose-950/80 text-white font-mono text-[9px] px-1 py-0.2 rounded font-black">
                               🕒 {analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met' ? analysis.intradayConfluence.bearishConfluenceTime : stock.candleTimestamp || '09:15 AM'}

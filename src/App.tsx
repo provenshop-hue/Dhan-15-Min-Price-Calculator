@@ -584,7 +584,7 @@ export default function App() {
       prev.map((s) => ({ ...s, error: null }))
     );
 
-    const CONCURRENCY = 3;
+    const CONCURRENCY = 8;
     let completed = 0;
     let authErrorOccurred = false;
 
@@ -683,7 +683,7 @@ export default function App() {
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      await new Promise((resolve) => setTimeout(resolve, 30));
     }
 
     setIsBulkLoading(false);
