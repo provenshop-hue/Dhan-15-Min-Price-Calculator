@@ -3,6 +3,12 @@ import { is100PercentBullishMove, is100PercentBearishMove } from './rsiPullback'
 import { isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle } from './gann';
 import { analyzeBullishCombinations } from './bullishCombinations';
 import { getNseStrikeLadder, formatStrikePrice } from './nseStrikeMaster';
+import { 
+  computeAllSectorStrengths, 
+  evaluateStockSectorConfluence, 
+  StockSectorAnalysis, 
+  SectorMetric 
+} from './sectorMaster';
 
 export interface TenFifteenTradePick {
   rank: 1 | 2 | 3;
@@ -29,6 +35,7 @@ export interface TenFifteenTradePick {
   is100PercentFormulaMet: boolean;
   isOpenPatternMet: boolean; // Open=Low for Bullish, Open=High for Bearish
   is15mBreakoutOrBreakdown: boolean;
+  sectorAnalysis: StockSectorAnalysis; // Sector strength % and ENTER/AVOID indicator
   catalysts: string[];
   tradeSetup: {
     entryZone: { min: number; max: number; label: string };
@@ -57,12 +64,16 @@ export interface TenFifteenAnalysisResult {
   scannedCount: number;
   timestamp: string;
   is1015PrimeWindow: boolean;
+  topSectors: SectorMetric[];
 }
 
 /**
- * Computes a multi-factor 10:15 AM Bullish Conviction Score (0 - 100)
+ * Computes a multi-factor 10:15 AM Bullish Conviction Score (0 - 100) including Sector Confluence
  */
-export function calculate1015BullishScore(stock: StockCalculated): { score: number; catalysts: string[] } {
+export function calculate1015BullishScore(
+  stock: StockCalculated, 
+  sectorAnalysis?: StockSectorAnalysis
+): { score: number; catalysts: string[] } {
   const cmp = stock.closePrice || stock.openPrice || 0;
   if (cmp <= 0) return { score: 0, catalysts: [] };
 
@@ -115,7 +126,17 @@ export function calculate1015BullishScore(stock: StockCalculated): { score: numb
     catalysts.push('🎯 Bullish Pattern Combo Active');
   }
 
-  // 7. Gann Modulo Calculation Bonus
+  // 7. Sector Strength Confluence (+12 pts or -15 pts penalty)
+  if (sectorAnalysis) {
+    score += sectorAnalysis.scoreAdjustment;
+    if (sectorAnalysis.tradeVerdict === 'ENTER') {
+      catalysts.push(`🟢 Sector Surge (+${sectorAnalysis.sectorAvgPct.toFixed(2)}% • ${sectorAnalysis.sectorBullishBreadthPct}% Green)`);
+    } else if (sectorAnalysis.tradeVerdict === 'AVOID') {
+      catalysts.push(`⚠️ Sector Headwind (${sectorAnalysis.sectorAvgPct.toFixed(2)}% • Selloff Risk)`);
+    }
+  }
+
+  // 8. Gann Modulo Calculation Bonus
   if (stock.openCalc !== undefined && stock.openCalc !== null && stock.openCalc < 3) {
     score += 5;
     catalysts.push('📐 Gann Open Calc < 3 Harmonic Alignment');
@@ -127,9 +148,12 @@ export function calculate1015BullishScore(stock: StockCalculated): { score: numb
 }
 
 /**
- * Computes a multi-factor 10:15 AM Bearish Conviction Score (0 - 100)
+ * Computes a multi-factor 10:15 AM Bearish Conviction Score (0 - 100) including Sector Confluence
  */
-export function calculate1015BearishScore(stock: StockCalculated): { score: number; catalysts: string[] } {
+export function calculate1015BearishScore(
+  stock: StockCalculated,
+  sectorAnalysis?: StockSectorAnalysis
+): { score: number; catalysts: string[] } {
   const cmp = stock.closePrice || stock.openPrice || 0;
   if (cmp <= 0) return { score: 0, catalysts: [] };
 
@@ -172,13 +196,23 @@ export function calculate1015BearishScore(stock: StockCalculated): { score: numb
     }
   }
 
-  // 6. Gann Close Calc < 3 or Breakdown Align
+  // 6. Sector Breakdown Confluence (+12 pts or -15 pts penalty)
+  if (sectorAnalysis) {
+    score += sectorAnalysis.scoreAdjustment;
+    if (sectorAnalysis.tradeVerdict === 'ENTER') {
+      catalysts.push(`🟢 Sector Breakdown (${sectorAnalysis.sectorAvgPct.toFixed(2)}% • ${100 - sectorAnalysis.sectorBullishBreadthPct}% Falling)`);
+    } else if (sectorAnalysis.tradeVerdict === 'AVOID') {
+      catalysts.push(`⚠️ Sector Strength Conflict (+${sectorAnalysis.sectorAvgPct.toFixed(2)}% Industry Rally)`);
+    }
+  }
+
+  // 7. Gann Close Calc < 3 or Breakdown Align
   if (stock.closeCalc !== undefined && stock.closeCalc !== null && stock.closeCalc < 3) {
     score += 5;
     catalysts.push('📐 Gann Close Calc < 3 Harmonic Alignment');
   }
 
-  // 7. Negative Intraday Loss (% change <= -1.0%)
+  // 8. Negative Intraday Loss (% change <= -1.0%)
   if ((stock.pctChange || 0) <= -1.0) {
     score += 5;
     catalysts.push(`🔻 Strong Selling Flow (${(stock.pctChange || 0).toFixed(2)}%)`);
@@ -276,6 +310,10 @@ function buildTradeSetup(
  * Main Engine: Analyzes all stocks and extracts the Top 3 Bullish and Top 3 Bearish stocks for the day @ 10:15 AM
  */
 export function analyzeTenFifteenPicks(stocks: StockCalculated[]): TenFifteenAnalysisResult {
+  // Compute live Sector Strengths across all stocks
+  const sectorMetricsMap = computeAllSectorStrengths(stocks);
+  const sectorMetricsList = Array.from(sectorMetricsMap.values()).sort((a, b) => b.avgPctChange - a.avgPctChange);
+
   // Only consider stocks with loaded price data
   const validStocks = stocks.filter(
     (s) => s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0 &&
@@ -288,11 +326,17 @@ export function analyzeTenFifteenPicks(stocks: StockCalculated[]): TenFifteenAna
   // 1. Evaluate Bullish candidates
   const scoredBullish = candidatePool
     .map((s) => {
-      const { score, catalysts } = calculate1015BullishScore(s);
-      return { stock: s, score, catalysts };
+      const sectorAnalysis = evaluateStockSectorConfluence(s, 'BULLISH', sectorMetricsMap);
+      const { score, catalysts } = calculate1015BullishScore(s, sectorAnalysis);
+      return { stock: s, score, catalysts, sectorAnalysis };
     })
     .sort((a, b) => {
-      // Prioritize 100% Bullish move first
+      // Prioritize ENTER verdict with 100% Bullish move first
+      const aEnter = a.sectorAnalysis.tradeVerdict === 'ENTER';
+      const bEnter = b.sectorAnalysis.tradeVerdict === 'ENTER';
+      if (aEnter && !bEnter) return -1;
+      if (!aEnter && bEnter) return 1;
+
       const a100 = is100PercentBullishMove(a.stock);
       const b100 = is100PercentBullishMove(b.stock);
       if (a100 && !b100) return -1;
@@ -339,6 +383,7 @@ export function analyzeTenFifteenPicks(stocks: StockCalculated[]): TenFifteenAna
       is100PercentFormulaMet: is100,
       isOpenPatternMet: isOpenLow,
       is15mBreakoutOrBreakdown: is15mBreak,
+      sectorAnalysis: item.sectorAnalysis,
       catalysts: item.catalysts,
       tradeSetup: buildTradeSetup(s, 'BULLISH')
     };
@@ -347,11 +392,17 @@ export function analyzeTenFifteenPicks(stocks: StockCalculated[]): TenFifteenAna
   // 2. Evaluate Bearish candidates
   const scoredBearish = candidatePool
     .map((s) => {
-      const { score, catalysts } = calculate1015BearishScore(s);
-      return { stock: s, score, catalysts };
+      const sectorAnalysis = evaluateStockSectorConfluence(s, 'BEARISH', sectorMetricsMap);
+      const { score, catalysts } = calculate1015BearishScore(s, sectorAnalysis);
+      return { stock: s, score, catalysts, sectorAnalysis };
     })
     .sort((a, b) => {
-      // Prioritize 100% Bearish move first
+      // Prioritize ENTER verdict with 100% Bearish move first
+      const aEnter = a.sectorAnalysis.tradeVerdict === 'ENTER';
+      const bEnter = b.sectorAnalysis.tradeVerdict === 'ENTER';
+      if (aEnter && !bEnter) return -1;
+      if (!aEnter && bEnter) return 1;
+
       const a100 = is100PercentBearishMove(a.stock);
       const b100 = is100PercentBearishMove(b.stock);
       if (a100 && !b100) return -1;
@@ -398,6 +449,7 @@ export function analyzeTenFifteenPicks(stocks: StockCalculated[]): TenFifteenAna
       is100PercentFormulaMet: is100,
       isOpenPatternMet: isOpenHigh,
       is15mBreakoutOrBreakdown: is15mBreak,
+      sectorAnalysis: item.sectorAnalysis,
       catalysts: item.catalysts,
       tradeSetup: buildTradeSetup(s, 'BEARISH')
     };
@@ -418,6 +470,7 @@ export function analyzeTenFifteenPicks(stocks: StockCalculated[]): TenFifteenAna
     bearishCountTotal,
     scannedCount: candidatePool.length,
     timestamp: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-    is1015PrimeWindow: true
+    is1015PrimeWindow: true,
+    topSectors: sectorMetricsList
   };
 }

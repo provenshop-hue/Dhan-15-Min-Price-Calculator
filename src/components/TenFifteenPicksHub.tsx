@@ -23,10 +23,16 @@ import {
   RefreshCw, 
   Sliders, 
   HelpCircle,
-  BarChart2
+  BarChart2,
+  PieChart,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Gauge
 } from 'lucide-react';
 import { StockCalculated } from '../types';
 import { analyzeTenFifteenPicks, TenFifteenTradePick } from '../utils/tenFifteenPicks';
+import { SectorMetric } from '../utils/sectorMaster';
 
 interface TenFifteenPicksHubProps {
   stocks: StockCalculated[];
@@ -46,9 +52,10 @@ export const TenFifteenPicksHub: React.FC<TenFifteenPicksHubProps> = ({
   isLoading
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
-  const [filterMode, setFilterMode] = useState<'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY'>('ALL');
+  const [filterMode, setFilterMode] = useState<'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY' | 'ENTER_ONLY'>('ALL');
   const [copiedTradeId, setCopiedTradeId] = useState<string | null>(null);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
+  const [isSectorsOpen, setIsSectorsOpen] = useState<boolean>(true);
 
   // Analyze 10:15 AM Picks
   const analysis = useMemo(() => {
@@ -61,9 +68,26 @@ export const TenFifteenPicksHub: React.FC<TenFifteenPicksHubProps> = ({
     return map;
   }, [stocks]);
 
+  // Filtered picks based on current filter mode
+  const filteredBullishPicks = useMemo(() => {
+    if (filterMode === 'ENTER_ONLY') {
+      return analysis.bullishPicks.filter((p) => p.sectorAnalysis.tradeVerdict === 'ENTER');
+    }
+    return analysis.bullishPicks;
+  }, [analysis.bullishPicks, filterMode]);
+
+  const filteredBearishPicks = useMemo(() => {
+    if (filterMode === 'ENTER_ONLY') {
+      return analysis.bearishPicks.filter((p) => p.sectorAnalysis.tradeVerdict === 'ENTER');
+    }
+    return analysis.bearishPicks;
+  }, [analysis.bearishPicks, filterMode]);
+
   const handleCopySetup = (pick: TenFifteenTradePick) => {
     const planText = `⭐ 10:15 AM ${pick.direction} TRADE SETUP: ${pick.symbol}
 CMP: ₹${pick.cmp.toFixed(2)} (${pick.pctChange >= 0 ? '+' : ''}${pick.pctChange.toFixed(2)}%)
+Sector: ${pick.sectorAnalysis.categoryIcon} ${pick.sectorAnalysis.sectorName} (${pick.sectorAnalysis.sectorAvgPct >= 0 ? '+' : ''}${pick.sectorAnalysis.sectorAvgPct.toFixed(2)}% Strength • ${pick.sectorAnalysis.sectorBullishBreadthPct}% Bullish Breadth)
+Sector Verdict: ${pick.sectorAnalysis.verdictLabel} - ${pick.sectorAnalysis.verdictDescription}
 Conviction Score: ${pick.convictionScore}%
 --------------------------------------
 Entry Zone: ${pick.tradeSetup.entryZone.label}
@@ -130,6 +154,78 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
     }
   };
 
+  const renderSectorVerdictBadge = (pick: TenFifteenTradePick) => {
+    const { sectorAnalysis } = pick;
+    const isEnter = sectorAnalysis.tradeVerdict === 'ENTER';
+    const isAvoid = sectorAnalysis.tradeVerdict === 'AVOID';
+
+    return (
+      <div className={`p-2.5 rounded-xl border transition-all ${
+        isEnter 
+          ? 'bg-gradient-to-r from-emerald-950/80 to-slate-900 border-emerald-500/50 text-white ring-1 ring-emerald-400/40 shadow-sm' 
+          : isAvoid 
+          ? 'bg-gradient-to-r from-rose-950/80 to-slate-900 border-rose-500/50 text-white' 
+          : 'bg-slate-900 border-amber-500/40 text-white'
+      } mb-3`}>
+        <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1.5">
+          {/* Sector Info */}
+          <div className="flex items-center space-x-1.5 text-xs font-semibold text-slate-300">
+            <span className="text-sm">{sectorAnalysis.categoryIcon}</span>
+            <span className="font-bold text-white">{sectorAnalysis.sectorName}</span>
+            <span className="text-slate-500">•</span>
+            <span className={`font-mono font-bold ${
+              sectorAnalysis.sectorAvgPct >= 0 ? 'text-emerald-400' : 'text-rose-400'
+            }`}>
+              {sectorAnalysis.sectorAvgPct >= 0 ? '+' : ''}{sectorAnalysis.sectorAvgPct.toFixed(2)}% Strength
+            </span>
+          </div>
+
+          {/* Verdict Pill */}
+          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-black uppercase tracking-wide ${
+            isEnter
+              ? 'bg-emerald-500 text-slate-950 shadow-xs'
+              : isAvoid
+              ? 'bg-rose-500 text-white'
+              : 'bg-amber-400 text-slate-950'
+          }`}>
+            {isEnter && <CheckCircle className="w-3.5 h-3.5" />}
+            {isAvoid && <XCircle className="w-3.5 h-3.5" />}
+            {!isEnter && !isAvoid && <AlertTriangle className="w-3.5 h-3.5" />}
+            <span>{sectorAnalysis.tradeVerdict}: {isEnter ? 'GO' : isAvoid ? 'NO GO' : 'WATCH'}</span>
+          </span>
+        </div>
+
+        {/* Sector Breadth Meter & Explanation */}
+        <div className="flex items-center justify-between text-[11px] text-slate-300 gap-2 mb-1">
+          <span>
+            Breadth: <strong className="text-emerald-300">{sectorAnalysis.sectorAdvancing} Green</strong> / <strong className="text-rose-300">{sectorAnalysis.sectorDeclining} Red</strong> ({sectorAnalysis.sectorBullishBreadthPct}% Bullish)
+          </span>
+          <span className="text-[10px] text-slate-400">
+            {sectorAnalysis.sectorTotalStocks} stocks in sector
+          </span>
+        </div>
+
+        {/* Mini Breadth Progress Bar */}
+        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mb-1.5 flex">
+          <div 
+            className="bg-emerald-500 h-full transition-all duration-300"
+            style={{ width: `${sectorAnalysis.sectorBullishBreadthPct}%` }}
+            title={`${sectorAnalysis.sectorBullishBreadthPct}% Bullish`}
+          />
+          <div 
+            className="bg-rose-500 h-full transition-all duration-300"
+            style={{ width: `${100 - sectorAnalysis.sectorBullishBreadthPct}%` }}
+            title={`${100 - sectorAnalysis.sectorBullishBreadthPct}% Bearish`}
+          />
+        </div>
+
+        <p className="text-[11px] text-slate-300 leading-snug">
+          {sectorAnalysis.verdictDescription}
+        </p>
+      </div>
+    );
+  };
+
   return (
     <section 
       id="ten-fifteen-picks-hub"
@@ -152,12 +248,13 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
                 <span className="bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-2xs">
                   3 Bullish &bull; 3 Bearish
                 </span>
-                <span className="bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  1st Hour Breakout Scan
+                <span className="bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <PieChart className="w-3 h-3 text-cyan-300" />
+                  Sector Strength Verified
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-                Calculated at 10:15 AM after the opening 1-hour discovery drive (09:15–10:15). Combines <strong>100% Bullish/Bearish move formulas</strong>, 15m breakouts, Open=Low/High, VWAP, and Gann calculations.
+                Calculated at 10:15 AM after the 1-hour discovery drive (09:15–10:15). Automatically pairs <strong>100% Move Formulas</strong> with <strong>Sector Strength Percentage</strong> to validate institutional flow before you enter.
               </p>
             </div>
           </div>
@@ -180,11 +277,25 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
               </span>
             </div>
 
+            {/* Toggle Sector Leaderboard */}
+            <button
+              onClick={() => setIsSectorsOpen(!isSectorsOpen)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                isSectorsOpen 
+                  ? 'bg-indigo-600 text-white border-indigo-400/50 shadow-sm' 
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
+              title="Toggle Live Sector Strength Heatmap"
+            >
+              <PieChart className="w-3.5 h-3.5" />
+              <span>Sectors Heatmap</span>
+            </button>
+
             {/* Info modal trigger */}
             <button
               onClick={() => setIsInfoOpen(!isInfoOpen)}
               className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs transition-colors"
-              title="Learn why 10:15 AM is the institutional trade window"
+              title="Learn strategy & timing rules"
             >
               <HelpCircle className="w-4 h-4" />
             </button>
@@ -214,6 +325,56 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
 
         </div>
 
+        {/* Sector Strength Live Leaderboard Bar */}
+        {isSectorsOpen && analysis.topSectors.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-slate-800 animate-fade-in">
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Gauge className="w-3.5 h-3.5 text-indigo-400" />
+                Live Sector Strength Percentages @ 10:15 AM
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Rule: Enter Bullish if Sector &gt; +0.4% • Enter Short if Sector &lt; -0.4%
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {analysis.topSectors.slice(0, 6).map((sec) => {
+                const isGainer = sec.avgPctChange >= 0;
+                return (
+                  <div
+                    key={sec.sectorKey}
+                    className={`p-2 rounded-xl border text-xs transition-all ${
+                      sec.avgPctChange >= 0.4
+                        ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                        : sec.avgPctChange <= -0.4
+                        ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
+                        : 'bg-slate-900/60 border-slate-800 text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[11px] mb-1 font-semibold">
+                      <span className="truncate flex items-center gap-1">
+                        <span>{sec.categoryIcon}</span>
+                        <span className="truncate">{sec.sectorName.split(' ')[0]}</span>
+                      </span>
+                      <span className={`font-mono font-black ${
+                        isGainer ? 'text-emerald-400' : 'text-rose-400'
+                      }`}>
+                        {isGainer ? '+' : ''}{sec.avgPctChange.toFixed(2)}%
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-400">
+                      <span>{sec.bullishBreadthPct}% Bull</span>
+                      <span>{sec.advancingCount}↑ {sec.decliningCount}↓</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* 10:15 AM Strategy Info Drawer */}
         {isInfoOpen && (
           <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-200 grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/60 animate-fade-in">
@@ -227,18 +388,18 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
             </div>
             <div>
               <div className="font-bold text-emerald-300 flex items-center gap-1 mb-1">
-                <TrendingUp className="w-3.5 h-3.5" /> 2. 100% Bullish Formula
+                <PieChart className="w-3.5 h-3.5" /> 2. Sector Strength Rule
               </div>
               <p className="text-slate-300 text-[11px] leading-relaxed">
-                Matches Close &gt; Open &bull; Close &gt; Prev Close &bull; Close &ge; High - (Range &times; 0.20) &bull; Body / Range &ge; 0.65 &bull; Open=Low &bull; Above VWAP.
+                <strong>ENTER</strong> when sector is aligned (&gt; +0.4% &amp; &gt; 60% green for Bulls; &lt; -0.4% &amp; &gt; 60% red for Shorts). <strong>AVOID</strong> if fighting sector momentum.
               </p>
             </div>
             <div>
-              <div className="font-bold text-rose-300 flex items-center gap-1 mb-1">
-                <TrendingDown className="w-3.5 h-3.5" /> 3. 100% Bearish Formula
+              <div className="font-bold text-indigo-300 flex items-center gap-1 mb-1">
+                <Target className="w-3.5 h-3.5" /> 3. 100% Formula Confluence
               </div>
               <p className="text-slate-300 text-[11px] leading-relaxed">
-                Matches Close &lt; Open &bull; Close &lt; Prev Close &bull; Close &le; Low + (Range &times; 0.20) &bull; Body / Range &ge; 0.60 &bull; Open=High &bull; Below VWAP.
+                Validates Close &gt; Open, Close &gt; Prev Close, Close &ge; High - 0.20&times;Range, Body/Range &ge; 0.65, Open=Low, and VWAP support.
               </p>
             </div>
           </div>
@@ -246,7 +407,7 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
 
         {/* Filter Tabs Strip */}
         <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center space-x-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700/80">
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700/80">
             <button
               onClick={() => setFilterMode('ALL')}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
@@ -256,6 +417,18 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
               }`}
             >
               All 6 Power Picks
+            </button>
+            <button
+              onClick={() => setFilterMode('ENTER_ONLY')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 ${
+                filterMode === 'ENTER_ONLY'
+                  ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                  : 'text-emerald-300 hover:text-white hover:bg-emerald-900/40'
+              }`}
+              title="Show only trades where Sector is Strongly Aligned (ENTER Verdict)"
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>🟢 Sector ENTER Only</span>
             </button>
             <button
               onClick={() => setFilterMode('BULLISH_ONLY')}
@@ -292,17 +465,17 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
       {/* Main Content Area: Side-by-Side Dual Deck */}
       {isExpanded && (
         <div className="p-4 sm:p-6 bg-slate-50/60">
-          <div className={`grid grid-cols-1 ${filterMode === 'ALL' ? 'lg:grid-cols-2' : 'grid-cols-1 max-w-4xl mx-auto'} gap-6`}>
+          <div className={`grid grid-cols-1 ${filterMode === 'ALL' || filterMode === 'ENTER_ONLY' ? 'lg:grid-cols-2' : 'grid-cols-1 max-w-4xl mx-auto'} gap-6`}>
             
             {/* LEFT DECK: TOP 3 BULLISH STOCKS */}
-            {(filterMode === 'ALL' || filterMode === 'BULLISH_ONLY') && (
+            {(filterMode === 'ALL' || filterMode === 'BULLISH_ONLY' || filterMode === 'ENTER_ONLY') && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping" />
                     <h3 className="text-sm font-black text-emerald-950 uppercase tracking-wide flex items-center gap-1.5">
                       <TrendingUp className="w-4 h-4 text-emerald-600" />
-                      <span>Top 3 Bullish Stocks for the Day</span>
+                      <span>Top Bullish Stocks for the Day</span>
                     </h3>
                   </div>
                   <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-bold border border-emerald-300">
@@ -310,12 +483,12 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
                   </span>
                 </div>
 
-                {analysis.bullishPicks.length === 0 ? (
+                {filteredBullishPicks.length === 0 ? (
                   <div className="p-6 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
-                    No bullish candidates detected in current snapshot. Click "Fetch All 15m Candles" to sync live data.
+                    No bullish candidates meet the current filter. Try selecting "All 6 Power Picks".
                   </div>
                 ) : (
-                  analysis.bullishPicks.map((pick) => {
+                  filteredBullishPicks.map((pick) => {
                     const originalStock = stockMap.get(pick.stockId);
                     const isCopied = copiedTradeId === pick.stockId;
 
@@ -356,6 +529,9 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
                             </span>
                           </div>
                         </div>
+
+                        {/* 🌟 SECTOR STRENGTH PERCENTAGE & ENTER / AVOID VERDICT BADGE */}
+                        {renderSectorVerdictBadge(pick)}
 
                         {/* Conviction Score Bar & Catalysts */}
                         <div className="mb-3.5 bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200/80">
@@ -521,14 +697,14 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
             )}
 
             {/* RIGHT DECK: TOP 3 BEARISH STOCKS */}
-            {(filterMode === 'ALL' || filterMode === 'BEARISH_ONLY') && (
+            {(filterMode === 'ALL' || filterMode === 'BEARISH_ONLY' || filterMode === 'ENTER_ONLY') && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-rose-200">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
                     <h3 className="text-sm font-black text-rose-950 uppercase tracking-wide flex items-center gap-1.5">
                       <TrendingDown className="w-4 h-4 text-rose-600" />
-                      <span>Top 3 Bearish Stocks for the Day</span>
+                      <span>Top Bearish Stocks for the Day</span>
                     </h3>
                   </div>
                   <span className="bg-rose-100 text-rose-800 text-xs px-2.5 py-0.5 rounded-full font-bold border border-rose-300">
@@ -536,12 +712,12 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
                   </span>
                 </div>
 
-                {analysis.bearishPicks.length === 0 ? (
+                {filteredBearishPicks.length === 0 ? (
                   <div className="p-6 bg-white rounded-2xl border border-slate-200 text-center text-xs text-slate-500">
-                    No bearish candidates detected in current snapshot. Click "Fetch All 15m Candles" to sync live data.
+                    No bearish candidates meet the current filter. Try selecting "All 6 Power Picks".
                   </div>
                 ) : (
-                  analysis.bearishPicks.map((pick) => {
+                  filteredBearishPicks.map((pick) => {
                     const originalStock = stockMap.get(pick.stockId);
                     const isCopied = copiedTradeId === pick.stockId;
 
@@ -582,6 +758,9 @@ Catalysts: ${pick.catalysts.join(' • ')}`;
                             </span>
                           </div>
                         </div>
+
+                        {/* 🌟 SECTOR STRENGTH PERCENTAGE & ENTER / AVOID VERDICT BADGE */}
+                        {renderSectorVerdictBadge(pick)}
 
                         {/* Conviction Score Bar & Catalysts */}
                         <div className="mb-3.5 bg-rose-50/70 p-2.5 rounded-xl border border-rose-200/80">
