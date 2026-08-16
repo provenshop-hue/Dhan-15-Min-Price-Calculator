@@ -1586,3 +1586,146 @@ function getTimeElapsedStr(startTimeStr: string, endTimeStr: string): string {
   return `${m}m`;
 }
 
+/**
+ * 15-Minute Bounce at 9:30 AM (Bullish):
+ * Criteria:
+ * 1. Data available (open, close, high, low).
+ * 2. Bullish session bias: Close >= Open (Green candle) OR Open = Low pattern held at 9:15-9:30 AM.
+ * 3. Price reacted from low/support and pushed up towards high:
+ *    - Close >= Low + (High - Low) * 0.45 (trading in upper 55% of the 15m candle range).
+ *    - AND price is holding above or near Gann Buy Above / VWAP / Previous Close.
+ *    - AND pctChange >= -0.20% (no severe session loss).
+ *    - AND RSI >= 44 (positive momentum).
+ */
+export function is15mBounce930Bullish(stock: StockCalculated): boolean {
+  const open = stock.openPrice;
+  const close = stock.closePrice;
+  const high = stock.highPrice;
+  const low = stock.lowPrice;
+
+  if (open === undefined || open === null || open <= 0) return false;
+  if (close === undefined || close === null || close <= 0) return false;
+  if (high === undefined || high === null || high <= 0) return false;
+  if (low === undefined || low === null || low <= 0) return false;
+
+  const range = high - low;
+  const pct = stock.pctChange || 0;
+  const isOpenLow = checkStockOpenLow(stock);
+
+  // Must not be a strong red candle with negative net day change
+  if (close < open && pct < -0.2 && !isOpenLow) return false;
+
+  // Check 1: Open = Low or Green Candle
+  const isGreenOrOpenLow = close >= open || isOpenLow;
+  if (!isGreenOrOpenLow) return false;
+
+  // Check 2: Bounced into upper half of candle
+  if (range > 0) {
+    const positionInRange = (close - low) / range;
+    if (positionInRange < 0.45 && !isOpenLow) return false;
+  }
+
+  // Check 3: Holding VWAP or Gann Support or positive momentum
+  const vwap = stock.vwap || open;
+  const isAboveVwapOrBuy = close >= vwap * 0.995 || (stock.buyAbove ? close >= stock.buyAbove * 0.995 : false);
+  const rsi = stock.rsi ?? 50;
+
+  if (rsi < 44 && !isOpenLow) return false;
+
+  return isAboveVwapOrBuy || pct >= 0;
+}
+
+/**
+ * 15-Minute Bounce / Rejection at 9:30 AM (Bearish):
+ * Criteria:
+ * 1. Data available (open, close, high, low).
+ * 2. Bearish session bias: Close <= Open (Red candle) OR Open = High pattern held at 9:15-9:30 AM.
+ * 3. Price rejected from high/resistance and pushed down towards low:
+ *    - Close <= High - (High - Low) * 0.45 (trading in lower 55% of the 15m candle range).
+ *    - AND price is holding below or near Gann Sell Below / VWAP / Previous Close.
+ *    - AND pctChange <= 0.20% (no strong session rally).
+ *    - AND RSI <= 56 (negative momentum).
+ */
+export function is15mBounce930Bearish(stock: StockCalculated): boolean {
+  const open = stock.openPrice;
+  const close = stock.closePrice;
+  const high = stock.highPrice;
+  const low = stock.lowPrice;
+
+  if (open === undefined || open === null || open <= 0) return false;
+  if (close === undefined || close === null || close <= 0) return false;
+  if (high === undefined || high === null || high <= 0) return false;
+  if (low === undefined || low === null || low <= 0) return false;
+
+  const range = high - low;
+  const pct = stock.pctChange || 0;
+  const isOpenHigh = checkStockOpenHigh(stock);
+
+  // Must not be a strong green candle with positive net day change
+  if (close > open && pct > 0.2 && !isOpenHigh) return false;
+
+  // Check 1: Open = High or Red Candle
+  const isRedOrOpenHigh = close <= open || isOpenHigh;
+  if (!isRedOrOpenHigh) return false;
+
+  // Check 2: Rejected into lower half of candle
+  if (range > 0) {
+    const positionInRange = (high - close) / range;
+    if (positionInRange < 0.45 && !isOpenHigh) return false;
+  }
+
+  // Check 3: Below VWAP or Gann Resistance or negative momentum
+  const vwap = stock.vwap || open;
+  const isBelowVwapOrSell = close <= vwap * 1.005 || (stock.sellBelow ? close <= stock.sellBelow * 1.005 : false);
+  const rsi = stock.rsi ?? 50;
+
+  if (rsi > 56 && !isOpenHigh) return false;
+
+  return isBelowVwapOrSell || pct <= 0;
+}
+
+export interface Bounce930Info {
+  isBullish: boolean;
+  isBearish: boolean;
+  bounceType: 'BULLISH' | 'BEARISH' | 'NONE';
+  badgeLabel: string;
+  badgeClass: string;
+  detail: string;
+}
+
+export function get15mBounce930Info(stock: StockCalculated): Bounce930Info {
+  const isBull = is15mBounce930Bullish(stock);
+  const isBear = is15mBounce930Bearish(stock);
+
+  if (isBull && !isBear) {
+    return {
+      isBullish: true,
+      isBearish: false,
+      bounceType: 'BULLISH',
+      badgeLabel: '🟢 9:30 AM Bull Bounce',
+      badgeClass: 'bg-emerald-950 text-emerald-300 border-emerald-500/80',
+      detail: `9:30 AM Bullish candle bounce: Price holding above low/support (₹${(stock.lowPrice || 0).toFixed(2)}) with buyers driving price towards ₹${(stock.closePrice || 0).toFixed(2)}.`
+    };
+  }
+
+  if (isBear && !isBull) {
+    return {
+      isBullish: false,
+      isBearish: true,
+      bounceType: 'BEARISH',
+      badgeLabel: '🔴 9:30 AM Bear Breakdown',
+      badgeClass: 'bg-rose-950 text-rose-300 border-rose-500/80',
+      detail: `9:30 AM Bearish candle rejection: Price failed at high/resistance (₹${(stock.highPrice || 0).toFixed(2)}) with sellers driving price towards ₹${(stock.closePrice || 0).toFixed(2)}.`
+    };
+  }
+
+  return {
+    isBullish: false,
+    isBearish: false,
+    bounceType: 'NONE',
+    badgeLabel: 'Neutral',
+    badgeClass: 'bg-slate-800 text-slate-400 border-slate-700',
+    detail: 'No specific 9:30 AM directional bounce detected.'
+  };
+}
+

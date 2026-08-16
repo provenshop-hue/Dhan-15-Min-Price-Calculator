@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, Flame, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown, Clock } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney } from '../types';
 import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3, isOpenCalc2DecLesserThanClose, isOpenCalc2DecGreaterThanClose, isOpenCalcLessThan3AndCloseGreaterThan10, isOpenCalcGreaterThan10AndCloseLessThan3 } from '../utils/gann';
-import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
+import { detect15mHighPullbackBounce, is15mBounce930Bullish, is15mBounce930Bearish, get15mBounce930Info } from '../utils/rsiPullback';
 import { analyzeBullishCombinations } from '../utils/bullishCombinations';
 import { evaluateStockTradeJourney } from '../utils/tradeTracker';
 import { evaluateStockSectorStrength } from '../utils/sectorMaster';
@@ -24,6 +24,8 @@ export interface PresetRecipe15m {
 
 export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
   // 15m Candlestick & Price Patterns
+  { id: 'BOUNCE_930_BULLISH', label: '🟢 15m Bounce @ 9:30 AM (Bullish)', category: '15m Candlestick & Price Patterns', description: 'Price bounced up at 9:30 AM candle close holding support / O=L with bullish momentum' },
+  { id: 'BOUNCE_930_BEARISH', label: '🔴 15m Bounce/Rejection @ 9:30 AM (Bearish)', category: '15m Candlestick & Price Patterns', description: 'Price rejected down at 9:30 AM candle close below O=H / 15m low with selling pressure' },
   { id: 'OPEN_LOW', label: '🟢 Open = Low Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at low of first 15m candle' },
   { id: 'OPEN_HIGH', label: '🔴 Open = High Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at high of first 15m candle' },
   { id: 'HIGH_CLOSE', label: '🏆 High = Close Pattern', category: '15m Candlestick & Price Patterns', description: 'Closing/CMP near high of 15m candle' },
@@ -62,6 +64,20 @@ export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
 ];
 
 export const PRESET_RECIPES_15M: PresetRecipe15m[] = [
+  {
+    id: 'BOUNCE_930_BULL_WAVE',
+    name: '🟢 9:30 AM Bullish Bounce Wave',
+    description: '15m Bounce @ 9:30 AM + Above 15m High + Bullish',
+    optionKeys: ['BOUNCE_930_BULLISH', 'ABOVE_15M_HIGH', 'BULLISH'],
+    badge: '9:30 AM Bull'
+  },
+  {
+    id: 'BOUNCE_930_BEAR_WAVE',
+    name: '🔴 9:30 AM Bearish Breakdown Wave',
+    description: '15m Bounce/Rejection @ 9:30 AM + Below 15m Low + Bearish',
+    optionKeys: ['BOUNCE_930_BEARISH', 'BELOW_15M_LOW', 'BEARISH'],
+    badge: '9:30 AM Bear'
+  },
   {
     id: 'SECTOR_POWER_BULL',
     name: '🛡️ Sector-Aligned Bull Power',
@@ -315,6 +331,10 @@ export const StockTable: React.FC<StockTableProps> = ({
         const bounce = detect15mHighPullbackBounce(s);
         return bounce.isPullbackBounce;
       }
+      case 'BOUNCE_930_BULLISH':
+        return is15mBounce930Bullish(s);
+      case 'BOUNCE_930_BEARISH':
+        return is15mBounce930Bearish(s);
       case 'CALCULATED_DATA':
         return s.isFetched || (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0);
       default:
@@ -365,8 +385,10 @@ export const StockTable: React.FC<StockTableProps> = ({
   const comboAnyCount = stocks.filter((s) => analyzeBullishCombinations(s).isAnyComboMet).length;
   const veryBullishCount = stocks.filter((s) => s.trend === 'Very Bullish').length;
   const bullishCount = stocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish').length;
+  const bounce930BullCount = stocks.filter(is15mBounce930Bullish).length;
   const veryBearishCount = stocks.filter((s) => s.trend === 'Very Bearish').length;
   const bearishCount = stocks.filter((s) => s.trend === 'Bearish' || s.trend === 'Very Bearish').length;
+  const bounce930BearCount = stocks.filter(is15mBounce930Bearish).length;
 
   // Filter stocks
   const filteredStocks = stocks.filter((s) => {
@@ -395,8 +417,10 @@ export const StockTable: React.FC<StockTableProps> = ({
     if (trendFilter === 'BULLISH_COMBO_ANY' && !analyzeBullishCombinations(s).isAnyComboMet) return false;
     if (trendFilter === 'VERY_BULLISH' && s.trend !== 'Very Bullish') return false;
     if (trendFilter === 'BULLISH' && s.trend !== 'Bullish' && s.trend !== 'Very Bullish') return false;
+    if (trendFilter === 'BOUNCE_930_BULLISH' && !is15mBounce930Bullish(s)) return false;
     if (trendFilter === 'VERY_BEARISH' && s.trend !== 'Very Bearish') return false;
     if (trendFilter === 'BEARISH' && s.trend !== 'Bearish' && s.trend !== 'Very Bearish') return false;
+    if (trendFilter === 'BOUNCE_930_BEARISH' && !is15mBounce930Bearish(s)) return false;
     if (trendFilter === 'CALCULATED' && !(s.isFetched || (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0))) return false;
 
     // 🧪 Filter Recipe multi-checkbox filtering
@@ -824,6 +848,18 @@ export const StockTable: React.FC<StockTableProps> = ({
               Bullish ({bullishCount})
             </button>
             <button
+              onClick={() => { setTrendFilter('BOUNCE_930_BULLISH'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-all flex items-center gap-1 ${
+                trendFilter === 'BOUNCE_930_BULLISH'
+                  ? 'bg-emerald-900 text-emerald-200 ring-2 ring-emerald-400 shadow-2xs'
+                  : 'text-emerald-900 bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300/80 shadow-2xs'
+              }`}
+              title="15m Bounce at 9:30 AM (Bullish candle bounce off support/O=L with buying conviction)"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300 stroke-[2.5]" />
+              9:30 AM Bounce (Bull) ({bounce930BullCount})
+            </button>
+            <button
               onClick={() => { setTrendFilter('VERY_BEARISH'); setCurrentPage(1); }}
               className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
                 trendFilter === 'VERY_BEARISH' ? 'bg-rose-600 text-white shadow-2xs' : 'text-rose-700 hover:bg-rose-100'
@@ -838,6 +874,18 @@ export const StockTable: React.FC<StockTableProps> = ({
               }`}
             >
               Bearish ({bearishCount})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('BOUNCE_930_BEARISH'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-all flex items-center gap-1 ${
+                trendFilter === 'BOUNCE_930_BEARISH'
+                  ? 'bg-rose-900 text-rose-200 ring-2 ring-rose-400 shadow-2xs'
+                  : 'text-rose-900 bg-rose-100/90 hover:bg-rose-200 border border-rose-300/80 shadow-2xs'
+              }`}
+              title="15m Bounce / Rejection at 9:30 AM (Bearish candle rejection off resistance/O=H with selling pressure)"
+            >
+              <ArrowDownRight className="w-3.5 h-3.5 text-rose-600 dark:text-rose-300 stroke-[2.5]" />
+              9:30 AM Bounce (Bear) ({bounce930BearCount})
             </button>
             <button
               onClick={() => { setTrendFilter('CALCULATED'); setCurrentPage(1); }}
@@ -1504,6 +1552,20 @@ export const StockTable: React.FC<StockTableProps> = ({
                                 {sec.tradeVerdict}
                               </span>
                             </div>
+                          );
+                        })()}
+
+                        {/* 15m Bounce @ 9:30 AM Signal Indicator Badge */}
+                        {(() => {
+                          const bounceInfo = get15mBounce930Info(stock);
+                          if (bounceInfo.bounceType === 'NONE') return null;
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border shadow-2xs ${bounceInfo.badgeClass}`}
+                              title={bounceInfo.detail}
+                            >
+                              {bounceInfo.badgeLabel}
+                            </span>
                           );
                         })()}
 

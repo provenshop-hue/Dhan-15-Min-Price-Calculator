@@ -7,6 +7,7 @@ import { evaluateIdealOptionTrade } from '../utils/idealTradeAnalyzer';
 import { evaluateBtstPrediction } from '../utils/btstPredictor';
 import { formatStrikePrice } from '../utils/nseStrikeMaster';
 import { evaluateStockSectorStrength } from '../utils/sectorMaster';
+import { get15mBounce930Info } from '../utils/rsiPullback';
 import { StockTimingHistoryAnalysis } from './StockTimingHistoryAnalysis';
 
 interface StockDetailModalProps {
@@ -201,6 +202,51 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, allSt
                   </strong>
                   <span className="text-[8.5px] text-slate-400 block mt-0.5 font-sans">Algorithm Weight</span>
                 </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ⏱️ 15m Bounce @ 9:30 AM Status Card */}
+        {(() => {
+          const bounceInfo = get15mBounce930Info(stock);
+          if (bounceInfo.bounceType === 'NONE') return null;
+
+          return (
+            <div className={`mt-4 p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md ${
+              bounceInfo.bounceType === 'BULLISH'
+                ? 'bg-gradient-to-r from-emerald-950/90 via-slate-900 to-emerald-950/90 border-emerald-500/60 text-emerald-100'
+                : 'bg-gradient-to-r from-rose-950/90 via-slate-900 to-rose-950/90 border-rose-500/60 text-rose-100'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-xl border ${
+                  bounceInfo.bounceType === 'BULLISH'
+                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                    : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                }`}>
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                    <span>15M CANDLE BOUNCE @ 09:30 AM</span>
+                    <span className={`px-2 py-0.5 rounded text-[9.5px] font-black border ${bounceInfo.badgeClass}`}>
+                      {bounceInfo.badgeLabel}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 font-medium leading-relaxed">
+                    {bounceInfo.detail}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right shrink-0">
+                <span className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg border ${
+                  bounceInfo.bounceType === 'BULLISH'
+                    ? 'bg-emerald-600 text-white border-emerald-400'
+                    : 'bg-rose-600 text-white border-rose-400'
+                }`}>
+                  {bounceInfo.bounceType === 'BULLISH' ? '🚀 Bullish 9:30 Setup' : '📉 Bearish 9:30 Setup'}
+                </span>
               </div>
             </div>
           );
