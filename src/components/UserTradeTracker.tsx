@@ -5,13 +5,21 @@ import {
   DhanApiCredentials,
   InstrumentType,
   PositionSide,
-  TradeActionAdvice
+  TradeActionAdvice,
+  UserCapitalProfile
 } from '../types';
 import {
   evaluateUserTrackedTrade,
   getStoredUserTrades,
   saveStoredUserTrades
 } from '../utils/userTradeAdvisor';
+import {
+  getStoredTotalCapital,
+  saveStoredTotalCapital,
+  calculateUserCapitalJourney
+} from '../utils/capitalJourneyAdvisor';
+import { CapitalJourneyModal } from './CapitalJourneyModal';
+import { StockJourneyTimelineModal } from './StockJourneyTimelineModal';
 import { INITIAL_STOCKS } from '../data/stocks';
 import { getExactNseStrikeStep, roundToExactNseStrike, formatStrikePrice } from '../utils/nseStrikeMaster';
 import {
@@ -55,7 +63,8 @@ import {
   MessageSquare,
   Heart,
   Smile,
-  Bot
+  Bot,
+  Wallet
 } from 'lucide-react';
 
 interface UserTradeTrackerProps {
@@ -77,6 +86,11 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
   onSelectStockDetail,
   onOpenPositionSizer
 }) => {
+  // Capital Journey & Bankroll State
+  const [totalCapital, setTotalCapital] = useState<number>(() => getStoredTotalCapital());
+  const [isCapitalModalOpen, setIsCapitalModalOpen] = useState<boolean>(false);
+  const [selectedJourneyTrade, setSelectedJourneyTrade] = useState<UserTrackedTrade | null>(null);
+
   // Stored Trades
   const [trades, setTrades] = useState<UserTrackedTrade[]>(() => {
     return getStoredUserTrades();
@@ -286,6 +300,11 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
   // Active & Closed Trades Filtering
   const openTrades = useMemo(() => trades.filter((t) => t.status === 'OPEN'), [trades]);
   const closedTrades = useMemo(() => trades.filter((t) => t.status === 'CLOSED'), [trades]);
+
+  // Capital Profile Calculation
+  const capitalProfile = useMemo(() => {
+    return calculateUserCapitalJourney(totalCapital, openTrades);
+  }, [totalCapital, openTrades]);
 
   // Summary Metrics
   const summaryMetrics = useMemo(() => {
@@ -683,6 +702,17 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
 
           {/* Action Toolbar */}
           <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+            {/* Capital & Journey Blueprint Button */}
+            <button
+              type="button"
+              onClick={() => setIsCapitalModalOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-400/40 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs"
+              title="View Complete Capital & Phased Journey Roadmap"
+            >
+              <Wallet className="w-4 h-4 text-blue-300" />
+              <span>Capital &amp; Journey (₹{totalCapital.toLocaleString('en-IN')})</span>
+            </button>
+
             {/* Master Companion Voice Briefing */}
             <button
               type="button"
@@ -846,6 +876,29 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
                 : `Hey buddy! I am tracking your ${openTrades.length} open position(s) in real-time. Every trade below has dedicated RSI/Volume coaching, clear profit targets, and exact averaging quantities with breakeven math. Let's stay disciplined and execute with confidence!`}
             </p>
           </div>
+        </div>
+
+        {/* Capital Journey Stage & Deployment Status Strip */}
+        <div className="mt-3 p-3 bg-gradient-to-r from-slate-950/90 via-indigo-950/50 to-slate-950/90 rounded-2xl border border-indigo-500/20 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-400/20">
+              <Target className="w-3.5 h-3.5 text-indigo-400" />
+            </div>
+            <div className="text-xs">
+              <span className="font-bold text-slate-200">{capitalProfile.stageTitle}: </span>
+              <span className="text-slate-400 font-medium">
+                ₹{capitalProfile.deployedCapital.toLocaleString('en-IN')} deployed ({((capitalProfile.deployedCapital / capitalProfile.totalTradingCapital) * 100).toFixed(0)}%), ₹{capitalProfile.freeCashCapital.toLocaleString('en-IN')} cash buffer ready.
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsCapitalModalOpen(true)}
+            className="px-3 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-400/30 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+          >
+            <Wallet className="w-3 h-3 text-indigo-300" />
+            <span>View Capital Journey Plan</span>
+            <ChevronRight className="w-3 h-3" />
+          </button>
         </div>
       </div>
 
@@ -1137,20 +1190,32 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
                             </div>
                           </div>
 
-                          {/* Voice Button */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleSpeakTrade(trade)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
-                            title="Listen to this trade's friendly coaching"
-                          >
-                            {speakingTradeId === trade.id ? (
-                              <VolumeX className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-                            ) : (
-                              <Volume2 className="w-3.5 h-3.5 text-blue-600" />
-                            )}
-                            <span>{speakingTradeId === trade.id ? 'Stop Voice' : '🔊 Listen to Friend'}</span>
-                          </button>
+                          {/* Voice & 5-Min Journey Timeline Buttons */}
+                          <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedJourneyTrade(trade)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
+                              title="Open 5-minute step-by-step timeline simulator & companion journey tracker"
+                            >
+                              <Clock className="w-3.5 h-3.5 text-blue-200" />
+                              <span>⏱️ 5-Min Journey</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSpeakTrade(trade)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
+                              title="Listen to this trade's friendly coaching"
+                            >
+                              {speakingTradeId === trade.id ? (
+                                <VolumeX className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                              ) : (
+                                <Volume2 className="w-3.5 h-3.5 text-blue-600" />
+                              )}
+                              <span>{speakingTradeId === trade.id ? 'Stop Voice' : '🔊 Listen'}</span>
+                            </button>
+                          </div>
                         </div>
 
                         {/* Co-Pilot Pillar 1: Friendly RSI & Volume Diagnostics */}
@@ -2984,6 +3049,28 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
           </div>
         </div>
       )}
+
+      {/* Capital Journey Blueprint Modal */}
+      <CapitalJourneyModal
+        isOpen={isCapitalModalOpen}
+        onClose={() => setIsCapitalModalOpen(false)}
+        capitalProfile={capitalProfile}
+        openTrades={openTrades}
+        onUpdateTotalCapital={(newAmt) => {
+          saveStoredTotalCapital(newAmt);
+          setTotalCapital(newAmt);
+        }}
+      />
+
+      {/* 5-Minute Stock Journey Timeline & Simulator Modal */}
+      <StockJourneyTimelineModal
+        isOpen={!!selectedJourneyTrade}
+        onClose={() => setSelectedJourneyTrade(null)}
+        trade={selectedJourneyTrade}
+        matchingStock={selectedJourneyTrade ? stockMap.get(selectedJourneyTrade.symbol.toUpperCase()) : undefined}
+        onSpeakText={(txt) => speakText(txt)}
+        isSpeaking={!!speakingTradeId}
+      />
 
     </div>
   );

@@ -1,6 +1,6 @@
 {
   "name": "StockMarket ATM",
-  "description": "15-minute open and close price calculator with Dhan HQ Data API integration, User Trade & Option Tracker with 5-minute live Dhan refresh and hold/average/profit guidance, Manual Stock Analyzer tab with real-time Gann calculations and manual override, 10:15 AM Daily Power Picks with sector strength percentage, multi-fetch trade confidence timing journey tracker, live ideal options radar, and built-in Nifty Futures stock list.",
+  "description": "15-minute open and close price calculator with Dhan HQ Data API integration, User Trade Tracker & Trading Companion with 5-minute live Dhan sync, Total Capital Journey Blueprint roadmap, 5-minute timeline iteration and time machine simulator for any stock with enable/disable controls, real-time RSI and volume coaching, precision averaging and exit plans, and speech synthesis voice guidance.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

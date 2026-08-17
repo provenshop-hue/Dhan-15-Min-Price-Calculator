@@ -580,3 +580,77 @@ export interface AveragingGuidanceData {
   isSafeToAverage: boolean;
 }
 
+export type CapitalStageType = 'MICRO_GROWTH' | 'CAPITAL_COMPOUNDER' | 'PRO_POSITION_SCALER' | 'INSTITUTIONAL_ELITE';
+
+export interface CapitalJourneyMilestone {
+  stageName: string;
+  targetCapital: number;
+  targetProfitGain: number;
+  maxLotsAllowed: number;
+  maxPositionsAllowed: number;
+  status: 'ACTIVE' | 'UPCOMING' | 'COMPLETED';
+  description: string;
+}
+
+export interface UserCapitalProfile {
+  totalTradingCapital: number; // User configurable bankroll (e.g. ₹1,00,000)
+  deployedCapital: number; // Deployed in active open trades
+  freeCashCapital: number; // Unallocated cash balance
+  reservedAveragingBuffer: number; // 35% suggested allocation for tactical averaging
+  emergencyRiskBuffer: number; // 15% safety buffer
+  stage: CapitalStageType;
+  stageTitle: string;
+  stageDescription: string;
+  nextMilestoneCapital: number;
+  progressToNextMilestonePct: number;
+  maxRiskPerTradeAmount: number;
+  maxRiskPerTradePct: number; // e.g. 2%
+  recommendedMaxActiveTrades: number;
+  recommendedMaxLotSize: number;
+  milestones: CapitalJourneyMilestone[];
+  journeyActionableRules: string[];
+  friendJourneyAdvice: string;
+}
+
+export interface JourneyTimelineStep {
+  stepIndex: number;
+  timeStr: string; // e.g. "09:15 AM", "09:20 AM"
+  minutesElapsed: number; // 0, 5, 10, 15...
+  price: number;
+  pointsDiff: number;
+  pnl: number;
+  pnlPct: number;
+  rsi: number;
+  rsiTrajectory: 'RISING' | 'FALLING' | 'FLAT';
+  volumeRatio: number;
+  buyerPressurePct: number;
+  vwap: number;
+  isAboveVwap: boolean;
+  verdictAction: 'STRONG_HOLD' | 'WAIT_PATIENTLY' | 'SCALE_IN_AVERAGE' | 'BOOK_PARTIAL_PROFIT' | 'EXIT_CAPITAL_PRESERVATION';
+  verdictBadge: string;
+  friendGuidanceMessage: string;
+  actionCallout: string;
+  isMilestone: boolean;
+  milestoneTag?: string; // e.g. "🎯 Target 1 Achieved", "⚖️ Support Bounce & Averaging Trigger"
+}
+
+export interface StockJourneyTimelineConfig {
+  tradeId: string;
+  symbol: string;
+  isEnabled: boolean; // Enable / disable 5-minute journey tracking
+  timelineStartTime: string; // e.g. "09:15"
+  timelineIntervalMinutes: number; // 5
+  autoIterateEnabled: boolean;
+  lastSimulatedStepIndex: number;
+}
+
+export interface StockJourneyData {
+  config: StockJourneyTimelineConfig;
+  trade: UserTrackedTrade;
+  steps: JourneyTimelineStep[];
+  totalSteps: number;
+  activeStepIndex: number;
+  overallJourneySummary: string;
+  journeyOutcome: 'IN_PROGRESS' | 'TARGET_HIT' | 'AVERAGED_REBOUND' | 'STOP_LOSS_PRESERVED';
+}
+
