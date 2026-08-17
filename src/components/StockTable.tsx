@@ -24,8 +24,8 @@ export interface PresetRecipe15m {
 
 export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
   // 15m Candlestick & Price Patterns
-  { id: 'BOUNCE_930_BULLISH', label: '🟢 15m Bounce @ 9:30 AM (Bullish)', category: '15m Candlestick & Price Patterns', description: 'Price bounced up at 9:30 AM candle close holding support / O=L with bullish momentum' },
-  { id: 'BOUNCE_930_BEARISH', label: '🔴 15m Bounce/Rejection @ 9:30 AM (Bearish)', category: '15m Candlestick & Price Patterns', description: 'Price rejected down at 9:30 AM candle close below O=H / 15m low with selling pressure' },
+  { id: 'BOUNCE_930_BULLISH', label: '🟢 15m Bounce @ 9:30 AM (Bullish)', category: '15m Candlestick & Price Patterns', description: 'Price hits higher and closes higher than the first 15-minute candle with bullish momentum' },
+  { id: 'BOUNCE_930_BEARISH', label: '🔴 15m Bounce/Rejection @ 9:30 AM (Bearish)', category: '15m Candlestick & Price Patterns', description: 'Price hits lower and closes lower than the first 15-minute candle with selling pressure' },
   { id: 'OPEN_LOW', label: '🟢 Open = Low Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at low of first 15m candle' },
   { id: 'OPEN_HIGH', label: '🔴 Open = High Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at high of first 15m candle' },
   { id: 'HIGH_CLOSE', label: '🏆 High = Close Pattern', category: '15m Candlestick & Price Patterns', description: 'Closing/CMP near high of 15m candle' },
@@ -854,7 +854,7 @@ export const StockTable: React.FC<StockTableProps> = ({
                   ? 'bg-emerald-900 text-emerald-200 ring-2 ring-emerald-400 shadow-2xs'
                   : 'text-emerald-900 bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300/80 shadow-2xs'
               }`}
-              title="15m Bounce at 9:30 AM (Bullish candle bounce off support/O=L with buying conviction)"
+              title="15m Bounce at 9:30 AM (Price hits higher and closes higher than the first 15-minute candle)"
             >
               <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300 stroke-[2.5]" />
               9:30 AM Bounce (Bull) ({bounce930BullCount})
@@ -882,7 +882,7 @@ export const StockTable: React.FC<StockTableProps> = ({
                   ? 'bg-rose-900 text-rose-200 ring-2 ring-rose-400 shadow-2xs'
                   : 'text-rose-900 bg-rose-100/90 hover:bg-rose-200 border border-rose-300/80 shadow-2xs'
               }`}
-              title="15m Bounce / Rejection at 9:30 AM (Bearish candle rejection off resistance/O=H with selling pressure)"
+              title="15m Bounce / Breakdown at 9:30 AM (Price hits lower and closes lower than the first 15-minute candle)"
             >
               <ArrowDownRight className="w-3.5 h-3.5 text-rose-600 dark:text-rose-300 stroke-[2.5]" />
               9:30 AM Bounce (Bear) ({bounce930BearCount})

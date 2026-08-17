@@ -1588,14 +1588,14 @@ function getTimeElapsedStr(startTimeStr: string, endTimeStr: string): string {
 
 /**
  * 15-Minute Bounce at 9:30 AM (Bullish):
+ * Strictly requires that the price hits higher and closes higher than the first 15-minute candle.
  * Criteria:
  * 1. Data available (open, close, high, low).
- * 2. Bullish session bias: Close >= Open (Green candle) OR Open = Low pattern held at 9:15-9:30 AM.
- * 3. Price reacted from low/support and pushed up towards high:
- *    - Close >= Low + (High - Low) * 0.45 (trading in upper 55% of the 15m candle range).
- *    - AND price is holding above or near Gann Buy Above / VWAP / Previous Close.
- *    - AND pctChange >= -0.20% (no severe session loss).
- *    - AND RSI >= 44 (positive momentum).
+ * 2. Hits higher: High price has traded higher than the first 15m candle high/open (high > first15mHigh || high > open).
+ * 3. Closes higher: Current / closing price closes strictly higher than the first 15m candle (close > first15mHigh || close > open & buyAbove).
+ * 4. Bullish confirmation: Close >= Open (Green candle) OR Open = Low pattern.
+ * 5. Upper range absorption: Close >= Low + (High - Low) * 0.45.
+ * 6. Momentum confirmation: RSI >= 44 and net day change pct >= 0.
  */
 export function is15mBounce930Bullish(stock: StockCalculated): boolean {
   const open = stock.openPrice;
@@ -1612,39 +1612,54 @@ export function is15mBounce930Bullish(stock: StockCalculated): boolean {
   const pct = stock.pctChange || 0;
   const isOpenLow = checkStockOpenLow(stock);
 
-  // Must not be a strong red candle with negative net day change
-  if (close < open && pct < -0.2 && !isOpenLow) return false;
+  // 1. Must not be a strong negative day
+  if (close < open && !isOpenLow) return false;
+  if (pct < 0 && !isOpenLow) return false;
 
-  // Check 1: Open = Low or Green Candle
-  const isGreenOrOpenLow = close >= open || isOpenLow;
-  if (!isGreenOrOpenLow) return false;
+  // 2. Reference 15m candle high
+  const first15mHigh = stock.first15mHigh && stock.first15mHigh > 0 ? stock.first15mHigh : null;
+  const buyAbove = stock.buyAbove && stock.buyAbove > 0 ? stock.buyAbove : null;
 
-  // Check 2: Bounced into upper half of candle
+  // 3. Must hit higher than the first 15-minute candle
+  if (first15mHigh) {
+    if (high <= first15mHigh && close <= first15mHigh) return false;
+  } else {
+    // If first15mHigh is the high of current candle, high must be above open
+    if (high <= open) return false;
+  }
+
+  // 4. Must close higher than the first 15-minute candle
+  if (first15mHigh) {
+    if (close <= first15mHigh) return false;
+  } else {
+    // Closes higher than opening price / Gann Buy Above
+    if (close <= open) return false;
+    if (buyAbove && close < buyAbove * 0.998 && !isOpenLow) return false;
+  }
+
+  // 5. Check: Bounced and holding in upper range of candle
   if (range > 0) {
     const positionInRange = (close - low) / range;
     if (positionInRange < 0.45 && !isOpenLow) return false;
   }
 
-  // Check 3: Holding VWAP or Gann Support or positive momentum
-  const vwap = stock.vwap || open;
-  const isAboveVwapOrBuy = close >= vwap * 0.995 || (stock.buyAbove ? close >= stock.buyAbove * 0.995 : false);
+  // 6. Positive RSI momentum
   const rsi = stock.rsi ?? 50;
-
   if (rsi < 44 && !isOpenLow) return false;
 
-  return isAboveVwapOrBuy || pct >= 0;
+  return true;
 }
 
 /**
- * 15-Minute Bounce / Rejection at 9:30 AM (Bearish):
+ * 15-Minute Bounce / Breakdown at 9:30 AM (Bearish):
+ * Strictly requires that the price hits lower and closes lower than the first 15-minute candle.
  * Criteria:
  * 1. Data available (open, close, high, low).
- * 2. Bearish session bias: Close <= Open (Red candle) OR Open = High pattern held at 9:15-9:30 AM.
- * 3. Price rejected from high/resistance and pushed down towards low:
- *    - Close <= High - (High - Low) * 0.45 (trading in lower 55% of the 15m candle range).
- *    - AND price is holding below or near Gann Sell Below / VWAP / Previous Close.
- *    - AND pctChange <= 0.20% (no strong session rally).
- *    - AND RSI <= 56 (negative momentum).
+ * 2. Hits lower: Low price has traded lower than the first 15m candle low/open (low < first15mLow || low < open).
+ * 3. Closes lower: Current / closing price closes strictly lower than the first 15m candle (close < first15mLow || close < open & sellBelow).
+ * 4. Bearish confirmation: Close <= Open (Red candle) OR Open = High pattern.
+ * 5. Lower range rejection: Close <= High - (High - Low) * 0.45.
+ * 6. Negative momentum: RSI <= 56 and net day change pct <= 0.
  */
 export function is15mBounce930Bearish(stock: StockCalculated): boolean {
   const open = stock.openPrice;
@@ -1661,27 +1676,42 @@ export function is15mBounce930Bearish(stock: StockCalculated): boolean {
   const pct = stock.pctChange || 0;
   const isOpenHigh = checkStockOpenHigh(stock);
 
-  // Must not be a strong green candle with positive net day change
-  if (close > open && pct > 0.2 && !isOpenHigh) return false;
+  // 1. Must not be a positive day
+  if (close > open && !isOpenHigh) return false;
+  if (pct > 0 && !isOpenHigh) return false;
 
-  // Check 1: Open = High or Red Candle
-  const isRedOrOpenHigh = close <= open || isOpenHigh;
-  if (!isRedOrOpenHigh) return false;
+  // 2. Reference 15m candle low
+  const first15mLow = stock.first15mLow && stock.first15mLow > 0 ? stock.first15mLow : null;
+  const sellBelow = stock.sellBelow && stock.sellBelow > 0 ? stock.sellBelow : null;
 
-  // Check 2: Rejected into lower half of candle
+  // 3. Must hit lower than the first 15-minute candle
+  if (first15mLow) {
+    if (low >= first15mLow && close >= first15mLow) return false;
+  } else {
+    // Low must have moved below open
+    if (low >= open) return false;
+  }
+
+  // 4. Must close lower than the first 15-minute candle
+  if (first15mLow) {
+    if (close >= first15mLow) return false;
+  } else {
+    // Closes lower than opening price / Gann Sell Below
+    if (close >= open) return false;
+    if (sellBelow && close > sellBelow * 1.002 && !isOpenHigh) return false;
+  }
+
+  // 5. Check: Rejected into lower half of candle
   if (range > 0) {
     const positionInRange = (high - close) / range;
     if (positionInRange < 0.45 && !isOpenHigh) return false;
   }
 
-  // Check 3: Below VWAP or Gann Resistance or negative momentum
-  const vwap = stock.vwap || open;
-  const isBelowVwapOrSell = close <= vwap * 1.005 || (stock.sellBelow ? close <= stock.sellBelow * 1.005 : false);
+  // 6. Negative RSI momentum
   const rsi = stock.rsi ?? 50;
-
   if (rsi > 56 && !isOpenHigh) return false;
 
-  return isBelowVwapOrSell || pct <= 0;
+  return true;
 }
 
 export interface Bounce930Info {
@@ -1698,24 +1728,26 @@ export function get15mBounce930Info(stock: StockCalculated): Bounce930Info {
   const isBear = is15mBounce930Bearish(stock);
 
   if (isBull && !isBear) {
+    const refHigh = stock.first15mHigh && stock.first15mHigh > 0 ? stock.first15mHigh : stock.openPrice || 0;
     return {
       isBullish: true,
       isBearish: false,
       bounceType: 'BULLISH',
       badgeLabel: '🟢 9:30 AM Bull Bounce',
       badgeClass: 'bg-emerald-950 text-emerald-300 border-emerald-500/80',
-      detail: `9:30 AM Bullish candle bounce: Price holding above low/support (₹${(stock.lowPrice || 0).toFixed(2)}) with buyers driving price towards ₹${(stock.closePrice || 0).toFixed(2)}.`
+      detail: `9:30 AM Bullish Breakout: Price hit higher (High: ₹${(stock.highPrice || 0).toFixed(2)}) and closed higher (₹${(stock.closePrice || 0).toFixed(2)} > ₹${refHigh.toFixed(2)}) than the first 15-minute candle with strong buying conviction.`
     };
   }
 
   if (isBear && !isBull) {
+    const refLow = stock.first15mLow && stock.first15mLow > 0 ? stock.first15mLow : stock.openPrice || 0;
     return {
       isBullish: false,
       isBearish: true,
       bounceType: 'BEARISH',
       badgeLabel: '🔴 9:30 AM Bear Breakdown',
       badgeClass: 'bg-rose-950 text-rose-300 border-rose-500/80',
-      detail: `9:30 AM Bearish candle rejection: Price failed at high/resistance (₹${(stock.highPrice || 0).toFixed(2)}) with sellers driving price towards ₹${(stock.closePrice || 0).toFixed(2)}.`
+      detail: `9:30 AM Bearish Breakdown: Price hit lower (Low: ₹${(stock.lowPrice || 0).toFixed(2)}) and closed lower (₹${(stock.closePrice || 0).toFixed(2)} < ₹${refLow.toFixed(2)}) than the first 15-minute candle with selling pressure.`
     };
   }
 
@@ -1725,7 +1757,7 @@ export function get15mBounce930Info(stock: StockCalculated): Bounce930Info {
     bounceType: 'NONE',
     badgeLabel: 'Neutral',
     badgeClass: 'bg-slate-800 text-slate-400 border-slate-700',
-    detail: 'No specific 9:30 AM directional bounce detected.'
+    detail: 'Price has not hit higher/lower and closed beyond the first 15-minute candle.'
   };
 }
 
