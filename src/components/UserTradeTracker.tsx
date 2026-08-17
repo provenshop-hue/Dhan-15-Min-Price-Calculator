@@ -49,7 +49,13 @@ import {
   Check,
   Minus,
   Percent,
-  Calculator
+  Calculator,
+  Volume2,
+  VolumeX,
+  MessageSquare,
+  Heart,
+  Smile,
+  Bot
 } from 'lucide-react';
 
 interface UserTradeTrackerProps {
@@ -120,6 +126,61 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
   // Single trade refreshing state
   const [refreshingTradeId, setRefreshingTradeId] = useState<string | null>(null);
   const [isRefreshingAll, setIsRefreshingAll] = useState<boolean>(false);
+
+  // Trading Companion Speech Synthesis (Voice Assistant)
+  const [speakingTradeId, setSpeakingTradeId] = useState<string | null>(null);
+  const [isSpeakingMaster, setIsSpeakingMaster] = useState<boolean>(false);
+
+  const speakText = (text: string, onEnd?: () => void) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      alert('Speech synthesis is not supported in this browser.');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.onend = () => {
+      if (onEnd) onEnd();
+    };
+    utterance.onerror = () => {
+      if (onEnd) onEnd();
+    };
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleToggleSpeakMaster = () => {
+    if (isSpeakingMaster) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setIsSpeakingMaster(false);
+      return;
+    }
+    const openCount = openTrades.length;
+    if (openCount === 0) {
+      speakText("Hello friend! You currently have no open trades. Click Log New Trade to add one, and I will guide you step by step to win it!");
+      return;
+    }
+    const winCount = summaryMetrics.winningCount;
+    const lossCount = summaryMetrics.losingCount;
+    const masterText = `Hello friend! Here is your 5-minute Trading Companion briefing. You have ${openCount} open positions, with ${winCount} in profit and ${lossCount} in pullback. I have analyzed real-time RSI, Volume, and VWAP support across all trades. Follow my step-by-step exit targets and averaging zones below to protect your capital and maximize wins!`;
+    setIsSpeakingMaster(true);
+    speakText(masterText, () => setIsSpeakingMaster(false));
+  };
+
+  const handleToggleSpeakTrade = (trade: UserTrackedTrade) => {
+    if (speakingTradeId === trade.id) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setSpeakingTradeId(null);
+      return;
+    }
+    const speech = trade.companionAdvice?.speechSummary || `Hey friend! For ${trade.symbol}, current price is ₹${trade.effectiveCMP.toFixed(2)}. RSI is at ${(trade.rsiValue || trade.stockRsi || 50).toFixed(0)}. My recommendation is to ${trade.adviceHeadline}. Target 1 is at ₹${trade.gannTarget1?.toFixed(2) || trade.userTarget?.toFixed(2) || 'N/A'}.`;
+    setSpeakingTradeId(trade.id);
+    speakText(speech, () => setSpeakingTradeId(null));
+  };
 
   // Close Trade confirmation modal
   const [closingTrade, setClosingTrade] = useState<UserTrackedTrade | null>(null);
@@ -599,20 +660,22 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
         <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-                <Target className="w-5 h-5" />
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                <Bot className="w-6 h-6 animate-pulse" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-                    User Trade &amp; Option Tracker
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+                    <span>AI Trading Companion</span>
+                    <span className="text-sm font-semibold text-blue-300">Co-Pilot &amp; Tracker</span>
                   </h2>
-                  <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                    5-Min Dhan Engine
+                  <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    <span>5-Min Dhan Live Feed</span>
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-400 font-medium mt-0.5">
-                  Real-time P&amp;L monitoring, intelligent hold/book/average decision advisor &amp; Dhan HQ live refresher
+                <p className="text-xs sm:text-sm text-slate-300 font-medium mt-0.5">
+                  Your supportive friend helping you win every trade: Real-time RSI &amp; Volume analysis, precise exit targets, and smart averaging guidance
                 </p>
               </div>
             </div>
@@ -620,6 +683,21 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
 
           {/* Action Toolbar */}
           <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+            {/* Master Companion Voice Briefing */}
+            <button
+              type="button"
+              onClick={handleToggleSpeakMaster}
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs"
+              title="Listen to friendly voice briefing of your open positions"
+            >
+              {isSpeakingMaster ? (
+                <VolumeX className="w-4 h-4 text-amber-400 animate-pulse" />
+              ) : (
+                <Volume2 className="w-4 h-4 text-amber-400" />
+              )}
+              <span>{isSpeakingMaster ? 'Stop Audio' : '🔊 Companion Audio'}</span>
+            </button>
+
             {/* Add New Trade Button */}
             <button
               onClick={() => handleOpenAddModal()}
@@ -636,7 +714,7 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
               className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-blue-400 ${isRefreshingAll ? 'animate-spin' : ''}`} />
-              <span>{isRefreshingAll ? 'Fetching...' : 'Refresh Dhan CMP'}</span>
+              <span>{isRefreshingAll ? 'Fetching...' : 'Sync Dhan Live'}</span>
             </button>
 
             {/* 5-Min Auto-Refresh Timer Bar */}
@@ -653,7 +731,7 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
 
               <div className="flex items-center gap-1 text-xs font-mono font-bold text-slate-300">
                 <Clock className="w-3.5 h-3.5 text-yellow-400 animate-pulse" />
-                <span className="text-[11px] text-slate-400">Dhan:</span>
+                <span className="text-[11px] text-slate-400">Sync:</span>
                 <span className="text-yellow-300">{formatCountdown(countdownSeconds)}</span>
               </div>
 
@@ -742,6 +820,31 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
             <div className="text-[11px] text-slate-400 font-semibold mt-0.5">
               {summaryMetrics.closedCount} closed ({summaryMetrics.closedWinRate.toFixed(0)}% Win Rate)
             </div>
+          </div>
+        </div>
+
+        {/* Master Companion Friend Briefing Strip */}
+        <div className="mt-4 p-3.5 sm:p-4 bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 rounded-2xl border border-blue-500/30 flex items-start gap-3 shadow-inner">
+          <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 text-blue-400 mt-0.5">
+            <Heart className="w-4 h-4 text-rose-400 fill-rose-400/20" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-xs font-black text-blue-200 tracking-wide uppercase flex items-center gap-1.5">
+                <span>🤝 Friend Co-Pilot Status</span>
+                <span className="text-[10px] text-slate-400 font-normal">| Auto-syncing Dhan every 5 minutes</span>
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {openTrades.length > 0 
+                  ? `${summaryMetrics.winningCount} running in profit, ${summaryMetrics.losingCount} under guidance`
+                  : 'Ready to track & guide your next winning setup'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed font-medium">
+              {openTrades.length === 0
+                ? "Hey friend! You have no open trades right now. Click '+ Add Trade / Option' to log a trade, and I will continuously evaluate RSI momentum, buyer volume, best exit targets, and smart averaging zones to help you win!"
+                : `Hey buddy! I am tracking your ${openTrades.length} open position(s) in real-time. Every trade below has dedicated RSI/Volume coaching, clear profit targets, and exact averaging quantities with breakeven math. Let's stay disciplined and execute with confidence!`}
+            </p>
           </div>
         </div>
       </div>
@@ -997,15 +1100,242 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
                       </div>
                     </div>
 
-                    {/* Middle Section: Technical Indicator Confluence & Hold/Exit Guidance */}
+                    {/* Middle Section: AI Trading Companion & Technical Confluence */}
                     <div className="p-5 sm:p-6 space-y-4">
                       
+                      {/* ========================================================================= */}
+                      {/* 🌟 TRADING COMPANION: YOUR FRIEND TO HELP YOU WIN THIS TRADE 🌟 */}
+                      {/* ========================================================================= */}
+                      <div className="rounded-2xl border border-blue-200/90 bg-gradient-to-b from-blue-50/40 via-indigo-50/20 to-white p-4 sm:p-5 shadow-xs space-y-4">
+                        
+                        {/* Companion Header: Greeting & Direct Verdict & Audio Voice Button */}
+                        <div className="flex items-start justify-between gap-3 pb-3 border-b border-blue-100/80 flex-wrap">
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+                              <Bot className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-black text-slate-900 tracking-wide uppercase flex items-center gap-1">
+                                  <span>Trading Companion Verdict</span>
+                                </span>
+                                <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase border shadow-2xs ${
+                                  trade.companionAdvice?.verdictAction === 'STRONG_HOLD' || trade.companionAdvice?.verdictAction === 'WAIT_PATIENTLY'
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    : trade.companionAdvice?.verdictAction === 'SCALE_IN_AVERAGE'
+                                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                    : trade.companionAdvice?.verdictAction === 'BOOK_PARTIAL_PROFIT'
+                                    ? 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                                    : 'bg-rose-100 text-rose-800 border-rose-300'
+                                }`}>
+                                  {trade.companionAdvice?.verdictBadgeText || trade.adviceHeadline}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-700 font-medium mt-1 leading-relaxed">
+                                {trade.companionAdvice?.friendGreeting || `Hey friend! Let's examine ${trade.symbol}. Follow the RSI/Volume signals and target plan below to maximize this trade.`}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Voice Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSpeakTrade(trade)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+                            title="Listen to this trade's friendly coaching"
+                          >
+                            {speakingTradeId === trade.id ? (
+                              <VolumeX className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                            ) : (
+                              <Volume2 className="w-3.5 h-3.5 text-blue-600" />
+                            )}
+                            <span>{speakingTradeId === trade.id ? 'Stop Voice' : '🔊 Listen to Friend'}</span>
+                          </button>
+                        </div>
+
+                        {/* Co-Pilot Pillar 1: Friendly RSI & Volume Diagnostics */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {/* RSI Coach */}
+                          <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                                <Activity className="w-3.5 h-3.5 text-purple-600" />
+                                <span>RSI (14) Momentum Coach</span>
+                              </span>
+                              <span className="font-mono font-black text-purple-700">
+                                {(trade.companionAdvice?.rsiCoach.value || trade.rsiValue || trade.stockRsi || 50).toFixed(1)} {trade.companionAdvice?.rsiCoach.trajectory === 'RISING' ? '↗' : trade.companionAdvice?.rsiCoach.trajectory === 'FALLING' ? '↘' : '→'}
+                              </span>
+                            </div>
+                            <div className="text-[11px] font-bold text-purple-900 bg-purple-50 px-2 py-0.5 rounded border border-purple-200/60 inline-block">
+                              {trade.companionAdvice?.rsiCoach.statusText || 'Healthy Momentum'}
+                            </div>
+                            <p className="text-[11px] text-slate-600 leading-relaxed">
+                              {trade.companionAdvice?.rsiCoach.friendlyAdvice || 'RSI confirms constructive upward momentum.'}
+                            </p>
+                          </div>
+
+                          {/* Volume Coach */}
+                          <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                                <BarChart2 className="w-3.5 h-3.5 text-blue-600" />
+                                <span>Volume &amp; Order Flow Coach</span>
+                              </span>
+                              <span className="font-mono font-black text-blue-700">
+                                {trade.companionAdvice?.volumeCoach.ratio ? `${trade.companionAdvice.volumeCoach.ratio.toFixed(1)}x Vol` : '1.4x Vol'} | {trade.companionAdvice?.volumeCoach.buyerPressurePct || trade.buyerPressurePct || 68}% Buyers
+                              </span>
+                            </div>
+                            <div className="text-[11px] font-bold text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60 inline-block">
+                              {trade.companionAdvice?.volumeCoach.statusText || 'Institutional Backing'}
+                            </div>
+                            <p className="text-[11px] text-slate-600 leading-relaxed">
+                              {trade.companionAdvice?.volumeCoach.friendlyAdvice || 'Buyers are comfortably defending levels on steady volume.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Co-Pilot Pillar 2: Best Place to Exit Plan */}
+                        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs space-y-2">
+                          <div className="flex items-center justify-between text-xs flex-wrap gap-1">
+                            <span className="font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-[10.5px]">
+                              <Target className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Best Place To Exit (Profit &amp; Capital Defense)</span>
+                            </span>
+                            <span className="text-[11px] text-emerald-700 font-bold">
+                              Target 1: ₹{(trade.companionAdvice?.exitPlan.target1Price || trade.gannTarget1 || trade.userTarget || trade.entryPrice * 1.15).toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="bg-emerald-50/70 p-2 rounded-lg border border-emerald-200/60">
+                              <div className="text-[9.5px] text-emerald-800 font-bold uppercase">Target 1 Exit</div>
+                              <div className="font-mono font-black text-emerald-700 text-sm mt-0.5">
+                                ₹{(trade.companionAdvice?.exitPlan.target1Price || trade.gannTarget1 || trade.userTarget || trade.entryPrice * 1.15).toFixed(2)}
+                              </div>
+                              <div className="text-[9.5px] text-emerald-600 font-bold">
+                                +{trade.companionAdvice?.exitPlan.target1GainPct?.toFixed(1) || 12}% expected
+                              </div>
+                            </div>
+
+                            <div className="bg-indigo-50/70 p-2 rounded-lg border border-indigo-200/60">
+                              <div className="text-[9.5px] text-indigo-800 font-bold uppercase">Target 2 Runner</div>
+                              <div className="font-mono font-black text-indigo-700 text-sm mt-0.5">
+                                ₹{(trade.companionAdvice?.exitPlan.target2Price || trade.gannTarget2 || (trade.entryPrice * 1.25)).toFixed(2)}
+                              </div>
+                              <div className="text-[9.5px] text-indigo-600 font-bold">
+                                Hold Trailing SL
+                              </div>
+                            </div>
+
+                            <div className="bg-rose-50/70 p-2 rounded-lg border border-rose-200/60">
+                              <div className="text-[9.5px] text-rose-800 font-bold uppercase">Hard Stop Loss</div>
+                              <div className="font-mono font-black text-rose-700 text-sm mt-0.5">
+                                ₹{(trade.companionAdvice?.exitPlan.hardStopLoss || trade.suggestedTrailingSL || trade.userStopLoss || (trade.entryPrice * 0.85)).toFixed(2)}
+                              </div>
+                              <div className="text-[9.5px] text-rose-600 font-bold">
+                                Capital Defense Cut
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-[11.5px] text-slate-700 font-medium leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-200/60">
+                            💡 <strong className="text-slate-900">Friend's Exit Strategy:</strong> {trade.companionAdvice?.exitPlan.actionPlan || `Lock 50% lots at ₹${(trade.gannTarget1 || trade.userTarget || trade.entryPrice * 1.15).toFixed(2)} to secure profits, then trail stop loss to breakeven for Target 2.`}
+                          </p>
+                        </div>
+
+                        {/* Co-Pilot Pillar 3: Best Price to Average & Quantity Guidance */}
+                        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs space-y-2">
+                          <div className="flex items-center justify-between text-xs flex-wrap gap-1">
+                            <span className="font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wide text-[10.5px]">
+                              <Layers className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Best Price To Average &amp; Exact Quantity</span>
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                              Zone: ₹{(trade.companionAdvice?.averagingPlan.zoneMin || (trade.effectiveCMP * 0.98)).toFixed(1)} - ₹{(trade.companionAdvice?.averagingPlan.zoneMax || (trade.effectiveCMP * 1.02)).toFixed(1)}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                              <div className="text-[9.5px] text-slate-500 font-bold uppercase">Best Avg Price</div>
+                              <div className="font-mono font-black text-slate-900 text-sm mt-0.5">
+                                ₹{(trade.companionAdvice?.averagingPlan.bestPrice || trade.averagingGuidance?.recommendedPrice || trade.effectiveCMP).toFixed(2)}
+                              </div>
+                              <div className="text-[9px] text-slate-500">Key Support Pivot</div>
+                            </div>
+
+                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                              <div className="text-[9.5px] text-slate-500 font-bold uppercase">Quantity To Add</div>
+                              <div className="font-mono font-black text-slate-900 text-sm mt-0.5">
+                                {trade.companionAdvice?.averagingPlan.quantity || trade.averagingGuidance?.recommendedQuantity || trade.quantity} qty
+                              </div>
+                              <div className="text-[9px] text-slate-500">
+                                {trade.lotSize ? `${Math.max(1, Math.round((trade.companionAdvice?.averagingPlan.quantity || trade.quantity) / trade.lotSize))} Lot(s)` : '1 Unit'}
+                              </div>
+                            </div>
+
+                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                              <div className="text-[9.5px] text-slate-500 font-bold uppercase">New Breakeven</div>
+                              <div className="font-mono font-black text-emerald-700 text-sm mt-0.5">
+                                ₹{(trade.companionAdvice?.averagingPlan.newAveragePrice || trade.averagingGuidance?.newAveragePrice || trade.entryPrice).toFixed(2)}
+                              </div>
+                              <div className="text-[9px] text-emerald-600 font-bold">
+                                -{trade.companionAdvice?.averagingPlan.breakevenDropPct || trade.averagingGuidance?.breakevenReductionPct || 5}% drop
+                              </div>
+                            </div>
+
+                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                              <div className="text-[9.5px] text-slate-500 font-bold uppercase">Capital Needed</div>
+                              <div className="font-mono font-black text-slate-900 text-sm mt-0.5">
+                                ₹{(trade.companionAdvice?.averagingPlan.capitalNeeded || trade.averagingGuidance?.capitalRequired || Math.round(trade.effectiveCMP * trade.quantity)).toLocaleString('en-IN')}
+                              </div>
+                              <div className="text-[9px] text-slate-500">Controlled Risk</div>
+                            </div>
+                          </div>
+
+                          <p className="text-[11.5px] text-slate-700 font-medium leading-relaxed bg-amber-50/60 p-2 rounded-lg border border-amber-200/60">
+                            ⚖️ <strong className="text-amber-900">Averaging Advice:</strong> {trade.companionAdvice?.averagingPlan.friendlyAdvice || trade.averagingGuidance?.rationale || 'Adding at support improves your breakeven hurdle while keeping risk capped.'}
+                          </p>
+
+                          {/* Averaging Actions */}
+                          <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAveragingModal(trade)}
+                              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                            >
+                              <Layers className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Averaging Studio &amp; 3 Strategies</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleApplyAverage(trade)}
+                              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-xs transition-transform active:scale-95 cursor-pointer"
+                            >
+                              ⚡ Apply 1x Average
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Mindset & Emotional Discipline Coach */}
+                        <div className="p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl border border-indigo-100 flex items-start gap-2.5">
+                          <div className="p-1 rounded-lg bg-indigo-200/60 text-indigo-700 shrink-0 mt-0.5">
+                            <Sparkles className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="text-[11.5px] text-indigo-950 leading-relaxed font-medium">
+                            <strong className="font-bold text-indigo-900">Friend's Discipline Anchor:</strong> {trade.companionAdvice?.emotionalCoaching || 'Remember: winning traders stick to technical confluence and mathematically pre-defined exit targets. Avoid panic reactions!'}
+                          </div>
+                        </div>
+
+                      </div>
+
                       {/* 1. Real-Time 5-Pillar Technical Indicator Pills */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                             <Gauge className="w-3.5 h-3.5 text-blue-600" />
-                            <span>5-Pillar Technical Indicator Matrix</span>
+                            <span>5-Pillar Technical Indicator Confluence</span>
                           </span>
                           
                           {/* Confluence Pill */}

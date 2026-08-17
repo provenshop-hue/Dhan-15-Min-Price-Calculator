@@ -5,7 +5,8 @@ import {
   InstrumentType, 
   PositionSide,
   AveragingGuidanceData,
-  AveragingStrategyOption
+  AveragingStrategyOption,
+  TradingCompanionData
 } from '../types';
 import { roundToExactNseStrike, getExactNseStrikeStep, formatStrikePrice } from './nseStrikeMaster';
 import { computeTechnicalIndicators } from './technicalIndicatorEngine';
@@ -418,7 +419,184 @@ export function evaluateUserTrackedTrade(
       vwap,
       unrealizedPnLPct,
       suggestedTrailingSL
+    ),
+
+    // AI Trading Companion (Friend / Co-Pilot Engine)
+    companionAdvice: generateTradingCompanionAdvice(
+      trade,
+      effectiveCMP,
+      stockCMP,
+      isBullishTrade,
+      tech,
+      generateAveragingGuidance(
+        trade,
+        effectiveCMP,
+        stockCMP,
+        isBullishTrade,
+        tech.confluenceScore,
+        rsi,
+        vwap,
+        unrealizedPnLPct,
+        suggestedTrailingSL
+      ),
+      unrealizedPnL,
+      unrealizedPnLPct,
+      t1,
+      t2,
+      t3,
+      suggestedTrailingSL
     )
+  };
+}
+
+/**
+ * Generates Conversational AI Trading Companion Guidance (Friend / Co-Pilot mode)
+ */
+export function generateTradingCompanionAdvice(
+  trade: Partial<UserTrackedTrade>,
+  effectiveCMP: number,
+  stockCMP: number,
+  isBullishTrade: boolean,
+  tech: any,
+  avgGuidance: AveragingGuidanceData,
+  unrealizedPnL: number,
+  unrealizedPnLPct: number,
+  t1: number,
+  t2: number,
+  t3: number,
+  suggestedTrailingSL: number | null
+): TradingCompanionData {
+  const symbol = trade.symbol ? trade.symbol.toUpperCase() : 'Stock';
+  const entryPrice = trade.entryPrice || effectiveCMP || 1;
+  const quantity = trade.quantity || 1;
+  const isOption = trade.instrumentType === 'CALL_OPTION' || trade.instrumentType === 'PUT_OPTION';
+  const rsi = tech.rsiValue || 50;
+  const rsiTraj = tech.rsiTrajectory || 'FLAT';
+  const volRatio = tech.volumeRatio || 1.0;
+  const buyerPct = tech.buyerPressurePct || 50;
+  const sellerPct = tech.sellerPressurePct || 50;
+  const confluence = tech.confluenceScore || 3;
+
+  // 1. Overall Status & Friend Greeting
+  let overallStatus: TradingCompanionData['overallStatus'] = 'HOLD_STRONG';
+  let verdictTitle = '🤝 STRONG HOLD — High Probability Setup';
+  let friendGreeting = '';
+  let friendlySummary = '';
+  let emotionalCoaching = '';
+
+  if (unrealizedPnLPct <= -14 || confluence <= 1) {
+    overallStatus = 'PROTECT_CAPITAL_EXIT';
+    verdictTitle = '🛑 CAPITAL DEFENSE — Let\'s Cut & Protect Funds';
+    friendGreeting = `Hey friend, don't feel discouraged. Preserving our capital right now is the smartest win we can take today.`;
+    friendlySummary = `The trade broke key technical support with only ${confluence}/5 indicator strength. Let's exit near ₹${effectiveCMP.toFixed(2)} to protect your balance for the next trade.`;
+    emotionalCoaching = `Remember: Every winning trader takes small, disciplined losses. Cutting this trade now saves you capital for high-probability setups tomorrow!`;
+  } else if (unrealizedPnLPct >= 8.0 || (unrealizedPnLPct >= 4.0 && isOption)) {
+    overallStatus = 'TAKE_PROFIT';
+    verdictTitle = '🎯 BOOK PARTIAL PROFIT — Lock In Green!';
+    friendGreeting = `Great job, friend! We are up +${unrealizedPnLPct.toFixed(1)}% (+₹${Math.round(unrealizedPnL).toLocaleString('en-IN')}).`;
+    friendlySummary = `Price is knocking on Gann Target 1 at ₹${t1.toFixed(2)}. I recommend locking in 50% profits right here to bank real cash, then moving our stop loss up to protect the rest.`;
+    emotionalCoaching = `Taking profits is how accounts grow consistently. Never let a great winning trade turn red!`;
+  } else if (avgGuidance.status === 'RECOMMENDED') {
+    overallStatus = 'SCALE_IN_AVERAGE';
+    verdictTitle = '⚖️ OPTIMAL AVERAGING ZONE — Pull Down Breakeven';
+    friendGreeting = `Stay relaxed, friend! This minor pullback (-${Math.abs(unrealizedPnLPct).toFixed(1)}%) is landing directly on high-volume support.`;
+    friendlySummary = `Price has pulled back into a prime support zone near VWAP with ${buyerPct}% buyers stepping in. Adding 1 lot at ₹${effectiveCMP.toFixed(2)} drops our breakeven hurdle closer to current price.`;
+    emotionalCoaching = `Red ticks on the screen are just the market testing patience. The technical foundation is solid!`;
+  } else if (unrealizedPnLPct < 0) {
+    overallStatus = 'WAIT_PATIENTLY';
+    verdictTitle = '⏳ PATIENT HOLD — Support Is Holding';
+    friendGreeting = `Hang tight, friend! We are in a minor consolidation at ₹${effectiveCMP.toFixed(2)}.`;
+    friendlySummary = `RSI is steady at ${rsi.toFixed(1)} and order flow is stable. There is zero reason to panic-sell — let the bulls complete this base.`;
+    emotionalCoaching = `Patience is where the majority of trading profits are made. Give the setup breathing room!`;
+  } else {
+    overallStatus = 'HOLD_STRONG';
+    verdictTitle = '🚀 STRONG HOLD — Bulls In Control';
+    friendGreeting = `Looking fantastic, friend! Momentum is on our side (+${unrealizedPnLPct.toFixed(1)}%).`;
+    friendlySummary = `We have strong ${confluence}/5 technical confluence with ${buyerPct}% buying pressure. Let this position run toward Target 1 (₹${t1.toFixed(2)}).`;
+    emotionalCoaching = `Great discipline! Sit back and let your winning trade develop without micromanaging.`;
+  }
+
+  // 2. RSI Companion Coach
+  let rsiFriendly = '';
+  if (rsi >= 70) {
+    rsiFriendly = `RSI is running hot at ${rsi.toFixed(1)} (Overbought). Bulls have pushed hard; watch for a minor consolidation or start trimming profits.`;
+  } else if (rsi >= 50) {
+    rsiFriendly = `RSI is healthy at ${rsi.toFixed(1)} (${rsiTraj === 'RISING' ? 'Rising ↗' : 'Steady'}). Plenty of upward fuel left before hitting fatigue.`;
+  } else if (rsi >= 40) {
+    rsiFriendly = `RSI is resting at ${rsi.toFixed(1)}. It is holding the 40 baseline support nicely, showing steady buyer absorption on dips.`;
+  } else {
+    rsiFriendly = `RSI is depressed at ${rsi.toFixed(1)} (Oversold). Heavy selling pressure; wait for a confirmed bounce above 40 before adding new funds.`;
+  }
+
+  // 3. Volume Companion Coach
+  let volFriendly = '';
+  if (volRatio >= 1.5 && buyerPct >= 60) {
+    volFriendly = `Volume is surging at ${volRatio.toFixed(1)}x average with ${buyerPct}% buyers dominating! Big institutional money is fueling this move.`;
+  } else if (buyerPct >= sellerPct) {
+    volFriendly = `Buyers are in control with ${buyerPct}% volume dominance (${volRatio.toFixed(1)}x normal). Pullbacks are on light volume, which is a bullish signal.`;
+  } else if (volRatio >= 1.5 && sellerPct >= 60) {
+    volFriendly = `Elevated volume (${volRatio.toFixed(1)}x) driven by ${sellerPct}% sellers. Be cautious and keep your stop loss active.`;
+  } else {
+    volFriendly = `Volume is balanced (${volRatio.toFixed(1)}x) with normal order flow. Price action is respecting standard support and resistance.`;
+  }
+
+  // 4. Best Place to Exit Plan
+  const target1Price = trade.userTarget || t1 || (entryPrice * (isBullishTrade ? 1.15 : 0.85));
+  const expectedProfit = Math.round((target1Price - entryPrice) * quantity);
+  const expectedProfitPct = Math.round(((target1Price - entryPrice) / entryPrice) * 1000) / 10;
+  const hardSL = trade.userStopLoss || (suggestedTrailingSL ? suggestedTrailingSL * 0.96 : entryPrice * (isBullishTrade ? 0.88 : 1.12));
+  const trailingSL = suggestedTrailingSL || (entryPrice * (isBullishTrade ? 0.94 : 1.06));
+
+  const exitPlan = {
+    bestTargetPrice: Math.round(target1Price * 100) / 100,
+    bestTargetLabel: `Gann Target 1 (₹${target1Price.toFixed(2)})`,
+    expectedProfit: Math.max(0, expectedProfit),
+    expectedProfitPct: Math.max(0, expectedProfitPct),
+    partialExitTrigger: `Book 50% at ₹${target1Price.toFixed(2)}, then trail stop loss to ₹${(entryPrice * 1.01).toFixed(2)} for Target 2 (₹${t2.toFixed(2)})`,
+    hardStopLoss: Math.round(hardSL * 100) / 100,
+    trailingStopLoss: Math.round(trailingSL * 100) / 100,
+    exitStrategyAdvice: `Primary exit is Target 1 at ₹${target1Price.toFixed(2)} (+${expectedProfitPct}%). If price stalls near ₹${(target1Price * 0.98).toFixed(2)}, book half and trail the rest.`
+  };
+
+  // 5. Best Price to Average & Quantity Plan
+  const averagingPlan = {
+    isRecommended: avgGuidance.status === 'RECOMMENDED' || avgGuidance.status === 'PYRAMID_ON_STRENGTH',
+    recommendationLabel: avgGuidance.statusHeadline,
+    bestPrice: avgGuidance.recommendedPrice || effectiveCMP,
+    bestPriceZone: avgGuidance.recommendedPriceRange || `₹${(effectiveCMP * 0.98).toFixed(2)} - ₹${(effectiveCMP * 1.01).toFixed(2)}`,
+    bestQuantity: avgGuidance.recommendedQuantity || quantity,
+    bestLots: avgGuidance.recommendedLots,
+    capitalNeeded: avgGuidance.capitalRequired || Math.round(effectiveCMP * quantity),
+    newAveragePrice: avgGuidance.newAveragePrice || entryPrice,
+    breakevenDropPct: avgGuidance.breakevenReductionPct || 0,
+    friendlyTip: avgGuidance.reason || `Add near VWAP support to reduce your breakeven hurdle.`
+  };
+
+  // 6. Speech Summary for Text-to-Speech
+  const speechSummary = `${friendGreeting} On ${symbol}, ${friendlySummary} RSI is at ${rsi.toFixed(0)}, and ${buyerPct} percent of volume is buyer-driven. My recommendation is to ${overallStatus.replace(/_/g, ' ').toLowerCase()}. Our best exit target is ₹${target1Price.toFixed(2)}, and keep a stop loss at ₹${hardSL.toFixed(2)}. ${emotionalCoaching}`;
+
+  return {
+    friendGreeting,
+    overallStatus,
+    verdictTitle,
+    friendlySummary,
+    rsiCoach: {
+      value: rsi,
+      trajectory: rsiTraj,
+      statusText: tech.rsiStatus || 'Normal',
+      friendlyExplanation: rsiFriendly
+    },
+    volumeCoach: {
+      ratio: volRatio,
+      buyerPressurePct: buyerPct,
+      sellerPressurePct: sellerPct,
+      volumeStatus: tech.volumeStatus || 'NORMAL',
+      friendlyExplanation: volFriendly
+    },
+    exitPlan,
+    averagingPlan,
+    emotionalCoaching,
+    speechSummary
   };
 }
 

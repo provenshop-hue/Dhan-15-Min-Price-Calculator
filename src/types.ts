@@ -490,6 +490,61 @@ export interface UserTrackedTrade {
 
   // Smart Averaging Guidance Engine
   averagingGuidance?: AveragingGuidanceData;
+
+  // AI Trading Companion (Friend/Co-Pilot Mode)
+  companionAdvice?: TradingCompanionData;
+}
+
+export interface TradingCompanionData {
+  friendGreeting: string; // e.g. "Hey friend, stay calm! Bulls are firmly holding the line."
+  overallStatus: 'HOLD_STRONG' | 'WAIT_PATIENTLY' | 'SCALE_IN_AVERAGE' | 'TAKE_PROFIT' | 'PROTECT_CAPITAL_EXIT';
+  verdictTitle: string; // e.g. "🤝 STRONG HOLD — High Probability Setup"
+  friendlySummary: string; // Conversational story of current trade health
+  
+  // RSI & Volume Companion Coach
+  rsiCoach: {
+    value: number;
+    trajectory: 'RISING' | 'FALLING' | 'FLAT';
+    statusText: string;
+    friendlyExplanation: string; // Plain-English friendly interpretation
+  };
+  volumeCoach: {
+    ratio: number;
+    buyerPressurePct: number;
+    sellerPressurePct: number;
+    volumeStatus: 'SURGE' | 'HIGH' | 'NORMAL' | 'LOW';
+    friendlyExplanation: string; // Plain-English friendly interpretation
+  };
+
+  // Best Place to Exit Plan
+  exitPlan: {
+    bestTargetPrice: number;
+    bestTargetLabel: string;
+    expectedProfit: number;
+    expectedProfitPct: number;
+    partialExitTrigger: string; // e.g. "Book 50% at ₹62.00, trail rest"
+    hardStopLoss: number;
+    trailingStopLoss: number;
+    exitStrategyAdvice: string;
+  };
+
+  // Best Price to Average & Quantity
+  averagingPlan: {
+    isRecommended: boolean;
+    recommendationLabel: string; // e.g. "Optimal Scale-In Dip", "Wait for Support Bounce", "Do Not Add"
+    bestPrice: number;
+    bestPriceZone: string; // e.g. "₹48.00 - ₹49.50"
+    bestQuantity: number;
+    bestLots?: number;
+    capitalNeeded: number;
+    newAveragePrice: number;
+    breakevenDropPct: number;
+    friendlyTip: string;
+  };
+
+  // Emotional & Discipline Coaching
+  emotionalCoaching: string;
+  speechSummary: string; // Optimized text for voice synthesis
 }
 
 export interface AveragingStrategyOption {
