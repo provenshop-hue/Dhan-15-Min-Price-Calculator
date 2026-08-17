@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -319,6 +319,23 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>🎯 Stock Analyzer</span>
                 <span className="bg-blue-100 text-blue-800 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">
                   Manual + Dhan
+                </span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => onChangeDashboardTab('user_tracker')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'user_tracker'
+                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-emerald-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-emerald-400" />
+                <span>💼 User Tracker</span>
+                <span className="bg-emerald-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  5-Min Dhan
                 </span>
               </span>
             </button>

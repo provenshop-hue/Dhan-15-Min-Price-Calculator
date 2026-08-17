@@ -19,6 +19,7 @@ import { TradeProfitTracker } from './components/TradeProfitTracker';
 import { IdealTradeRadar } from './components/IdealTradeRadar';
 import { TenFifteenPicksHub } from './components/TenFifteenPicksHub';
 import { ManualStockAnalyzer } from './components/ManualStockAnalyzer';
+import { UserTradeTracker } from './components/UserTradeTracker';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -208,8 +209,8 @@ export default function App() {
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
 
-  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', or 'stock_analyzer')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer'>('gann');
+  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'stock_analyzer', or 'user_tracker')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -1065,6 +1066,17 @@ export default function App() {
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
             onOpenSettings={() => setIsDhanGateOpen(true)}
+          />
+        ) : activeDashboardTab === 'user_tracker' ? (
+          /* Dedicated User Trade & Option Tracker with 5-Min Dhan Refresh */
+          <UserTradeTracker
+            stocks={stocks}
+            credentials={credentials}
+            onFetchSingleStock={handleFetchSingleDhan}
+            onFetchAllStocks={handleFetchAllDhan}
+            onOpenSettings={() => setIsDhanGateOpen(true)}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
           />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */

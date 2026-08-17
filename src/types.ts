@@ -366,3 +366,162 @@ export interface BtstPredictionItem {
   lastAnalyzedTime: string;
 }
 
+export type InstrumentType = 'EQUITY' | 'CALL_OPTION' | 'PUT_OPTION' | 'FUTURES';
+export type PositionSide = 'LONG' | 'SHORT';
+export type TradeActionAdvice =
+  | 'HOLD_FOR_PROFIT'
+  | 'BOOK_PROFIT'
+  | 'AVERAGE_PULLBACK'
+  | 'EXIT_CUT_LOSS'
+  | 'TIGHTEN_STOP_LOSS'
+  | 'MONITOR_CLOSELY';
+
+export interface UserTrackedTrade {
+  id: string;
+  symbol: string;
+  companyName: string;
+  instrumentType: InstrumentType;
+  positionSide: PositionSide; // 'LONG' | 'SHORT'
+  
+  // Option specific fields
+  strikePrice?: number | null;
+  optionType?: 'CE' | 'PE' | null;
+  expiryDate?: string | null;
+  
+  // Entry Details
+  entryPrice: number; // Entry rate user took
+  quantity: number; // Shares or total option contracts
+  lots?: number | null;
+  lotSize?: number | null;
+  entryDate: string; // YYYY-MM-DD
+  entryTime: string; // HH:MM AM/PM
+  entryNotes?: string;
+  strategyTag?: string; // e.g. "15m Bounce", "Gann Breakout", "RSI Dip", "BTST", "Custom"
+  
+  // User Set Targets / SL
+  userStopLoss?: number | null;
+  userTarget?: number | null;
+  
+  // Live Market State (Refreshed via Dhan API every 5 mins)
+  stockCMP: number; // Underlying Stock Current Market Price
+  optionCMP?: number | null; // Option CMP (Live/Calculated)
+  effectiveCMP: number; // CMP used for P&L (stockCMP for equity/fut, optionCMP for options)
+  
+  // Real-time P&L
+  unrealizedPnL: number; // ₹ Total gain/loss
+  unrealizedPnLPct: number; // % Gain/loss
+  pointsDiff: number; // Points gained/lost per share/contract
+  investedCapital: number; // Total amount invested (entryPrice * quantity)
+  currentValue: number; // Current value (effectiveCMP * quantity)
+  
+  // High / Low Peak Journey
+  highestPriceSinceEntry: number;
+  lowestPriceSinceEntry: number;
+  maxProfitAchieved: number;
+  maxDrawdownAchieved: number;
+  
+  // Smart Success Advisory & Guidance
+  advice: TradeActionAdvice;
+  adviceBadgeClass: string;
+  adviceHeadline: string;
+  adviceDetails: string;
+  confidenceScore: number; // 0 - 100%
+  healthScore: number; // 0 - 100% trade health
+  
+  // Actionable Guidance Steps
+  suggestedAction: string; // e.g. "Hang on for Target 2", "Add 1 lot at ₹X pullback", "Book 50% profit", "Exit now"
+  suggestedTrailingSL?: number | null;
+  suggestedAveragePrice?: number | null;
+  suggestedAverageQty?: number | null;
+  newAveragePrice?: number | null;
+  distanceToTargetPct?: number | null;
+  distanceToStopLossPct?: number | null;
+  riskRewardRatio?: string;
+  
+  // Technical Signals from Underlying
+  stockTrend?: 'Very Bullish' | 'Bullish' | 'Very Bearish' | 'Bearish' | 'Neutral' | null;
+  stockRsi?: number | null;
+  stockVwap?: number | null;
+  gannBuyAbove?: number | null;
+  gannSellBelow?: number | null;
+  gannTarget1?: number | null;
+  gannTarget2?: number | null;
+  gannTarget3?: number | null;
+  
+  // Timestamps & Status
+  lastUpdated: string;
+  status: 'OPEN' | 'CLOSED';
+  closedAt?: string | null;
+  exitPrice?: number | null;
+  realizedPnL?: number | null;
+  realizedPnLPct?: number | null;
+  closingReason?: string | null;
+
+  // Detailed Technical Indicators & Calculated Signals
+  rsiValue?: number;
+  rsiStatus?: string;
+  rsiTrajectory?: 'RISING' | 'FALLING' | 'FLAT';
+  volume?: number;
+  volumeRatio?: number;
+  volumeStatus?: 'SURGE' | 'HIGH' | 'NORMAL' | 'LOW';
+  buyerPressurePct?: number;
+  sellerPressurePct?: number;
+  macdLine?: number;
+  macdSignal?: number;
+  macdHistogram?: number;
+  macdStatus?: string;
+  macdSignalColor?: 'GREEN' | 'RED' | 'YELLOW';
+  ema9?: number;
+  ema21?: number;
+  emaAlignment?: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  vwapDistancePct?: number;
+  confluenceScore?: number;
+  confluenceMax?: number;
+  holdExitVerdict?: 'HOLD' | 'EXIT' | 'BOOK_PARTIAL' | 'AVERAGE';
+  verdictConfidence?: number;
+  indicatorChecklist?: {
+    name: string;
+    value: string;
+    verdict: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    description: string;
+  }[];
+  reasonsToHold?: string[];
+  reasonsToExit?: string[];
+
+  // Smart Averaging Guidance Engine
+  averagingGuidance?: AveragingGuidanceData;
+}
+
+export interface AveragingStrategyOption {
+  name: string; // "Equal 1x (Recommended)", "Conservative 0.5x", "Aggressive 2x"
+  ratio: number; // 1.0, 0.5, 2.0
+  addQuantity: number;
+  addLots?: number;
+  addPrice: number;
+  capitalRequired: number;
+  newAveragePrice: number;
+  newTotalQuantity: number;
+  reductionInBreakevenPct: number; // e.g. -8.5%
+  revisedRiskReward: string;
+  revisedStopLoss: number;
+}
+
+export interface AveragingGuidanceData {
+  status: 'RECOMMENDED' | 'WAIT_FOR_TRIGGER' | 'DO_NOT_AVERAGE' | 'PYRAMID_ON_STRENGTH';
+  statusBadge: string;
+  statusHeadline: string;
+  recommendedPrice: number;
+  recommendedPriceRange: string; // e.g. "₹47.50 - ₹49.20"
+  recommendedQuantity: number;
+  recommendedLots?: number;
+  newAveragePrice: number;
+  capitalRequired: number;
+  breakevenReductionPct: number; // % dropped in breakeven
+  hardStopLoss: number;
+  maxDrawdownRisk: number; // Max loss if SL hit on combined position
+  reason: string;
+  technicalSupportLevel: string; // e.g. "Intraday VWAP (₹2,910) / Gann S1"
+  strategies: AveragingStrategyOption[];
+  isSafeToAverage: boolean;
+}
+
