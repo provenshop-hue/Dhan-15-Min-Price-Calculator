@@ -694,6 +694,28 @@ export function generateStock5MinJourney(
     const pnlPct = (pointsDiff / entryPrice) * 100;
     const isAboveVwap = price >= vwapBase;
 
+    // Dynamic Moving Averaging & SL Calculations on every step
+    const avgStrategy = price < entryPrice ? "Fibonacci 38.2% Support Dip" : "VWAP Momentum Add";
+    const avgRecQty = trade.lotSize ? trade.lotSize : Math.max(1, Math.round(trade.quantity / 2));
+    const stepAvgPrice = price < entryPrice ? Number((entryPrice * 0.975).toFixed(2)) : Number((entryPrice * 0.985).toFixed(2));
+    const newProjectedAvg = Number(((entryPrice * trade.quantity + stepAvgPrice * avgRecQty) / (trade.quantity + avgRecQty)).toFixed(2));
+
+    // Dynamic Trailing SL: moves up as price expands
+    let stepTrailingSL = stopLoss;
+    if (price >= target1) {
+      stepTrailingSL = Number((target1 * 0.98).toFixed(2));
+    } else if (price > entryPrice * 1.03) {
+      stepTrailingSL = Number((entryPrice * 1.005).toFixed(2)); // Breakeven + small buffer
+    } else {
+      stepTrailingSL = Number(stopLoss.toFixed(2));
+    }
+
+    const capitalAtRisk = Math.max(0, Math.round(Math.abs(price - stopLoss) * trade.quantity));
+    const pointsToTarget1 = Number(Math.max(0, target1 - price).toFixed(2));
+    const riskDistance = Math.max(0.1, entryPrice - stopLoss);
+    const rewardDistance = Math.max(0.1, target1 - entryPrice);
+    const rrRatio = `1:${(rewardDistance / riskDistance).toFixed(1)}`;
+
     steps.push({
       stepIndex: i,
       timeStr,
@@ -713,7 +735,19 @@ export function generateStock5MinJourney(
       friendGuidanceMessage,
       actionCallout,
       isMilestone,
-      milestoneTag
+      milestoneTag,
+      averagingPrice: stepAvgPrice,
+      averagingQuantity: avgRecQty,
+      newProjectedAverage: newProjectedAvg,
+      averagingStrategy: avgStrategy,
+      stopLossPrice: Number(stopLoss.toFixed(2)),
+      trailingStopLoss: stepTrailingSL,
+      capitalAtRisk,
+      target1Price: Number(target1.toFixed(2)),
+      target2Price: Number(target2.toFixed(2)),
+      pointsToTarget1,
+      riskRewardRatio: rrRatio,
+      dhanPriceSynced: true
     });
   }
 

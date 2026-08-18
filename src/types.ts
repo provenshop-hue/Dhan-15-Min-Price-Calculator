@@ -632,6 +632,20 @@ export interface JourneyTimelineStep {
   actionCallout: string;
   isMilestone: boolean;
   milestoneTag?: string; // e.g. "🎯 Target 1 Achieved", "⚖️ Support Bounce & Averaging Trigger"
+
+  // Dynamic Real-time Suggestions on Timeline Shift
+  averagingPrice: number; // Best price to average
+  averagingQuantity: number; // Best quantity to average
+  newProjectedAverage: number; // New blended average after adding
+  averagingStrategy: string; // e.g. "Fibonacci 38.2% Support Dip" or "VWAP Defense Zone"
+  stopLossPrice: number; // Hard technical stop loss
+  trailingStopLoss: number; // Dynamic trailing stop loss
+  capitalAtRisk: number; // ₹ Max risk
+  target1Price: number; // Target 1 exit price
+  target2Price: number; // Target 2 exit price
+  pointsToTarget1: number; // Distance in points to Target 1
+  riskRewardRatio: string; // e.g. "1:2.4"
+  dhanPriceSynced?: boolean;
 }
 
 export interface StockJourneyTimelineConfig {

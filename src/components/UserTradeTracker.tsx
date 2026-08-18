@@ -3099,6 +3099,8 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
         initialTrade={selectedJourneyTrade}
         openTrades={openTrades}
         stockMap={stockMap}
+        onFetchSingleStock={onFetchSingleStock}
+        credentials={credentials}
         onSpeakText={(txt) => speakText(txt)}
         isSpeaking={!!speakingTradeId}
       />

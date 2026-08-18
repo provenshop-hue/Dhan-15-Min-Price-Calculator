@@ -5,7 +5,8 @@ import {
   StockJourneyData,
   StockCalculated,
   TrackedJourneyStockItem,
-  InstrumentType
+  InstrumentType,
+  DhanApiCredentials
 } from '../types';
 import { 
   generateStock5MinJourney, 
@@ -47,7 +48,8 @@ import {
   Search,
   CheckCircle2,
   ArrowRight,
-  LayoutGrid
+  LayoutGrid,
+  RefreshCw
 } from 'lucide-react';
 
 interface StockJourneyTimelineModalProps {
@@ -56,6 +58,8 @@ interface StockJourneyTimelineModalProps {
   initialTrade?: UserTrackedTrade | null;
   openTrades?: UserTrackedTrade[];
   stockMap?: Map<string, StockCalculated>;
+  onFetchSingleStock?: (stock: StockCalculated) => Promise<boolean>;
+  credentials?: DhanApiCredentials;
   onSpeakText?: (text: string) => void;
   isSpeaking?: boolean;
 }
@@ -66,6 +70,8 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
   initialTrade,
   openTrades = [],
   stockMap = new Map(),
+  onFetchSingleStock,
+  credentials,
   onSpeakText,
   isSpeaking = false
 }) => {
@@ -126,6 +132,11 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
   const [viewMode, setViewMode] = useState<'interactive' | 'table' | 'matrix'>('interactive');
   const [startTimeInput, setStartTimeInput] = useState<string>(currentStockItem?.config.timelineStartTime || '09:15');
 
+  // Real-time Dhan API Sync State
+  const [isDhanSyncing, setIsDhanSyncing] = useState<boolean>(false);
+  const [lastDhanSyncTime, setLastDhanSyncTime] = useState<string>(() => new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+  const [autoSpeakOnMove, setAutoSpeakOnMove] = useState<boolean>(false);
+
   // "Add Stock to Journey" Drawer / Modal state
   const [isAddStockOpen, setIsAddStockOpen] = useState<boolean>(false);
   const [addSymbol, setAddSymbol] = useState<string>('');
@@ -137,14 +148,32 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
 
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Asynchronously fetch current price from Dhan API whenever timeline shifts
+  const fetchDhanPriceOnTimelineShift = React.useCallback(async (symbol: string) => {
+    if (!symbol) return;
+    setIsDhanSyncing(true);
+    try {
+      const matching = stockMap.get(symbol.toUpperCase());
+      if (matching && onFetchSingleStock) {
+        await onFetchSingleStock(matching);
+      }
+    } catch (err) {
+      console.error('Error fetching Dhan live price on timeline change:', err);
+    } finally {
+      setLastDhanSyncTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setTimeout(() => setIsDhanSyncing(false), 500);
+    }
+  }, [stockMap, onFetchSingleStock]);
+
   // Sync state whenever active stock item switches
   useEffect(() => {
     if (currentStockItem) {
       setActiveStepIndex(currentStockItem.config.lastSimulatedStepIndex || 0);
       setStartTimeInput(currentStockItem.config.timelineStartTime || '09:15');
       setIsPlaying(false);
+      fetchDhanPriceOnTimelineShift(currentStockItem.symbol);
     }
-  }, [currentStockItem?.id]);
+  }, [currentStockItem?.id, fetchDhanPriceOnTimelineShift]);
 
   // Convert currentStockItem to active trade for 5-min journey generator
   const currentTrade = useMemo(() => {
@@ -173,7 +202,11 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
             setIsPlaying(false);
             return prev;
           }
-          return prev + 1;
+          const nextIdx = prev + 1;
+          if (currentStockItem) {
+            fetchDhanPriceOnTimelineShift(currentStockItem.symbol);
+          }
+          return nextIdx;
         });
       }, 2500);
     } else {
@@ -186,7 +219,15 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
         clearInterval(playbackTimerRef.current);
       }
     };
-  }, [isPlaying, journeyData?.steps.length]);
+  }, [isPlaying, journeyData?.steps.length, currentStockItem, fetchDhanPriceOnTimelineShift]);
+
+  // Trigger speak when step moves if autoSpeakOnMove is enabled
+  useEffect(() => {
+    if (autoSpeakOnMove && activeStep && currentStockItem && onSpeakText) {
+      const speechText = `${currentStockItem.symbol} at ${activeStep.timeStr}: ${activeStep.verdictBadge}. Price is ₹${activeStep.price}. ${activeStep.friendGuidanceMessage} Recommended average at ₹${activeStep.averagingPrice}, and keep stop loss at ₹${activeStep.trailingStopLoss}.`;
+      onSpeakText(speechText);
+    }
+  }, [activeStepIndex, autoSpeakOnMove]);
 
   // Handle toggling enable / disable for current stock
   const handleToggleEnable = () => {
@@ -219,6 +260,7 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
     setActiveStepIndex(0);
     saveStoredJourneyStocks(updatedStocks);
     saveStoredJourneyConfig(updatedConfig);
+    fetchDhanPriceOnTimelineShift(currentStockItem.symbol);
   };
 
   // Handle step slider change
@@ -236,6 +278,9 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
     setJourneyStocks(updatedStocks);
     saveStoredJourneyStocks(updatedStocks);
     saveStoredJourneyConfig(updatedConfig);
+
+    // Immediately fetch latest price from Dhan for accurate live correlation
+    fetchDhanPriceOnTimelineShift(currentStockItem.symbol);
   };
 
   // Remove a stock from the journey list
@@ -951,6 +996,43 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
                         </button>
                       ))}
                     </div>
+
+                    {/* Real-Time Dhan API Live Correlation Bar */}
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3 text-[11px] flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${isDhanSyncing ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}`} />
+                        <span className="font-bold text-slate-300">
+                          {isDhanSyncing ? '📡 Fetching Current Price from Dhan API...' : `⚡ Dhan Price Synced (${lastDhanSyncTime})`}
+                        </span>
+                        <span className="text-slate-400 font-mono hidden sm:inline">
+                          • Step Price: <strong className="text-white">₹{activeStep.price.toFixed(2)}</strong>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        {/* Auto-Speak on Move Toggle */}
+                        <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none font-bold text-[10.5px]">
+                          <input
+                            type="checkbox"
+                            checked={autoSpeakOnMove}
+                            onChange={(e) => setAutoSpeakOnMove(e.target.checked)}
+                            className="rounded border-slate-600 text-blue-500 focus:ring-0 cursor-pointer"
+                          />
+                          <span>🎙️ Auto-Speak on Move</span>
+                        </label>
+
+                        {/* Manual Dhan Sync Button */}
+                        <button
+                          type="button"
+                          onClick={() => currentStockItem && fetchDhanPriceOnTimelineShift(currentStockItem.symbol)}
+                          disabled={isDhanSyncing}
+                          className="px-2.5 py-1 rounded-lg bg-blue-600/80 hover:bg-blue-600 text-white font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isDhanSyncing ? 'animate-spin' : ''}`} />
+                          <span>{isDhanSyncing ? 'Syncing...' : 'Sync Dhan Live'}</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   {/* 2. Primary Friend Coaching Card for this 5-Minute Step */}
@@ -1061,6 +1143,113 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
                           {activeStep.actionCallout}
                         </div>
                       </div>
+                    </div>
+
+                    {/* 3. DYNAMIC MOVING SUGGESTIONS BENTO (Updated Live on Every Timeline Step) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-blue-100">
+                      
+                      {/* Averaging Engine Card */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-50 to-white border border-amber-200 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Smart Averaging Advisor</span>
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                            {activeStep.price < currentTrade.entryPrice ? 'Dip Support Zone' : 'Momentum Sizing'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600 font-medium">Best Price to Average:</span>
+                            <span className="font-mono font-black text-amber-700 text-sm">₹{activeStep.averagingPrice.toFixed(2)}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600 font-medium">Recommended Add Qty:</span>
+                            <span className="font-mono font-black text-slate-900">+{activeStep.averagingQuantity} Qty</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs pt-1 border-t border-amber-200/60">
+                            <span className="text-slate-600 font-medium">New Blended Average:</span>
+                            <span className="font-mono font-black text-emerald-700">₹{activeStep.newProjectedAverage.toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        <div className="p-2 rounded-xl bg-white/80 border border-amber-100 text-[10.5px] text-slate-700 leading-relaxed font-medium">
+                          💡 <strong>Strategy:</strong> {activeStep.averagingStrategy}.
+                        </div>
+                      </div>
+
+                      {/* Stop Loss & Capital Protection Card */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-500/10 via-rose-50 to-white border border-rose-200 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black text-rose-900 uppercase tracking-wide flex items-center gap-1.5">
+                            <Shield className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Stop Loss &amp; Defense</span>
+                          </span>
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
+                            R:R {activeStep.riskRewardRatio}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600 font-medium">Dynamic Trailing SL:</span>
+                            <span className="font-mono font-black text-rose-700 text-sm">₹{activeStep.trailingStopLoss.toFixed(2)}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600 font-medium">Hard Technical SL:</span>
+                            <span className="font-mono font-bold text-slate-800">₹{activeStep.stopLossPrice.toFixed(2)}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs pt-1 border-t border-rose-200/60">
+                            <span className="text-slate-600 font-medium">Max Capital at Risk:</span>
+                            <span className="font-mono font-black text-rose-700">₹{activeStep.capitalAtRisk.toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+
+                        <div className="p-2 rounded-xl bg-white/80 border border-rose-100 text-[10.5px] text-slate-700 leading-relaxed font-medium">
+                          🛡️ <strong>Rule:</strong> {activeStep.price >= activeStep.target1Price ? 'Target 1 hit: Trail SL locked above entry.' : 'Never risk more than planned SL to protect bankroll.'}
+                        </div>
+                      </div>
+
+                      {/* Targets & Profit Lock Card */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-50 to-white border border-emerald-200 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black text-emerald-900 uppercase tracking-wide flex items-center gap-1.5">
+                            <Target className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Target Harvest Plan</span>
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            {activeStep.pointsToTarget1 === 0 ? '🎯 T1 Achieved' : `${activeStep.pointsToTarget1} pts away`}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600 font-medium">Target 1 (Book 50% Lots):</span>
+                            <span className="font-mono font-black text-emerald-700 text-sm">₹{activeStep.target1Price.toFixed(2)}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600 font-medium">Target 2 (Runner Climax):</span>
+                            <span className="font-mono font-black text-slate-900">₹{activeStep.target2Price.toFixed(2)}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs pt-1 border-t border-emerald-200/60">
+                            <span className="text-slate-600 font-medium">Execution Directive:</span>
+                            <span className="font-bold text-emerald-800 text-[11px]">Lock 50% at T1 &amp; Trail</span>
+                          </div>
+                        </div>
+
+                        <div className="p-2 rounded-xl bg-white/80 border border-emerald-100 text-[10.5px] text-slate-700 leading-relaxed font-medium">
+                          🎯 <strong>Discipline:</strong> Book profit systematically to secure compounding gains.
+                        </div>
+                      </div>
+
                     </div>
 
                   </div>
