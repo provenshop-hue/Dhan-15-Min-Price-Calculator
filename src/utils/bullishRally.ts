@@ -31,7 +31,7 @@ export interface RallySignal {
   openPrice: number;
   pctChange: number;
   rallyType: string;
-  confidenceScore: number; // 80 - 98%
+  confidenceScore: number; // 75 - 98%
   confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT';
   reason: string;
   timestamp: string;
@@ -138,8 +138,6 @@ function buildTradePlan(
 
   // Option Premium Model
   const approxLtp = estimateOptionPremium(cmp, symbol);
-  const optionEntryMin = Math.round((approxLtp * 0.98) * 20) / 20;
-  const optionEntryMax = Math.round((approxLtp * 1.03) * 20) / 20;
   const optionTarget1 = Math.round((approxLtp * 1.38) * 20) / 20; // +38%
   const optionTarget2 = Math.round((approxLtp * 1.75) * 20) / 20; // +75%
   const optionStopLoss = Math.round((approxLtp * 0.72) * 20) / 20; // -28%
@@ -162,8 +160,7 @@ function buildTradePlan(
 }
 
 /**
- * Evaluates whether a stock meets ULTRA-STRICT High-Probability Bullish Rally criteria.
- * Designed to eliminate false breakouts and deliver profitable trades.
+ * Evaluates whether a stock meets High-Probability Bullish Rally criteria.
  */
 export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   if (!stock.openPrice || !stock.closePrice || stock.openPrice <= 0 || stock.closePrice <= 0) {
@@ -180,86 +177,94 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     ? stock.pctChange
     : ((cmp - open) / open) * 100;
 
-  // Strict Rule 1: Intraday price action must be positive (Green or Positive gain)
-  if (pct < 0.15 || cmp < open) {
+  // Basic directional check: Close must not be heavily negative
+  if (pct < 0 && cmp < open * 0.998) {
     return null;
   }
 
-  // Strict Rule 2: Institutional Benchmark Filter (Must be above or at VWAP)
-  if (vwap && cmp < vwap * 0.996) {
-    return null; // Reject if trading significantly below institutional VWAP
-  }
-
-  // Strict Rule 3: RSI Overbought/Oversold Filter
-  // Sweet spot for intraday continuation is 52 to 78. Reject if RSI > 84 (exhaustion) or < 48 (weak momentum)
-  if (rsi !== null && (rsi < 48 || rsi > 84)) {
+  // If VWAP is known and price is significantly below VWAP, reject false rallies
+  if (vwap && cmp < vwap * 0.992) {
     return null;
   }
 
-  // Detect patterns
+  // Reject extreme overbought exhaustion
+  if (rsi !== null && rsi > 88) {
+    return null;
+  }
+
   const is100Bull = is100PercentBullishMove(stock);
   const isOpenLow = isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow);
   const isAbove15m = isAboveFirst15mCandle(stock);
   const comboAnalysis = analyzeBullishCombinations(stock);
   const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-  let confidenceScore = 0;
+  let scoreWeight = 0;
   let rallyType = '';
-  let reason = '';
   const confluencePoints: string[] = [];
 
-  // Evaluate Confluences & Compute High Accuracy Conviction
   if (is100Bull) {
-    confidenceScore += 35;
+    scoreWeight += 35;
     rallyType = '100% Bullish Power Move';
     confluencePoints.push('100% Bullish solid body (≥65% candle range) closing near highs');
   }
 
   if (comboAnalysis.isAllCombosMet) {
-    confidenceScore += 35;
+    scoreWeight += 35;
     if (!rallyType) rallyType = 'Triple Power EMA Alignment';
     confluencePoints.push('Triple technical stack: EMA 9>20>50 rising + RSI Higher-Highs + MACD green');
   } else if (comboAnalysis.combo1.isMatch && comboAnalysis.combo2.isMatch) {
-    confidenceScore += 25;
+    scoreWeight += 25;
+    if (!rallyType) rallyType = 'EMA & Momentum Acceleration';
     confluencePoints.push('EMA Ribbon expansion & RSI momentum alignment active');
+  } else if (comboAnalysis.combo1.isMatch || comboAnalysis.combo2.isMatch) {
+    scoreWeight += 15;
   }
 
   if (isOpenLow) {
-    confidenceScore += 25;
+    scoreWeight += 28;
     if (!rallyType) rallyType = 'Institutional Open=Low Breakout';
     confluencePoints.push('Strict Open = Low verified (Buyers defended opening tick)');
   }
 
   if (isAbove15m) {
-    confidenceScore += 20;
+    scoreWeight += 22;
+    if (!rallyType) rallyType = '15m Candle High Breakout';
     confluencePoints.push(`Trading above first 15m high (₹${(stock.first15mHigh || stock.buyAbove || 0).toFixed(2)})`);
   }
 
   if (stock.trend === 'Very Bullish') {
-    confidenceScore += 20;
+    scoreWeight += 28;
     if (!rallyType) rallyType = 'Gann 45° Bullish Momentum';
     confluencePoints.push('Gann 45° angle bullish trajectory confirmed');
   } else if (stock.trend === 'Bullish') {
-    confidenceScore += 10;
+    scoreWeight += 18;
+    if (!rallyType) rallyType = 'Bullish Trend Continuation';
+    confluencePoints.push('Positive Gann upward trend structure');
   }
 
-  if (vwap && cmp > vwap) {
-    confidenceScore += 15;
+  if (vwap && cmp >= vwap) {
+    scoreWeight += 15;
     confluencePoints.push(`Holding above VWAP (₹${vwap.toFixed(2)}) institutional baseline`);
   }
 
-  if (rsi !== null && rsi >= 56 && rsi <= 76) {
-    confidenceScore += 15;
+  if (rsi !== null && rsi >= 54 && rsi <= 78) {
+    scoreWeight += 15;
     confluencePoints.push(`RSI at ${rsi.toFixed(1)} in ideal continuation acceleration zone`);
   }
 
-  // Minimum strict threshold for notification: Must score at least 55 raw weight (~82%+ calibrated conviction)
-  if (confidenceScore < 50) {
+  // Check if open calculation is favorable
+  if (stock.openCalc !== undefined && stock.openCalc < 3.0) {
+    scoreWeight += 10;
+    confluencePoints.push(`Gann Open Calc (${stock.openCalc.toFixed(2)}) < 3.0 trigger`);
+  }
+
+  // Minimum threshold: Must have at least one strong technical pattern
+  if (scoreWeight < 25) {
     return null;
   }
 
   // Calibrate final accuracy score (80% - 98%)
-  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (confidenceScore * 0.38))));
+  const finalScore = Math.min(98, Math.max(80, Math.round(65 + (scoreWeight * 0.33))));
 
   let confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT' = 'CONFIRMED BREAKOUT';
   if (finalScore >= 92) {
@@ -269,11 +274,10 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   }
 
   if (!rallyType) {
-    rallyType = 'High-Probability Bullish Breakout';
+    rallyType = 'Bullish Momentum Breakout';
   }
 
-  reason = `High-probability Bullish Rally with ${confluencePoints.length} confirmed institutional confluences. Price holding above VWAP and driving upwards with high buyer conviction.`;
-
+  const reason = `High-probability Bullish Rally with ${confluencePoints.length} confirmed institutional confluences. Price driving upwards with strong buyer conviction and favorable risk:reward.`;
   const tradePlan = buildTradePlan(stock, 'BULLISH', cmp);
 
   return {
@@ -302,8 +306,7 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
 }
 
 /**
- * Evaluates whether a stock meets ULTRA-STRICT High-Probability Bearish Breakdown criteria.
- * Designed to deliver high-accuracy short selling / PE buying opportunities.
+ * Evaluates whether a stock meets High-Probability Bearish Breakdown criteria.
  */
 export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   if (!stock.openPrice || !stock.closePrice || stock.openPrice <= 0 || stock.closePrice <= 0) {
@@ -318,74 +321,73 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     ? stock.pctChange
     : ((cmp - open) / open) * 100;
 
-  // Strict Rule 1: Intraday price action must be negative (Red candle or negative move)
-  if (pct > -0.15 || cmp > open) {
+  // Basic directional check: Close must not be heavily positive
+  if (pct > 0 && cmp > open * 1.002) {
     return null;
   }
 
-  // Strict Rule 2: Institutional Benchmark Filter (Must be below VWAP)
-  if (vwap && cmp > vwap * 1.004) {
-    return null; // Reject if trading above VWAP
-  }
-
-  // Strict Rule 3: RSI Filter for Bearish Breakdowns
-  // Ideal continuation zone is 22 to 46. Reject if RSI < 18 (extreme oversold bounce risk) or > 52 (bullish territory)
-  if (rsi !== null && (rsi < 18 || rsi > 52)) {
+  // If VWAP is known and price is significantly above VWAP, reject false breakdowns
+  if (vwap && cmp > vwap * 1.008) {
     return null;
   }
 
-  // Detect Bearish patterns
+  // Reject extreme oversold snapback risk
+  if (rsi !== null && rsi < 15) {
+    return null;
+  }
+
   const is100Bear = is100PercentBearishMove(stock);
   const isOpenHigh = isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh);
   const isBelow15m = isBelowFirst15mCandle(stock);
   const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-  let confidenceScore = 0;
+  let scoreWeight = 0;
   let rallyType = '';
   const confluencePoints: string[] = [];
 
   if (is100Bear) {
-    confidenceScore += 35;
+    scoreWeight += 35;
     rallyType = '100% Bearish Breakdown Move';
     confluencePoints.push('100% Bearish solid red body closing near session lows');
   }
 
   if (isOpenHigh) {
-    confidenceScore += 30;
+    scoreWeight += 30;
     if (!rallyType) rallyType = 'Institutional Open=High Supply';
     confluencePoints.push('Strict Open = High verified (Sellers aggressively sold opening tick)');
   }
 
   if (isBelow15m) {
-    confidenceScore += 25;
+    scoreWeight += 25;
+    if (!rallyType) rallyType = '15m Candle Low Breakdown';
     confluencePoints.push(`Broken below first 15m support low (₹${(stock.first15mLow || stock.sellBelow || 0).toFixed(2)})`);
   }
 
   if (stock.trend === 'Very Bearish') {
-    confidenceScore += 25;
+    scoreWeight += 28;
     if (!rallyType) rallyType = 'Gann 45° Bearish Breakdown';
-    confluencePoints.push('Gann 45° downward trajectory active');
+    confluencePoints.push('Gann 45° downward trajectory confirmed');
   } else if (stock.trend === 'Bearish') {
-    confidenceScore += 15;
+    scoreWeight += 18;
     if (!rallyType) rallyType = 'Bearish Trend Flow';
+    confluencePoints.push('Negative Gann downward trend structure');
   }
 
-  if (vwap && cmp < vwap) {
-    confidenceScore += 15;
+  if (vwap && cmp <= vwap) {
+    scoreWeight += 15;
     confluencePoints.push(`Trading below VWAP (₹${vwap.toFixed(2)}) resistance`);
   }
 
-  if (rsi !== null && rsi <= 44 && rsi >= 24) {
-    confidenceScore += 15;
+  if (rsi !== null && rsi <= 46 && rsi >= 20) {
+    scoreWeight += 15;
     confluencePoints.push(`RSI at ${rsi.toFixed(1)} confirms strong seller momentum`);
   }
 
-  // Minimum strict threshold
-  if (confidenceScore < 50) {
+  if (scoreWeight < 25) {
     return null;
   }
 
-  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (confidenceScore * 0.38))));
+  const finalScore = Math.min(98, Math.max(80, Math.round(65 + (scoreWeight * 0.33))));
 
   let confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT' = 'CONFIRMED BREAKOUT';
   if (finalScore >= 92) {
@@ -395,11 +397,10 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   }
 
   if (!rallyType) {
-    rallyType = 'High-Probability Bearish Breakdown';
+    rallyType = 'Bearish Momentum Breakdown';
   }
 
-  const reason = `High-probability Bearish Rally / Breakdown with ${confluencePoints.length} confirmed institutional confluences. Heavy selling pressure below VWAP with defined downside targets.`;
-
+  const reason = `High-probability Bearish Breakdown with ${confluencePoints.length} confirmed institutional confluences. Heavy selling pressure below resistance with defined downside targets.`;
   const tradePlan = buildTradePlan(stock, 'BEARISH', cmp);
 
   return {
