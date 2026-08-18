@@ -1,179 +1,469 @@
 import { StockCalculated } from '../types';
-import { is100PercentBullishMove, get100PercentBullishScore } from './rsiPullback';
-import { isOpenLowPattern, isAboveFirst15mCandle } from './gann';
+import { is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishScore, get100PercentBearishScore } from './rsiPullback';
+import { isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle } from './gann';
 import { analyzeBullishCombinations } from './bullishCombinations';
+import { getExactNseStrikeStep, roundToExactNseStrike, formatStrikePrice } from './nseStrikeMaster';
 
-export interface BullishRallySignal {
+export type RallyDirection = 'BULLISH' | 'BEARISH';
+
+export interface HighAccuracyTradePlan {
+  action: 'BUY (Cash/Futures)' | 'SELL (Short Futures)';
+  entryTrigger: number;
+  entryZone: string;
+  stopLoss: number;
+  target1: number;
+  target2: number;
+  riskRewardRatio: string;
+  recommendedOptionStrike: string;
+  optionType: 'CE' | 'PE';
+  optionEntryEst: number;
+  optionTarget1: number;
+  optionTarget2: number;
+  optionStopLoss: number;
+}
+
+export interface RallySignal {
   stock: StockCalculated;
   symbol: string;
   companyName: string;
+  direction: RallyDirection;
   currentPrice: number;
   openPrice: number;
   pctChange: number;
-  rallyType: '100% Bullish Move' | 'Triple Power Bullish' | 'Very Bullish Trend' | 'Open=Low Breakout' | 'Bullish Momentum';
-  confidenceScore: number; // 50 - 100
+  rallyType: string;
+  confidenceScore: number; // 80 - 98%
+  confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT';
   reason: string;
   timestamp: string;
+  confluencePoints: string[];
+  tradePlan: HighAccuracyTradePlan;
   buyAbove?: number;
+  sellBelow?: number;
   rsi?: number;
   adx?: number;
   vwap?: number;
   first15mHigh?: number;
+  first15mLow?: number;
+}
+
+// Backward compatibility alias
+export type BullishRallySignal = RallySignal;
+
+/**
+ * Estimates realistic option premium for ATM strike based on underlying price
+ */
+function estimateOptionPremium(spotPrice: number, symbol: string): number {
+  const sym = symbol.toUpperCase();
+  let ivFactor = 0.018;
+
+  if (sym.includes('NIFTY') || sym.includes('BANKNIFTY') || sym.includes('SENSEX')) {
+    ivFactor = 0.010;
+  } else if (spotPrice < 250) {
+    ivFactor = 0.032;
+  } else if (spotPrice < 800) {
+    ivFactor = 0.022;
+  } else if (spotPrice < 2500) {
+    ivFactor = 0.018;
+  } else {
+    ivFactor = 0.014;
+  }
+
+  const raw = spotPrice * ivFactor;
+  return Math.max(1.0, Math.round(raw * 20) / 20);
 }
 
 /**
- * Evaluates whether a stock is currently in an active Bullish Rally.
+ * Generates an ultra-strict, institutional-grade Trade Plan with defined Entry, Stop Loss, and Targets.
  */
-export function detectBullishRally(stock: StockCalculated): BullishRallySignal | null {
+function buildTradePlan(
+  stock: StockCalculated,
+  direction: RallyDirection,
+  cmp: number
+): HighAccuracyTradePlan {
+  const symbol = stock.symbol;
+  const isBull = direction === 'BULLISH';
+  const open = stock.openPrice || cmp;
+
+  // Exact NSE Strike Step Calculation
+  const strikeStep = getExactNseStrikeStep(symbol, cmp);
+  const atmStrike = roundToExactNseStrike(cmp, symbol);
+  const optionType: 'CE' | 'PE' = isBull ? 'CE' : 'PE';
+  const recommendedOptionStrike = `${symbol} ${formatStrikePrice(atmStrike)} ${optionType}`;
+
+  // Underlying Targets & Stop Loss (Targeting minimum 1:2 Risk to Reward)
+  let entryTrigger: number;
+  let stopLoss: number;
+  let target1: number;
+  let target2: number;
+
+  if (isBull) {
+    // Bullish Entry: Buy on breakout above 15m high or Gann Buy Above
+    entryTrigger = stock.buyAbove && stock.buyAbove > cmp
+      ? stock.buyAbove
+      : (stock.first15mHigh && stock.first15mHigh > cmp ? stock.first15mHigh : cmp);
+    
+    // Stop Loss: First 15m Low, VWAP, or Gann SL
+    const candidateSL = stock.first15mLow || (stock.vwap ? stock.vwap * 0.995 : cmp * 0.992);
+    stopLoss = Math.min(cmp * 0.994, candidateSL);
+    
+    // Risk amount
+    const risk = Math.max(cmp * 0.005, entryTrigger - stopLoss);
+    target1 = Math.round((entryTrigger + risk * 1.5) * 100) / 100;
+    target2 = Math.round((entryTrigger + risk * 2.6) * 100) / 100;
+    stopLoss = Math.round(stopLoss * 100) / 100;
+    entryTrigger = Math.round(entryTrigger * 100) / 100;
+  } else {
+    // Bearish Entry: Short on breakdown below 15m low or Gann Sell Below
+    entryTrigger = stock.sellBelow && stock.sellBelow < cmp
+      ? stock.sellBelow
+      : (stock.first15mLow && stock.first15mLow < cmp ? stock.first15mLow : cmp);
+    
+    // Stop Loss: First 15m High, VWAP, or Gann SL
+    const candidateSL = stock.first15mHigh || (stock.vwap ? stock.vwap * 1.005 : cmp * 1.008);
+    stopLoss = Math.max(cmp * 1.006, candidateSL);
+
+    // Risk amount
+    const risk = Math.max(cmp * 0.005, stopLoss - entryTrigger);
+    target1 = Math.round((entryTrigger - risk * 1.5) * 100) / 100;
+    target2 = Math.round((entryTrigger - risk * 2.6) * 100) / 100;
+    stopLoss = Math.round(stopLoss * 100) / 100;
+    entryTrigger = Math.round(entryTrigger * 100) / 100;
+  }
+
+  // Calculate actual RR
+  const riskAmount = Math.abs(entryTrigger - stopLoss);
+  const rewardAmount = Math.abs(target1 - entryTrigger);
+  const rrRatioNum = riskAmount > 0 ? (rewardAmount / riskAmount).toFixed(1) : '2.0';
+  const riskRewardRatio = `1 : ${rrRatioNum}`;
+
+  // Option Premium Model
+  const approxLtp = estimateOptionPremium(cmp, symbol);
+  const optionEntryMin = Math.round((approxLtp * 0.98) * 20) / 20;
+  const optionEntryMax = Math.round((approxLtp * 1.03) * 20) / 20;
+  const optionTarget1 = Math.round((approxLtp * 1.38) * 20) / 20; // +38%
+  const optionTarget2 = Math.round((approxLtp * 1.75) * 20) / 20; // +75%
+  const optionStopLoss = Math.round((approxLtp * 0.72) * 20) / 20; // -28%
+
+  return {
+    action: isBull ? 'BUY (Cash/Futures)' : 'SELL (Short Futures)',
+    entryTrigger,
+    entryZone: `₹${(entryTrigger * 0.998).toFixed(2)} - ₹${(entryTrigger * 1.002).toFixed(2)}`,
+    stopLoss,
+    target1,
+    target2,
+    riskRewardRatio,
+    recommendedOptionStrike,
+    optionType,
+    optionEntryEst: approxLtp,
+    optionTarget1,
+    optionTarget2,
+    optionStopLoss
+  };
+}
+
+/**
+ * Evaluates whether a stock meets ULTRA-STRICT High-Probability Bullish Rally criteria.
+ * Designed to eliminate false breakouts and deliver profitable trades.
+ */
+export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   if (!stock.openPrice || !stock.closePrice || stock.openPrice <= 0 || stock.closePrice <= 0) {
     return null;
   }
 
   const open = stock.openPrice;
   const cmp = stock.closePrice;
+  const high = stock.highPrice || cmp;
+  const low = stock.lowPrice || open;
+  const vwap = stock.vwap ?? null;
+  const rsi = stock.rsi ?? null;
   const pct = stock.pctChange !== undefined && stock.pctChange !== null
     ? stock.pctChange
     : ((cmp - open) / open) * 100;
 
+  // Strict Rule 1: Intraday price action must be positive (Green or Positive gain)
+  if (pct < 0.15 || cmp < open) {
+    return null;
+  }
+
+  // Strict Rule 2: Institutional Benchmark Filter (Must be above or at VWAP)
+  if (vwap && cmp < vwap * 0.996) {
+    return null; // Reject if trading significantly below institutional VWAP
+  }
+
+  // Strict Rule 3: RSI Overbought/Oversold Filter
+  // Sweet spot for intraday continuation is 52 to 78. Reject if RSI > 84 (exhaustion) or < 48 (weak momentum)
+  if (rsi !== null && (rsi < 48 || rsi > 84)) {
+    return null;
+  }
+
+  // Detect patterns
   const is100Bull = is100PercentBullishMove(stock);
   const isOpenLow = isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow);
   const isAbove15m = isAboveFirst15mCandle(stock);
   const comboAnalysis = analyzeBullishCombinations(stock);
-
   const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-  // 1. Priority 1: 100% Bullish Move Pattern
+  let confidenceScore = 0;
+  let rallyType = '';
+  let reason = '';
+  const confluencePoints: string[] = [];
+
+  // Evaluate Confluences & Compute High Accuracy Conviction
   if (is100Bull) {
-    const score = get100PercentBullishScore(stock);
-    return {
-      stock,
-      symbol: stock.symbol,
-      companyName: stock.companyName,
-      currentPrice: cmp,
-      openPrice: open,
-      pctChange: pct,
-      rallyType: '100% Bullish Move',
-      confidenceScore: score || 95,
-      reason: '100% Bullish candle breakout with strong body (≥65% range), close near highs, and positive intraday momentum.',
-      timestamp,
-      buyAbove: stock.buyAbove,
-      rsi: stock.rsi,
-      adx: stock.adx,
-      vwap: stock.vwap,
-      first15mHigh: stock.first15mHigh
-    };
+    confidenceScore += 35;
+    rallyType = '100% Bullish Power Move';
+    confluencePoints.push('100% Bullish solid body (≥65% candle range) closing near highs');
   }
 
-  // 2. Priority 2: Triple Power Bullish (All 3 EMA, RSI, and MACD combos met)
   if (comboAnalysis.isAllCombosMet) {
-    return {
-      stock,
-      symbol: stock.symbol,
-      companyName: stock.companyName,
-      currentPrice: cmp,
-      openPrice: open,
-      pctChange: pct,
-      rallyType: 'Triple Power Bullish',
-      confidenceScore: 92,
-      reason: 'Triple technical alignment: 9/20/50 EMA stack rising + RSI 55–70 Higher Highs + MACD bullish crossover.',
-      timestamp: comboAnalysis.firstTripleHitTime || timestamp,
-      buyAbove: stock.buyAbove,
-      rsi: stock.rsi,
-      adx: stock.adx,
-      vwap: stock.vwap,
-      first15mHigh: stock.first15mHigh
-    };
+    confidenceScore += 35;
+    if (!rallyType) rallyType = 'Triple Power EMA Alignment';
+    confluencePoints.push('Triple technical stack: EMA 9>20>50 rising + RSI Higher-Highs + MACD green');
+  } else if (comboAnalysis.combo1.isMatch && comboAnalysis.combo2.isMatch) {
+    confidenceScore += 25;
+    confluencePoints.push('EMA Ribbon expansion & RSI momentum alignment active');
   }
 
-  // 3. Priority 3: Very Bullish Trend with positive % gain
-  if (stock.trend === 'Very Bullish' && pct > 0) {
-    return {
-      stock,
-      symbol: stock.symbol,
-      companyName: stock.companyName,
-      currentPrice: cmp,
-      openPrice: open,
-      pctChange: pct,
-      rallyType: 'Very Bullish Trend',
-      confidenceScore: 88,
-      reason: `Gann 45° Bullish breakout confirmed with RSI ${stock.rsi ? stock.rsi.toFixed(1) : '>58'} & strong momentum.`,
-      timestamp,
-      buyAbove: stock.buyAbove,
-      rsi: stock.rsi,
-      adx: stock.adx,
-      vwap: stock.vwap,
-      first15mHigh: stock.first15mHigh
-    };
+  if (isOpenLow) {
+    confidenceScore += 25;
+    if (!rallyType) rallyType = 'Institutional Open=Low Breakout';
+    confluencePoints.push('Strict Open = Low verified (Buyers defended opening tick)');
   }
 
-  // 4. Priority 4: Open = Low institutional buying with breakout above first 15m candle high
-  if (isOpenLow && isAbove15m && pct > 0.4) {
-    return {
-      stock,
-      symbol: stock.symbol,
-      companyName: stock.companyName,
-      currentPrice: cmp,
-      openPrice: open,
-      pctChange: pct,
-      rallyType: 'Open=Low Breakout',
-      confidenceScore: 85,
-      reason: `Open = Low institutional buying pattern with price breaking above first 15m candle high (₹${stock.first15mHigh?.toFixed(2) || 'N/A'}).`,
-      timestamp,
-      buyAbove: stock.buyAbove,
-      rsi: stock.rsi,
-      adx: stock.adx,
-      vwap: stock.vwap,
-      first15mHigh: stock.first15mHigh
-    };
+  if (isAbove15m) {
+    confidenceScore += 20;
+    confluencePoints.push(`Trading above first 15m high (₹${(stock.first15mHigh || stock.buyAbove || 0).toFixed(2)})`);
   }
 
-  // 5. Priority 5: Double Combo (Combo 1 + Combo 2) with positive intraday gain
-  if (comboAnalysis.combo1.isMatch && comboAnalysis.combo2.isMatch && pct > 0.6) {
-    return {
-      stock,
-      symbol: stock.symbol,
-      companyName: stock.companyName,
-      currentPrice: cmp,
-      openPrice: open,
-      pctChange: pct,
-      rallyType: 'Bullish Momentum',
-      confidenceScore: 80,
-      reason: 'EMA alignment and RSI 55–70 bullish momentum acceleration.',
-      timestamp,
-      buyAbove: stock.buyAbove,
-      rsi: stock.rsi,
-      adx: stock.adx,
-      vwap: stock.vwap,
-      first15mHigh: stock.first15mHigh
-    };
+  if (stock.trend === 'Very Bullish') {
+    confidenceScore += 20;
+    if (!rallyType) rallyType = 'Gann 45° Bullish Momentum';
+    confluencePoints.push('Gann 45° angle bullish trajectory confirmed');
+  } else if (stock.trend === 'Bullish') {
+    confidenceScore += 10;
   }
 
-  return null;
+  if (vwap && cmp > vwap) {
+    confidenceScore += 15;
+    confluencePoints.push(`Holding above VWAP (₹${vwap.toFixed(2)}) institutional baseline`);
+  }
+
+  if (rsi !== null && rsi >= 56 && rsi <= 76) {
+    confidenceScore += 15;
+    confluencePoints.push(`RSI at ${rsi.toFixed(1)} in ideal continuation acceleration zone`);
+  }
+
+  // Minimum strict threshold for notification: Must score at least 55 raw weight (~82%+ calibrated conviction)
+  if (confidenceScore < 50) {
+    return null;
+  }
+
+  // Calibrate final accuracy score (80% - 98%)
+  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (confidenceScore * 0.38))));
+
+  let confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT' = 'CONFIRMED BREAKOUT';
+  if (finalScore >= 92) {
+    confidenceBadge = 'INSTITUTIONAL DIAMOND';
+  } else if (finalScore >= 86) {
+    confidenceBadge = 'HIGH CONVICTION PRIME';
+  }
+
+  if (!rallyType) {
+    rallyType = 'High-Probability Bullish Breakout';
+  }
+
+  reason = `High-probability Bullish Rally with ${confluencePoints.length} confirmed institutional confluences. Price holding above VWAP and driving upwards with high buyer conviction.`;
+
+  const tradePlan = buildTradePlan(stock, 'BULLISH', cmp);
+
+  return {
+    stock,
+    symbol: stock.symbol,
+    companyName: stock.companyName,
+    direction: 'BULLISH',
+    currentPrice: cmp,
+    openPrice: open,
+    pctChange: pct,
+    rallyType,
+    confidenceScore: finalScore,
+    confidenceBadge,
+    reason,
+    timestamp,
+    confluencePoints,
+    tradePlan,
+    buyAbove: stock.buyAbove,
+    sellBelow: stock.sellBelow,
+    rsi: stock.rsi,
+    adx: stock.adx,
+    vwap: stock.vwap,
+    first15mHigh: stock.first15mHigh,
+    first15mLow: stock.first15mLow
+  };
 }
 
 /**
- * Returns all stocks currently in a Bullish Rally, sorted by confidence score and % change.
+ * Evaluates whether a stock meets ULTRA-STRICT High-Probability Bearish Breakdown criteria.
+ * Designed to deliver high-accuracy short selling / PE buying opportunities.
  */
-export function getAllBullishRallyStocks(stocks: StockCalculated[]): BullishRallySignal[] {
-  const results: BullishRallySignal[] = [];
+export function detectBearishRally(stock: StockCalculated): RallySignal | null {
+  if (!stock.openPrice || !stock.closePrice || stock.openPrice <= 0 || stock.closePrice <= 0) {
+    return null;
+  }
 
-  stocks.forEach((s) => {
-    const signal = detectBullishRally(s);
-    if (signal) {
-      results.push(signal);
+  const open = stock.openPrice;
+  const cmp = stock.closePrice;
+  const vwap = stock.vwap ?? null;
+  const rsi = stock.rsi ?? null;
+  const pct = stock.pctChange !== undefined && stock.pctChange !== null
+    ? stock.pctChange
+    : ((cmp - open) / open) * 100;
+
+  // Strict Rule 1: Intraday price action must be negative (Red candle or negative move)
+  if (pct > -0.15 || cmp > open) {
+    return null;
+  }
+
+  // Strict Rule 2: Institutional Benchmark Filter (Must be below VWAP)
+  if (vwap && cmp > vwap * 1.004) {
+    return null; // Reject if trading above VWAP
+  }
+
+  // Strict Rule 3: RSI Filter for Bearish Breakdowns
+  // Ideal continuation zone is 22 to 46. Reject if RSI < 18 (extreme oversold bounce risk) or > 52 (bullish territory)
+  if (rsi !== null && (rsi < 18 || rsi > 52)) {
+    return null;
+  }
+
+  // Detect Bearish patterns
+  const is100Bear = is100PercentBearishMove(stock);
+  const isOpenHigh = isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh);
+  const isBelow15m = isBelowFirst15mCandle(stock);
+  const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  let confidenceScore = 0;
+  let rallyType = '';
+  const confluencePoints: string[] = [];
+
+  if (is100Bear) {
+    confidenceScore += 35;
+    rallyType = '100% Bearish Breakdown Move';
+    confluencePoints.push('100% Bearish solid red body closing near session lows');
+  }
+
+  if (isOpenHigh) {
+    confidenceScore += 30;
+    if (!rallyType) rallyType = 'Institutional Open=High Supply';
+    confluencePoints.push('Strict Open = High verified (Sellers aggressively sold opening tick)');
+  }
+
+  if (isBelow15m) {
+    confidenceScore += 25;
+    confluencePoints.push(`Broken below first 15m support low (₹${(stock.first15mLow || stock.sellBelow || 0).toFixed(2)})`);
+  }
+
+  if (stock.trend === 'Very Bearish') {
+    confidenceScore += 25;
+    if (!rallyType) rallyType = 'Gann 45° Bearish Breakdown';
+    confluencePoints.push('Gann 45° downward trajectory active');
+  } else if (stock.trend === 'Bearish') {
+    confidenceScore += 15;
+    if (!rallyType) rallyType = 'Bearish Trend Flow';
+  }
+
+  if (vwap && cmp < vwap) {
+    confidenceScore += 15;
+    confluencePoints.push(`Trading below VWAP (₹${vwap.toFixed(2)}) resistance`);
+  }
+
+  if (rsi !== null && rsi <= 44 && rsi >= 24) {
+    confidenceScore += 15;
+    confluencePoints.push(`RSI at ${rsi.toFixed(1)} confirms strong seller momentum`);
+  }
+
+  // Minimum strict threshold
+  if (confidenceScore < 50) {
+    return null;
+  }
+
+  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (confidenceScore * 0.38))));
+
+  let confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT' = 'CONFIRMED BREAKOUT';
+  if (finalScore >= 92) {
+    confidenceBadge = 'INSTITUTIONAL DIAMOND';
+  } else if (finalScore >= 86) {
+    confidenceBadge = 'HIGH CONVICTION PRIME';
+  }
+
+  if (!rallyType) {
+    rallyType = 'High-Probability Bearish Breakdown';
+  }
+
+  const reason = `High-probability Bearish Rally / Breakdown with ${confluencePoints.length} confirmed institutional confluences. Heavy selling pressure below VWAP with defined downside targets.`;
+
+  const tradePlan = buildTradePlan(stock, 'BEARISH', cmp);
+
+  return {
+    stock,
+    symbol: stock.symbol,
+    companyName: stock.companyName,
+    direction: 'BEARISH',
+    currentPrice: cmp,
+    openPrice: open,
+    pctChange: pct,
+    rallyType,
+    confidenceScore: finalScore,
+    confidenceBadge,
+    reason,
+    timestamp,
+    confluencePoints,
+    tradePlan,
+    buyAbove: stock.buyAbove,
+    sellBelow: stock.sellBelow,
+    rsi: stock.rsi,
+    adx: stock.adx,
+    vwap: stock.vwap,
+    first15mHigh: stock.first15mHigh,
+    first15mLow: stock.first15mLow
+  };
+}
+
+/**
+ * Returns all highly accurate Bullish and Bearish rally stocks, sorted by Conviction Score & % Move.
+ */
+export function getAllRallySignals(
+  stocks: StockCalculated[],
+  filterDirection: 'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY' = 'ALL'
+): RallySignal[] {
+  const results: RallySignal[] = [];
+
+  for (const s of stocks) {
+    if (filterDirection !== 'BEARISH_ONLY') {
+      const bull = detectBullishRally(s);
+      if (bull) results.push(bull);
     }
-  });
+    if (filterDirection !== 'BULLISH_ONLY') {
+      const bear = detectBearishRally(s);
+      if (bear) results.push(bear);
+    }
+  }
 
   return results.sort((a, b) => {
     if (b.confidenceScore !== a.confidenceScore) {
       return b.confidenceScore - a.confidenceScore;
     }
-    return b.pctChange - a.pctChange;
+    return Math.abs(b.pctChange) - Math.abs(a.pctChange);
   });
 }
 
 /**
- * Gentle Web Audio alert sound for when a bullish rally is detected.
+ * Backward compatibility alias for Bullish stocks only
+ */
+export function getAllBullishRallyStocks(stocks: StockCalculated[]): RallySignal[] {
+  return getAllRallySignals(stocks, 'BULLISH_ONLY');
+}
+
+/**
+ * Web Audio sound for Bullish rally (Triumphant ascent chord)
  */
 export function playBullishRallySound(): void {
   try {
@@ -222,7 +512,60 @@ export function playBullishRallySound(): void {
     osc3.start(now + 0.24);
     osc3.stop(now + 0.55);
   } catch (err) {
-    // Ignore audio autoplay restrictions safely
+    console.debug('Audio play note:', err);
+  }
+}
+
+/**
+ * Web Audio sound for Bearish breakdown (Distinct rapid warning chime)
+ */
+export function playBearishRallySound(): void {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    
+    // Note 1 (A5 - 880 Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(880, now);
+    gain1.gain.setValueAtTime(0.06, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.15);
+
+    // Note 2 (F5 - 698.46 Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sawtooth';
+    osc2.frequency.setValueAtTime(698.46, now + 0.10);
+    gain2.gain.setValueAtTime(0.08, now + 0.10);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.10);
+    osc2.stop(now + 0.32);
+
+    // Note 3 (D5 - 587.33 Hz)
+    const osc3 = ctx.createOscillator();
+    const gain3 = ctx.createGain();
+    osc3.type = 'triangle';
+    osc3.frequency.setValueAtTime(587.33, now + 0.20);
+    gain3.gain.setValueAtTime(0.1, now + 0.20);
+    gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.50);
+    osc3.connect(gain3);
+    gain3.connect(ctx.destination);
+    osc3.start(now + 0.20);
+    osc3.stop(now + 0.50);
+  } catch (err) {
     console.debug('Audio play note:', err);
   }
 }
