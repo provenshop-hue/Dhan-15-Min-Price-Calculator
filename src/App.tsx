@@ -240,17 +240,17 @@ export default function App() {
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
   const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
 
-  // Auto-Fetch State (Default: 15 minutes)
+  // Auto-Fetch State (Default: 5 minutes - Every 5th minute)
   const [autoFetchIntervalMinutes, setAutoFetchIntervalMinutes] = useState<number>(() => {
     const saved = localStorage.getItem('dhan_auto_fetch_interval_mins');
-    return saved ? Number(saved) : 15;
+    return saved ? Number(saved) : 5;
   });
   const [isAutoFetchEnabled, setIsAutoFetchEnabled] = useState<boolean>(() => {
     return localStorage.getItem('dhan_auto_fetch_enabled') !== 'false';
   });
   const [nextFetchSeconds, setNextFetchSeconds] = useState<number>(() => {
     const savedMins = localStorage.getItem('dhan_auto_fetch_interval_mins');
-    return (savedMins ? Number(savedMins) : 15) * 60;
+    return (savedMins ? Number(savedMins) : 5) * 60;
   });
   const [lastFetchTime, setLastFetchTime] = useState<string | null>(null);
 

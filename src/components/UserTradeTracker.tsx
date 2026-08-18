@@ -789,13 +789,12 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
                   setCountdownSeconds(val * 60);
                 }}
                 className="bg-slate-900 border border-slate-700 text-slate-200 text-[11px] font-bold rounded px-1.5 py-0.5 outline-none cursor-pointer"
-                title="Select Auto-Refresh Interval"
+                title="Select Auto-Refresh Interval (Default: Every 5th minute)"
               >
-                <option value={1}>1m</option>
-                <option value={3}>3m</option>
-                <option value={5}>5m</option>
+                <option value={5}>5m (5th min)</option>
                 <option value={10}>10m</option>
                 <option value={15}>15m</option>
+                <option value={30}>30m</option>
               </select>
             </div>
           </div>

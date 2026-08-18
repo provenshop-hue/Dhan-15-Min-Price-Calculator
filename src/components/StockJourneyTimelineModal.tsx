@@ -132,10 +132,11 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
   const [viewMode, setViewMode] = useState<'interactive' | 'table' | 'matrix'>('interactive');
   const [startTimeInput, setStartTimeInput] = useState<string>(currentStockItem?.config.timelineStartTime || '09:15');
 
-  // Real-time Dhan API Sync State
+  // Real-time Dhan API Sync State (Strictly every 5th minute cadence)
   const [isDhanSyncing, setIsDhanSyncing] = useState<boolean>(false);
   const [lastDhanSyncTime, setLastDhanSyncTime] = useState<string>(() => new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
   const [autoSpeakOnMove, setAutoSpeakOnMove] = useState<boolean>(false);
+  const lastDhanApiCallTimesRef = useRef<Record<string, number>>({});
 
   // "Add Stock to Journey" Drawer / Modal state
   const [isAddStockOpen, setIsAddStockOpen] = useState<boolean>(false);
@@ -148,17 +149,28 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
 
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Asynchronously fetch current price from Dhan API whenever timeline shifts
-  const fetchDhanPriceOnTimelineShift = React.useCallback(async (symbol: string) => {
+  // Call Dhan API strictly on every 5th minute (not every minute), with optional force override
+  const fetchDhanPriceOnTimelineShift = React.useCallback(async (symbol: string, force: boolean = false) => {
     if (!symbol) return;
+    const now = Date.now();
+    const symKey = symbol.toUpperCase();
+    const lastTime = lastDhanApiCallTimesRef.current[symKey] || 0;
+    const FIVE_MINUTES_MS = 5 * 60 * 1000; // 300,000 ms
+
+    // Only call Dhan API if at least 5 minutes have elapsed since last API fetch for this stock, or if force is true
+    if (!force && lastTime > 0 && (now - lastTime < FIVE_MINUTES_MS)) {
+      return;
+    }
+
     setIsDhanSyncing(true);
     try {
-      const matching = stockMap.get(symbol.toUpperCase());
+      const matching = stockMap.get(symKey);
       if (matching && onFetchSingleStock) {
         await onFetchSingleStock(matching);
+        lastDhanApiCallTimesRef.current[symKey] = Date.now();
       }
     } catch (err) {
-      console.error('Error fetching Dhan live price on timeline change:', err);
+      console.error('Error fetching Dhan live price on 5th minute:', err);
     } finally {
       setLastDhanSyncTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       setTimeout(() => setIsDhanSyncing(false), 500);
@@ -171,7 +183,7 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
       setActiveStepIndex(currentStockItem.config.lastSimulatedStepIndex || 0);
       setStartTimeInput(currentStockItem.config.timelineStartTime || '09:15');
       setIsPlaying(false);
-      fetchDhanPriceOnTimelineShift(currentStockItem.symbol);
+      fetchDhanPriceOnTimelineShift(currentStockItem.symbol, false);
     }
   }, [currentStockItem?.id, fetchDhanPriceOnTimelineShift]);
 
@@ -1002,7 +1014,10 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${isDhanSyncing ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}`} />
                         <span className="font-bold text-slate-300">
-                          {isDhanSyncing ? '📡 Fetching Current Price from Dhan API...' : `⚡ Dhan Price Synced (${lastDhanSyncTime})`}
+                          {isDhanSyncing ? '📡 Fetching 5-Min Price from Dhan API...' : `⚡ Dhan Price Synced (at ${lastDhanSyncTime})`}
+                        </span>
+                        <span className="bg-slate-800 text-blue-300 px-2 py-0.5 rounded-md text-[10px] font-bold border border-slate-700">
+                          ⏱️ 5-Min API Rhythm
                         </span>
                         <span className="text-slate-400 font-mono hidden sm:inline">
                           • Step Price: <strong className="text-white">₹{activeStep.price.toFixed(2)}</strong>
@@ -1021,12 +1036,13 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
                           <span>🎙️ Auto-Speak on Move</span>
                         </label>
 
-                        {/* Manual Dhan Sync Button */}
+                        {/* Manual Dhan Sync Button (forces immediate fetch) */}
                         <button
                           type="button"
-                          onClick={() => currentStockItem && fetchDhanPriceOnTimelineShift(currentStockItem.symbol)}
+                          onClick={() => currentStockItem && fetchDhanPriceOnTimelineShift(currentStockItem.symbol, true)}
                           disabled={isDhanSyncing}
                           className="px-2.5 py-1 rounded-lg bg-blue-600/80 hover:bg-blue-600 text-white font-bold text-[10.5px] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                          title="Force immediate Dhan API price refresh"
                         >
                           <RefreshCw className={`w-3 h-3 ${isDhanSyncing ? 'animate-spin' : ''}`} />
                           <span>{isDhanSyncing ? 'Syncing...' : 'Sync Dhan Live'}</span>
