@@ -46,6 +46,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 }) => {
   const [filterDirection, setFilterDirection] = useState<'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY'>('ALL');
   const [minAccuracyThreshold, setMinAccuracyThreshold] = useState<number>(80); // 80% or 90%
+  const [sortPreference, setSortPreference] = useState<'RECENCY_FIRST' | 'ACCURACY_FIRST'>('RECENCY_FIRST');
   const [rallySignals, setRallySignals] = useState<RallySignal[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(true);
@@ -65,7 +66,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
   // Scan stocks whenever stocks or filters change
   useEffect(() => {
-    const rawDetected = getAllRallySignals(stocks, filterDirection);
+    const rawDetected = getAllRallySignals(stocks, filterDirection, sortPreference);
     const filtered = rawDetected.filter((s) => s.confidenceScore >= minAccuracyThreshold);
     setRallySignals(filtered);
 
@@ -101,7 +102,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     if (currentIndex >= filtered.length) {
       setCurrentIndex(0);
     }
-  }, [stocks, filterDirection, minAccuracyThreshold, soundEnabled]);
+  }, [stocks, filterDirection, minAccuracyThreshold, sortPreference, soundEnabled]);
 
   const handleNextSlide = useCallback(() => {
     if (rallySignals.length <= 1) return;
@@ -214,8 +215,12 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/30 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold">
                   {currentRally.confidenceScore}%
                 </span>
-                <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
-                  <Clock className="w-2.5 h-2.5" />
+                <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5 border ${
+                  currentRally.isFresh 
+                    ? 'bg-amber-400/20 text-yellow-200 border-amber-400/40 animate-pulse' 
+                    : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                }`}>
+                  {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5" />}
                   {currentRally.rulePassedTime}
                 </span>
               </div>
@@ -223,7 +228,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               {rallySignals.length > 1 && (
                 <div className="text-[10px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
                   <span>Rotating ({currentIndex + 1}/{rallySignals.length})</span>
-                  <span className="text-[9px] text-slate-400">• Passed at {currentRally.rulePassedTime}</span>
+                  <span className="text-[9px] text-slate-400">• {currentRally.isFresh ? '⚡ Just triggered' : `Passed at ${currentRally.rulePassedTime}`}</span>
                 </div>
               )}
             </div>
@@ -301,9 +306,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               <span className="bg-black/40 text-yellow-200 text-[10px] px-2 py-0.5 rounded-full font-bold border border-yellow-300/40">
                 {currentRally.confidenceScore}% Accuracy
               </span>
-              <span className="bg-black/40 text-cyan-200 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border border-cyan-300/40 flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5" />
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border flex items-center gap-1 ${
+                currentRally.isFresh
+                  ? 'bg-amber-400/30 text-yellow-200 border-amber-300/60 shadow-[0_0_10px_rgba(251,191,36,0.3)]'
+                  : 'bg-black/40 text-cyan-200 border-cyan-300/40'
+              }`}>
+                {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5" />}
                 {currentRally.rulePassedTime}
+                {currentRally.isMarketHours && currentRally.recencyMinutes <= 30 && (
+                  <span className="text-[9px] text-amber-200 ml-0.5 font-sans">
+                    ({currentRally.recencyMinutes === 0 ? 'Fresh' : `${currentRally.recencyMinutes}m ago`})
+                  </span>
+                )}
               </span>
             </span>
           </div>
@@ -363,7 +377,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         </div>
 
         {/* Filter & Strictness Quick Bar */}
-        <div className="bg-slate-950/80 px-3 py-1.5 flex items-center justify-between border-b border-slate-800 text-[10px]">
+        <div className="bg-slate-950/80 px-3 py-1.5 flex items-center justify-between border-b border-slate-800 text-[10px] flex-wrap gap-1">
           <div className="flex items-center space-x-1 text-slate-400">
             <Filter className="w-3 h-3 text-slate-400" />
             <span>Filter:</span>
@@ -388,6 +402,23 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           </div>
 
           <div className="flex items-center space-x-1">
+            {/* Sort Mode Toggle (Recency vs Accuracy) */}
+            <button
+              onClick={() => {
+                setSortPreference((prev) => (prev === 'RECENCY_FIRST' ? 'ACCURACY_FIRST' : 'RECENCY_FIRST'));
+                setCurrentIndex(0);
+              }}
+              className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-1 ${
+                sortPreference === 'RECENCY_FIRST'
+                  ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50 shadow-sm'
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}
+              title="Intelligent Intraday Sorting: Prioritize stocks that passed closest to refresh time"
+            >
+              <Zap className="w-2.5 h-2.5 text-cyan-400" />
+              <span>{sortPreference === 'RECENCY_FIRST' ? '⚡ Freshest First' : '★ Score First'}</span>
+            </button>
+
             <button
               onClick={() => {
                 setMinAccuracyThreshold(minAccuracyThreshold === 80 ? 90 : 80);
@@ -400,7 +431,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               }`}
               title="Toggle Ultra-Strict (90%+ only) or High Accuracy (80%+)"
             >
-              {minAccuracyThreshold >= 90 ? '★ Ultra (90%+)' : '80%+ Accuracy'}
+              {minAccuracyThreshold >= 90 ? '★ Ultra 90%+' : '80%+'}
             </button>
           </div>
         </div>
@@ -409,8 +440,15 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         {showAllList ? (
           <div className="p-3 max-h-72 overflow-y-auto space-y-1.5 bg-slate-950/95">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1">
-              <span>All High-Accuracy Active Setups ({rallySignals.length})</span>
-              <span className="text-[10px] text-slate-400">Click any stock to view</span>
+              <span className="flex items-center gap-1.5">
+                <span>Active Setups ({rallySignals.length})</span>
+                {sortPreference === 'RECENCY_FIRST' && (
+                  <span className="text-[9.5px] text-cyan-300 font-normal bg-cyan-950/80 border border-cyan-800/60 px-1.5 py-0.2 rounded">
+                    Sorted by freshest breakdown/breakout
+                  </span>
+                )}
+              </span>
+              <span className="text-[10px] text-slate-400">Click stock to inspect</span>
             </div>
             {rallySignals.map((signal, idx) => {
               const sigBull = signal.direction === 'BULLISH';
@@ -439,13 +477,19 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       <div className="text-xs font-bold text-white flex items-center gap-1.5">
                         <span>{signal.symbol}</span>
                         <span className="text-[10px] text-slate-400 font-normal">₹{signal.currentPrice.toFixed(1)}</span>
+                        {signal.isFresh && (
+                          <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
+                            <Zap className="w-2 h-2 fill-current" />
+                            FRESH
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-slate-400 truncate max-w-[170px]">
                         {signal.rallyType}
                       </div>
                       <div className="text-[9px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
                         <Clock className="w-2.5 h-2.5 text-cyan-400" />
-                        <span>Rules passed: {signal.rulePassedTime}</span>
+                        <span>Passed: {signal.rulePassedTime} {signal.isMarketHours && `(${signal.recencyMinutes === 0 ? 'Just now' : `${signal.recencyMinutes}m ago`})`}</span>
                       </div>
                     </div>
                   </div>
@@ -480,9 +524,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     }`}>
                       {currentRally.confidenceBadge}
                     </span>
-                    <span className="text-[10px] bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5 text-cyan-400" />
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 border ${
+                      currentRally.isFresh
+                        ? 'bg-amber-950/90 text-yellow-300 border-amber-500/50 shadow-sm animate-pulse'
+                        : 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40'
+                    }`}>
+                      {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5 text-cyan-400" />}
                       Rule Passed: {currentRally.rulePassedTime}
+                      {currentRally.isMarketHours && (
+                        <span className="text-[9px] text-slate-300 font-sans ml-0.5">
+                          ({currentRally.recencyMinutes === 0 ? 'Just now' : `${currentRally.recencyMinutes}m ago`})
+                        </span>
+                      )}
                     </span>
                   </div>
 
@@ -516,9 +569,14 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                   <span className="text-slate-300 font-medium">Exact Rule Passed Timing:</span>
                   <span className="font-mono font-bold text-cyan-300">{currentRally.rulePassedTime}</span>
+                  {currentRally.isMarketHours && (
+                    <span className="text-[9.5px] text-amber-300 font-mono font-bold">
+                      ({currentRally.recencyMinutes === 0 ? '⚡ Just now' : `⚡ ${currentRally.recencyMinutes}m ago`})
+                    </span>
+                  )}
                 </div>
                 <span className="text-[9px] text-slate-400 font-mono">
-                  {currentRally.isMarketHours ? 'From 09:15 AM Market Open' : 'EOD Default (3:15 PM)'}
+                  {currentRally.isMarketHours ? 'Closest to refresh' : 'EOD Default (3:15 PM)'}
                 </span>
               </div>
             </div>

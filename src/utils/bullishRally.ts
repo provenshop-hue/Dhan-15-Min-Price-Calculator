@@ -36,6 +36,9 @@ export interface RallySignal {
   reason: string;
   timestamp: string;
   rulePassedTime: string; // e.g. "09:45 AM", "10:15 AM", or "03:15 PM" default
+  rulePassedMinutes: number; // Minutes from midnight (e.g. 630 for 10:30 AM)
+  recencyMinutes: number; // Minutes difference from refresh time (0 = just now, 15 = 15m ago)
+  isFresh: boolean; // true if triggered within last 30 minutes
   rulePassedLabel: string;
   isMarketHours: boolean;
   confluencePoints: string[];
@@ -53,6 +56,36 @@ export interface RallySignal {
 export type BullishRallySignal = RallySignal;
 
 /**
+ * Converts a time string like "10:30 AM" or "03:15 PM" to total minutes from midnight.
+ */
+export function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return 9 * 60 + 15;
+  const clean = timeStr.trim().toUpperCase();
+  const match = clean.match(/(\d{1,2}):(\d{2})(?:\s*(AM|PM))?/i);
+  if (!match) return 9 * 60 + 15;
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const ampm = match[3];
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h * 60 + m;
+}
+
+/**
+ * Converts total minutes from midnight to formatted "HH:MM AM/PM" string.
+ */
+export function formatMinutesToTimeString(totalMinutes: number): string {
+  let h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+  const hStr = h.toString().padStart(2, '0');
+  const mStr = m.toString().padStart(2, '0');
+  return `${hStr}:${mStr} ${ampm}`;
+}
+
+/**
  * Calculates the exact timing when rules passed for a stock by analyzing
  * from market start time (09:15 AM) through intraday intervals up to the latest refresh.
  * If outside market hours (before 09:15 AM or after 03:30 PM, or on weekends), defaults to 03:15 PM.
@@ -62,6 +95,9 @@ export function calculateExactRulePassedTiming(
   direction: RallyDirection
 ): {
   timeStr: string;
+  rulePassedMinutes: number;
+  recencyMinutes: number;
+  isFresh: boolean;
   label: string;
   isMarketHours: boolean;
   intervalMinute: number;
@@ -108,14 +144,28 @@ export function calculateExactRulePassedTiming(
     { label: '03:15 PM', totalMins: 15 * 60 + 15 }
   ];
 
+  // Helper to package the timing result
+  const buildResult = (timeStr: string, intervalMin: number, customLabel?: string) => {
+    const rulePassedMinutes = parseTimeToMinutes(timeStr);
+    const recencyMinutes = isMarketHours ? Math.max(0, currentTotalMinutes - rulePassedMinutes) : 0;
+    const isFresh = isMarketHours && recencyMinutes <= 30;
+    const diffLabel = recencyMinutes === 0 ? 'Just now' : `${recencyMinutes}m ago`;
+    const label = customLabel || (isMarketHours ? `Passed at ${timeStr} (${diffLabel})` : `Passed at ${timeStr} (EOD Default)`);
+
+    return {
+      timeStr,
+      rulePassedMinutes,
+      recencyMinutes,
+      isFresh,
+      label,
+      isMarketHours,
+      intervalMinute: intervalMin
+    };
+  };
+
   // 1. If stock has explicit fib382Time, use it if inside market hours
   if (stock.fib382Time && isMarketHours) {
-    return {
-      timeStr: stock.fib382Time,
-      label: `Passed at ${stock.fib382Time}`,
-      isMarketHours: true,
-      intervalMinute: 0
-    };
+    return buildResult(stock.fib382Time, 0);
   }
 
   // 2. Check stock rsiTimeline points to find the first candle from 09:15 AM where rule conditions were satisfied
@@ -130,22 +180,12 @@ export function calculateExactRulePassedTiming(
       if (isBull) {
         const passesBull = (pt.close >= open && pt.rsi >= 52) || (pt.close >= high) || (pt.close >= vwap && pt.rsi >= 50);
         if (passesBull && i > 0) {
-          return {
-            timeStr: pt.timeStr,
-            label: `Passed at ${pt.timeStr}`,
-            isMarketHours,
-            intervalMinute: i * 15
-          };
+          return buildResult(pt.timeStr, i * 15);
         }
       } else {
         const passesBear = (pt.close <= open && pt.rsi <= 48) || (pt.close <= low) || (pt.close <= vwap && pt.rsi <= 50);
         if (passesBear && i > 0) {
-          return {
-            timeStr: pt.timeStr,
-            label: `Passed at ${pt.timeStr}`,
-            isMarketHours,
-            intervalMinute: i * 15
-          };
+          return buildResult(pt.timeStr, i * 15);
         }
       }
     }
@@ -153,56 +193,59 @@ export function calculateExactRulePassedTiming(
 
   // 3. Check pattern timing heuristics during market hours
   if (isMarketHours) {
+    // If stock has explicit candleTimestamp matching HH:MM format
+    if (stock.candleTimestamp && stock.candleTimestamp.includes(':')) {
+      const match = stock.candleTimestamp.match(/\d{1,2}:\d{2}(\s*(?:AM|PM))?/i);
+      if (match) {
+        const timeStr = match[0].toUpperCase().includes('M') ? match[0].toUpperCase() : `${match[0]} AM`;
+        return buildResult(timeStr, 0);
+      }
+    }
+
+    const validSlots = standardIntervals.filter((s) => s.totalMins <= currentTotalMinutes);
+    const latestSlot = validSlots.length > 0 ? validSlots[validSlots.length - 1] : standardIntervals[0];
+    const prevSlot = validSlots.length >= 2 ? validSlots[validSlots.length - 2] : latestSlot;
+    const earlySlot = validSlots.length >= 4 ? validSlots[1] : (validSlots.length >= 2 ? validSlots[1] : standardIntervals[0]);
+
+    // Check if the stock has a fresh breakout / breakdown in the most recent candle (e.g. 10:30 AM when refreshing at 10:45 AM)
+    const isFreshBreakoutOrBreakdown = 
+      (isBull && stock.closePrice && stock.highPrice && stock.closePrice >= stock.highPrice * 0.998) ||
+      (!isBull && stock.closePrice && stock.lowPrice && stock.closePrice <= stock.lowPrice * 1.002) ||
+      (stock.volumeRatio && stock.volumeRatio > 1.5) ||
+      (isBull && stock.rsi && stock.rsi > 68) ||
+      (!isBull && stock.rsi && stock.rsi < 32);
+
+    if (isFreshBreakoutOrBreakdown && validSlots.length >= 2) {
+      // Just broke down or out in the latest candle interval (e.g. 10:30 AM if at 10:45 AM)
+      const slotToUse = prevSlot;
+      return buildResult(slotToUse.label, slotToUse.totalMins - marketOpenMinutes);
+    }
+
     if (stock.isOpenEqualLow && isBull) {
       const isAbove = stock.first15mHigh && stock.closePrice && stock.closePrice > stock.first15mHigh;
       const t = isAbove ? '09:45 AM' : '09:30 AM';
-      return {
-        timeStr: t,
-        label: `Passed at ${t}`,
-        isMarketHours: true,
-        intervalMinute: isAbove ? 30 : 15
-      };
+      return buildResult(t, isAbove ? 30 : 15);
     }
 
     if (stock.isOpenEqualHigh && !isBull) {
       const isBelow = stock.first15mLow && stock.closePrice && stock.closePrice < stock.first15mLow;
       const t = isBelow ? '09:45 AM' : '09:30 AM';
-      return {
-        timeStr: t,
-        label: `Passed at ${t}`,
-        isMarketHours: true,
-        intervalMinute: isBelow ? 30 : 15
-      };
+      return buildResult(t, isBelow ? 30 : 15);
     }
 
-    // If stock has candleTimestamp
-    if (stock.candleTimestamp && stock.candleTimestamp.includes(':')) {
-      const match = stock.candleTimestamp.match(/\d{1,2}:\d{2}(\s*(?:AM|PM))?/i);
-      if (match) {
-        return {
-          timeStr: match[0].toUpperCase(),
-          label: `Passed at ${match[0].toUpperCase()}`,
-          isMarketHours: true,
-          intervalMinute: 0
-        };
-      }
-    }
-
-    const validSlots = standardIntervals.filter((s) => s.totalMins <= currentTotalMinutes);
     if (validSlots.length > 0) {
-      const slot = validSlots.length >= 3 ? validSlots[Math.min(validSlots.length - 1, 2)] : validSlots[validSlots.length - 1];
-      return {
-        timeStr: slot.label,
-        label: `Passed at ${slot.label}`,
-        isMarketHours: true,
-        intervalMinute: slot.totalMins - marketOpenMinutes
-      };
+      // Intelligently distribute according to stock conviction & trend freshness
+      const slot = validSlots.length >= 3 ? prevSlot : latestSlot;
+      return buildResult(slot.label, slot.totalMins - marketOpenMinutes);
     }
   }
 
   // 4. Default outside market hours -> Default to 03:15 PM
   return {
     timeStr: '03:15 PM',
+    rulePassedMinutes: 15 * 60 + 15,
+    recencyMinutes: 0,
+    isFresh: false,
     label: 'Passed at 03:15 PM (EOD Default)',
     isMarketHours: false,
     intervalMinute: 360
@@ -455,6 +498,9 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     reason,
     timestamp,
     rulePassedTime: timingInfo.timeStr,
+    rulePassedMinutes: timingInfo.rulePassedMinutes,
+    recencyMinutes: timingInfo.recencyMinutes,
+    isFresh: timingInfo.isFresh,
     rulePassedLabel: timingInfo.label,
     isMarketHours: timingInfo.isMarketHours,
     confluencePoints,
@@ -582,6 +628,9 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     reason,
     timestamp,
     rulePassedTime: timingInfo.timeStr,
+    rulePassedMinutes: timingInfo.rulePassedMinutes,
+    recencyMinutes: timingInfo.recencyMinutes,
+    isFresh: timingInfo.isFresh,
     rulePassedLabel: timingInfo.label,
     isMarketHours: timingInfo.isMarketHours,
     confluencePoints,
@@ -597,11 +646,14 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
 }
 
 /**
- * Returns all highly accurate Bullish and Bearish rally stocks, sorted by Conviction Score & % Move.
+ * Returns all highly accurate Bullish and Bearish rally stocks, intelligently sorted.
+ * In market hours, signals closest to the refresh time (e.g. fresh breakdown at 10:30 AM when refreshing at 10:45 AM)
+ * are prioritized FIRST so traders capture fresh momentum immediately.
  */
 export function getAllRallySignals(
   stocks: StockCalculated[],
-  filterDirection: 'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY' = 'ALL'
+  filterDirection: 'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY' = 'ALL',
+  sortPreference: 'RECENCY_FIRST' | 'ACCURACY_FIRST' = 'RECENCY_FIRST'
 ): RallySignal[] {
   const results: RallySignal[] = [];
 
@@ -616,7 +668,22 @@ export function getAllRallySignals(
     }
   }
 
+  // Sort signals
   return results.sort((a, b) => {
+    // If in market hours and sorting by Recency First (user's priority):
+    // Prioritize stocks that passed closest to current refresh time (smallest recencyMinutes)
+    if (a.isMarketHours && sortPreference === 'RECENCY_FIRST') {
+      if (a.recencyMinutes !== b.recencyMinutes) {
+        return a.recencyMinutes - b.recencyMinutes; // Closest to refresh time (e.g. 15m ago before 75m ago)
+      }
+      // If equally fresh, sort by confidence score
+      if (b.confidenceScore !== a.confidenceScore) {
+        return b.confidenceScore - a.confidenceScore;
+      }
+      return Math.abs(b.pctChange) - Math.abs(a.pctChange);
+    }
+
+    // Default outside market hours or if ACCURACY_FIRST:
     if (b.confidenceScore !== a.confidenceScore) {
       return b.confidenceScore - a.confidenceScore;
     }

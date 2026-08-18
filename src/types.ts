@@ -17,6 +17,8 @@ export interface StockCalculated {
   first15mHigh?: number | null;
   first15mLow?: number | null;
   volume?: number | null;
+  volumeRatio?: number | null;
+  volumeSpike?: boolean | null;
   candleTimestamp?: string | null;
   previousClose?: number | null;
 
