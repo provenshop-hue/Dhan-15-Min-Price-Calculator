@@ -644,13 +644,31 @@ export interface StockJourneyTimelineConfig {
   lastSimulatedStepIndex: number;
 }
 
+export interface TrackedJourneyStockItem {
+  id: string;
+  symbol: string;
+  tradeId?: string; // linked trade ID if from tracked ledger
+  instrumentType: InstrumentType;
+  strikePrice?: number;
+  entryPrice: number;
+  quantity: number;
+  entryTime: string;
+  targetPrice?: number;
+  stopLossPrice?: number;
+  currentPrice?: number;
+  addedAt: number;
+  config: StockJourneyTimelineConfig;
+}
+
 export interface StockJourneyData {
   config: StockJourneyTimelineConfig;
   trade: UserTrackedTrade;
+  journeyItem?: TrackedJourneyStockItem;
   steps: JourneyTimelineStep[];
   totalSteps: number;
   activeStepIndex: number;
   overallJourneySummary: string;
   journeyOutcome: 'IN_PROGRESS' | 'TARGET_HIT' | 'AVERAGED_REBOUND' | 'STOP_LOSS_PRESERVED';
 }
+
 

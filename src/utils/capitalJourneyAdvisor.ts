@@ -6,11 +6,14 @@ import {
   StockJourneyTimelineConfig, 
   StockJourneyData, 
   JourneyTimelineStep,
-  StockCalculated
+  StockCalculated,
+  TrackedJourneyStockItem,
+  InstrumentType
 } from '../types';
 
 const CAPITAL_STORAGE_KEY = 'user_trading_total_capital_v1';
 const JOURNEY_CONFIGS_KEY = 'stock_journey_configs_v1';
+const JOURNEY_STOCKS_KEY = 'stock_journey_tracked_items_v1';
 
 /**
  * Retrieves the user's total configured trading capital from localStorage.
@@ -67,6 +70,261 @@ export function saveStoredJourneyConfig(config: StockJourneyTimelineConfig): voi
     console.error('Error saving journey config:', e);
   }
 }
+
+/**
+ * Deletes a per-stock 5-minute journey timeline config.
+ */
+export function deleteStoredJourneyConfig(tradeId: string): void {
+  try {
+    const existing = getStoredJourneyConfigs();
+    delete existing[tradeId];
+    localStorage.setItem(JOURNEY_CONFIGS_KEY, JSON.stringify(existing));
+  } catch (e) {
+    console.error('Error deleting journey config:', e);
+  }
+}
+
+/**
+ * Retrieves the list of tracked stocks in the 5-minute Journey Manager.
+ */
+export function getStoredJourneyStocks(existingTrades: UserTrackedTrade[] = []): TrackedJourneyStockItem[] {
+  try {
+    const saved = localStorage.getItem(JOURNEY_STOCKS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Error reading journey stocks from storage:', e);
+  }
+
+  // Fallback: If existing trades are present, seed from existing open trades
+  if (existingTrades.length > 0) {
+    const seeded = existingTrades.map(createJourneyStockFromTrade);
+    saveStoredJourneyStocks(seeded);
+    return seeded;
+  }
+
+  // Initial default seed stocks for immediate exploration
+  const defaultSeeds: TrackedJourneyStockItem[] = [
+    {
+      id: 'journey-seed-reliance',
+      symbol: 'RELIANCE',
+      instrumentType: 'EQUITY',
+      entryPrice: 2940.50,
+      quantity: 50,
+      entryTime: '09:15',
+      targetPrice: 3050.00,
+      stopLossPrice: 2880.00,
+      currentPrice: 2962.40,
+      addedAt: Date.now() - 3600000,
+      config: {
+        tradeId: 'journey-seed-reliance',
+        symbol: 'RELIANCE',
+        isEnabled: true,
+        timelineStartTime: '09:15',
+        timelineIntervalMinutes: 5,
+        autoIterateEnabled: false,
+        lastSimulatedStepIndex: 3
+      }
+    },
+    {
+      id: 'journey-seed-nifty-ce',
+      symbol: 'NIFTY',
+      instrumentType: 'CALL_OPTION',
+      strikePrice: 24500,
+      entryPrice: 135.00,
+      quantity: 50,
+      entryTime: '09:30',
+      targetPrice: 195.00,
+      stopLossPrice: 95.00,
+      currentPrice: 148.50,
+      addedAt: Date.now() - 1800000,
+      config: {
+        tradeId: 'journey-seed-nifty-ce',
+        symbol: 'NIFTY',
+        isEnabled: true,
+        timelineStartTime: '09:30',
+        timelineIntervalMinutes: 5,
+        autoIterateEnabled: false,
+        lastSimulatedStepIndex: 5
+      }
+    },
+    {
+      id: 'journey-seed-tatasteel',
+      symbol: 'TATASTEEL',
+      instrumentType: 'EQUITY',
+      entryPrice: 154.20,
+      quantity: 500,
+      entryTime: '10:00',
+      targetPrice: 168.00,
+      stopLossPrice: 148.00,
+      currentPrice: 156.80,
+      addedAt: Date.now() - 7200000,
+      config: {
+        tradeId: 'journey-seed-tatasteel',
+        symbol: 'TATASTEEL',
+        isEnabled: true,
+        timelineStartTime: '10:00',
+        timelineIntervalMinutes: 5,
+        autoIterateEnabled: false,
+        lastSimulatedStepIndex: 4
+      }
+    }
+  ];
+
+  saveStoredJourneyStocks(defaultSeeds);
+  return defaultSeeds;
+}
+
+/**
+ * Persists the entire list of journey stocks into localStorage.
+ */
+export function saveStoredJourneyStocks(items: TrackedJourneyStockItem[]): void {
+  try {
+    localStorage.setItem(JOURNEY_STOCKS_KEY, JSON.stringify(items));
+  } catch (e) {
+    console.error('Error saving journey stocks to storage:', e);
+  }
+}
+
+/**
+ * Creates a TrackedJourneyStockItem from an existing UserTrackedTrade.
+ */
+export function createJourneyStockFromTrade(trade: UserTrackedTrade): TrackedJourneyStockItem {
+  const existingConfigs = getStoredJourneyConfigs();
+  const cfg = existingConfigs[trade.id] || {
+    tradeId: trade.id,
+    symbol: trade.symbol,
+    isEnabled: true,
+    timelineStartTime: trade.entryTime || '09:15',
+    timelineIntervalMinutes: 5,
+    autoIterateEnabled: false,
+    lastSimulatedStepIndex: 0
+  };
+
+  return {
+    id: `journey-trade-${trade.id}`,
+    tradeId: trade.id,
+    symbol: trade.symbol,
+    instrumentType: trade.instrumentType,
+    strikePrice: trade.strikePrice,
+    entryPrice: trade.entryPrice,
+    quantity: trade.quantity,
+    entryTime: trade.entryTime || '09:15',
+    targetPrice: trade.gannTarget1 || trade.userTarget || (trade.entryPrice * 1.12),
+    stopLossPrice: trade.userStopLoss || (trade.entryPrice * 0.88),
+    currentPrice: trade.effectiveCMP || trade.entryPrice,
+    addedAt: Date.now(),
+    config: cfg
+  };
+}
+
+/**
+ * Creates a standalone TrackedJourneyStockItem for any stock symbol.
+ */
+export function createStandaloneJourneyStock(params: {
+  symbol: string;
+  instrumentType: InstrumentType;
+  strikePrice?: number;
+  entryPrice: number;
+  quantity?: number;
+  entryTime?: string;
+  targetPrice?: number;
+  stopLossPrice?: number;
+  currentPrice?: number;
+}): TrackedJourneyStockItem {
+  const id = `journey-stock-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+  const cleanSymbol = params.symbol.trim().toUpperCase();
+  const startTime = params.entryTime || '09:15';
+  const qty = params.quantity && params.quantity > 0 ? params.quantity : 50;
+
+  const cfg: StockJourneyTimelineConfig = {
+    tradeId: id,
+    symbol: cleanSymbol,
+    isEnabled: true,
+    timelineStartTime: startTime,
+    timelineIntervalMinutes: 5,
+    autoIterateEnabled: false,
+    lastSimulatedStepIndex: 0
+  };
+
+  return {
+    id,
+    symbol: cleanSymbol,
+    instrumentType: params.instrumentType,
+    strikePrice: params.strikePrice,
+    entryPrice: params.entryPrice,
+    quantity: qty,
+    entryTime: startTime,
+    targetPrice: params.targetPrice || (params.entryPrice * 1.12),
+    stopLossPrice: params.stopLossPrice || (params.entryPrice * 0.88),
+    currentPrice: params.currentPrice || params.entryPrice,
+    addedAt: Date.now(),
+    config: cfg
+  };
+}
+
+/**
+ * Converts a TrackedJourneyStockItem to a temporary UserTrackedTrade object for calculations.
+ */
+export function convertJourneyItemToTrade(
+  item: TrackedJourneyStockItem,
+  matchingStock?: StockCalculated
+): UserTrackedTrade {
+  const price = matchingStock?.closePrice || matchingStock?.openPrice || item.entryPrice;
+  const cmp = item.currentPrice || price;
+  const diff = cmp - item.entryPrice;
+  const unrealizedPnL = Math.round(diff * item.quantity);
+  const unrealizedPnLPct = item.entryPrice > 0 ? (diff / item.entryPrice) * 100 : 0;
+  const nowStr = new Date().toISOString();
+
+  return {
+    id: item.tradeId || item.id,
+    symbol: item.symbol,
+    companyName: matchingStock?.companyName || item.symbol,
+    instrumentType: item.instrumentType,
+    positionSide: 'LONG',
+    strikePrice: item.strikePrice,
+    lotSize: 1,
+    quantity: item.quantity,
+    entryPrice: item.entryPrice,
+    entryDate: new Date(item.addedAt).toISOString().split('T')[0],
+    entryTime: item.entryTime,
+    stockCMP: price,
+    effectiveCMP: cmp,
+    unrealizedPnL,
+    unrealizedPnLPct,
+    pointsDiff: diff,
+    investedCapital: Math.round(item.entryPrice * item.quantity),
+    currentValue: Math.round(cmp * item.quantity),
+    highestPriceSinceEntry: Math.max(item.entryPrice, cmp),
+    lowestPriceSinceEntry: Math.min(item.entryPrice, cmp),
+    maxProfitAchieved: Math.max(0, unrealizedPnL),
+    maxDrawdownAchieved: Math.min(0, unrealizedPnL),
+    advice: unrealizedPnL >= 0 ? 'HOLD_FOR_PROFIT' : 'AVERAGE_PULLBACK',
+    adviceBadgeClass: unrealizedPnL >= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300',
+    adviceHeadline: `${item.symbol} 5-Minute Companion Active`,
+    adviceDetails: `Monitoring 5-minute technical momentum and averaging thresholds.`,
+    confidenceScore: 85,
+    healthScore: 80,
+    suggestedAction: 'Hold with confidence and track 5-min steps.',
+    gannTarget1: item.targetPrice || item.entryPrice * 1.12,
+    gannTarget2: item.targetPrice ? item.targetPrice * 1.08 : item.entryPrice * 1.20,
+    userTarget: item.targetPrice,
+    userStopLoss: item.stopLossPrice || item.entryPrice * 0.88,
+    lastUpdated: nowStr,
+    status: 'OPEN',
+    rsiValue: matchingStock?.rsi || 54.2,
+    rsiStatus: 'BULLISH',
+    volumeRatio: 1.4,
+    buyerPressurePct: 68,
+    vwapDistancePct: 1.2
+  };
+}
+
 
 /**
  * Calculates complete capital allocation, journey stage, risk thresholds, and roadmap.
