@@ -138,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{isBulkLoading ? 'Fetching Dhan Data...' : 'Fetch All 15m Candles'}</span>
             </button>
 
-            {/* 5-Min Auto-Fetch Toggle & Live Countdown (Every 5th Minute) */}
+            {/* 15-Min Auto-Fetch Toggle & Live Countdown */}
             {onToggleAutoFetch && (
               <div className="flex items-center space-x-1 bg-purple-50/90 border border-purple-200/90 rounded-lg p-0.5 shadow-2xs">
                 <button
@@ -150,14 +150,14 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}
                   title={
                     isAutoFetchEnabled
-                      ? `Auto-Fetch is ACTIVE. Automatically fetches prices from Dhan API every ${autoFetchIntervalMinutes}th minute.`
-                      : 'Auto-Fetch is PAUSED. Click to activate automatic 5-minute fetching.'
+                      ? 'Auto-Fetch is ACTIVE. Automatically fetches 15m candles every 15 minutes.'
+                      : 'Auto-Fetch is PAUSED. Click to activate automatic 15-minute fetching.'
                   }
                 >
                   {isAutoFetchEnabled ? (
                     <>
                       <Clock className="w-3.5 h-3.5 text-yellow-300 animate-pulse fill-current" />
-                      <span>Auto {autoFetchIntervalMinutes}m:</span>
+                      <span>Auto 15m:</span>
                       <span className="font-mono text-yellow-200 font-black">{formatCountdown(nextFetchSeconds)}</span>
                     </>
                   ) : (
@@ -173,11 +173,11 @@ export const Header: React.FC<HeaderProps> = ({
                     value={autoFetchIntervalMinutes}
                     onChange={(e) => onChangeAutoFetchInterval(Number(e.target.value))}
                     className="bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-[11px] rounded px-1 py-1 outline-none cursor-pointer border border-purple-300 transition-colors"
-                    title="Select Auto-Fetch Interval (Default: Every 5th minute)"
+                    title="Select Auto-Fetch Interval"
                   >
-                    <option value={5}>5m (5th min)</option>
-                    <option value={10}>10m</option>
                     <option value={15}>15m</option>
+                    <option value={10}>10m</option>
+                    <option value={5}>5m</option>
                     <option value={30}>30m</option>
                   </select>
                 )}

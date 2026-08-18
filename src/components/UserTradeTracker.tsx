@@ -89,7 +89,6 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
   // Capital Journey & Bankroll State
   const [totalCapital, setTotalCapital] = useState<number>(() => getStoredTotalCapital());
   const [isCapitalModalOpen, setIsCapitalModalOpen] = useState<boolean>(false);
-  const [isJourneyHubOpen, setIsJourneyHubOpen] = useState<boolean>(false);
   const [selectedJourneyTrade, setSelectedJourneyTrade] = useState<UserTrackedTrade | null>(null);
 
   // Stored Trades
@@ -703,20 +702,6 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
 
           {/* Action Toolbar */}
           <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-            {/* Multi-Stock 5-Min Journey Hub Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedJourneyTrade(null);
-                setIsJourneyHubOpen(true);
-              }}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-indigo-600/40 hover:bg-indigo-600/60 text-indigo-200 border border-indigo-400/40 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-xs"
-              title="Open 5-Minute Multi-Stock Journey Manager (Add, Remove & Track Multiple Stocks)"
-            >
-              <Clock className="w-4 h-4 text-indigo-300" />
-              <span>⏱️ 5-Min Stock Journeys</span>
-            </button>
-
             {/* Capital & Journey Blueprint Button */}
             <button
               type="button"
@@ -789,12 +774,13 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
                   setCountdownSeconds(val * 60);
                 }}
                 className="bg-slate-900 border border-slate-700 text-slate-200 text-[11px] font-bold rounded px-1.5 py-0.5 outline-none cursor-pointer"
-                title="Select Auto-Refresh Interval (Default: Every 5th minute)"
+                title="Select Auto-Refresh Interval"
               >
-                <option value={5}>5m (5th min)</option>
+                <option value={1}>1m</option>
+                <option value={3}>3m</option>
+                <option value={5}>5m</option>
                 <option value={10}>10m</option>
                 <option value={15}>15m</option>
-                <option value={30}>30m</option>
               </select>
             </div>
           </div>
@@ -905,26 +891,14 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setSelectedJourneyTrade(null);
-                setIsJourneyHubOpen(true);
-              }}
-              className="px-3 py-1 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-400/30 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-            >
-              <Clock className="w-3 h-3 text-blue-300" />
-              <span>⏱️ Multi-Stock Journeys</span>
-            </button>
-            <button
-              onClick={() => setIsCapitalModalOpen(true)}
-              className="px-3 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-400/30 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-            >
-              <Wallet className="w-3 h-3 text-indigo-300" />
-              <span>View Capital Plan</span>
-              <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
+          <button
+            onClick={() => setIsCapitalModalOpen(true)}
+            className="px-3 py-1 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-400/30 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+          >
+            <Wallet className="w-3 h-3 text-indigo-300" />
+            <span>View Capital Journey Plan</span>
+            <ChevronRight className="w-3 h-3" />
+          </button>
         </div>
       </div>
 
@@ -3088,18 +3062,12 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
         }}
       />
 
-      {/* 5-Minute Multi-Stock Journey Timeline & Simulator Modal */}
+      {/* 5-Minute Stock Journey Timeline & Simulator Modal */}
       <StockJourneyTimelineModal
-        isOpen={isJourneyHubOpen || !!selectedJourneyTrade}
-        onClose={() => {
-          setIsJourneyHubOpen(false);
-          setSelectedJourneyTrade(null);
-        }}
-        initialTrade={selectedJourneyTrade}
-        openTrades={openTrades}
-        stockMap={stockMap}
-        onFetchSingleStock={onFetchSingleStock}
-        credentials={credentials}
+        isOpen={!!selectedJourneyTrade}
+        onClose={() => setSelectedJourneyTrade(null)}
+        trade={selectedJourneyTrade}
+        matchingStock={selectedJourneyTrade ? stockMap.get(selectedJourneyTrade.symbol.toUpperCase()) : undefined}
         onSpeakText={(txt) => speakText(txt)}
         isSpeaking={!!speakingTradeId}
       />
