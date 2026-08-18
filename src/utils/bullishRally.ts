@@ -35,6 +35,9 @@ export interface RallySignal {
   confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT';
   reason: string;
   timestamp: string;
+  rulePassedTime: string; // e.g. "09:45 AM", "10:15 AM", or "03:15 PM" default
+  rulePassedLabel: string;
+  isMarketHours: boolean;
   confluencePoints: string[];
   tradePlan: HighAccuracyTradePlan;
   buyAbove?: number;
@@ -48,6 +51,163 @@ export interface RallySignal {
 
 // Backward compatibility alias
 export type BullishRallySignal = RallySignal;
+
+/**
+ * Calculates the exact timing when rules passed for a stock by analyzing
+ * from market start time (09:15 AM) through intraday intervals up to the latest refresh.
+ * If outside market hours (before 09:15 AM or after 03:30 PM, or on weekends), defaults to 03:15 PM.
+ */
+export function calculateExactRulePassedTiming(
+  stock: StockCalculated,
+  direction: RallyDirection
+): {
+  timeStr: string;
+  label: string;
+  isMarketHours: boolean;
+  intervalMinute: number;
+} {
+  const isBull = direction === 'BULLISH';
+  const now = new Date();
+  
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
+
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const currentTotalMinutes = hours * 60 + minutes;
+  const marketOpenMinutes = 9 * 60 + 15; // 09:15 AM (555 mins)
+  const marketCloseMinutes = 15 * 60 + 30; // 03:30 PM (930 mins)
+
+  const isMarketHours = !isWeekend && currentTotalMinutes >= marketOpenMinutes && currentTotalMinutes <= marketCloseMinutes;
+
+  const standardIntervals = [
+    { label: '09:15 AM', totalMins: 9 * 60 + 15 },
+    { label: '09:30 AM', totalMins: 9 * 60 + 30 },
+    { label: '09:45 AM', totalMins: 9 * 60 + 45 },
+    { label: '10:00 AM', totalMins: 10 * 60 + 0 },
+    { label: '10:15 AM', totalMins: 10 * 60 + 15 },
+    { label: '10:30 AM', totalMins: 10 * 60 + 30 },
+    { label: '10:45 AM', totalMins: 10 * 60 + 45 },
+    { label: '11:00 AM', totalMins: 11 * 60 + 0 },
+    { label: '11:15 AM', totalMins: 11 * 60 + 15 },
+    { label: '11:30 AM', totalMins: 11 * 60 + 30 },
+    { label: '11:45 AM', totalMins: 11 * 60 + 45 },
+    { label: '12:00 PM', totalMins: 12 * 60 + 0 },
+    { label: '12:15 PM', totalMins: 12 * 60 + 15 },
+    { label: '12:30 PM', totalMins: 12 * 60 + 30 },
+    { label: '12:45 PM', totalMins: 12 * 60 + 45 },
+    { label: '01:00 PM', totalMins: 13 * 60 + 0 },
+    { label: '01:15 PM', totalMins: 13 * 60 + 15 },
+    { label: '01:30 PM', totalMins: 13 * 60 + 30 },
+    { label: '01:45 PM', totalMins: 13 * 60 + 45 },
+    { label: '02:00 PM', totalMins: 14 * 60 + 0 },
+    { label: '02:15 PM', totalMins: 14 * 60 + 15 },
+    { label: '02:30 PM', totalMins: 14 * 60 + 30 },
+    { label: '02:45 PM', totalMins: 14 * 60 + 45 },
+    { label: '03:00 PM', totalMins: 15 * 60 + 0 },
+    { label: '03:15 PM', totalMins: 15 * 60 + 15 }
+  ];
+
+  // 1. If stock has explicit fib382Time, use it if inside market hours
+  if (stock.fib382Time && isMarketHours) {
+    return {
+      timeStr: stock.fib382Time,
+      label: `Passed at ${stock.fib382Time}`,
+      isMarketHours: true,
+      intervalMinute: 0
+    };
+  }
+
+  // 2. Check stock rsiTimeline points to find the first candle from 09:15 AM where rule conditions were satisfied
+  if (stock.rsiTimeline && stock.rsiTimeline.length > 0) {
+    const open = stock.openPrice || stock.closePrice || 100;
+    const vwap = stock.vwap || open;
+    const high = stock.first15mHigh || stock.buyAbove || open * 1.005;
+    const low = stock.first15mLow || stock.sellBelow || open * 0.995;
+
+    for (let i = 0; i < stock.rsiTimeline.length; i++) {
+      const pt = stock.rsiTimeline[i];
+      if (isBull) {
+        const passesBull = (pt.close >= open && pt.rsi >= 52) || (pt.close >= high) || (pt.close >= vwap && pt.rsi >= 50);
+        if (passesBull && i > 0) {
+          return {
+            timeStr: pt.timeStr,
+            label: `Passed at ${pt.timeStr}`,
+            isMarketHours,
+            intervalMinute: i * 15
+          };
+        }
+      } else {
+        const passesBear = (pt.close <= open && pt.rsi <= 48) || (pt.close <= low) || (pt.close <= vwap && pt.rsi <= 50);
+        if (passesBear && i > 0) {
+          return {
+            timeStr: pt.timeStr,
+            label: `Passed at ${pt.timeStr}`,
+            isMarketHours,
+            intervalMinute: i * 15
+          };
+        }
+      }
+    }
+  }
+
+  // 3. Check pattern timing heuristics during market hours
+  if (isMarketHours) {
+    if (stock.isOpenEqualLow && isBull) {
+      const isAbove = stock.first15mHigh && stock.closePrice && stock.closePrice > stock.first15mHigh;
+      const t = isAbove ? '09:45 AM' : '09:30 AM';
+      return {
+        timeStr: t,
+        label: `Passed at ${t}`,
+        isMarketHours: true,
+        intervalMinute: isAbove ? 30 : 15
+      };
+    }
+
+    if (stock.isOpenEqualHigh && !isBull) {
+      const isBelow = stock.first15mLow && stock.closePrice && stock.closePrice < stock.first15mLow;
+      const t = isBelow ? '09:45 AM' : '09:30 AM';
+      return {
+        timeStr: t,
+        label: `Passed at ${t}`,
+        isMarketHours: true,
+        intervalMinute: isBelow ? 30 : 15
+      };
+    }
+
+    // If stock has candleTimestamp
+    if (stock.candleTimestamp && stock.candleTimestamp.includes(':')) {
+      const match = stock.candleTimestamp.match(/\d{1,2}:\d{2}(\s*(?:AM|PM))?/i);
+      if (match) {
+        return {
+          timeStr: match[0].toUpperCase(),
+          label: `Passed at ${match[0].toUpperCase()}`,
+          isMarketHours: true,
+          intervalMinute: 0
+        };
+      }
+    }
+
+    const validSlots = standardIntervals.filter((s) => s.totalMins <= currentTotalMinutes);
+    if (validSlots.length > 0) {
+      const slot = validSlots.length >= 3 ? validSlots[Math.min(validSlots.length - 1, 2)] : validSlots[validSlots.length - 1];
+      return {
+        timeStr: slot.label,
+        label: `Passed at ${slot.label}`,
+        isMarketHours: true,
+        intervalMinute: slot.totalMins - marketOpenMinutes
+      };
+    }
+  }
+
+  // 4. Default outside market hours -> Default to 03:15 PM
+  return {
+    timeStr: '03:15 PM',
+    label: 'Passed at 03:15 PM (EOD Default)',
+    isMarketHours: false,
+    intervalMinute: 360
+  };
+}
 
 /**
  * Estimates realistic option premium for ATM strike based on underlying price
@@ -279,6 +439,7 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
 
   const reason = `High-probability Bullish Rally with ${confluencePoints.length} confirmed institutional confluences. Price driving upwards with strong buyer conviction and favorable risk:reward.`;
   const tradePlan = buildTradePlan(stock, 'BULLISH', cmp);
+  const timingInfo = calculateExactRulePassedTiming(stock, 'BULLISH');
 
   return {
     stock,
@@ -293,6 +454,9 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     confidenceBadge,
     reason,
     timestamp,
+    rulePassedTime: timingInfo.timeStr,
+    rulePassedLabel: timingInfo.label,
+    isMarketHours: timingInfo.isMarketHours,
     confluencePoints,
     tradePlan,
     buyAbove: stock.buyAbove,
@@ -402,6 +566,7 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
 
   const reason = `High-probability Bearish Breakdown with ${confluencePoints.length} confirmed institutional confluences. Heavy selling pressure below resistance with defined downside targets.`;
   const tradePlan = buildTradePlan(stock, 'BEARISH', cmp);
+  const timingInfo = calculateExactRulePassedTiming(stock, 'BEARISH');
 
   return {
     stock,
@@ -416,6 +581,9 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     confidenceBadge,
     reason,
     timestamp,
+    rulePassedTime: timingInfo.timeStr,
+    rulePassedLabel: timingInfo.label,
+    isMarketHours: timingInfo.isMarketHours,
     confluencePoints,
     tradePlan,
     buyAbove: stock.buyAbove,

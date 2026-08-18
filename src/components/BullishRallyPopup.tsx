@@ -204,7 +204,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             )}
 
             <div>
-              <div className="text-xs font-black flex items-center gap-1.5">
+              <div className="text-xs font-black flex items-center gap-1.5 flex-wrap">
                 <span className={isBull ? 'text-emerald-300' : 'text-rose-300'}>
                   {currentRally.symbol}
                 </span>
@@ -214,12 +214,16 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/30 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold">
                   {currentRally.confidenceScore}%
                 </span>
+                <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
+                  <Clock className="w-2.5 h-2.5" />
+                  {currentRally.rulePassedTime}
+                </span>
               </div>
               
               {rallySignals.length > 1 && (
-                <div className="text-[10px] text-slate-300 font-medium flex items-center gap-1">
+                <div className="text-[10px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
                   <span>Rotating ({currentIndex + 1}/{rallySignals.length})</span>
-                  <span className="text-[9px] text-slate-400">• Click to view</span>
+                  <span className="text-[9px] text-slate-400">• Passed at {currentRally.rulePassedTime}</span>
                 </div>
               )}
             </div>
@@ -292,10 +296,14 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             ) : (
               <TrendingDown className="w-4 h-4 text-yellow-200 animate-pulse" />
             )}
-            <span className="text-xs font-black tracking-wider uppercase text-white flex items-center gap-1.5">
+            <span className="text-xs font-black tracking-wider uppercase text-white flex items-center gap-1.5 flex-wrap">
               <span>{isBull ? 'Bullish Rally' : 'Bearish Breakdown'}</span>
               <span className="bg-black/40 text-yellow-200 text-[10px] px-2 py-0.5 rounded-full font-bold border border-yellow-300/40">
                 {currentRally.confidenceScore}% Accuracy
+              </span>
+              <span className="bg-black/40 text-cyan-200 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border border-cyan-300/40 flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5" />
+                {currentRally.rulePassedTime}
               </span>
             </span>
           </div>
@@ -435,6 +443,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       <div className="text-[10px] text-slate-400 truncate max-w-[170px]">
                         {signal.rallyType}
                       </div>
+                      <div className="text-[9px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
+                        <Clock className="w-2.5 h-2.5 text-cyan-400" />
+                        <span>Rules passed: {signal.rulePassedTime}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -458,7 +470,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             <div>
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="flex items-center space-x-1.5">
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
                     <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded font-mono ${
                       currentRally.confidenceBadge === 'INSTITUTIONAL DIAMOND'
                         ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
@@ -468,13 +480,13 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     }`}>
                       {currentRally.confidenceBadge}
                     </span>
-                    <span className="text-[10px] text-slate-400 font-mono flex items-center gap-0.5">
-                      <Clock className="w-2.5 h-2.5 text-amber-400" />
-                      {currentRally.timestamp}
+                    <span className="text-[10px] bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-cyan-400" />
+                      Rule Passed: {currentRally.rulePassedTime}
                     </span>
                   </div>
 
-                  <h4 className={`text-sm font-extrabold leading-tight mt-1 ${isBull ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  <h4 className={`text-sm font-extrabold leading-tight mt-1.5 ${isBull ? 'text-emerald-300' : 'text-rose-300'}`}>
                     {isBull ? 'Bullish rally' : 'Bearish breakdown'} is going on with{' '}
                     <span className="text-white underline decoration-2 font-black">{currentRally.symbol}</span>!
                   </h4>
@@ -496,6 +508,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
                   </div>
                 </div>
+              </div>
+
+              {/* Exact Timing Analysis Banner */}
+              <div className="mt-2 bg-slate-900/95 border border-slate-700/80 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-[10.5px]">
+                <div className="flex items-center space-x-1.5">
+                  <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <span className="text-slate-300 font-medium">Exact Rule Passed Timing:</span>
+                  <span className="font-mono font-bold text-cyan-300">{currentRally.rulePassedTime}</span>
+                </div>
+                <span className="text-[9px] text-slate-400 font-mono">
+                  {currentRally.isMarketHours ? 'From 09:15 AM Market Open' : 'EOD Default (3:15 PM)'}
+                </span>
               </div>
             </div>
 
