@@ -20,6 +20,7 @@ import { IdealTradeRadar } from './components/IdealTradeRadar';
 import { TenFifteenPicksHub } from './components/TenFifteenPicksHub';
 import { ManualStockAnalyzer } from './components/ManualStockAnalyzer';
 import { UserTradeTracker } from './components/UserTradeTracker';
+import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -240,17 +241,17 @@ export default function App() {
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
   const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
 
-  // Auto-Fetch State (Default: 15 minutes)
+  // Auto-Fetch State (Default: 5 minutes, fetching 15m candles)
   const [autoFetchIntervalMinutes, setAutoFetchIntervalMinutes] = useState<number>(() => {
     const saved = localStorage.getItem('dhan_auto_fetch_interval_mins');
-    return saved ? Number(saved) : 15;
+    return saved ? Number(saved) : 5;
   });
   const [isAutoFetchEnabled, setIsAutoFetchEnabled] = useState<boolean>(() => {
     return localStorage.getItem('dhan_auto_fetch_enabled') !== 'false';
   });
   const [nextFetchSeconds, setNextFetchSeconds] = useState<number>(() => {
     const savedMins = localStorage.getItem('dhan_auto_fetch_interval_mins');
-    return (savedMins ? Number(savedMins) : 15) * 60;
+    return (savedMins ? Number(savedMins) : 5) * 60;
   });
   const [lastFetchTime, setLastFetchTime] = useState<string | null>(null);
 
@@ -1159,6 +1160,13 @@ export default function App() {
         onClose={() => setIsCsvImportOpen(false)}
         onImportStocks={handleImportStocks}
         onResetToDefault={handleResetToDefaultCSV}
+      />
+
+      {/* Bullish Rally Popup / Popunder Alert */}
+      <BullishRallyPopup
+        stocks={stocks}
+        onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+        onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
       />
 
     </div>
