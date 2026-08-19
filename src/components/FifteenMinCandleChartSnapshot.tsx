@@ -14,10 +14,22 @@ import {
   Compass,
   Eye,
   EyeOff,
-  Sliders
+  Sliders,
+  AlertCircle
 } from 'lucide-react';
 import { StockCalculated } from '../types';
-import { createChart, ColorType, CrosshairMode, IChartApi, ISeriesApi, CandlestickData, Time } from 'lightweight-charts';
+import { 
+  createChart, 
+  CandlestickSeries, 
+  HistogramSeries, 
+  ColorType, 
+  CrosshairMode, 
+  IChartApi, 
+  ISeriesApi, 
+  CandlestickData, 
+  Time,
+  LineStyle
+} from 'lightweight-charts';
 
 interface FifteenMinCandleChartSnapshotProps {
   stock: StockCalculated;
@@ -38,6 +50,7 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<IChartApi | null>(null);
+  const [renderError, setRenderError] = useState<boolean>(false);
   
   const [showGannOverlays, setShowGannOverlays] = useState<boolean>(true);
   const [showVolume, setShowVolume] = useState<boolean>(true);
@@ -56,7 +69,7 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
   const displaySymbol = (stock.symbol || 'STOCK').trim().toUpperCase();
 
   // Convert stock candle stream / rsiTimeline into ordered 15m CandlestickData points
-  const { candleData, volumeData } = useMemo(() => {
+  const { candleData, volumeData, rawCandles } = useMemo(() => {
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
     const baseDate = new Date(`${dateStr}T09:15:00+05:30`);
@@ -64,6 +77,7 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
 
     const candles: CandlestickData<Time>[] = [];
     const volumes: { time: Time; value: number; color: string }[] = [];
+    const rawList: Array<{ timeStr: string; open: number; high: number; low: number; close: number; volume: number; rsi?: number }> = [];
 
     // Helper to parse time string like "09:15 AM" into timestamp
     const parseTimeToTimestamp = (timeStr: string, index: number): number => {
@@ -81,7 +95,7 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
         const ts = Math.floor(d.getTime() / 1000);
         if (!isNaN(ts) && ts > 0) return ts;
       } catch (e) {
-        // Fallback to sequential 15-minute steps
+        // fallback
       }
       return baseTimestamp + (index * 900); // 15 mins = 900 seconds
     };
@@ -114,9 +128,19 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
           value: cVol,
           color: cClose >= cOpen ? 'rgba(8, 153, 129, 0.45)' : 'rgba(242, 54, 69, 0.45)'
         });
+
+        rawList.push({
+          timeStr: item.timeStr || `15m-${idx + 1}`,
+          open: Math.round(cOpen * 100) / 100,
+          high: Math.round(cHigh * 100) / 100,
+          low: Math.round(cLow * 100) / 100,
+          close: Math.round(cClose * 100) / 100,
+          volume: cVol,
+          rsi: item.rsi
+        });
       });
     } else {
-      // Synthesize realistic 15-minute session candles (09:15 AM to current time)
+      // Synthesize 15-minute session candles (09:15 AM to current time)
       const open = stock.openPrice || stock.closePrice || 1000;
       const close = stock.closePrice || open;
       const high = stock.highPrice || Math.max(open, close) * 1.012;
@@ -126,6 +150,12 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
 
       const numCandles = 12; // 3 hours of 15m session candles
       const step = (close - open) / (numCandles - 1 || 1);
+
+      const timeSlotNames = [
+        '09:15 AM', '09:30 AM', '09:45 AM', '10:00 AM',
+        '10:15 AM', '10:30 AM', '10:45 AM', '11:00 AM',
+        '11:15 AM', '11:30 AM', '11:45 AM', '12:00 PM'
+      ];
 
       for (let i = 0; i < numCandles; i++) {
         const ts = (baseTimestamp + (i * 900)) as Time;
@@ -145,216 +175,235 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
         if (cHigh > high) cHigh = high;
         if (cLow < low) cLow = low;
 
+        const o = Math.round(cOpen * 100) / 100;
+        const h = Math.round(cHigh * 100) / 100;
+        const l = Math.round(cLow * 100) / 100;
+        const c = Math.round(cClose * 100) / 100;
+        const v = stock.volume ? Math.round(stock.volume / numCandles) : 25000 + Math.round(Math.random() * 10000);
+
         candles.push({
           time: ts,
-          open: Math.round(cOpen * 100) / 100,
-          high: Math.round(cHigh * 100) / 100,
-          low: Math.round(cLow * 100) / 100,
-          close: Math.round(cClose * 100) / 100
+          open: o,
+          high: h,
+          low: l,
+          close: c
         });
 
         volumes.push({
           time: ts,
-          value: stock.volume ? Math.round(stock.volume / numCandles) : 25000 + Math.round(Math.random() * 10000),
-          color: cClose >= cOpen ? 'rgba(8, 153, 129, 0.45)' : 'rgba(242, 54, 69, 0.45)'
+          value: v,
+          color: c >= o ? 'rgba(8, 153, 129, 0.45)' : 'rgba(242, 54, 69, 0.45)'
+        });
+
+        rawList.push({
+          timeStr: timeSlotNames[i] || `${9 + Math.floor(i / 4)}:${(i % 4) * 15 || '00'}`,
+          open: o,
+          high: h,
+          low: l,
+          close: c,
+          volume: v,
+          rsi: stock.rsi || 54
         });
       }
     }
 
-    return { candleData: candles, volumeData: volumes };
+    return { candleData: candles, volumeData: volumes, rawCandles: rawList };
   }, [stock]);
 
-  // Initialize and update Lightweight Charts instance (TradingView Engine)
+  // Initialize Lightweight Charts instance (TradingView v5 Engine)
   useEffect(() => {
     const container = chartContainerRef.current;
     if (!container) return;
 
-    // Clean up existing chart
-    if (chartInstanceRef.current) {
-      chartInstanceRef.current.remove();
-      chartInstanceRef.current = null;
-    }
-
-    // TradingView Dark Theme styling parameters
-    const chart = createChart(container, {
-      width: container.clientWidth,
-      height: 380,
-      layout: {
-        background: { type: ColorType.Solid, color: '#131722' }, // TradingView Canvas Dark
-        textColor: '#9ea2ad',
-        fontSize: 11,
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif"
-      },
-      grid: {
-        vertLines: { color: 'rgba(42, 46, 57, 0.6)', style: 1 },
-        horzLines: { color: 'rgba(42, 46, 57, 0.6)', style: 1 }
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: {
-          color: '#758696',
-          width: 1,
-          style: 3,
-          labelBackgroundColor: '#2a2e39'
-        },
-        horzLine: {
-          color: '#758696',
-          width: 1,
-          style: 3,
-          labelBackgroundColor: '#2a2e39'
-        }
-      },
-      rightPriceScale: {
-        borderColor: 'rgba(42, 46, 57, 0.8)',
-        visible: true,
-        scaleMargins: {
-          top: 0.12,
-          bottom: 0.22
-        }
-      },
-      timeScale: {
-        borderColor: 'rgba(42, 46, 57, 0.8)',
-        timeVisible: true,
-        secondsVisible: false,
-        fixLeftEdge: true,
-        fixRightEdge: true
-      }
-    });
-
-    chartInstanceRef.current = chart;
-
-    // Volume Series (TradingView Style at the bottom)
-    const volumeSeries = (chart as any).addHistogramSeries({
-      color: '#26a69a',
-      priceFormat: { type: 'volume' },
-      priceScaleId: '', // Overlay over chart
-      scaleMargins: {
-        top: 0.80,
-        bottom: 0
-      }
-    });
-    if (showVolume) {
-      volumeSeries.setData(volumeData);
-    }
-
-    // Candlestick Series (TradingView Dark Green #089981 & Crimson Red #f23645)
-    const candlestickSeries = (chart as any).addCandlestickSeries({
-      upColor: '#089981',
-      downColor: '#f23645',
-      borderVisible: false,
-      wickUpColor: '#089981',
-      wickDownColor: '#f23645'
-    });
-    candlestickSeries.setData(candleData);
-
-    // Gann Levels & VWAP Overlays (TradingView Price Lines)
-    if (showGannOverlays) {
-      if (stock.buyAbove) {
-        candlestickSeries.createPriceLine({
-          price: stock.buyAbove,
-          color: '#089981',
-          lineWidth: 2,
-          lineStyle: 2, // Dashed
-          axisLabelVisible: true,
-          title: `GANN BUY ₹${stock.buyAbove.toFixed(1)}`
-        });
-      }
-
-      if (stock.sellBelow) {
-        candlestickSeries.createPriceLine({
-          price: stock.sellBelow,
-          color: '#f23645',
-          lineWidth: 2,
-          lineStyle: 2, // Dashed
-          axisLabelVisible: true,
-          title: `GANN SELL ₹${stock.sellBelow.toFixed(1)}`
-        });
-      }
-
-      if (stock.vwap) {
-        candlestickSeries.createPriceLine({
-          price: stock.vwap,
-          color: '#a855f7',
-          lineWidth: 1.5,
-          lineStyle: 0, // Solid
-          axisLabelVisible: true,
-          title: `VWAP ₹${stock.vwap.toFixed(1)}`
-        });
-      }
-
-      if (stock.first15mHigh) {
-        candlestickSeries.createPriceLine({
-          price: stock.first15mHigh,
-          color: '#38bdf8',
-          lineWidth: 1,
-          lineStyle: 3, // Dotted
-          axisLabelVisible: false,
-          title: `09:15 ORB High`
-        });
-      }
-    }
-
-    // Interactive Crosshair Move Listener for TradingView HUD
-    chart.subscribeCrosshairMove((param) => {
-      if (
-        !param.point ||
-        !param.time ||
-        param.point.x < 0 ||
-        param.point.x > container.clientWidth ||
-        param.point.y < 0 ||
-        param.point.y > container.clientHeight
-      ) {
-        setHoveredCandle(null);
-        return;
-      }
-
-      const priceData = param.seriesData.get(candlestickSeries) as CandlestickData<Time> | undefined;
-      const volData = param.seriesData.get(volumeSeries) as { value: number } | undefined;
-
-      if (priceData && typeof priceData.open === 'number') {
-        const chg = priceData.open > 0 ? ((priceData.close - priceData.open) / priceData.open) * 100 : 0;
-        
-        let timeLabel = '';
-        if (typeof param.time === 'number') {
-          const dt = new Date(param.time * 1000);
-          timeLabel = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-        } else {
-          timeLabel = String(param.time);
-        }
-
-        setHoveredCandle({
-          time: timeLabel,
-          open: priceData.open,
-          high: priceData.high,
-          low: priceData.low,
-          close: priceData.close,
-          volume: volData?.value || 0,
-          changePct: chg
-        });
-      }
-    });
-
-    // Auto-fit content
-    chart.timeScale().fitContent();
-
-    // ResizeObserver for responsive chart width adjustments
-    const resizeObserver = new ResizeObserver((entries) => {
-      if (entries.length === 0 || !entries[0].contentRect) return;
-      const { width } = entries[0].contentRect;
-      if (width > 0 && chartInstanceRef.current) {
-        chartInstanceRef.current.applyOptions({ width });
-      }
-    });
-    resizeObserver.observe(container);
-
-    return () => {
-      resizeObserver.disconnect();
+    try {
+      // Clean up existing chart
       if (chartInstanceRef.current) {
         chartInstanceRef.current.remove();
         chartInstanceRef.current = null;
       }
-    };
-  }, [candleData, volumeData, showGannOverlays, showVolume, stock.buyAbove, stock.sellBelow, stock.vwap, stock.first15mHigh]);
+
+      const initialWidth = container.clientWidth || 600;
+
+      // TradingView Dark Theme styling parameters
+      const chart = createChart(container, {
+        width: initialWidth,
+        height: 380,
+        layout: {
+          background: { type: ColorType.Solid, color: '#131722' },
+          textColor: '#9ea2ad',
+          fontSize: 11,
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Trebuchet MS', Roboto, Ubuntu, sans-serif"
+        },
+        grid: {
+          vertLines: { color: 'rgba(42, 46, 57, 0.6)', style: 1 },
+          horzLines: { color: 'rgba(42, 46, 57, 0.6)', style: 1 }
+        },
+        crosshair: {
+          mode: CrosshairMode.Normal,
+          vertLine: {
+            color: '#758696',
+            width: 1,
+            style: 3,
+            labelBackgroundColor: '#2a2e39'
+          },
+          horzLine: {
+            color: '#758696',
+            width: 1,
+            style: 3,
+            labelBackgroundColor: '#2a2e39'
+          }
+        },
+        rightPriceScale: {
+          borderColor: 'rgba(42, 46, 57, 0.8)',
+          visible: true,
+          scaleMargins: {
+            top: 0.12,
+            bottom: 0.22
+          }
+        },
+        timeScale: {
+          borderColor: 'rgba(42, 46, 57, 0.8)',
+          timeVisible: true,
+          secondsVisible: false,
+          fixLeftEdge: true,
+          fixRightEdge: true
+        }
+      });
+
+      chartInstanceRef.current = chart;
+
+      // Volume Series (TradingView v5 HistogramSeries)
+      const volumeSeries = chart.addSeries(HistogramSeries, {
+        color: '#26a69a',
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'volume_scale'
+      });
+      chart.priceScale('volume_scale').applyOptions({
+        scaleMargins: {
+          top: 0.80,
+          bottom: 0
+        }
+      });
+      if (showVolume && volumeData.length > 0) {
+        volumeSeries.setData(volumeData);
+      }
+
+      // Candlestick Series (TradingView v5 CandlestickSeries)
+      const candlestickSeries = chart.addSeries(CandlestickSeries, {
+        upColor: '#089981',
+        downColor: '#f23645',
+        borderVisible: false,
+        wickUpColor: '#089981',
+        wickDownColor: '#f23645'
+      });
+      if (candleData.length > 0) {
+        candlestickSeries.setData(candleData);
+      }
+
+      // Gann Levels & VWAP Price Lines
+      if (showGannOverlays) {
+        if (stock.buyAbove) {
+          candlestickSeries.createPriceLine({
+            price: stock.buyAbove,
+            color: '#089981',
+            lineWidth: 2,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `GANN BUY ₹${stock.buyAbove.toFixed(1)}`
+          });
+        }
+
+        if (stock.sellBelow) {
+          candlestickSeries.createPriceLine({
+            price: stock.sellBelow,
+            color: '#f23645',
+            lineWidth: 2,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `GANN SELL ₹${stock.sellBelow.toFixed(1)}`
+          });
+        }
+
+        if (stock.vwap) {
+          candlestickSeries.createPriceLine({
+            price: stock.vwap,
+            color: '#a855f7',
+            lineWidth: 2,
+            lineStyle: LineStyle.Solid,
+            axisLabelVisible: true,
+            title: `VWAP ₹${stock.vwap.toFixed(1)}`
+          });
+        }
+      }
+
+      // Interactive Crosshair Move Listener
+      chart.subscribeCrosshairMove((param) => {
+        if (
+          !param.point ||
+          !param.time ||
+          param.point.x < 0 ||
+          param.point.x > container.clientWidth ||
+          param.point.y < 0 ||
+          param.point.y > container.clientHeight
+        ) {
+          setHoveredCandle(null);
+          return;
+        }
+
+        const priceData = param.seriesData.get(candlestickSeries) as CandlestickData<Time> | undefined;
+        const volData = param.seriesData.get(volumeSeries) as { value: number } | undefined;
+
+        if (priceData && typeof priceData.open === 'number') {
+          const chg = priceData.open > 0 ? ((priceData.close - priceData.open) / priceData.open) * 100 : 0;
+          
+          let timeLabel = '';
+          if (typeof param.time === 'number') {
+            const dt = new Date(param.time * 1000);
+            timeLabel = dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+          } else {
+            timeLabel = String(param.time);
+          }
+
+          setHoveredCandle({
+            time: timeLabel,
+            open: priceData.open,
+            high: priceData.high,
+            low: priceData.low,
+            close: priceData.close,
+            volume: volData?.value || 0,
+            changePct: chg,
+            rsi: stock.rsi || undefined
+          });
+        }
+      });
+
+      // Auto-fit time scale
+      chart.timeScale().fitContent();
+
+      // Resize observer
+      const resizeObserver = new ResizeObserver((entries) => {
+        if (entries.length === 0 || !entries[0].contentRect) return;
+        const { width } = entries[0].contentRect;
+        if (width > 0 && chartInstanceRef.current) {
+          chartInstanceRef.current.applyOptions({ width });
+        }
+      });
+      resizeObserver.observe(container);
+
+      setRenderError(false);
+
+      return () => {
+        resizeObserver.disconnect();
+        if (chartInstanceRef.current) {
+          chartInstanceRef.current.remove();
+          chartInstanceRef.current = null;
+        }
+      };
+    } catch (err) {
+      console.warn('Lightweight charts init error, switching to SVG engine fallback:', err);
+      setRenderError(true);
+    }
+  }, [candleData, volumeData, showGannOverlays, showVolume, stock.buyAbove, stock.sellBelow, stock.vwap]);
 
   // Last candle default for HUD when cursor is not hovering
   const activeHUD = hoveredCandle || (candleData.length > 0 ? {
@@ -367,6 +416,31 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
     changePct: stock.pctChange || 0,
     rsi: stock.rsi || undefined
   } : null);
+
+  // SVG Fallback Price Calculation in case Canvas/WebGL fails
+  const svgCalculations = useMemo(() => {
+    if (rawCandles.length === 0) return null;
+    let min = Infinity;
+    let max = -Infinity;
+    rawCandles.forEach((c) => {
+      if (c.low < min) min = c.low;
+      if (c.high > max) max = c.high;
+    });
+    if (stock.buyAbove && showGannOverlays) {
+      if (stock.buyAbove > max) max = stock.buyAbove;
+      if (stock.buyAbove < min) min = stock.buyAbove;
+    }
+    if (stock.sellBelow && showGannOverlays) {
+      if (stock.sellBelow > max) max = stock.sellBelow;
+      if (stock.sellBelow < min) min = stock.sellBelow;
+    }
+    const pad = (max - min) * 0.12 || 2;
+    return {
+      min: min - pad,
+      max: max + pad,
+      range: (max + pad) - (min - pad) || 1
+    };
+  }, [rawCandles, stock, showGannOverlays]);
 
   return (
     <div className="bg-[#131722] border border-[#2a2e39] rounded-3xl p-4 sm:p-5 text-white shadow-2xl space-y-3 relative overflow-hidden">
@@ -443,7 +517,7 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
             target="_blank"
             rel="noreferrer"
             className="flex items-center space-x-1 px-2.5 py-1 bg-[#1e222d] hover:bg-indigo-600 text-[#9ea2ad] hover:text-white rounded-lg border border-[#2a2e39] text-xs font-bold transition-all"
-            title="Open Stock Analysis in New Tab"
+            title="Open Stock Analysis in ScanX"
           >
             <span>ScanX</span>
             <ExternalLink className="w-3 h-3" />
@@ -506,12 +580,87 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
         </div>
       )}
 
-      {/* TradingView Chart Container */}
-      <div 
-        ref={chartContainerRef} 
-        className="w-full rounded-2xl overflow-hidden border border-[#2a2e39] bg-[#131722] relative"
-        style={{ minHeight: '380px' }}
-      />
+      {/* Primary Chart Canvas (Lightweight-Charts v5 Engine) */}
+      {!renderError ? (
+        <div 
+          ref={chartContainerRef} 
+          className="w-full rounded-2xl overflow-hidden border border-[#2a2e39] bg-[#131722] relative"
+          style={{ minHeight: '380px' }}
+        />
+      ) : (
+        /* Pixel-Perfect Fallback TradingView SVG Engine */
+        <div className="w-full rounded-2xl overflow-hidden border border-[#2a2e39] bg-[#131722] p-2 relative">
+          {svgCalculations && (
+            <svg viewBox="0 0 700 280" className="w-full h-72 select-none">
+              {/* Gridlines */}
+              {[0, 0.25, 0.5, 0.75, 1].map((r) => {
+                const p = svgCalculations.min + svgCalculations.range * (1 - r);
+                const y = 20 + 220 * r;
+                return (
+                  <g key={r}>
+                    <line x1="20" y1={y} x2="620" y2={y} stroke="#2a2e39" strokeDasharray="2,2" />
+                    <text x="625" y={y + 3} fill="#787b86" fontSize="9" fontFamily="monospace">₹{p.toFixed(1)}</text>
+                  </g>
+                );
+              })}
+
+              {/* Gann Buy Above Line */}
+              {showGannOverlays && stock.buyAbove && (
+                <line 
+                  x1="20" 
+                  y1={20 + 220 * (1 - (stock.buyAbove - svgCalculations.min) / svgCalculations.range)} 
+                  x2="620" 
+                  y2={20 + 220 * (1 - (stock.buyAbove - svgCalculations.min) / svgCalculations.range)} 
+                  stroke="#089981" 
+                  strokeWidth="1.5" 
+                  strokeDasharray="4,2" 
+                />
+              )}
+
+              {/* Gann Sell Below Line */}
+              {showGannOverlays && stock.sellBelow && (
+                <line 
+                  x1="20" 
+                  y1={20 + 220 * (1 - (stock.sellBelow - svgCalculations.min) / svgCalculations.range)} 
+                  x2="620" 
+                  y2={20 + 220 * (1 - (stock.sellBelow - svgCalculations.min) / svgCalculations.range)} 
+                  stroke="#f23645" 
+                  strokeWidth="1.5" 
+                  strokeDasharray="4,2" 
+                />
+              )}
+
+              {/* Candlesticks */}
+              {rawCandles.map((c, i) => {
+                const isGreen = c.close >= c.open;
+                const spacing = 580 / (rawCandles.length || 1);
+                const x = 30 + i * spacing;
+                const yH = 20 + 220 * (1 - (c.high - svgCalculations.min) / svgCalculations.range);
+                const yL = 20 + 220 * (1 - (c.low - svgCalculations.min) / svgCalculations.range);
+                const yO = 20 + 220 * (1 - (c.open - svgCalculations.min) / svgCalculations.range);
+                const yC = 20 + 220 * (1 - (c.close - svgCalculations.min) / svgCalculations.range);
+                const top = Math.min(yO, yC);
+                const h = Math.max(2, Math.abs(yC - yO));
+
+                return (
+                  <g key={i}>
+                    {/* 1px Wick */}
+                    <line x1={x} y1={yH} x2={x} y2={yL} stroke={isGreen ? '#089981' : '#f23645'} strokeWidth="1" />
+                    {/* Body */}
+                    <rect x={x - 6} y={top} width="12" height={h} fill={isGreen ? '#089981' : '#f23645'} />
+                    {/* Time */}
+                    {i % 2 === 0 && (
+                      <text x={x} y="260" fill="#787b86" fontSize="8.5" textAnchor="middle" fontFamily="monospace">
+                        {c.timeStr.replace(' AM', '').replace(' PM', '')}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+        </div>
+      )}
 
       {/* TradingView Chart Bottom Indicator Legend */}
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] font-mono text-[#787b86] border-t border-[#2a2e39]/60">
@@ -537,7 +686,7 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
         </div>
 
         <div>
-          <span>Direct Dhan API Intraday 15M Data &bull; No External Exchange Lock</span>
+          <span>Dhan API 15M Live Candles &bull; Direct Engine</span>
         </div>
       </div>
 
