@@ -21,7 +21,9 @@ import {
   Filter,
   Sparkles,
   Award,
-  Activity
+  Activity,
+  Key,
+  Radio
 } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials } from '../types';
 import { 
@@ -37,10 +39,12 @@ interface SectorStrengthDashboardProps {
   stocks: StockCalculated[];
   credentials: DhanApiCredentials;
   onFetchSingleStock?: (stock: StockCalculated) => Promise<void>;
+  onFetchSectorStocks?: (symbolOrSectorKey: string) => Promise<void>;
   onFetchAllStocks?: () => Promise<void>;
   onSelectStockDetail?: (stock: StockCalculated) => void;
   onOpenPositionSizer?: (stock: StockCalculated) => void;
   onOpenRsiAnalyst?: (stock: StockCalculated) => void;
+  onOpenSettings?: () => void;
   isLoading?: boolean;
 }
 
@@ -48,10 +52,12 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
   stocks,
   credentials,
   onFetchSingleStock,
+  onFetchSectorStocks,
   onFetchAllStocks,
   onSelectStockDetail,
   onOpenPositionSizer,
   onOpenRsiAnalyst,
+  onOpenSettings,
   isLoading = false
 }) => {
   // Search input state
@@ -61,6 +67,10 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [sectorFilter, setSectorFilter] = useState<'ALL' | 'BULLISH' | 'BEARISH' | 'TOP_PERFORMERS'>('ALL');
   const [selectedSectorKey, setSelectedSectorKey] = useState<string | null>(null);
+
+  // Live checking status
+  const [isChecking, setIsChecking] = useState<boolean>(false);
+  const [checkStatusMessage, setCheckStatusMessage] = useState<string>('');
 
   // Compute all sector metrics across universe
   const sectorMetricsMap = useMemo(() => {
@@ -121,13 +131,40 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
     return getDetailedStockSectorReport(activeStockSymbol, stocks, tradeDirection);
   }, [activeStockSymbol, stocks, tradeDirection]);
 
-  // Trigger search handler
-  const handleCheckStrength = (symbolToUse?: string) => {
+  // Trigger search handler & fetch live Dhan data
+  const handleCheckStrength = async (symbolToUse?: string) => {
     const sym = (symbolToUse || searchInput).trim().toUpperCase();
     if (!sym) return;
     setActiveStockSymbol(sym);
     setSearchInput(sym);
     setIsDropdownOpen(false);
+
+    setIsChecking(true);
+    const sec = getStockSector(sym);
+    setCheckStatusMessage(`⚡ Fetching live Dhan candle for ${sym} & ${sec.sectorName} peer stocks...`);
+
+    try {
+      if (onFetchSectorStocks) {
+        await onFetchSectorStocks(sym);
+      } else if (onFetchSingleStock) {
+        const stk = stocks.find((s) => s.symbol.toUpperCase() === sym) || {
+          id: `stock_${sym}`,
+          symbol: sym,
+          companyName: sym,
+          lotSizeJun2026: 500,
+          lotSizeJul2026: 500,
+          lotSizeAug2026: 500,
+          screenerUrl: `https://scanx.trade/company/${sym.toLowerCase()}`,
+          isFetched: false
+        };
+        await onFetchSingleStock(stk as StockCalculated);
+      }
+    } catch (err) {
+      console.error('Failed to fetch sector data from Dhan API:', err);
+    } finally {
+      setIsChecking(false);
+      setCheckStatusMessage('');
+    }
   };
 
   // Popular stock quick-picks for instant testing
@@ -146,15 +183,16 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="space-y-2">
-            <div className="flex items-center space-x-2.5">
+            <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
               <div className="p-2 bg-indigo-600/30 border border-indigo-400/40 rounded-xl text-indigo-300">
                 <Compass className="w-5 h-5 animate-spin-slow" />
               </div>
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-300 bg-indigo-950/80 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
                 Institutional Sector Radar
               </span>
-              <span className="text-xs font-mono font-semibold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                ● Live 18+ Sectors Matrix
+              <span className="text-xs font-mono font-semibold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                <Radio className="w-3 h-3 animate-pulse" />
+                <span>Live Dhan API Sector Sync</span>
               </span>
             </div>
             <h2 className="text-2xl md:text-3xl font-black tracking-tight text-white flex items-center gap-2">
@@ -211,20 +249,34 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
           </div>
         </div>
 
-        {/* Global Refresh Controls */}
+        {/* Global Refresh & Dhan Credentials Status */}
         <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center space-x-2 text-slate-400 text-[11px]">
-            <Info className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span>Click any stock below or type manually to instantly evaluate sector confluence.</span>
+          <div className="flex items-center space-x-2 text-slate-300 text-[11px]">
+            {credentials.isConfigured ? (
+              <span className="flex items-center gap-1 text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-lg">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Dhan API Connected</span>
+              </span>
+            ) : (
+              <button
+                onClick={() => onOpenSettings?.()}
+                className="flex items-center gap-1 text-amber-300 hover:text-amber-200 bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded-lg font-bold cursor-pointer"
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>Configure Dhan API Keys (Click here)</span>
+              </button>
+            )}
+            <span>Type any stock symbol below to fetch live Dhan 15-min candle &amp; industry metrics instantly.</span>
           </div>
+
           {onFetchAllStocks && (
             <button
               onClick={() => onFetchAllStocks()}
-              disabled={isLoading}
+              disabled={isLoading || isChecking}
               className="flex items-center space-x-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>{isLoading ? 'Refreshing Live Prices...' : 'Refresh All F&O Sector Prices'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${(isLoading || isChecking) ? 'animate-spin' : ''}`} />
+              <span>{isLoading ? 'Refreshing All Live Prices...' : 'Refresh All F&O Sector Prices'}</span>
             </button>
           )}
         </div>
@@ -239,7 +291,7 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
               <span>Check Stock Sector Strength &amp; Confluence</span>
             </h3>
             <p className="text-xs text-slate-500">
-              Enter any stock symbol (or choose a popular stock) and click <strong className="text-indigo-600">"Check Sector Strength"</strong> at any time.
+              Enter any stock symbol (or choose a popular stock) and click <strong className="text-indigo-600">"Check Sector Strength"</strong> to fetch live Dhan candles immediately.
             </p>
           </div>
 
@@ -270,7 +322,7 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
           </div>
         </div>
 
-        {/* Search Input Bar + Button */}
+        {/* Search Input Bar + Action Button */}
         <div className="relative">
           <div className="flex flex-col sm:flex-row items-stretch gap-2">
             <div className="relative flex-1">
@@ -299,7 +351,7 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
                     setSearchInput('');
                     setIsDropdownOpen(false);
                   }}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <XCircle className="w-4 h-4" />
                 </button>
@@ -308,18 +360,36 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
 
             <button
               onClick={() => handleCheckStrength()}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center justify-center space-x-2 shrink-0 cursor-pointer"
+              disabled={isChecking}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-black text-sm rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 shrink-0 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              <Zap className="w-4 h-4 text-yellow-300 fill-current" />
-              <span>Check Sector Strength</span>
+              {isChecking ? (
+                <>
+                  <RefreshCw className="w-4 h-4 text-yellow-300 animate-spin" />
+                  <span>Fetching Dhan Data...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 text-yellow-300 fill-current" />
+                  <span>Check Sector Strength</span>
+                </>
+              )}
             </button>
           </div>
+
+          {/* Live Fetching Progress Toast Banner */}
+          {isChecking && checkStatusMessage && (
+            <div className="mt-2 p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center space-x-2 text-xs font-bold text-indigo-900 animate-pulse">
+              <RefreshCw className="w-4 h-4 text-indigo-600 animate-spin shrink-0" />
+              <span>{checkStatusMessage}</span>
+            </div>
+          )}
 
           {/* Autocomplete suggestions dropdown */}
           {isDropdownOpen && suggestions.length > 0 && (
             <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden max-h-64 overflow-y-auto">
               <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-mono text-slate-500 uppercase font-bold">
-                Matching Stocks
+                Matching Stocks (Click to Check &amp; Fetch)
               </div>
               {suggestions.map((item) => {
                 const sec = getStockSector(item.symbol);
@@ -337,10 +407,12 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
                       <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[10px]">
                         {sec.icon} {sec.sectorName}
                       </span>
-                      {item.closePrice && (
+                      {item.closePrice ? (
                         <span className="font-bold text-slate-900">₹{item.closePrice.toFixed(1)}</span>
+                      ) : (
+                        <span className="text-indigo-600 font-sans text-[10px] font-bold">Fetch Live</span>
                       )}
-                      {item.pctChange !== undefined && (
+                      {item.pctChange !== undefined && item.pctChange !== 0 && (
                         <span className={`font-bold ${item.pctChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {item.pctChange >= 0 ? '+' : ''}{item.pctChange.toFixed(2)}%
                         </span>
@@ -355,13 +427,14 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
 
         {/* Quick Ticker Chips */}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
-          <span className="text-[11px] font-bold text-slate-500 uppercase mr-1">Quick Select:</span>
+          <span className="text-[11px] font-bold text-slate-500 uppercase mr-1">Quick Select &amp; Fetch:</span>
           {popularPicks.map((sym) => {
             const isActive = activeStockSymbol.toUpperCase() === sym.toUpperCase();
             return (
               <button
                 key={sym}
                 onClick={() => handleCheckStrength(sym)}
+                disabled={isChecking}
                 className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-2xs ring-2 ring-indigo-300'
@@ -402,28 +475,46 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
               </div>
             </div>
 
-            {/* Quick Live Price & Alpha Badge */}
+            {/* Quick Live Price & Alpha Badge & Re-fetch Button */}
             <div className="flex items-center space-x-3 shrink-0">
               <div className="text-right">
                 <div className="text-xl font-mono font-black text-white">
-                  ₹{report.stock.closePrice ? report.stock.closePrice.toFixed(2) : '-'}
+                  {report.stock.closePrice ? `₹${report.stock.closePrice.toFixed(2)}` : (
+                    <span className="text-amber-400 text-sm font-sans font-bold">Awaiting Live Price</span>
+                  )}
                 </div>
                 <div className="text-xs font-mono font-bold">
-                  <span className={(report.stock.pctChange || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                    {(report.stock.pctChange || 0) >= 0 ? '+' : ''}{(report.stock.pctChange || 0).toFixed(2)}%
-                  </span>
-                  <span className="text-slate-400 text-[10px] ml-1.5">
-                    (Alpha: <strong className={report.relativeStrengthAlpha >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
-                      {report.relativeStrengthAlpha >= 0 ? '+' : ''}{report.relativeStrengthAlpha.toFixed(2)}%
-                    </strong>)
-                  </span>
+                  {report.stock.closePrice ? (
+                    <>
+                      <span className={(report.stock.pctChange || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                        {(report.stock.pctChange || 0) >= 0 ? '+' : ''}{(report.stock.pctChange || 0).toFixed(2)}%
+                      </span>
+                      <span className="text-slate-400 text-[10px] ml-1.5">
+                        (Alpha: <strong className={report.relativeStrengthAlpha >= 0 ? 'text-emerald-300' : 'text-rose-300'}>
+                          {report.relativeStrengthAlpha >= 0 ? '+' : ''}{report.relativeStrengthAlpha.toFixed(2)}%
+                        </strong>)
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-slate-400 text-[11px]">Click Check to Fetch from Dhan</span>
+                  )}
                 </div>
               </div>
+
+              {/* Instant Re-fetch Dhan button */}
+              <button
+                onClick={() => handleCheckStrength(report.stock.symbol)}
+                disabled={isChecking}
+                className="p-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                title="Fetch / Re-calculate from Dhan API"
+              >
+                <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
+              </button>
 
               {onSelectStockDetail && (
                 <button
                   onClick={() => onSelectStockDetail(report.stock)}
-                  className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors cursor-pointer"
+                  className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition-colors cursor-pointer"
                   title="View Full Stock Calculation Details"
                 >
                   <ExternalLink className="w-4 h-4" />
@@ -614,10 +705,10 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
                             {peer.companyName}
                           </td>
                           <td className="py-2 px-3 text-right font-bold text-white">
-                            ₹{peer.closePrice ? peer.closePrice.toFixed(1) : '-'}
+                            {peer.closePrice ? `₹${peer.closePrice.toFixed(1)}` : '-'}
                           </td>
                           <td className={`py-2 px-3 text-right font-bold ${pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                            {peer.closePrice ? `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%` : '-'}
                           </td>
                           <td className="py-2 px-3 text-center">
                             {peer.vwap ? (
@@ -647,9 +738,10 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
                           <td className="py-2 px-3 text-center">
                             <button
                               onClick={() => handleCheckStrength(peer.symbol)}
-                              className="px-2.5 py-1 bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                              className="px-2.5 py-1 bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer flex items-center space-x-1 mx-auto"
                             >
-                              Inspect
+                              <Zap className="w-3 h-3 text-yellow-400" />
+                              <span>Check</span>
                             </button>
                           </td>
                         </tr>
@@ -672,7 +764,7 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
               <span>All 18+ Market Sectors Heatmap &amp; Strength Ranking</span>
             </h3>
             <p className="text-xs text-slate-500">
-              Live sorted leaderboard of Indian stock market industries. Click any sector to view all component stocks.
+              Live sorted leaderboard of Indian stock market industries. Click any sector to view component stocks or fetch live Dhan data.
             </p>
           </div>
 
@@ -760,7 +852,7 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
                   </div>
                 </div>
 
-                {/* Top Stock in Sector */}
+                {/* Top Stock in Sector & Instant Check Button */}
                 <div className="mt-2.5 pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px] font-mono">
                   <span className="text-slate-500">Leader:</span>
                   <button
@@ -768,12 +860,13 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
                       e.stopPropagation();
                       if (sector.leaderSymbol) handleCheckStrength(sector.leaderSymbol);
                     }}
-                    className="font-bold text-indigo-600 hover:underline flex items-center gap-0.5"
+                    className="font-bold text-indigo-600 hover:underline flex items-center gap-1"
                   >
                     <span>{sector.leaderSymbol || 'N/A'}</span>
                     {sector.leaderPct !== undefined && (
                       <span className="text-emerald-600">({sector.leaderPct >= 0 ? '+' : ''}{sector.leaderPct.toFixed(1)}%)</span>
                     )}
+                    <ChevronRight className="w-3 h-3 text-indigo-400" />
                   </button>
                 </div>
               </div>

@@ -29,6 +29,7 @@ import { calculateGann15Min } from './utils/gann';
 import { is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishFadeReason, get100PercentBearishFadeReason, detectHistorical100Fades } from './utils/rsiPullback';
 import { getStoredTradeJourneys, updateAllTradeJourneys, clearTradeJourneys } from './utils/tradeTracker';
 import { analyzeIdealOptionsAndStocks } from './utils/idealTradeAnalyzer';
+import { getStockSector } from './utils/sectorMaster';
 
 import { Download, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
 
@@ -498,9 +499,14 @@ export default function App() {
 
   // Fetch single stock candle from Dhan API
   const handleFetchSingleDhan = async (stock: StockCalculated) => {
-    setStocks((prev) =>
-      prev.map((s) => (s.id === stock.id ? { ...s, isLoading: true, error: null } : s))
-    );
+    setStocks((prev) => {
+      const exists = prev.some((s) => s.id === stock.id || s.symbol.toUpperCase() === stock.symbol.toUpperCase());
+      if (exists) {
+        return prev.map((s) => (s.id === stock.id || s.symbol.toUpperCase() === stock.symbol.toUpperCase() ? { ...s, isLoading: true, error: null } : s));
+      } else {
+        return [...prev, { ...stock, isLoading: true, error: null }];
+      }
+    });
 
     const result = await fetchSingleStockCandle(stock);
 
@@ -513,53 +519,56 @@ export default function App() {
       const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
       const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow, stock.symbol, data.candleTimestamp);
 
-      setStocks((prev) =>
-        prev.map((s) =>
-          s.id === stock.id
-            ? {
-                ...s,
-                securityId: data.securityId || result.secId,
-                openPrice,
-                closePrice,
-                highPrice: data.high,
-                lowPrice: data.low,
-                previousClose: data.previousClose !== undefined ? data.previousClose : s.previousClose,
-                first15mHigh: data.first15mHigh,
-                first15mLow: data.first15mLow,
-                volume: data.volume,
-                rsi: rsi !== undefined && rsi !== null ? rsi : (s.rsi ?? null),
-                adx: calc.adx ?? adx ?? s.adx ?? null,
-                rsiTimeline: data.rsiTimeline || s.rsiTimeline,
-                vwap: calc.vwap,
-                vwapStatus: calc.vwapStatus,
-                candleTimestamp: data.candleTimestamp,
-                openCalc: calc.openCalc,
-                closeCalc: calc.closeCalc,
-                totalCalc: calc.totalCalc,
-                buyAbove: calc.buyAbove,
-                sellBelow: calc.sellBelow,
-                targetsUp: calc.targetsUp,
-                targetsDown: calc.targetsDown,
-                trend: calc.trend,
-                pctChange: calc.pctChange,
-                gannScore: calc.gannScore,
-                isOpenEqualLow: calc.isOpenEqualLow,
-                isOpenEqualHigh: calc.isOpenEqualHigh,
-                openLowDiffPct: calc.openLowDiffPct,
-                openHighDiffPct: calc.openHighDiffPct,
-                fib382Bull: calc.fib382Bull,
-                fib382Bear: calc.fib382Bear,
-                fibPullbackPct: calc.fibPullbackPct,
-                fibStatus: calc.fibStatus,
-                isFib382Retrace: calc.isFib382Retrace,
-                fib382Time: calc.fib382Time,
-                isFetched: true,
-                isLoading: false,
-                error: null
-              }
-            : s
-        )
-      );
+      const updatedObj: StockCalculated = {
+        ...stock,
+        securityId: data.securityId || result.secId,
+        openPrice,
+        closePrice,
+        highPrice: data.high,
+        lowPrice: data.low,
+        previousClose: data.previousClose !== undefined ? data.previousClose : stock.previousClose,
+        first15mHigh: data.first15mHigh,
+        first15mLow: data.first15mLow,
+        volume: data.volume,
+        rsi: rsi !== undefined && rsi !== null ? rsi : (stock.rsi ?? null),
+        adx: calc.adx ?? adx ?? stock.adx ?? null,
+        rsiTimeline: data.rsiTimeline || stock.rsiTimeline,
+        vwap: calc.vwap,
+        vwapStatus: calc.vwapStatus,
+        candleTimestamp: data.candleTimestamp,
+        openCalc: calc.openCalc,
+        closeCalc: calc.closeCalc,
+        totalCalc: calc.totalCalc,
+        buyAbove: calc.buyAbove,
+        sellBelow: calc.sellBelow,
+        targetsUp: calc.targetsUp,
+        targetsDown: calc.targetsDown,
+        trend: calc.trend,
+        pctChange: calc.pctChange,
+        gannScore: calc.gannScore,
+        isOpenEqualLow: calc.isOpenEqualLow,
+        isOpenEqualHigh: calc.isOpenEqualHigh,
+        openLowDiffPct: calc.openLowDiffPct,
+        openHighDiffPct: calc.openHighDiffPct,
+        fib382Bull: calc.fib382Bull,
+        fib382Bear: calc.fib382Bear,
+        fibPullbackPct: calc.fibPullbackPct,
+        fibStatus: calc.fibStatus,
+        isFib382Retrace: calc.isFib382Retrace,
+        fib382Time: calc.fib382Time,
+        isFetched: true,
+        isLoading: false,
+        error: null
+      };
+
+      setStocks((prev) => {
+        const exists = prev.some((s) => s.id === stock.id || s.symbol.toUpperCase() === stock.symbol.toUpperCase());
+        if (exists) {
+          return prev.map((s) => (s.id === stock.id || s.symbol.toUpperCase() === stock.symbol.toUpperCase() ? updatedObj : s));
+        } else {
+          return [...prev, updatedObj];
+        }
+      });
 
       setNotification({
         type: 'success',
@@ -571,7 +580,7 @@ export default function App() {
       }
       setStocks((prev) =>
         prev.map((s) =>
-          s.id === stock.id ? { ...s, isLoading: false, error: result.error || 'Fetch failed' } : s
+          (s.id === stock.id || s.symbol.toUpperCase() === stock.symbol.toUpperCase()) ? { ...s, isLoading: false, error: result.error || 'Fetch failed' } : s
         )
       );
       setNotification({
@@ -579,6 +588,132 @@ export default function App() {
         message: `Error fetching ${stock.symbol}: ${result.error}`
       });
     }
+  };
+
+  // Fetch all stocks belonging to a specific sector from Dhan API for real-time sector strength
+  const handleFetchSectorStocks = async (symbolOrSectorKey: string) => {
+    const cleanSym = (symbolOrSectorKey || '').trim().toUpperCase();
+    if (!cleanSym) return;
+
+    const secMeta = getStockSector(cleanSym);
+    const targetSectorKey = secMeta.sectorKey !== 'DIVERSIFIED' ? secMeta.sectorKey : cleanSym;
+
+    // Find all peer stocks in that sector from current stocks list
+    const sectorPeers = stocks.filter((s) => {
+      const sm = getStockSector(s.symbol);
+      return sm.sectorKey === targetSectorKey;
+    });
+
+    // Check if target symbol is already present
+    const existingTarget = stocks.find((s) => s.symbol.toUpperCase() === cleanSym);
+    const targetStock: StockCalculated = existingTarget || {
+      id: `stock_${cleanSym}`,
+      symbol: cleanSym,
+      companyName: cleanSym,
+      lotSizeJun2026: 500,
+      lotSizeJul2026: 500,
+      lotSizeAug2026: 500,
+      screenerUrl: `https://scanx.trade/company/${cleanSym.toLowerCase()}`,
+      securityId: getDhanSecurityId(cleanSym),
+      closePrice: null,
+      pctChange: 0,
+      isFetched: false
+    };
+
+    // Combine target stock + its peer sector stocks (limiting to up to 14 peers for fast response)
+    const listToFetch: StockCalculated[] = [
+      targetStock,
+      ...sectorPeers.filter((p) => p.symbol.toUpperCase() !== cleanSym).slice(0, 14)
+    ];
+
+    setNotification({
+      type: 'info',
+      message: `⚡ Fetching live Dhan candles for ${targetStock.symbol} & ${secMeta.sectorName} (${listToFetch.length} stocks)...`
+    });
+
+    // Fetch target stock first for immediate feedback
+    await handleFetchSingleDhan(targetStock);
+
+    // Fetch peer stocks in parallel batches of 4
+    const remainingPeers = listToFetch.filter((s) => s.symbol.toUpperCase() !== cleanSym);
+    const CONCURRENCY = 4;
+    for (let i = 0; i < remainingPeers.length; i += CONCURRENCY) {
+      const chunk = remainingPeers.slice(i, i + CONCURRENCY);
+      await Promise.all(
+        chunk.map(async (stk) => {
+          try {
+            const result = await fetchSingleStockCandle(stk);
+            if (result.success && result.data) {
+              const data = result.data;
+              const openPrice = data.open;
+              const closePrice = data.close;
+              const rsi = data.rsi;
+              const adx = data.adx;
+              const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
+              const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow, stk.symbol, data.candleTimestamp);
+
+              setStocks((prev) => {
+                const exists = prev.some((s) => s.id === stk.id || s.symbol.toUpperCase() === stk.symbol.toUpperCase());
+                const updatedItem: StockCalculated = {
+                  ...(prev.find((s) => s.id === stk.id || s.symbol.toUpperCase() === stk.symbol.toUpperCase()) || stk),
+                  securityId: data.securityId || result.secId,
+                  openPrice,
+                  closePrice,
+                  highPrice: data.high,
+                  lowPrice: data.low,
+                  previousClose: data.previousClose !== undefined ? data.previousClose : stk.previousClose,
+                  first15mHigh: data.first15mHigh,
+                  first15mLow: data.first15mLow,
+                  volume: data.volume,
+                  rsi: rsi !== undefined && rsi !== null ? rsi : (stk.rsi ?? null),
+                  adx: calc.adx ?? adx ?? stk.adx ?? null,
+                  rsiTimeline: data.rsiTimeline || stk.rsiTimeline,
+                  vwap: calc.vwap,
+                  vwapStatus: calc.vwapStatus,
+                  candleTimestamp: data.candleTimestamp,
+                  openCalc: calc.openCalc,
+                  closeCalc: calc.closeCalc,
+                  totalCalc: calc.totalCalc,
+                  buyAbove: calc.buyAbove,
+                  sellBelow: calc.sellBelow,
+                  targetsUp: calc.targetsUp,
+                  targetsDown: calc.targetsDown,
+                  trend: calc.trend,
+                  pctChange: calc.pctChange,
+                  gannScore: calc.gannScore,
+                  isOpenEqualLow: calc.isOpenEqualLow,
+                  isOpenEqualHigh: calc.isOpenEqualHigh,
+                  openLowDiffPct: calc.openLowDiffPct,
+                  openHighDiffPct: calc.openHighDiffPct,
+                  fib382Bull: calc.fib382Bull,
+                  fib382Bear: calc.fib382Bear,
+                  fibPullbackPct: calc.fibPullbackPct,
+                  fibStatus: calc.fibStatus,
+                  isFib382Retrace: calc.isFib382Retrace,
+                  fib382Time: calc.fib382Time,
+                  isFetched: true,
+                  isLoading: false,
+                  error: null
+                };
+
+                if (exists) {
+                  return prev.map((s) => (s.id === stk.id || s.symbol.toUpperCase() === stk.symbol.toUpperCase() ? updatedItem : s));
+                } else {
+                  return [...prev, updatedItem];
+                }
+              });
+            }
+          } catch (e) {
+            console.error(`Failed to fetch peer candle for ${stk.symbol}:`, e);
+          }
+        })
+      );
+    }
+
+    setNotification({
+      type: 'success',
+      message: `✅ Live Sector Strength updated for ${secMeta.sectorName} from Dhan API!`
+    });
   };
 
   // Fetch all stocks via Dhan API
@@ -1086,10 +1221,12 @@ export default function App() {
             stocks={stocks}
             credentials={credentials}
             onFetchSingleStock={handleFetchSingleDhan}
+            onFetchSectorStocks={handleFetchSectorStocks}
             onFetchAllStocks={handleFetchAllDhan}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
             isLoading={isBulkLoading}
           />
         ) : (
