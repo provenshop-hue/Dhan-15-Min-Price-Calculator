@@ -34,6 +34,7 @@ import {
   SectorMetric,
   DetailedStockSectorReport 
 } from '../utils/sectorMaster';
+import { FifteenMinCandleChartSnapshot } from './FifteenMinCandleChartSnapshot';
 
 interface SectorStrengthDashboardProps {
   stocks: StockCalculated[];
@@ -548,6 +549,16 @@ export const SectorStrengthDashboard: React.FC<SectorStrengthDashboardProps> = (
               <span><strong>Execution Rule:</strong> {report.tacticalAdvice}</span>
             </div>
           </div>
+
+          {/* 📊 15-Minute Candlestick Chart Snapshot */}
+          <FifteenMinCandleChartSnapshot
+            stock={report.stock}
+            sectorName={report.sectorName}
+            sectorAvgPct={report.sectorAvgPct}
+            tradeDirection={tradeDirection}
+            onRefresh={() => handleCheckStrength(report.stock.symbol)}
+            isRefreshing={isChecking}
+          />
 
           {/* Sector Strength & Breadth Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
