@@ -41,6 +41,9 @@ export interface RallySignal {
   isFresh: boolean; // true if triggered within last 30 minutes
   rulePassedLabel: string;
   isMarketHours: boolean;
+  confluenceCount: number; // e.g. 4 or 5
+  totalConfluences: number; // 6
+  confluenceRatio: string; // e.g. "4/6"
   confluencePoints: string[];
   tradePlan: HighAccuracyTradePlan;
   buyAbove?: number;
@@ -398,89 +401,107 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   const is100Bull = is100PercentBullishMove(stock);
   const isOpenLow = isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow);
   const isAbove15m = isAboveFirst15mCandle(stock);
+  const isAboveBuyLevel = stock.buyAbove ? cmp >= stock.buyAbove : false;
   const comboAnalysis = analyzeBullishCombinations(stock);
   const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
   let scoreWeight = 0;
   let rallyType = '';
   const confluencePoints: string[] = [];
+  const TOTAL_CONFLUENCES = 6;
+  let matchedPillars = 0;
 
+  // Pillar 1: Candle / Intraday Price Action (100% Bullish or Open=Low)
   if (is100Bull) {
     scoreWeight += 35;
+    matchedPillars++;
     rallyType = '100% Bullish Power Move';
     confluencePoints.push('100% Bullish solid body (≥65% candle range) closing near highs');
+  } else if (isOpenLow) {
+    scoreWeight += 30;
+    matchedPillars++;
+    rallyType = 'Institutional Open=Low Breakout';
+    confluencePoints.push('Strict Open = Low verified (Buyers aggressively defended opening tick)');
   }
 
+  // Pillar 2: Breakout & Structural Clearance (Above 15m High or Gann Buy Above)
+  if (isAbove15m) {
+    scoreWeight += 25;
+    matchedPillars++;
+    if (!rallyType) rallyType = '15m Candle High Breakout';
+    confluencePoints.push(`Trading above first 15m high (₹${(stock.first15mHigh || stock.buyAbove || 0).toFixed(2)})`);
+  } else if (isAboveBuyLevel) {
+    scoreWeight += 20;
+    matchedPillars++;
+    if (!rallyType) rallyType = 'Gann Buy-Above Breakout';
+    confluencePoints.push(`Cleared Gann Buy-Above trigger (₹${stock.buyAbove?.toFixed(2)})`);
+  }
+
+  // Pillar 3: Gann Mathematical Angle & Trend
+  if (stock.trend === 'Very Bullish') {
+    scoreWeight += 28;
+    matchedPillars++;
+    if (!rallyType) rallyType = 'Gann 45° Bullish Momentum';
+    confluencePoints.push('Gann 45° angle bullish trajectory confirmed');
+  } else if (stock.trend === 'Bullish') {
+    scoreWeight += 20;
+    matchedPillars++;
+    if (!rallyType) rallyType = 'Bullish Trend Continuation';
+    confluencePoints.push('Positive Gann upward trend structure');
+  } else if (stock.openCalc !== undefined && stock.openCalc < 3.0) {
+    scoreWeight += 15;
+    matchedPillars++;
+    confluencePoints.push(`Gann Open Calc (${stock.openCalc.toFixed(2)}) harmonic trigger`);
+  }
+
+  // Pillar 4: Institutional VWAP Support
+  if (vwap && cmp >= vwap) {
+    scoreWeight += 20;
+    matchedPillars++;
+    confluencePoints.push(`Holding above VWAP (₹${vwap.toFixed(2)}) institutional baseline`);
+  }
+
+  // Pillar 5: RSI Momentum Corridor
+  if (rsi !== null && rsi >= 54 && rsi <= 78) {
+    scoreWeight += 20;
+    matchedPillars++;
+    confluencePoints.push(`RSI at ${rsi.toFixed(1)} in ideal continuation acceleration zone`);
+  }
+
+  // Pillar 6: Technical Stack / EMA Alignment
   if (comboAnalysis.isAllCombosMet) {
     scoreWeight += 35;
+    matchedPillars++;
     if (!rallyType) rallyType = 'Triple Power EMA Alignment';
     confluencePoints.push('Triple technical stack: EMA 9>20>50 rising + RSI Higher-Highs + MACD green');
   } else if (comboAnalysis.combo1.isMatch && comboAnalysis.combo2.isMatch) {
     scoreWeight += 25;
+    matchedPillars++;
     if (!rallyType) rallyType = 'EMA & Momentum Acceleration';
     confluencePoints.push('EMA Ribbon expansion & RSI momentum alignment active');
-  } else if (comboAnalysis.combo1.isMatch || comboAnalysis.combo2.isMatch) {
-    scoreWeight += 15;
   }
 
-  if (isOpenLow) {
-    scoreWeight += 28;
-    if (!rallyType) rallyType = 'Institutional Open=Low Breakout';
-    confluencePoints.push('Strict Open = Low verified (Buyers defended opening tick)');
-  }
-
-  if (isAbove15m) {
-    scoreWeight += 22;
-    if (!rallyType) rallyType = '15m Candle High Breakout';
-    confluencePoints.push(`Trading above first 15m high (₹${(stock.first15mHigh || stock.buyAbove || 0).toFixed(2)})`);
-  }
-
-  if (stock.trend === 'Very Bullish') {
-    scoreWeight += 28;
-    if (!rallyType) rallyType = 'Gann 45° Bullish Momentum';
-    confluencePoints.push('Gann 45° angle bullish trajectory confirmed');
-  } else if (stock.trend === 'Bullish') {
-    scoreWeight += 18;
-    if (!rallyType) rallyType = 'Bullish Trend Continuation';
-    confluencePoints.push('Positive Gann upward trend structure');
-  }
-
-  if (vwap && cmp >= vwap) {
-    scoreWeight += 15;
-    confluencePoints.push(`Holding above VWAP (₹${vwap.toFixed(2)}) institutional baseline`);
-  }
-
-  if (rsi !== null && rsi >= 54 && rsi <= 78) {
-    scoreWeight += 15;
-    confluencePoints.push(`RSI at ${rsi.toFixed(1)} in ideal continuation acceleration zone`);
-  }
-
-  // Check if open calculation is favorable
-  if (stock.openCalc !== undefined && stock.openCalc < 3.0) {
-    scoreWeight += 10;
-    confluencePoints.push(`Gann Open Calc (${stock.openCalc.toFixed(2)}) < 3.0 trigger`);
-  }
-
-  // Minimum threshold: Must have at least one strong technical pattern
-  if (scoreWeight < 25) {
+  // STRICT MULTI-CONFLUENCE REQUIREMENT:
+  // Must match MOST of the confluence pillars (at least 3 out of 6) and have strong institutional weight (>= 45)
+  if (matchedPillars < 3 || scoreWeight < 45) {
     return null;
   }
 
-  // Calibrate final accuracy score (80% - 98%)
-  const finalScore = Math.min(98, Math.max(80, Math.round(65 + (scoreWeight * 0.33))));
+  // Calibrate final accuracy score (80% - 98%) based on confluence depth
+  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (scoreWeight * 0.28) + (matchedPillars * 3))));
 
   let confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT' = 'CONFIRMED BREAKOUT';
-  if (finalScore >= 92) {
+  if (matchedPillars >= 5 || finalScore >= 92) {
     confidenceBadge = 'INSTITUTIONAL DIAMOND';
-  } else if (finalScore >= 86) {
+  } else if (matchedPillars >= 4 || finalScore >= 86) {
     confidenceBadge = 'HIGH CONVICTION PRIME';
   }
 
   if (!rallyType) {
-    rallyType = 'Bullish Momentum Breakout';
+    rallyType = 'Bullish Multi-Confluence Rally';
   }
 
-  const reason = `High-probability Bullish Rally with ${confluencePoints.length} confirmed institutional confluences. Price driving upwards with strong buyer conviction and favorable risk:reward.`;
+  const reason = `High-conviction Bullish setup matching ${matchedPillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((matchedPillars / TOTAL_CONFLUENCES) * 100)}% majority). Strong buyer commitment with favorable risk:reward.`;
   const tradePlan = buildTradePlan(stock, 'BULLISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BULLISH');
 
@@ -495,6 +516,9 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     rallyType,
     confidenceScore: finalScore,
     confidenceBadge,
+    confluenceCount: matchedPillars,
+    totalConfluences: TOTAL_CONFLUENCES,
+    confluenceRatio: `${matchedPillars}/${TOTAL_CONFLUENCES}`,
     reason,
     timestamp,
     rulePassedTime: timingInfo.timeStr,
@@ -516,7 +540,7 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
 }
 
 /**
- * Evaluates whether a stock meets High-Probability Bearish Breakdown criteria.
+ * Evaluates whether a stock meets High-Probability Bearish Breakdown criteria with multi-confluence.
  */
 export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   if (!stock.openPrice || !stock.closePrice || stock.openPrice <= 0 || stock.closePrice <= 0) {
@@ -549,68 +573,103 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   const is100Bear = is100PercentBearishMove(stock);
   const isOpenHigh = isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh);
   const isBelow15m = isBelowFirst15mCandle(stock);
+  const isBelowSellLevel = stock.sellBelow ? cmp <= stock.sellBelow : false;
   const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
   let scoreWeight = 0;
   let rallyType = '';
   const confluencePoints: string[] = [];
+  const TOTAL_CONFLUENCES = 6;
+  let matchedPillars = 0;
 
+  // Pillar 1: Candle / Intraday Price Action (100% Bearish or Open=High)
   if (is100Bear) {
     scoreWeight += 35;
+    matchedPillars++;
     rallyType = '100% Bearish Breakdown Move';
     confluencePoints.push('100% Bearish solid red body closing near session lows');
-  }
-
-  if (isOpenHigh) {
+  } else if (isOpenHigh) {
     scoreWeight += 30;
-    if (!rallyType) rallyType = 'Institutional Open=High Supply';
-    confluencePoints.push('Strict Open = High verified (Sellers aggressively sold opening tick)');
+    matchedPillars++;
+    rallyType = 'Institutional Open=High Supply';
+    confluencePoints.push('Strict Open = High verified (Sellers aggressively dumped opening tick)');
   }
 
+  // Pillar 2: Breakdown & Support Breach (Below 15m Low or Gann Sell Below)
   if (isBelow15m) {
     scoreWeight += 25;
+    matchedPillars++;
     if (!rallyType) rallyType = '15m Candle Low Breakdown';
     confluencePoints.push(`Broken below first 15m support low (₹${(stock.first15mLow || stock.sellBelow || 0).toFixed(2)})`);
+  } else if (isBelowSellLevel) {
+    scoreWeight += 20;
+    matchedPillars++;
+    if (!rallyType) rallyType = 'Gann Sell-Below Breakdown';
+    confluencePoints.push(`Violated Gann Sell-Below level (₹${stock.sellBelow?.toFixed(2)})`);
   }
 
+  // Pillar 3: Gann Downward Angle & Trend
   if (stock.trend === 'Very Bearish') {
     scoreWeight += 28;
+    matchedPillars++;
     if (!rallyType) rallyType = 'Gann 45° Bearish Breakdown';
     confluencePoints.push('Gann 45° downward trajectory confirmed');
   } else if (stock.trend === 'Bearish') {
-    scoreWeight += 18;
+    scoreWeight += 20;
+    matchedPillars++;
     if (!rallyType) rallyType = 'Bearish Trend Flow';
     confluencePoints.push('Negative Gann downward trend structure');
   }
 
+  // Pillar 4: Institutional VWAP Resistance
   if (vwap && cmp <= vwap) {
-    scoreWeight += 15;
+    scoreWeight += 20;
+    matchedPillars++;
     confluencePoints.push(`Trading below VWAP (₹${vwap.toFixed(2)}) resistance`);
   }
 
-  if (rsi !== null && rsi <= 46 && rsi >= 20) {
-    scoreWeight += 15;
+  // Pillar 5: RSI Seller Momentum Corridor
+  if (rsi !== null && rsi <= 46 && rsi >= 18) {
+    scoreWeight += 20;
+    matchedPillars++;
     confluencePoints.push(`RSI at ${rsi.toFixed(1)} confirms strong seller momentum`);
   }
 
-  if (scoreWeight < 25) {
+  // Pillar 6: Selling Pressure Impulse & Volume / ADX
+  if (pct <= -1.0) {
+    scoreWeight += 25;
+    matchedPillars++;
+    confluencePoints.push(`Intraday breakdown expansion (${pct.toFixed(2)}% drop)`);
+  } else if (stock.adx !== undefined && stock.adx !== null && stock.adx >= 20) {
+    scoreWeight += 20;
+    matchedPillars++;
+    confluencePoints.push(`ADX at ${stock.adx.toFixed(1)} confirms trending bear momentum`);
+  } else if (stock.volumeSpike) {
+    scoreWeight += 15;
+    matchedPillars++;
+    confluencePoints.push('Institutional sell volume spike detected');
+  }
+
+  // STRICT MULTI-CONFLUENCE REQUIREMENT:
+  // Must match MOST of the confluence pillars (at least 3 out of 6) and have strong institutional weight (>= 45)
+  if (matchedPillars < 3 || scoreWeight < 45) {
     return null;
   }
 
-  const finalScore = Math.min(98, Math.max(80, Math.round(65 + (scoreWeight * 0.33))));
+  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (scoreWeight * 0.28) + (matchedPillars * 3))));
 
   let confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT' = 'CONFIRMED BREAKOUT';
-  if (finalScore >= 92) {
+  if (matchedPillars >= 5 || finalScore >= 92) {
     confidenceBadge = 'INSTITUTIONAL DIAMOND';
-  } else if (finalScore >= 86) {
+  } else if (matchedPillars >= 4 || finalScore >= 86) {
     confidenceBadge = 'HIGH CONVICTION PRIME';
   }
 
   if (!rallyType) {
-    rallyType = 'Bearish Momentum Breakdown';
+    rallyType = 'Bearish Multi-Confluence Breakdown';
   }
 
-  const reason = `High-probability Bearish Breakdown with ${confluencePoints.length} confirmed institutional confluences. Heavy selling pressure below resistance with defined downside targets.`;
+  const reason = `High-conviction Bearish setup matching ${matchedPillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((matchedPillars / TOTAL_CONFLUENCES) * 100)}% majority). Heavy selling pressure below key resistance with defined downside targets.`;
   const tradePlan = buildTradePlan(stock, 'BEARISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BEARISH');
 
@@ -625,6 +684,9 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     rallyType,
     confidenceScore: finalScore,
     confidenceBadge,
+    confluenceCount: matchedPillars,
+    totalConfluences: TOTAL_CONFLUENCES,
+    confluenceRatio: `${matchedPillars}/${TOTAL_CONFLUENCES}`,
     reason,
     timestamp,
     rulePassedTime: timingInfo.timeStr,
@@ -646,37 +708,41 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
 }
 
 /**
- * Returns all highly accurate Bullish and Bearish rally stocks, intelligently sorted.
+ * Returns all highly accurate Bullish and Bearish rally stocks matching MOST confluences, intelligently sorted.
  * In market hours, signals closest to the refresh time (e.g. fresh breakdown at 10:30 AM when refreshing at 10:45 AM)
  * are prioritized FIRST so traders capture fresh momentum immediately.
  */
 export function getAllRallySignals(
   stocks: StockCalculated[],
   filterDirection: 'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY' = 'ALL',
-  sortPreference: 'RECENCY_FIRST' | 'ACCURACY_FIRST' = 'RECENCY_FIRST'
+  sortPreference: 'RECENCY_FIRST' | 'ACCURACY_FIRST' = 'RECENCY_FIRST',
+  minConfluences: number = 3
 ): RallySignal[] {
   const results: RallySignal[] = [];
 
   for (const s of stocks) {
     if (filterDirection !== 'BEARISH_ONLY') {
       const bull = detectBullishRally(s);
-      if (bull) results.push(bull);
+      if (bull && bull.confluenceCount >= minConfluences) results.push(bull);
     }
     if (filterDirection !== 'BULLISH_ONLY') {
       const bear = detectBearishRally(s);
-      if (bear) results.push(bear);
+      if (bear && bear.confluenceCount >= minConfluences) results.push(bear);
     }
   }
 
-  // Sort signals
+  // Sort signals:
   return results.sort((a, b) => {
     // If in market hours and sorting by Recency First (user's priority):
-    // Prioritize stocks that passed closest to current refresh time (smallest recencyMinutes)
     if (a.isMarketHours && sortPreference === 'RECENCY_FIRST') {
       if (a.recencyMinutes !== b.recencyMinutes) {
         return a.recencyMinutes - b.recencyMinutes; // Closest to refresh time (e.g. 15m ago before 75m ago)
       }
-      // If equally fresh, sort by confidence score
+      // If equally fresh, prioritize higher confluence count (e.g. 5/6 before 4/6)
+      if (b.confluenceCount !== a.confluenceCount) {
+        return b.confluenceCount - a.confluenceCount;
+      }
+      // Then confidence score
       if (b.confidenceScore !== a.confidenceScore) {
         return b.confidenceScore - a.confidenceScore;
       }
@@ -684,6 +750,10 @@ export function getAllRallySignals(
     }
 
     // Default outside market hours or if ACCURACY_FIRST:
+    // Prioritize highest confluence count first
+    if (b.confluenceCount !== a.confluenceCount) {
+      return b.confluenceCount - a.confluenceCount;
+    }
     if (b.confidenceScore !== a.confidenceScore) {
       return b.confidenceScore - a.confidenceScore;
     }

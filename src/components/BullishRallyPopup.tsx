@@ -46,6 +46,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 }) => {
   const [filterDirection, setFilterDirection] = useState<'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY'>('ALL');
   const [minAccuracyThreshold, setMinAccuracyThreshold] = useState<number>(80); // 80% or 90%
+  const [minConfluences, setMinConfluences] = useState<number>(3); // 3 (Majority) or 4 (Maximum)
   const [sortPreference, setSortPreference] = useState<'RECENCY_FIRST' | 'ACCURACY_FIRST'>('RECENCY_FIRST');
   const [rallySignals, setRallySignals] = useState<RallySignal[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -64,9 +65,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const ROTATE_INTERVAL_MS = 5000; // 5 seconds per slide
   const PROGRESS_TICK_MS = 50;
 
-  // Scan stocks whenever stocks or filters change
+  // Scan stocks whenever stocks or filters change - only show stocks that match most confluences
   useEffect(() => {
-    const rawDetected = getAllRallySignals(stocks, filterDirection, sortPreference);
+    const rawDetected = getAllRallySignals(stocks, filterDirection, sortPreference, minConfluences);
     const filtered = rawDetected.filter((s) => s.confidenceScore >= minAccuracyThreshold);
     setRallySignals(filtered);
 
@@ -102,7 +103,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     if (currentIndex >= filtered.length) {
       setCurrentIndex(0);
     }
-  }, [stocks, filterDirection, minAccuracyThreshold, sortPreference, soundEnabled]);
+  }, [stocks, filterDirection, minAccuracyThreshold, minConfluences, sortPreference, soundEnabled]);
 
   const handleNextSlide = useCallback(() => {
     if (rallySignals.length <= 1) return;
@@ -215,6 +216,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/30 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold">
                   {currentRally.confidenceScore}%
                 </span>
+                <span className="bg-purple-400/20 text-purple-200 border border-purple-400/30 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
+                  <ShieldCheck className="w-2.5 h-2.5 text-purple-300" />
+                  {currentRally.confluenceRatio} Confluences
+                </span>
                 <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5 border ${
                   currentRally.isFresh 
                     ? 'bg-amber-400/20 text-yellow-200 border-amber-400/40 animate-pulse' 
@@ -228,7 +233,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               {rallySignals.length > 1 && (
                 <div className="text-[10px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
                   <span>Rotating ({currentIndex + 1}/{rallySignals.length})</span>
-                  <span className="text-[9px] text-slate-400">• {currentRally.isFresh ? '⚡ Just triggered' : `Passed at ${currentRally.rulePassedTime}`}</span>
+                  <span className="text-[9px] text-slate-400">• High-Confluence ({currentRally.confluenceRatio})</span>
                 </div>
               )}
             </div>
@@ -305,6 +310,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               <span>{isBull ? 'Bullish Rally' : 'Bearish Breakdown'}</span>
               <span className="bg-black/40 text-yellow-200 text-[10px] px-2 py-0.5 rounded-full font-bold border border-yellow-300/40">
                 {currentRally.confidenceScore}% Accuracy
+              </span>
+              <span className="bg-black/40 text-purple-200 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border border-purple-300/40 flex items-center gap-0.5">
+                <ShieldCheck className="w-3 h-3 text-purple-300" />
+                {currentRally.confluenceRatio} Confluences
               </span>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border flex items-center gap-1 ${
                 currentRally.isFresh
@@ -402,6 +411,23 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           </div>
 
           <div className="flex items-center space-x-1">
+            {/* Confluence Selector Toggle */}
+            <button
+              onClick={() => {
+                setMinConfluences((prev) => (prev === 3 ? 4 : 3));
+                setCurrentIndex(0);
+              }}
+              className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-0.5 ${
+                minConfluences >= 4
+                  ? 'bg-purple-950 text-purple-300 border-purple-500/50 shadow-sm'
+                  : 'bg-slate-800 text-slate-300 border-slate-700'
+              }`}
+              title="Filter by technical confluence depth (3+/6 Majority or 4+/6 Ultra)"
+            >
+              <ShieldCheck className="w-2.5 h-2.5 text-purple-300" />
+              <span>{minConfluences >= 4 ? '💎 4+/6 Max' : '🎯 3+/6 Most'}</span>
+            </button>
+
             {/* Sort Mode Toggle (Recency vs Accuracy) */}
             <button
               onClick={() => {
@@ -442,9 +468,12 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1">
               <span className="flex items-center gap-1.5">
                 <span>Active Setups ({rallySignals.length})</span>
+                <span className="text-[9px] text-purple-300 bg-purple-950/80 border border-purple-800/60 px-1.5 py-0.2 rounded font-mono">
+                  {minConfluences}+ of 6 Confluences
+                </span>
                 {sortPreference === 'RECENCY_FIRST' && (
                   <span className="text-[9.5px] text-cyan-300 font-normal bg-cyan-950/80 border border-cyan-800/60 px-1.5 py-0.2 rounded">
-                    Sorted by freshest breakdown/breakout
+                    Freshest first
                   </span>
                 )}
               </span>
@@ -477,6 +506,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       <div className="text-xs font-bold text-white flex items-center gap-1.5">
                         <span>{signal.symbol}</span>
                         <span className="text-[10px] text-slate-400 font-normal">₹{signal.currentPrice.toFixed(1)}</span>
+                        <span className="bg-purple-400/20 text-purple-200 border border-purple-400/30 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
+                          <ShieldCheck className="w-2 h-2 text-purple-300" />
+                          {signal.confluenceRatio}
+                        </span>
                         {signal.isFresh && (
                           <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
                             <Zap className="w-2 h-2 fill-current" />
@@ -523,6 +556,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                         : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                     }`}>
                       {currentRally.confidenceBadge}
+                    </span>
+                    <span className="bg-purple-950/90 text-purple-200 border border-purple-500/40 text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1">
+                      <ShieldCheck className="w-2.5 h-2.5 text-purple-300" />
+                      {currentRally.confluenceRatio} Confluences Matched
                     </span>
                     <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 border ${
                       currentRally.isFresh
@@ -575,8 +612,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     </span>
                   )}
                 </div>
-                <span className="text-[9px] text-slate-400 font-mono">
-                  {currentRally.isMarketHours ? 'Closest to refresh' : 'EOD Default (3:15 PM)'}
+                <span className="text-[9px] text-purple-300 font-mono flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-purple-400" />
+                  {currentRally.confluenceRatio} Confluences Matched
                 </span>
               </div>
             </div>
@@ -639,11 +677,16 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
             {/* Confluence Points Checklist */}
             <div className="bg-slate-900/90 border border-slate-800/90 p-2 rounded-xl space-y-1">
-              <div className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                <span>Verified High-Accuracy Confluences:</span>
+              <div className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Verified Confluences ({currentRally.confluenceRatio} Matched):</span>
+                </div>
+                <span className="text-[9px] font-mono text-purple-300 bg-purple-950/80 px-1.5 py-0.2 rounded border border-purple-500/30">
+                  {Math.round((currentRally.confluenceCount / currentRally.totalConfluences) * 100)}% Majority
+                </span>
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 mt-1">
                 {currentRally.confluencePoints.map((point, idx) => (
                   <div key={idx} className="flex items-start space-x-1.5 text-[10px] text-slate-200">
                     <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
