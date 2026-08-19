@@ -22,7 +22,8 @@ import {
   Play,
   Pause,
   List,
-  Layers
+  Layers,
+  Info
 } from 'lucide-react';
 import { StockCalculated } from '../types';
 import { 
@@ -47,14 +48,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const [filterDirection, setFilterDirection] = useState<'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY'>('ALL');
   const [minAccuracyThreshold, setMinAccuracyThreshold] = useState<number>(80); // 80% or 90%
   const [minConfluences, setMinConfluences] = useState<number>(3); // 3 (Majority) or 4 (Maximum)
+  const [maxPicksLimit, setMaxPicksLimit] = useState<number>(5); // Top 3, Top 5 (Default best match), or 0 (All)
+  const [safeOnly, setSafeOnly] = useState<boolean>(true); // Anti-Trap: Filter out overextended high-risk traps
   const [sortPreference, setSortPreference] = useState<'RECENCY_FIRST' | 'ACCURACY_FIRST'>('RECENCY_FIRST');
   const [rallySignals, setRallySignals] = useState<RallySignal[]>([]);
+  const [totalQualifiedCount, setTotalQualifiedCount] = useState<number>(0);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [showAllList, setShowAllList] = useState<boolean>(false);
+  const [showAntiTrapGuide, setShowAntiTrapGuide] = useState<boolean>(false);
   const [slideProgress, setSlideProgress] = useState<number>(0);
 
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
@@ -65,21 +70,25 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const ROTATE_INTERVAL_MS = 5000; // 5 seconds per slide
   const PROGRESS_TICK_MS = 50;
 
-  // Scan stocks whenever stocks or filters change - only show stocks that match most confluences
+  // Scan stocks whenever stocks or filters change - only show stocks that match most confluences & top elite picks
   useEffect(() => {
-    const rawDetected = getAllRallySignals(stocks, filterDirection, sortPreference, minConfluences);
+    const rawDetected = getAllRallySignals(stocks, filterDirection, sortPreference, minConfluences, 0, safeOnly);
     const filtered = rawDetected.filter((s) => s.confidenceScore >= minAccuracyThreshold);
-    setRallySignals(filtered);
+    setTotalQualifiedCount(filtered.length);
 
-    if (filtered.length > 0) {
-      const currentKeys = new Set(filtered.map((d) => `${d.symbol}_${d.direction}`));
+    // Strict Elite Selection: Cap to top 3 or 5 best matches & confluence
+    const curatedSignals = maxPicksLimit > 0 ? filtered.slice(0, maxPicksLimit) : filtered;
+    setRallySignals(curatedSignals);
+
+    if (curatedSignals.length > 0) {
+      const currentKeys = new Set(curatedSignals.map((d) => `${d.symbol}_${d.direction}`));
       let hasNewRally = false;
       let newDirection: RallyDirection = 'BULLISH';
 
       for (const key of currentKeys) {
         if (!previousRallySymbolsRef.current.has(key)) {
           hasNewRally = true;
-          const found = filtered.find((d) => `${d.symbol}_${d.direction}` === key);
+          const found = curatedSignals.find((d) => `${d.symbol}_${d.direction}` === key);
           if (found) newDirection = found.direction;
           break;
         }
@@ -100,10 +109,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     }
 
     // Keep currentIndex in bounds
-    if (currentIndex >= filtered.length) {
+    if (currentIndex >= curatedSignals.length) {
       setCurrentIndex(0);
     }
-  }, [stocks, filterDirection, minAccuracyThreshold, minConfluences, sortPreference, soundEnabled]);
+  }, [stocks, filterDirection, minAccuracyThreshold, minConfluences, maxPicksLimit, safeOnly, sortPreference, soundEnabled]);
 
   const handleNextSlide = useCallback(() => {
     if (rallySignals.length <= 1) return;
@@ -213,12 +222,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <span className={`px-1.5 py-0.2 rounded text-[10px] ${isBull ? 'bg-emerald-500/30 text-white' : 'bg-rose-500/30 text-white'}`}>
                   {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
                 </span>
-                <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/30 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold">
-                  {currentRally.confidenceScore}%
-                </span>
+                {currentIndex === 0 ? (
+                  <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold">
+                    👑 #1 BEST
+                  </span>
+                ) : (
+                  <span className="bg-slate-800 text-slate-300 border border-slate-700 px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold">
+                    ⭐ #{currentIndex + 1}
+                  </span>
+                )}
                 <span className="bg-purple-400/20 text-purple-200 border border-purple-400/30 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
                   <ShieldCheck className="w-2.5 h-2.5 text-purple-300" />
-                  {currentRally.confluenceRatio} Confluences
+                  {currentRally.confluenceRatio}
                 </span>
                 <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5 border ${
                   currentRally.isFresh 
@@ -232,8 +247,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               
               {rallySignals.length > 1 && (
                 <div className="text-[10px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
-                  <span>Rotating ({currentIndex + 1}/{rallySignals.length})</span>
-                  <span className="text-[9px] text-slate-400">• High-Confluence ({currentRally.confluenceRatio})</span>
+                  <span>Top Setups ({currentIndex + 1}/{rallySignals.length})</span>
+                  <span className="text-[9px] text-slate-400">• Best Match ({currentRally.confluenceRatio})</span>
                 </div>
               )}
             </div>
@@ -332,6 +347,23 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           </div>
 
           <div className="flex items-center space-x-1">
+            {/* Anti-Trap Guide Toggle */}
+            <button
+              onClick={() => {
+                setShowAntiTrapGuide((prev) => !prev);
+                if (!showAntiTrapGuide) setShowAllList(false);
+              }}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${
+                showAntiTrapGuide 
+                  ? 'bg-amber-400 text-slate-950 font-black shadow-md' 
+                  : 'bg-white/10 text-amber-200 hover:bg-white/20'
+              }`}
+              title="How to avoid false breakouts and traps when confluences meet"
+            >
+              <ShieldCheck className="w-3 h-3 text-amber-300" />
+              <span>Anti-Trap</span>
+            </button>
+
             {/* Auto-Rotate Play/Pause */}
             {rallySignals.length > 1 && (
               <button
@@ -347,7 +379,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
             {/* List View Toggle */}
             <button
-              onClick={() => setShowAllList((prev) => !prev)}
+              onClick={() => {
+                setShowAllList((prev) => !prev);
+                if (!showAllList) setShowAntiTrapGuide(false);
+              }}
               className={`p-1 rounded transition-colors ${
                 showAllList ? 'bg-white/20 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
@@ -410,7 +445,38 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1 flex-wrap gap-y-1">
+            {/* Elite Curation Limit (Top 5 Best vs Top 3 Elite vs All) */}
+            <div className="flex items-center bg-slate-900/90 border border-slate-700/80 rounded p-0.5 space-x-0.5">
+              <button
+                onClick={() => { setMaxPicksLimit(3); setCurrentIndex(0); }}
+                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all ${
+                  maxPicksLimit === 3 ? 'bg-amber-400/20 text-yellow-300 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Show only top 3 absolute highest quality best confluence stocks"
+              >
+                Top 3
+              </button>
+              <button
+                onClick={() => { setMaxPicksLimit(5); setCurrentIndex(0); }}
+                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all ${
+                  maxPicksLimit === 5 ? 'bg-amber-500/30 text-amber-200 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Show top 5 best match stocks (Recommended)"
+              >
+                Top 5 (Best)
+              </button>
+              <button
+                onClick={() => { setMaxPicksLimit(0); setCurrentIndex(0); }}
+                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all ${
+                  maxPicksLimit === 0 ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Show all stocks passing confluence threshold"
+              >
+                All ({totalQualifiedCount})
+              </button>
+            </div>
+
             {/* Confluence Selector Toggle */}
             <button
               onClick={() => {
@@ -422,10 +488,27 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   ? 'bg-purple-950 text-purple-300 border-purple-500/50 shadow-sm'
                   : 'bg-slate-800 text-slate-300 border-slate-700'
               }`}
-              title="Filter by technical confluence depth (3+/6 Majority or 4+/6 Ultra)"
+              title="Filter by technical confluence depth (3+/6 Majority or 4+/6 Ultra Max)"
             >
               <ShieldCheck className="w-2.5 h-2.5 text-purple-300" />
               <span>{minConfluences >= 4 ? '💎 4+/6 Max' : '🎯 3+/6 Most'}</span>
+            </button>
+
+            {/* Anti-Trap Safe-Only Filter */}
+            <button
+              onClick={() => {
+                setSafeOnly((prev) => !prev);
+                setCurrentIndex(0);
+              }}
+              className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-1 ${
+                safeOnly
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50 shadow-sm'
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}
+              title="Filter out overextended trap setups (stocks that moved too far from VWAP)"
+            >
+              <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+              <span>{safeOnly ? '🛡️ Safe Only' : 'All Traps Incl.'}</span>
             </button>
 
             {/* Sort Mode Toggle (Recency vs Accuracy) */}
@@ -442,32 +525,89 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               title="Intelligent Intraday Sorting: Prioritize stocks that passed closest to refresh time"
             >
               <Zap className="w-2.5 h-2.5 text-cyan-400" />
-              <span>{sortPreference === 'RECENCY_FIRST' ? '⚡ Freshest First' : '★ Score First'}</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setMinAccuracyThreshold(minAccuracyThreshold === 80 ? 90 : 80);
-                setCurrentIndex(0);
-              }}
-              className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border ${
-                minAccuracyThreshold >= 90
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
-              }`}
-              title="Toggle Ultra-Strict (90%+ only) or High Accuracy (80%+)"
-            >
-              {minAccuracyThreshold >= 90 ? '★ Ultra 90%+' : '80%+'}
+              <span>{sortPreference === 'RECENCY_FIRST' ? '⚡ Freshest' : '★ Score'}</span>
             </button>
           </div>
         </div>
 
-        {/* Multi-Stock Scannable Drawer List (If user toggles List View) */}
-        {showAllList ? (
+        {/* Anti-Trap Guide Panel (Explaining how to avoid false breakouts) */}
+        {showAntiTrapGuide ? (
+          <div className="p-3.5 max-h-80 overflow-y-auto space-y-3 bg-slate-950/98 text-slate-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <h4 className="text-xs font-black uppercase text-amber-300 tracking-wider">
+                  Anti-Trap Master Guide: Why Confluent Stocks Fail & How to Avoid
+                </h4>
+              </div>
+              <button
+                onClick={() => setShowAntiTrapGuide(false)}
+                className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <div className="text-[11px] text-slate-300 leading-relaxed">
+              Even when 5 or 6 institutional confluences match, a stock can reverse immediately if traders buy blindly at the wrong moment. Here are the 4 Golden Rules to avoid false breakout traps:
+            </div>
+
+            <div className="space-y-2">
+              <div className="bg-slate-900/90 border border-amber-500/30 p-2 rounded-xl">
+                <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                  <span>1. ⏳ The 5-Minute Candle Close Rule (Never Buy Wicks)</span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-1">
+                  <strong>The Trap:</strong> Price wicks above the 15m high for 10 seconds and instantly drops. Early retail traders get trapped.
+                  <br />
+                  <strong>The Fix:</strong> Always wait for a <strong>completed 5-minute candle</strong> to CLOSE strictly above the trigger level before entering.
+                </p>
+              </div>
+
+              <div className="bg-slate-900/90 border border-rose-500/30 p-2 rounded-xl">
+                <div className="text-[11px] font-bold text-rose-300 flex items-center gap-1.5">
+                  <span>2. 🛑 Avoid Overextension (The &gt;3% VWAP Trap)</span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-1">
+                  <strong>The Trap:</strong> Stock is already +4.5% up and RSI &gt; 78. Smart money uses breakout buying liquidity to book profit and dump.
+                  <br />
+                  <strong>The Fix:</strong> Keep <strong>🛡️ Safe Only</strong> enabled! Never buy an overextended stock at peak; wait for a <strong>pullback to VWAP or EMA-9</strong>.
+                </p>
+              </div>
+
+              <div className="bg-slate-900/90 border border-cyan-500/30 p-2 rounded-xl">
+                <div className="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5">
+                  <span>3. 📊 Check Nifty & Sector Alignment</span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-1">
+                  <strong>The Trap:</strong> Taking a bullish breakout while Nifty 50 or BankNifty is falling sharply. 80% of individual breakouts fail if the index dumps.
+                  <br />
+                  <strong>The Fix:</strong> Only take Long setups when Nifty is above its own VWAP, and Short setups when Nifty is below VWAP.
+                </p>
+              </div>
+
+              <div className="bg-slate-900/90 border border-emerald-500/30 p-2 rounded-xl">
+                <div className="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
+                  <span>4. 🔒 Hard Invalidation SL Rule</span>
+                </div>
+                <p className="text-[10px] text-slate-300 mt-1">
+                  <strong>The Fix:</strong> If a 5-minute candle closes below VWAP (for Longs) or above VWAP (for Shorts), institutional support is broken. <strong>Exit immediately without hoping.</strong>
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowAntiTrapGuide(false)}
+              className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors"
+            >
+              Got It — Back to Signals
+            </button>
+          </div>
+        ) : showAllList ? (
           <div className="p-3 max-h-72 overflow-y-auto space-y-1.5 bg-slate-950/95">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1">
               <span className="flex items-center gap-1.5">
-                <span>Active Setups ({rallySignals.length})</span>
+                <span>Top Setups ({rallySignals.length}{totalQualifiedCount > rallySignals.length ? ` of ${totalQualifiedCount}` : ''})</span>
                 <span className="text-[9px] text-purple-300 bg-purple-950/80 border border-purple-800/60 px-1.5 py-0.2 rounded font-mono">
                   {minConfluences}+ of 6 Confluences
                 </span>
@@ -503,9 +643,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       <TrendingDown className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                     )}
                     <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
                         <span>{signal.symbol}</span>
                         <span className="text-[10px] text-slate-400 font-normal">₹{signal.currentPrice.toFixed(1)}</span>
+                        {idx === 0 ? (
+                          <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
+                            👑 #1 BEST
+                          </span>
+                        ) : (
+                          <span className="bg-slate-800 text-slate-300 border border-slate-700 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold">
+                            #{idx + 1}
+                          </span>
+                        )}
                         <span className="bg-purple-400/20 text-purple-200 border border-purple-400/30 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
                           <ShieldCheck className="w-2 h-2 text-purple-300" />
                           {signal.confluenceRatio}
@@ -548,6 +697,16 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                    {currentIndex === 0 ? (
+                      <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/50 text-[10px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1 shadow-sm">
+                        👑 #1 Best Confluence Match
+                      </span>
+                    ) : (
+                      <span className="bg-slate-800/90 text-slate-200 border border-slate-700 text-[10px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1">
+                        ⭐ Top Elite #{currentIndex + 1}
+                      </span>
+                    )}
+
                     <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded font-mono ${
                       currentRally.confidenceBadge === 'INSTITUTIONAL DIAMOND'
                         ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
@@ -672,6 +831,59 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <div className="text-[10px] font-mono text-slate-300">
                   LTP ~<span className="text-white font-bold">₹{plan.optionEntryEst.toFixed(1)}</span> (T1: <span className="text-emerald-400 font-bold">₹{plan.optionTarget1.toFixed(1)}</span>)
                 </div>
+              </div>
+            </div>
+
+            {/* Anti-Trap Execution & Invalidation Rules Box (Crucial to prevent false breakout losses) */}
+            <div className={`p-2.5 rounded-xl border text-[10.5px] space-y-1.5 ${
+              currentRally.trapRiskLevel === 'SAFE'
+                ? 'bg-slate-900/90 border-emerald-500/40'
+                : currentRally.trapRiskLevel === 'MODERATE'
+                ? 'bg-amber-950/40 border-amber-500/40'
+                : 'bg-rose-950/40 border-rose-500/50'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1.5 font-bold">
+                  <ShieldCheck className={`w-3.5 h-3.5 ${
+                    currentRally.trapRiskLevel === 'SAFE' ? 'text-emerald-400' : currentRally.trapRiskLevel === 'MODERATE' ? 'text-amber-400' : 'text-rose-400'
+                  }`} />
+                  <span className="uppercase text-[10px] tracking-wider text-slate-200">
+                    Anti-Trap Guard:
+                  </span>
+                  <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black ${
+                    currentRally.trapRiskLevel === 'SAFE'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : currentRally.trapRiskLevel === 'MODERATE'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
+                  }`}>
+                    {currentRally.trapRiskLevel === 'SAFE' ? '🛡️ Prime Base (Safe Entry)' : currentRally.trapRiskLevel === 'MODERATE' ? '⚠️ Moderate Extension' : '🚨 Overextended Trap Risk'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowAntiTrapGuide(true)}
+                  className="text-[9.5px] text-amber-300 hover:underline cursor-pointer flex items-center gap-0.5"
+                >
+                  <Info className="w-2.5 h-2.5" />
+                  <span>Trap Rules</span>
+                </button>
+              </div>
+
+              {/* Strict Entry Confirmation Trigger */}
+              <div className="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800 space-y-1">
+                <div className="text-slate-300 flex items-start gap-1">
+                  <span className="text-emerald-400 font-bold shrink-0">🎯 Entry Confirmation:</span>
+                  <span className="font-mono text-white text-[10px]">{currentRally.entryConfirmation}</span>
+                </div>
+                <div className="text-slate-300 flex items-start gap-1 border-t border-slate-800/80 pt-1">
+                  <span className="text-rose-400 font-bold shrink-0">🛑 Invalidation SL:</span>
+                  <span className="font-mono text-rose-300 text-[10px]">{currentRally.invalidationRule}</span>
+                </div>
+              </div>
+
+              {/* Trap Warning Note */}
+              <div className="text-[9.5px] text-slate-400 leading-snug">
+                💡 <span className="text-slate-300 font-medium">{currentRally.trapWarning}</span>
               </div>
             </div>
 

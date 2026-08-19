@@ -46,6 +46,10 @@ export interface RallySignal {
   confluenceRatio: string; // e.g. "4/6"
   confluencePoints: string[];
   tradePlan: HighAccuracyTradePlan;
+  trapRiskLevel: 'SAFE' | 'MODERATE' | 'OVEREXTENDED_TRAP';
+  trapWarning: string;
+  entryConfirmation: string;
+  invalidationRule: string;
   buyAbove?: number;
   sellBelow?: number;
   rsi?: number;
@@ -501,9 +505,26 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     rallyType = 'Bullish Multi-Confluence Rally';
   }
 
-  const reason = `High-conviction Bullish setup matching ${matchedPillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((matchedPillars / TOTAL_CONFLUENCES) * 100)}% majority). Strong buyer commitment with favorable risk:reward.`;
+  // Anti-Trap & Fakeout Evaluation for Bullish
+  let trapRiskLevel: 'SAFE' | 'MODERATE' | 'OVEREXTENDED_TRAP' = 'SAFE';
+  let trapWarning = 'Prime Base: Healthy momentum close to VWAP support. Low false breakout risk.';
+  const vwapDistPct = vwap ? ((cmp - vwap) / vwap) * 100 : 0;
+
+  if (pct > 4.5 || (rsi !== null && rsi > 78) || vwapDistPct > 2.8) {
+    trapRiskLevel = 'OVEREXTENDED_TRAP';
+    trapWarning = `Overextended Trap Warning (+${pct.toFixed(1)}%, ${vwapDistPct > 2.8 ? `${vwapDistPct.toFixed(1)}% above VWAP` : `RSI ${rsi?.toFixed(0)}`}). High risk of profit-taking dump. DO NOT market buy; wait for dip to VWAP (₹${vwap ? vwap.toFixed(1) : cmp.toFixed(1)}) or EMA-9.`;
+  } else if (pct > 3.0 || (rsi !== null && rsi > 70) || vwapDistPct > 1.8) {
+    trapRiskLevel = 'MODERATE';
+    trapWarning = `Moderate Extension (+${pct.toFixed(1)}%). Enter ONLY on 5m candle close confirmation or tight SL near VWAP (₹${vwap ? vwap.toFixed(1) : cmp.toFixed(1)}).`;
+  }
+
   const tradePlan = buildTradePlan(stock, 'BULLISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BULLISH');
+  const triggerPrice = stock.first15mHigh || stock.buyAbove || (open * 1.008);
+  const entryConfirmation = `Wait for 5m candle close ABOVE ₹${triggerPrice.toFixed(2)} or enter on pullback to VWAP (₹${(vwap || cmp).toFixed(2)})`;
+  const invalidationRule = `Hard Exit if 5m candle closes BELOW VWAP (₹${(vwap ? vwap * 0.997 : tradePlan.stopLoss).toFixed(2)})`;
+
+  const reason = `High-conviction Bullish setup matching ${matchedPillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((matchedPillars / TOTAL_CONFLUENCES) * 100)}% majority). Strong buyer commitment with favorable risk:reward.`;
 
   return {
     stock,
@@ -529,6 +550,10 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     isMarketHours: timingInfo.isMarketHours,
     confluencePoints,
     tradePlan,
+    trapRiskLevel,
+    trapWarning,
+    entryConfirmation,
+    invalidationRule,
     buyAbove: stock.buyAbove,
     sellBelow: stock.sellBelow,
     rsi: stock.rsi,
@@ -669,9 +694,26 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     rallyType = 'Bearish Multi-Confluence Breakdown';
   }
 
-  const reason = `High-conviction Bearish setup matching ${matchedPillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((matchedPillars / TOTAL_CONFLUENCES) * 100)}% majority). Heavy selling pressure below key resistance with defined downside targets.`;
+  // Anti-Trap & Fakeout Evaluation for Bearish
+  let trapRiskLevel: 'SAFE' | 'MODERATE' | 'OVEREXTENDED_TRAP' = 'SAFE';
+  let trapWarning = 'Prime Breakdown Zone: Clean sell-side pressure below VWAP resistance. Low trap risk.';
+  const vwapBelowPct = vwap ? ((vwap - cmp) / vwap) * 100 : 0;
+
+  if (pct < -4.5 || (rsi !== null && rsi < 22) || vwapBelowPct > 2.8) {
+    trapRiskLevel = 'OVEREXTENDED_TRAP';
+    trapWarning = `Overextended Downside Alert (${pct.toFixed(1)}%, ${vwapBelowPct > 2.8 ? `${vwapBelowPct.toFixed(1)}% below VWAP` : `RSI ${rsi?.toFixed(0)}`}). High risk of short-covering spike. DO NOT short breakdown lows; wait for bounce retest of VWAP (₹${vwap ? vwap.toFixed(1) : cmp.toFixed(1)}).`;
+  } else if (pct < -3.0 || (rsi !== null && rsi < 30) || vwapBelowPct > 1.8) {
+    trapRiskLevel = 'MODERATE';
+    trapWarning = `Moderate Extension (${pct.toFixed(1)}%). Enter short ONLY on 5m candle close confirmation below ₹${(stock.first15mLow || stock.sellBelow || cmp).toFixed(1)}.`;
+  }
+
   const tradePlan = buildTradePlan(stock, 'BEARISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BEARISH');
+  const triggerPrice = stock.first15mLow || stock.sellBelow || (open * 0.992);
+  const entryConfirmation = `Wait for 5m candle close BELOW ₹${triggerPrice.toFixed(2)} or enter on bounce retest to VWAP (₹${(vwap || cmp).toFixed(2)})`;
+  const invalidationRule = `Hard Exit if 5m candle closes ABOVE VWAP (₹${(vwap ? vwap * 1.003 : tradePlan.stopLoss).toFixed(2)})`;
+
+  const reason = `High-conviction Bearish setup matching ${matchedPillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((matchedPillars / TOTAL_CONFLUENCES) * 100)}% majority). Heavy selling pressure below key resistance with defined downside targets.`;
 
   return {
     stock,
@@ -697,6 +739,10 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     isMarketHours: timingInfo.isMarketHours,
     confluencePoints,
     tradePlan,
+    trapRiskLevel,
+    trapWarning,
+    entryConfirmation,
+    invalidationRule,
     buyAbove: stock.buyAbove,
     sellBelow: stock.sellBelow,
     rsi: stock.rsi,
@@ -709,40 +755,67 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
 
 /**
  * Returns all highly accurate Bullish and Bearish rally stocks matching MOST confluences, intelligently sorted.
- * In market hours, signals closest to the refresh time (e.g. fresh breakdown at 10:30 AM when refreshing at 10:45 AM)
- * are prioritized FIRST so traders capture fresh momentum immediately.
+ * Prioritizes the absolute BEST matches and BEST confluence setups at that exact point in time.
+ * In market hours, fresh triggers closest to the refresh time with highest confluence are prioritized first.
  */
 export function getAllRallySignals(
   stocks: StockCalculated[],
   filterDirection: 'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY' = 'ALL',
   sortPreference: 'RECENCY_FIRST' | 'ACCURACY_FIRST' = 'RECENCY_FIRST',
-  minConfluences: number = 3
+  minConfluences: number = 3,
+  limit?: number,
+  safeOnly: boolean = false
 ): RallySignal[] {
   const results: RallySignal[] = [];
 
   for (const s of stocks) {
     if (filterDirection !== 'BEARISH_ONLY') {
       const bull = detectBullishRally(s);
-      if (bull && bull.confluenceCount >= minConfluences) results.push(bull);
+      if (bull && bull.confluenceCount >= minConfluences) {
+        if (!safeOnly || bull.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
+          results.push(bull);
+        }
+      }
     }
     if (filterDirection !== 'BULLISH_ONLY') {
       const bear = detectBearishRally(s);
-      if (bear && bear.confluenceCount >= minConfluences) results.push(bear);
+      if (bear && bear.confluenceCount >= minConfluences) {
+        if (!safeOnly || bear.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
+          results.push(bear);
+        }
+      }
     }
   }
 
-  // Sort signals:
-  return results.sort((a, b) => {
+  // Sort signals to find the absolute Best Match & Best Confluence with Anti-Trap prioritization:
+  const trapOrder = { SAFE: 2, MODERATE: 1, OVEREXTENDED_TRAP: 0 };
+
+  const sorted = results.sort((a, b) => {
+    // 0. Anti-Trap Priority: Rank healthy base/pullback setups ahead of overextended exhaustion traps
+    if (trapOrder[b.trapRiskLevel] !== trapOrder[a.trapRiskLevel]) {
+      return trapOrder[b.trapRiskLevel] - trapOrder[a.trapRiskLevel];
+    }
+
     // If in market hours and sorting by Recency First (user's priority):
     if (a.isMarketHours && sortPreference === 'RECENCY_FIRST') {
-      if (a.recencyMinutes !== b.recencyMinutes) {
-        return a.recencyMinutes - b.recencyMinutes; // Closest to refresh time (e.g. 15m ago before 75m ago)
+      // 1. Freshness tier: Triggers within last 30 mins get top tier
+      const aFresh = a.recencyMinutes <= 30 ? 1 : 0;
+      const bFresh = b.recencyMinutes <= 30 ? 1 : 0;
+      if (bFresh !== aFresh) {
+        return bFresh - aFresh;
       }
-      // If equally fresh, prioritize higher confluence count (e.g. 5/6 before 4/6)
+
+      // 2. Best Confluence Count (e.g. 6/6, 5/6, 4/6 before 3/6)
       if (b.confluenceCount !== a.confluenceCount) {
         return b.confluenceCount - a.confluenceCount;
       }
-      // Then confidence score
+
+      // 3. Recency minutes (closest to refresh time)
+      if (a.recencyMinutes !== b.recencyMinutes) {
+        return a.recencyMinutes - b.recencyMinutes;
+      }
+
+      // 4. Highest confidence score
       if (b.confidenceScore !== a.confidenceScore) {
         return b.confidenceScore - a.confidenceScore;
       }
@@ -750,7 +823,7 @@ export function getAllRallySignals(
     }
 
     // Default outside market hours or if ACCURACY_FIRST:
-    // Prioritize highest confluence count first
+    // Prioritize highest confluence count first (Best Confluence)
     if (b.confluenceCount !== a.confluenceCount) {
       return b.confluenceCount - a.confluenceCount;
     }
@@ -759,6 +832,12 @@ export function getAllRallySignals(
     }
     return Math.abs(b.pctChange) - Math.abs(a.pctChange);
   });
+
+  if (limit && limit > 0) {
+    return sorted.slice(0, limit);
+  }
+
+  return sorted;
 }
 
 /**
