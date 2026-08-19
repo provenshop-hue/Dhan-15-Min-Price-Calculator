@@ -20,6 +20,7 @@ import { IdealTradeRadar } from './components/IdealTradeRadar';
 import { TenFifteenPicksHub } from './components/TenFifteenPicksHub';
 import { ManualStockAnalyzer } from './components/ManualStockAnalyzer';
 import { UserTradeTracker } from './components/UserTradeTracker';
+import { SectorStrengthDashboard } from './components/SectorStrengthDashboard';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
@@ -210,8 +211,8 @@ export default function App() {
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
 
-  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'stock_analyzer', or 'user_tracker')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker'>('gann');
+  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'stock_analyzer', 'user_tracker', or 'sector_strength')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker' | 'sector_strength'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -1078,6 +1079,18 @@ export default function App() {
             onOpenSettings={() => setIsDhanGateOpen(true)}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+          />
+        ) : activeDashboardTab === 'sector_strength' ? (
+          /* Dedicated Sector Strength & Real-Time Stock Confluence Hub */
+          <SectorStrengthDashboard
+            stocks={stocks}
+            credentials={credentials}
+            onFetchSingleStock={handleFetchSingleDhan}
+            onFetchAllStocks={handleFetchAllDhan}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+            isLoading={isBulkLoading}
           />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker' | 'sector_strength';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker' | 'sector_strength') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -336,6 +336,24 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>💼 User Tracker</span>
                 <span className="bg-emerald-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   5-Min Dhan
+                </span>
+              </span>
+            </button>
+
+            {/* 🏢 Sector Strength Menu Tab */}
+            <button
+              onClick={() => onChangeDashboardTab('sector_strength')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'sector_strength'
+                  ? 'bg-gradient-to-r from-purple-700 via-indigo-700 to-blue-700 text-white shadow-md shadow-indigo-500/30 ring-1 ring-white/30'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-purple-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Compass className={`w-3.5 h-3.5 ${activeDashboardTab === 'sector_strength' ? 'text-yellow-300 animate-spin-slow' : 'text-indigo-600'}`} />
+                <span>🏢 Sector Strength</span>
+                <span className="bg-gradient-to-r from-yellow-400 to-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  18+ Sectors
                 </span>
               </span>
             </button>

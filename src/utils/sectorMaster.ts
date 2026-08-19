@@ -282,18 +282,216 @@ export const STOCK_SECTOR_MAP: Record<string, { sectorKey: string; sectorName: s
   'UPL': { sectorKey: 'CHEMICALS', sectorName: 'Crop Protection & Agri Chem', icon: '🌾' },
 
   // --- ADANI CONGLOMERATE ---
-  'ADANIENT': { sectorKey: 'CONGLOMERATE', sectorName: 'Incubation & Diversified', icon: '🌐' }
+  'ADANIENT': { sectorKey: 'CONGLOMERATE', sectorName: 'Incubation & Diversified', icon: '🌐' },
+
+  // --- INDICES ---
+  'NIFTY': { sectorKey: 'INDICES', sectorName: 'Nifty 50 Benchmark', icon: '📈' },
+  'SENSEX': { sectorKey: 'INDICES', sectorName: 'BSE Sensex Benchmark', icon: '🏛️' }
 };
 
 /**
- * Returns the sector mapping for any given stock symbol
+ * Returns the sector mapping for any given stock symbol (with fuzzy fallback)
  */
 export function getStockSector(symbol: string): { sectorKey: string; sectorName: string; icon: string } {
-  const cleanSymbol = symbol.trim().toUpperCase();
+  if (!symbol) return { sectorKey: 'DIVERSIFIED', sectorName: 'Diversified & Others', icon: '📊' };
+  const cleanSymbol = symbol.trim().toUpperCase().replace(/[^A-Z0-9&-]/g, '');
   if (STOCK_SECTOR_MAP[cleanSymbol]) {
     return STOCK_SECTOR_MAP[cleanSymbol];
   }
+  // Try partial match in case symbol is passed with suffixes (e.g. RELIANCE-EQ)
+  for (const [key, val] of Object.entries(STOCK_SECTOR_MAP)) {
+    if (cleanSymbol.startsWith(key) || key.startsWith(cleanSymbol)) {
+      return val;
+    }
+  }
   return { sectorKey: 'DIVERSIFIED', sectorName: 'Diversified & Others', icon: '📊' };
+}
+
+export interface DetailedStockSectorReport {
+  stock: StockCalculated;
+  sectorKey: string;
+  sectorName: string;
+  categoryIcon: string;
+  sectorRank: number;
+  totalSectorsCount: number;
+  sectorAvgPct: number;
+  sectorBullishBreadthPct: number;
+  sectorAdvancing: number;
+  sectorDeclining: number;
+  sectorNeutral: number;
+  sectorTotalStocks: number;
+  sectorBias: 'STRONG_BULLISH' | 'BULLISH' | 'NEUTRAL' | 'BEARISH' | 'STRONG_BEARISH';
+  sectorLeader?: { symbol: string; pct: number };
+  sectorLaggard?: { symbol: string; pct: number };
+  relativeStrengthAlpha: number; // Stock % minus Sector Avg %
+  relativeStrengthLabel: 'Outperforming Sector (Alpha Leader)' | 'In-Line with Sector' | 'Underperforming Sector (Laggard)';
+  tradeVerdict: 'ENTER' | 'CAUTION' | 'AVOID';
+  verdictLabel: string;
+  verdictDescription: string;
+  badgeBg: string;
+  badgeTextColor: string;
+  badgeBorderColor: string;
+  isAligned: boolean;
+  scoreAdjustment: number;
+  peerStocks: StockCalculated[];
+  checklist: {
+    title: string;
+    passed: boolean;
+    detail: string;
+  }[];
+  tacticalAdvice: string;
+}
+
+/**
+ * Generates an all-inclusive deep sector strength report for any searched stock
+ */
+export function getDetailedStockSectorReport(
+  symbolInput: string,
+  allStocks: StockCalculated[],
+  direction: 'BULLISH' | 'BEARISH' = 'BULLISH'
+): DetailedStockSectorReport | null {
+  if (!symbolInput || !symbolInput.trim()) return null;
+
+  const query = symbolInput.trim().toUpperCase();
+  
+  // Find matching stock in universe, or build a synthetic one
+  let targetStock = allStocks.find(
+    (s) => s.symbol.toUpperCase() === query || 
+           s.companyName.toUpperCase().includes(query) ||
+           s.symbol.toUpperCase().includes(query)
+  );
+
+  if (!targetStock) {
+    // If not found in loaded array, check if it's in master sector map
+    const sectorMeta = getStockSector(query);
+    targetStock = {
+      id: `manual_${query}`,
+      symbol: query,
+      companyName: query,
+      lotSizeJun2026: 500,
+      lotSizeJul2026: 500,
+      lotSizeAug2026: 500,
+      screenerUrl: `https://scanx.trade/company/${query.toLowerCase()}`,
+      closePrice: null,
+      pctChange: 0,
+      isFetched: false
+    };
+  }
+
+  const { sectorKey, sectorName, icon } = getStockSector(targetStock.symbol);
+  const metricsMap = computeAllSectorStrengths(allStocks);
+  
+  // Rank all sectors by average % change
+  const sortedSectors = Array.from(metricsMap.values()).sort((a, b) => b.avgPctChange - a.avgPctChange);
+  const sectorIndex = sortedSectors.findIndex((s) => s.sectorKey === sectorKey);
+  const sectorRank = sectorIndex !== -1 ? sectorIndex + 1 : sortedSectors.length;
+
+  const metric = metricsMap.get(sectorKey) || {
+    sectorKey,
+    sectorName,
+    categoryIcon: icon,
+    totalStocks: 1,
+    validStocksCount: 1,
+    avgPctChange: targetStock.pctChange || 0,
+    advancingCount: (targetStock.pctChange || 0) > 0 ? 1 : 0,
+    decliningCount: (targetStock.pctChange || 0) < 0 ? 1 : 0,
+    neutralCount: 0,
+    bullishBreadthPct: (targetStock.pctChange || 0) >= 0 ? 100 : 0,
+    sectorBias: (targetStock.pctChange || 0) > 0.5 ? 'BULLISH' : (targetStock.pctChange || 0) < -0.5 ? 'BEARISH' : 'NEUTRAL'
+  };
+
+  const confluence = evaluateStockSectorConfluence(targetStock, direction, metricsMap);
+
+  // Peer stocks in the exact same sector
+  const peerStocks = allStocks
+    .filter((s) => getStockSector(s.symbol).sectorKey === sectorKey)
+    .sort((a, b) => (b.pctChange || 0) - (a.pctChange || 0));
+
+  const stockPct = targetStock.pctChange || 0;
+  const relativeStrengthAlpha = Math.round((stockPct - metric.avgPctChange) * 100) / 100;
+
+  let relativeStrengthLabel: DetailedStockSectorReport['relativeStrengthLabel'] = 'In-Line with Sector';
+  if (relativeStrengthAlpha >= 0.75) {
+    relativeStrengthLabel = 'Outperforming Sector (Alpha Leader)';
+  } else if (relativeStrengthAlpha <= -0.75) {
+    relativeStrengthLabel = 'Underperforming Sector (Laggard)';
+  }
+
+  // Build 4-point Institutional Flow Checklist
+  const checklist = [
+    {
+      title: '1. Sector Trend Alignment',
+      passed: direction === 'BULLISH' 
+        ? metric.avgPctChange >= 0.20 && (metric.sectorBias === 'BULLISH' || metric.sectorBias === 'STRONG_BULLISH')
+        : metric.avgPctChange <= -0.20 && (metric.sectorBias === 'BEARISH' || metric.sectorBias === 'STRONG_BEARISH'),
+      detail: direction === 'BULLISH'
+        ? `Sector average is ${metric.avgPctChange >= 0 ? '+' : ''}${metric.avgPctChange.toFixed(2)}% (${metric.sectorBias.replace('_', ' ')})`
+        : `Sector average is ${metric.avgPctChange.toFixed(2)}% (${metric.sectorBias.replace('_', ' ')})`
+    },
+    {
+      title: '2. Industry Market Breadth',
+      passed: direction === 'BULLISH' ? metric.bullishBreadthPct >= 55 : metric.bullishBreadthPct <= 45,
+      detail: `${metric.bullishBreadthPct}% green breadth (${metric.advancingCount} advancing / ${metric.decliningCount} declining of ${metric.totalStocks} stocks)`
+    },
+    {
+      title: '3. Stock Relative Strength (Alpha)',
+      passed: direction === 'BULLISH' ? stockPct >= metric.avgPctChange : stockPct <= metric.avgPctChange,
+      detail: `${targetStock.symbol} (${stockPct >= 0 ? '+' : ''}${stockPct.toFixed(2)}%) is ${relativeStrengthAlpha >= 0 ? '+' : ''}${relativeStrengthAlpha.toFixed(2)}% relative to sector average`
+    },
+    {
+      title: '4. Technical Confirmation (VWAP & Gann)',
+      passed: direction === 'BULLISH'
+        ? (targetStock.vwap ? (targetStock.closePrice || 0) >= targetStock.vwap : true) && (targetStock.trend?.includes('Bullish') ?? true)
+        : (targetStock.vwap ? (targetStock.closePrice || 0) <= targetStock.vwap : true) && (targetStock.trend?.includes('Bearish') ?? true),
+      detail: targetStock.vwap
+        ? `LTP ₹${targetStock.closePrice || '-'} vs VWAP ₹${targetStock.vwap} (${(targetStock.closePrice || 0) >= targetStock.vwap ? 'Above VWAP' : 'Below VWAP'}) • Trend: ${targetStock.trend || 'Calculated'}`
+        : `Trend: ${targetStock.trend || 'Awaiting 15m Calculation'}`
+    }
+  ];
+
+  let tacticalAdvice = '';
+  if (confluence.tradeVerdict === 'ENTER') {
+    tacticalAdvice = direction === 'BULLISH'
+      ? `🟢 High Probability Setup: ${targetStock.symbol} has strong sector tailwinds (+${metric.avgPctChange.toFixed(2)}%). Enter on 15m Buy Level breakout with trail stop.`
+      : `🟢 High Probability Short: ${targetStock.symbol} has heavy sector selling pressure (${metric.avgPctChange.toFixed(2)}%). Enter on 15m Sell Below trigger.`;
+  } else if (confluence.tradeVerdict === 'CAUTION') {
+    tacticalAdvice = `🟡 Moderate Conviction: Sector is neutral or mixed (${metric.avgPctChange >= 0 ? '+' : ''}${metric.avgPctChange.toFixed(2)}%). Trade with smaller position sizing and strict Stop-Loss.`;
+  } else {
+    tacticalAdvice = direction === 'BULLISH'
+      ? `🔴 Trap Alert: Avoid buying ${targetStock.symbol} now. The broader ${sectorName} sector is selling off (${metric.avgPctChange.toFixed(2)}%), making breakouts vulnerable to failure.`
+      : `🔴 Trap Alert: Avoid shorting ${targetStock.symbol} now. The broader ${sectorName} sector is rallying (+${metric.avgPctChange.toFixed(2)}%), causing strong bounce risk.`;
+  }
+
+  return {
+    stock: targetStock,
+    sectorKey,
+    sectorName,
+    categoryIcon: icon,
+    sectorRank,
+    totalSectorsCount: sortedSectors.length,
+    sectorAvgPct: metric.avgPctChange,
+    sectorBullishBreadthPct: metric.bullishBreadthPct,
+    sectorAdvancing: metric.advancingCount,
+    sectorDeclining: metric.decliningCount,
+    sectorNeutral: metric.neutralCount,
+    sectorTotalStocks: metric.totalStocks,
+    sectorBias: metric.sectorBias,
+    sectorLeader: metric.leaderSymbol ? { symbol: metric.leaderSymbol, pct: metric.leaderPct || 0 } : undefined,
+    sectorLaggard: metric.laggardSymbol ? { symbol: metric.laggardSymbol, pct: metric.laggardPct || 0 } : undefined,
+    relativeStrengthAlpha,
+    relativeStrengthLabel,
+    tradeVerdict: confluence.tradeVerdict,
+    verdictLabel: confluence.verdictLabel,
+    verdictDescription: confluence.verdictDescription,
+    badgeBg: confluence.badgeBg,
+    badgeTextColor: confluence.badgeTextColor,
+    badgeBorderColor: confluence.badgeBorderColor,
+    isAligned: confluence.isAligned,
+    scoreAdjustment: confluence.scoreAdjustment,
+    peerStocks,
+    checklist,
+    tacticalAdvice
+  };
 }
 
 /**
