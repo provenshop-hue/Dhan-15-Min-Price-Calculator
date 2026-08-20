@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker' | 'sector_strength';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker' | 'sector_strength') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -307,18 +307,18 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button
-              onClick={() => onChangeDashboardTab('stock_analyzer')}
+              onClick={() => onChangeDashboardTab('parabolic_rally')}
               className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeDashboardTab === 'stock_analyzer'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xs'
-                  : 'text-slate-700 hover:text-slate-950 hover:bg-blue-50'
+                activeDashboardTab === 'parabolic_rally'
+                  ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 text-white shadow-md shadow-orange-500/20 ring-1 ring-white/30'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-orange-50'
               }`}
             >
               <span className="flex items-center gap-1.5">
-                <Calculator className="w-3.5 h-3.5 text-blue-500" />
-                <span>🎯 Stock Analyzer</span>
-                <span className="bg-blue-100 text-blue-800 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase">
-                  Manual + Dhan
+                <Flame className={`w-3.5 h-3.5 ${activeDashboardTab === 'parabolic_rally' ? 'text-amber-200 fill-amber-200 animate-pulse' : 'text-orange-500 fill-orange-500'}`} />
+                <span>⚡ Parabolic Rally</span>
+                <span className="bg-gradient-to-r from-yellow-300 to-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  15M Bull/Bear
                 </span>
               </span>
             </button>

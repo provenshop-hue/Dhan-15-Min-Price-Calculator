@@ -18,7 +18,7 @@ import { NotificationScroller } from './components/NotificationScroller';
 import { TradeProfitTracker } from './components/TradeProfitTracker';
 import { IdealTradeRadar } from './components/IdealTradeRadar';
 import { TenFifteenPicksHub } from './components/TenFifteenPicksHub';
-import { ManualStockAnalyzer } from './components/ManualStockAnalyzer';
+import { ParabolicRallyDashboard } from './components/ParabolicRallyDashboard';
 import { UserTradeTracker } from './components/UserTradeTracker';
 import { SectorStrengthDashboard } from './components/SectorStrengthDashboard';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
@@ -212,8 +212,8 @@ export default function App() {
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
 
-  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'stock_analyzer', 'user_tracker', or 'sector_strength')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'stock_analyzer' | 'user_tracker' | 'sector_strength'>('gann');
+  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'parabolic_rally', 'user_tracker', or 'sector_strength')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -1193,16 +1193,17 @@ export default function App() {
             onFetchAll={handleFetchAllDhan}
             isBulkLoading={isBulkLoading}
           />
-        ) : activeDashboardTab === 'stock_analyzer' ? (
-          /* Dedicated Manual Stock Analyzer & Gann Calculator Hub */
-          <ManualStockAnalyzer
+        ) : activeDashboardTab === 'parabolic_rally' ? (
+          /* Dedicated 15-Minute Parabolic Rally & Breakdown Probability Engine */
+          <ParabolicRallyDashboard
             stocks={stocks}
             credentials={credentials}
             onFetchSingleStock={handleFetchSingleDhan}
-            onUpdateStockInMaster={handleAddOrEditManualStock}
+            onFetchAllStocks={handleFetchAllDhan}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
-            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
             onOpenSettings={() => setIsDhanGateOpen(true)}
+            isLoading={isBulkLoading}
           />
         ) : activeDashboardTab === 'user_tracker' ? (
           /* Dedicated User Trade & Option Tracker with 5-Min Dhan Refresh */
