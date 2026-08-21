@@ -23,7 +23,9 @@ import {
   Award,
   ArrowUpRight,
   ArrowDownRight,
-  PieChart
+  PieChart,
+  ArrowUpDown,
+  Calendar
 } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials } from '../types';
 import {
@@ -54,6 +56,8 @@ type ViewFilter =
   | 'EARLY_1_3_MIN'
   | 'EXHAUSTION';
 
+type SortOption = 'SCORE_DESC' | 'TIME_NEWEST' | 'GAIN_DESC' | 'SYMBOL_ASC';
+
 export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = ({
   stocks,
   credentials,
@@ -68,6 +72,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   const [activeFilter, setActiveFilter] = useState<ViewFilter>('FULLY_BULLISH');
   const [selectedSector, setSelectedSector] = useState<string>('ALL');
   const [minScoreFilter, setMinScoreFilter] = useState<number>(0);
+  const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
+  const [timeWindowFilter, setTimeWindowFilter] = useState<string>('ALL');
   const [inspectedStock, setInspectedStock] = useState<ParabolicRallyAnalysis | null>(null);
   const [chartStock, setChartStock] = useState<StockCalculated | null>(null);
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
@@ -118,46 +124,69 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
   // Filtered analyses
   const filteredAnalyses = useMemo(() => {
-    return analyses.filter((a) => {
-      // Search
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesSym = a.stock.symbol.toLowerCase().includes(q);
-        const matchesComp = a.stock.companyName.toLowerCase().includes(q);
-        const matchesSec = a.sectorName.toLowerCase().includes(q);
-        if (!matchesSym && !matchesComp && !matchesSec) return false;
-      }
+    return analyses
+      .filter((a) => {
+        // Search
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchesSym = a.stock.symbol.toLowerCase().includes(q);
+          const matchesComp = a.stock.companyName.toLowerCase().includes(q);
+          const matchesSec = a.sectorName.toLowerCase().includes(q);
+          if (!matchesSym && !matchesComp && !matchesSec) return false;
+        }
 
-      // Sector
-      if (selectedSector !== 'ALL' && a.sectorName !== selectedSector) {
-        return false;
-      }
+        // Sector
+        if (selectedSector !== 'ALL' && a.sectorName !== selectedSector) {
+          return false;
+        }
 
-      // Score filter
-      if (a.score < minScoreFilter) {
-        return false;
-      }
+        // Score filter
+        if (a.score < minScoreFilter) {
+          return false;
+        }
 
-      // View Filter
-      switch (activeFilter) {
-        case 'FULLY_BULLISH':
-          return a.isFullyBullish;
-        case 'FULLY_BEARISH':
-          return a.isFullyBearish;
-        case 'CONFIRMED_BULLISH':
-          return a.stage === 'BULLISH_CONFIRMED';
-        case 'CONFIRMED_BEARISH':
-          return a.stage === 'BEARISH_CONFIRMED';
-        case 'EARLY_1_3_MIN':
-          return a.stage === 'BULLISH_EARLY' || a.stage === 'BEARISH_EARLY';
-        case 'EXHAUSTION':
-          return a.stage === 'EXHAUSTION';
-        case 'ALL':
-        default:
-          return true;
-      }
-    }).sort((a, b) => b.score - a.score || (b.stock.pctChange || 0) - (a.stock.pctChange || 0));
-  }, [analyses, searchQuery, selectedSector, minScoreFilter, activeFilter]);
+        // Time Window Filter
+        if (timeWindowFilter !== 'ALL') {
+          const slot = a.timing.candleTimeSlot;
+          if (timeWindowFilter === 'OPENING' && !slot.startsWith('09:')) return false;
+          if (timeWindowFilter === 'MORNING' && (!slot.startsWith('10:') && !slot.startsWith('11:'))) return false;
+          if (timeWindowFilter === 'MIDDAY' && (!slot.startsWith('11:') && !slot.startsWith('12:') && !slot.startsWith('01:'))) return false;
+          if (timeWindowFilter === 'AFTERNOON' && (!slot.startsWith('01:') && !slot.startsWith('02:') && !slot.startsWith('03:'))) return false;
+        }
+
+        // View Filter
+        switch (activeFilter) {
+          case 'FULLY_BULLISH':
+            return a.isFullyBullish;
+          case 'FULLY_BEARISH':
+            return a.isFullyBearish;
+          case 'CONFIRMED_BULLISH':
+            return a.stage === 'BULLISH_CONFIRMED';
+          case 'CONFIRMED_BEARISH':
+            return a.stage === 'BEARISH_CONFIRMED';
+          case 'EARLY_1_3_MIN':
+            return a.stage === 'BULLISH_EARLY' || a.stage === 'BEARISH_EARLY';
+          case 'EXHAUSTION':
+            return a.stage === 'EXHAUSTION';
+          case 'ALL':
+          default:
+            return true;
+        }
+      })
+      .sort((a, b) => {
+        if (sortBy === 'TIME_NEWEST') {
+          return (b.timing.rulePassedMinutes - a.timing.rulePassedMinutes) || (b.score - a.score);
+        }
+        if (sortBy === 'GAIN_DESC') {
+          return (b.stock.pctChange || 0) - (a.stock.pctChange || 0);
+        }
+        if (sortBy === 'SYMBOL_ASC') {
+          return a.stock.symbol.localeCompare(b.stock.symbol);
+        }
+        // Default: SCORE_DESC
+        return (b.score - a.score) || ((b.stock.pctChange || 0) - (a.stock.pctChange || 0));
+      });
+  }, [analyses, searchQuery, selectedSector, minScoreFilter, timeWindowFilter, activeFilter, sortBy]);
 
   const handleRefreshAll = async () => {
     setIsRefreshingAll(true);
@@ -391,14 +420,14 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
       </div>
 
       {/* 🔍 Controls & Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 flex-1">
           {/* Search Input */}
-          <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search symbol, company, or sector..."
+              placeholder="Search symbol, sector..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
@@ -433,17 +462,49 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
           {/* Min Score Filter Slider / Select */}
           <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
             <Sliders className="w-3.5 h-3.5 text-slate-600" />
-            <span className="text-xs text-slate-600 font-medium">Min Score:</span>
+            <span className="text-xs text-slate-600 font-medium">Score:</span>
             <select
               value={minScoreFilter}
               onChange={(e) => setMinScoreFilter(Number(e.target.value))}
               className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
             >
-              <option value={0}>Any Score (0+)</option>
-              <option value={6}>Early Bias (6+)</option>
+              <option value={0}>Any (0+)</option>
+              <option value={6}>Early (6+)</option>
               <option value={9}>Confirmed (9+)</option>
-              <option value={12}>🔥 Fully Parabolic (12+)</option>
-              <option value={14}>Elite Confluence (14+)</option>
+              <option value={12}>🔥 Parabolic (12+)</option>
+            </select>
+          </div>
+
+          {/* Signal Time Window Filter */}
+          <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+            <Clock className="w-3.5 h-3.5 text-blue-600" />
+            <span className="text-xs text-slate-600 font-medium">Window:</span>
+            <select
+              value={timeWindowFilter}
+              onChange={(e) => setTimeWindowFilter(e.target.value)}
+              className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+            >
+              <option value="ALL">All Day (09:15–03:30)</option>
+              <option value="OPENING">09:15–10:00 AM (Opening)</option>
+              <option value="MORNING">10:00–11:30 AM (Morning)</option>
+              <option value="MIDDAY">11:30 AM–01:30 PM (Midday)</option>
+              <option value="AFTERNOON">01:30–03:30 PM (Close)</option>
+            </select>
+          </div>
+
+          {/* Sort By Selector */}
+          <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+            <ArrowUpDown className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="text-xs text-slate-600 font-medium">Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+            >
+              <option value="SCORE_DESC">Highest Score</option>
+              <option value="TIME_NEWEST">🕒 Newest Signal Time</option>
+              <option value="GAIN_DESC">Highest % Change</option>
+              <option value="SYMBOL_ASC">Alphabetical (A-Z)</option>
             </select>
           </div>
         </div>
@@ -451,14 +512,15 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
         {/* View Switcher & Clear */}
         <div className="flex items-center space-x-2 shrink-0">
           <button
-            onClick={() => setActiveFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeFilter === 'ALL'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 bg-slate-100'
-            }`}
+            onClick={() => {
+              setActiveFilter('ALL');
+              setSelectedSector('ALL');
+              setMinScoreFilter(0);
+              setTimeWindowFilter('ALL');
+            }}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 transition-all cursor-pointer"
           >
-            Show All ({analyses.length})
+            Reset
           </button>
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
             <button
@@ -573,6 +635,40 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                         )}
                         <span>{item.stageLabel}</span>
                       </span>
+                    </div>
+                  </div>
+
+                  {/* 🕒 EXACT SIGNAL TRIGGER TIME BADGE */}
+                  <div className="bg-gradient-to-r from-indigo-50 via-slate-50 to-indigo-50/60 p-2.5 rounded-xl border border-indigo-100 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 bg-indigo-600 text-white rounded-md shadow-2xs">
+                        <Clock className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                          <span>Signal Met:</span>
+                          <span className="text-indigo-700 font-black text-xs">{item.timing.timeStr}</span>
+                          {item.timing.isFresh && (
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium">
+                          15m Bar: {item.timing.candleTimeSlot}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                        item.timing.isFresh
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-slate-200/80 text-slate-700 border-slate-300'
+                      }`}>
+                        {item.timing.recencyLabel}
+                      </span>
+                      <div className="text-[9px] text-indigo-700 font-bold mt-0.5">
+                        {item.timing.intraCandleTime}
+                      </div>
                     </div>
                   </div>
 
@@ -712,8 +808,9 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-4 py-3">Symbol &amp; Company</th>
+                  <th className="px-3 py-3">🕒 Signal Met Time</th>
                   <th className="px-3 py-3">LTP &amp; % Chg</th>
-                  <th className="px-3 py-3">15m Confluence Score</th>
+                  <th className="px-3 py-3">15m Confluence</th>
                   <th className="px-3 py-3">Stage &amp; Verdict</th>
                   <th className="px-3 py-3">VWAP Spread</th>
                   <th className="px-3 py-3">ORB Status</th>
@@ -743,6 +840,23 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                         <div className="font-black text-slate-900">{item.stock.symbol}</div>
                         <div className="text-[10px] text-slate-500 truncate max-w-[150px]">
                           {item.stock.companyName}
+                        </div>
+                      </td>
+                      {/* Signal Met Time Column */}
+                      <td className="px-3 py-3">
+                        <div className="flex items-center space-x-1.5">
+                          <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span className="font-black text-slate-900 text-xs">{item.timing.timeStr}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${
+                            item.timing.isFresh
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300 font-black'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}>
+                            {item.timing.recencyLabel}
+                          </span>
+                          <span className="text-[9px] text-slate-400">({item.timing.candleTimeSlot})</span>
                         </div>
                       </td>
                       <td className="px-3 py-3">
@@ -862,6 +976,36 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
             {/* Modal Content */}
             <div className="p-5 overflow-y-auto space-y-4 flex-1">
+              {/* EXACT SIGNAL TRIGGER TIMING BANNER */}
+              <div className="p-3.5 bg-gradient-to-r from-indigo-50 via-slate-50 to-indigo-50/70 border border-indigo-200/80 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-600 text-white rounded-lg shadow-sm">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-black text-indigo-950 text-sm flex items-center gap-2">
+                      <span>Signal Trigger Time: {inspectedStock.timing.timeStr}</span>
+                      <span className={`text-[10px] font-black px-2 py-0.2 rounded-full border ${
+                        inspectedStock.timing.isFresh
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-slate-200 text-slate-700 border-slate-300'
+                      }`}>
+                        {inspectedStock.timing.recencyLabel}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-indigo-700 font-semibold mt-0.5">
+                      15m Candle Window: {inspectedStock.timing.candleTimeSlot} • Intra-Candle Trigger: {inspectedStock.timing.intraCandleTime}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[10px] font-bold uppercase bg-white border border-indigo-200 px-2.5 py-1 rounded-full text-indigo-900 shadow-2xs">
+                    Phase: {inspectedStock.intraCandlePhase.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </div>
+
               {/* Score Header */}
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
                 <div>
@@ -889,7 +1033,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               {/* 12 Checklist Rules */}
               <div className="space-y-2">
                 <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between">
-                  <span>12-Point Probability Verification</span>
+                  <span>12-Point Probability Verification with Trigger Timestamps</span>
                   <span className="text-[11px] text-slate-500 font-normal">
                     {inspectedStock.checks.filter((c) => c.passed).length} of 12 Passed
                   </span>
@@ -903,21 +1047,32 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                         check.passed ? 'bg-emerald-50/20' : 'bg-slate-50/40 opacity-70'
                       }`}
                     >
-                      <div className="flex items-start space-x-2.5">
+                      <div className="flex items-start space-x-2.5 flex-1">
                         {check.passed ? (
                           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                         ) : (
                           <XCircle className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                         )}
-                        <div>
-                          <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                        <div className="flex-1">
+                          <div className="text-xs font-bold text-slate-900 flex items-center gap-2 flex-wrap">
                             <span>{check.name}</span>
                             <span className="text-[10px] text-slate-500 font-normal">
                               ({check.actualValue})
                             </span>
+                            {check.passed && check.passedTime && check.passedTime !== 'Not Met' && (
+                              <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200 flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5" />
+                                {check.passedTime}
+                              </span>
+                            )}
                           </div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            {check.detail}
+                          <div className="text-[11px] text-slate-500 mt-0.5 flex items-center justify-between">
+                            <span>{check.detail}</span>
+                            {check.passed && check.passedPhase && (
+                              <span className="text-[10px] text-slate-400 font-medium italic">
+                                {check.passedPhase}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>

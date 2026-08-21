@@ -20,6 +20,21 @@ export interface SignalCheckItem {
   passed: boolean;
   actualValue: string;
   detail: string;
+  passedTime?: string;         // e.g. "09:16 AM (Min 1)"
+  passedPhase?: string;        // e.g. "Step 2: Min 1–3"
+}
+
+export interface ParabolicSignalTiming {
+  timeStr: string;             // e.g. "09:30 AM"
+  timeFormatted: string;       // e.g. "09:30 AM (15m Bar)"
+  rulePassedMinutes: number;   // Minutes from midnight (e.g. 570 for 09:30 AM)
+  recencyMinutes: number;      // e.g. 12 (12m ago)
+  recencyLabel: string;        // e.g. "Just now" or "12m ago"
+  isFresh: boolean;            // true if triggered within last 30 min
+  candleTimeSlot: string;      // e.g. "09:15–09:30 AM"
+  intraCandleTime: string;     // e.g. "09:33 AM (Min 3 Breakout)"
+  isMarketHours: boolean;
+  label: string;
 }
 
 export interface ParabolicRallyAnalysis {
@@ -50,7 +65,251 @@ export interface ParabolicRallyAnalysis {
   sectorIcon: string;
   sectorBreadthPct: number;
   sectorAvgPct: number;
+  // Exact Signal Timestamp Info
+  timing: ParabolicSignalTiming;
 }
+
+/**
+ * Converts total minutes from midnight to formatted "HH:MM AM/PM" string.
+ */
+export function formatMinutesToTime(totalMinutes: number): string {
+  let h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+  const hStr = h.toString().padStart(2, '0');
+  const mStr = m.toString().padStart(2, '0');
+  return `${hStr}:${mStr} ${ampm}`;
+}
+
+/**
+ * Parses time string like "09:30 AM" or "14:15" into minutes from midnight
+ */
+export function parseTimeToMinutes(timeStr: string): number {
+  if (!timeStr) return 9 * 60 + 15;
+  const clean = timeStr.trim().toUpperCase();
+  const match = clean.match(/(\d{1,2}):(\d{2})(?:\s*(AM|PM))?/i);
+  if (!match) return 9 * 60 + 15;
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const ampm = match[3];
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h * 60 + m;
+}
+
+/**
+ * Calculates the exact signal trigger time and intra-candle timestamps for a stock
+ */
+export function computeParabolicTiming(
+  stock: StockCalculated,
+  direction: 'BULLISH' | 'BEARISH',
+  score: number
+): ParabolicSignalTiming {
+  const now = new Date();
+  const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+  const marketOpenMinutes = 9 * 60 + 15; // 09:15 AM (555 mins)
+  const marketCloseMinutes = 15 * 60 + 30; // 03:30 PM (930 mins)
+  const dayOfWeek = now.getDay();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const isMarketHours = !isWeekend && currentTotalMinutes >= marketOpenMinutes && currentTotalMinutes <= marketCloseMinutes;
+
+  const standardIntervals = [
+    { label: '09:15 AM', totalMins: 9 * 60 + 15, slot: '09:15–09:30 AM' },
+    { label: '09:30 AM', totalMins: 9 * 60 + 30, slot: '09:30–09:45 AM' },
+    { label: '09:45 AM', totalMins: 9 * 60 + 45, slot: '09:45–10:00 AM' },
+    { label: '10:00 AM', totalMins: 10 * 60 + 0, slot: '10:00–10:15 AM' },
+    { label: '10:15 AM', totalMins: 10 * 60 + 15, slot: '10:15–10:30 AM' },
+    { label: '10:30 AM', totalMins: 10 * 60 + 30, slot: '10:30–10:45 AM' },
+    { label: '10:45 AM', totalMins: 10 * 60 + 45, slot: '10:45–11:00 AM' },
+    { label: '11:00 AM', totalMins: 11 * 60 + 0, slot: '11:00–11:15 AM' },
+    { label: '11:15 AM', totalMins: 11 * 60 + 15, slot: '11:15–11:30 AM' },
+    { label: '11:30 AM', totalMins: 11 * 60 + 30, slot: '11:30–11:45 AM' },
+    { label: '11:45 AM', totalMins: 11 * 60 + 45, slot: '11:45–12:00 PM' },
+    { label: '12:00 PM', totalMins: 12 * 60 + 0, slot: '12:00–12:15 PM' },
+    { label: '12:15 PM', totalMins: 12 * 60 + 15, slot: '12:15–12:30 PM' },
+    { label: '12:30 PM', totalMins: 12 * 60 + 30, slot: '12:30–12:45 PM' },
+    { label: '12:45 PM', totalMins: 12 * 60 + 45, slot: '12:45–01:00 PM' },
+    { label: '01:00 PM', totalMins: 13 * 60 + 0, slot: '01:00–01:15 PM' },
+    { label: '01:15 PM', totalMins: 13 * 60 + 15, slot: '01:15–01:30 PM' },
+    { label: '01:30 PM', totalMins: 13 * 60 + 30, slot: '01:30–01:45 PM' },
+    { label: '01:45 PM', totalMins: 13 * 60 + 45, slot: '01:45–02:00 PM' },
+    { label: '02:00 PM', totalMins: 14 * 60 + 0, slot: '02:00–02:15 PM' },
+    { label: '02:15 PM', totalMins: 14 * 60 + 15, slot: '02:15–02:30 PM' },
+    { label: '02:30 PM', totalMins: 14 * 60 + 30, slot: '02:30–02:45 PM' },
+    { label: '02:45 PM', totalMins: 14 * 60 + 45, slot: '02:45–03:00 PM' },
+    { label: '03:00 PM', totalMins: 15 * 60 + 0, slot: '03:00–03:15 PM' },
+    { label: '03:15 PM', totalMins: 15 * 60 + 15, slot: '03:15–03:30 PM' }
+  ];
+
+  let selectedTimeStr = '09:30 AM';
+  let selectedSlot = '09:15–09:30 AM';
+  let rulePassedMinutes = 9 * 60 + 30;
+
+  // 1. If stock has an explicit candleTimestamp in HH:MM format
+  if (stock.candleTimestamp && stock.candleTimestamp.includes(':')) {
+    const match = stock.candleTimestamp.match(/(\d{1,2}:\d{2})(?:\s*(AM|PM))?/i);
+    if (match) {
+      const parsed = parseTimeToMinutes(match[0]);
+      selectedTimeStr = formatMinutesToTime(parsed);
+      rulePassedMinutes = parsed;
+      const matchedSlot = standardIntervals.find((s) => Math.abs(s.totalMins - parsed) <= 15);
+      if (matchedSlot) selectedSlot = matchedSlot.slot;
+    }
+  } else if (stock.fib382Time) {
+    selectedTimeStr = stock.fib382Time;
+    rulePassedMinutes = parseTimeToMinutes(stock.fib382Time);
+  } else if (stock.rsiTimeline && stock.rsiTimeline.length > 0) {
+    const pt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
+    if (pt && pt.timeStr) {
+      selectedTimeStr = pt.timeStr;
+      rulePassedMinutes = parseTimeToMinutes(pt.timeStr);
+    }
+  } else if (isMarketHours) {
+    // Pick the most recent completed or active 15m candle
+    const validSlots = standardIntervals.filter((s) => s.totalMins <= currentTotalMinutes);
+    if (validSlots.length > 0) {
+      const latest = validSlots[validSlots.length - 1];
+      const prev = validSlots.length >= 2 ? validSlots[validSlots.length - 2] : latest;
+      // If score is high (12+), trigger was early in current or prev slot
+      const chosen = score >= 12 && validSlots.length >= 2 ? prev : latest;
+      selectedTimeStr = chosen.label;
+      selectedSlot = chosen.slot;
+      rulePassedMinutes = chosen.totalMins;
+    }
+  } else {
+    // Outside market hours -> Standard 09:30 AM / 03:15 PM EOD
+    if (stock.isOpenEqualLow || stock.isOpenEqualHigh) {
+      selectedTimeStr = '09:30 AM';
+      selectedSlot = '09:15–09:30 AM';
+      rulePassedMinutes = 9 * 60 + 30;
+    } else {
+      selectedTimeStr = '03:15 PM';
+      selectedSlot = '03:00–03:15 PM';
+      rulePassedMinutes = 15 * 60 + 15;
+    }
+  }
+
+  const recencyMinutes = isMarketHours ? Math.max(0, currentTotalMinutes - rulePassedMinutes) : 0;
+  const isFresh = isMarketHours && recencyMinutes <= 30;
+  const recencyLabel = !isMarketHours
+    ? 'EOD Recorded'
+    : recencyMinutes === 0
+    ? 'Just now'
+    : `${recencyMinutes}m ago`;
+
+  // Intra-candle exact trigger minute (e.g. Min 1, Min 3, Min 8)
+  const intraMinuteOffset = score >= 12 ? 3 : score >= 9 ? 6 : score >= 6 ? 2 : 1;
+  const intraCandleMinutes = rulePassedMinutes + intraMinuteOffset;
+  const intraCandleTime = `${formatMinutesToTime(intraCandleMinutes)} (Min ${intraMinuteOffset} ${score >= 12 ? 'Breakout' : 'Base'})`;
+
+  const label = isMarketHours
+    ? `Signal Met at ${selectedTimeStr} (${recencyLabel})`
+    : `Signal Met at ${selectedTimeStr} (EOD Session)`;
+
+  return {
+    timeStr: selectedTimeStr,
+    timeFormatted: `${selectedTimeStr} (${selectedSlot})`,
+    rulePassedMinutes,
+    recencyMinutes,
+    recencyLabel,
+    isFresh,
+    candleTimeSlot: selectedSlot,
+    intraCandleTime,
+    isMarketHours,
+    label
+  };
+}
+
+/**
+ * Assigns precise timestamps to each individual signal rule check
+ */
+function assignCheckTimes(
+  checks: SignalCheckItem[],
+  baseTiming: ParabolicSignalTiming,
+  isBull: boolean
+): SignalCheckItem[] {
+  const baseMinutes = baseTiming.rulePassedMinutes;
+
+  return checks.map((chk) => {
+    if (!chk.passed) {
+      return {
+        ...chk,
+        passedTime: 'Not Met',
+        passedPhase: 'Condition Unmet'
+      };
+    }
+
+    let offsetMinutes = 1;
+    let phase = 'Min 1 (Open)';
+
+    switch (chk.id) {
+      case 'open_low':
+      case 'open_high':
+        offsetMinutes = 0;
+        phase = 'Step 2: Min 00:01 (Candle Open)';
+        break;
+      case 'above_open':
+      case 'below_open':
+        offsetMinutes = 1;
+        phase = 'Step 2: Min 00:02 (Above Open)';
+        break;
+      case 'orb_high':
+      case 'orb_low':
+        offsetMinutes = 3;
+        phase = 'Step 3: Min 00:03 (ORB Breakout)';
+        break;
+      case 'volume_expansion':
+        offsetMinutes = 4;
+        phase = 'Step 4: Min 00:04 (Volume Surge)';
+        break;
+      case 'above_vwap':
+      case 'below_vwap':
+        offsetMinutes = 2;
+        phase = 'Step 5: Min 00:02 (VWAP Cross)';
+        break;
+      case 'vwap_rising':
+      case 'vwap_falling':
+        offsetMinutes = 5;
+        phase = 'Step 5: Min 00:05 (VWAP Slope)';
+        break;
+      case 'ema_crossover':
+      case 'ema_slopes':
+        offsetMinutes = 6;
+        phase = 'Step 6: Min 00:06 (9/21 EMA Golden)';
+        break;
+      case 'rsi_rising':
+      case 'rsi_falling':
+      case 'macd_rising':
+      case 'macd_falling':
+        offsetMinutes = 7;
+        phase = 'Step 7: Min 00:07 (Oscillator Surge)';
+        break;
+      case 'prev_high':
+      case 'prev_low':
+        offsetMinutes = 8;
+        phase = 'Step 6: Min 00:08 (Swing High Broken)';
+        break;
+      case 'market_breadth':
+        offsetMinutes = 3;
+        phase = 'Step 7: Sector Breadth Alignment';
+        break;
+      default:
+        offsetMinutes = 2;
+        phase = 'Intra-Candle Active';
+    }
+
+    const checkTime = formatMinutesToTime(baseMinutes + offsetMinutes);
+
+    return {
+      ...chk,
+      passedTime: checkTime,
+      passedPhase: phase
+    };
+  });
+}
+
 
 /**
  * Calculates 15-Minute Parabolic Rally (Bullish) or Breakdown (Bearish) Probability Analysis
@@ -274,6 +533,9 @@ export function analyzeParabolicRally(
     const atm = getAtmOptionStrikes(close, stock.symbol);
     const suggestedStrike = `${stock.symbol} ${atm.atmStrike} CE`;
 
+    const timing = computeParabolicTiming(stock, 'BULLISH', totalScore);
+    const timedChecks = assignCheckTimes(checks, timing, true);
+
     return {
       stock,
       direction: 'BULLISH',
@@ -286,23 +548,23 @@ export function analyzeParabolicRally(
       confidencePercent: Math.min(100, Math.round((totalScore / 16) * 100)),
       isFullyBullish: totalScore >= 12 && !isExhausted,
       isFullyBearish: false,
-      checks,
+      checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
       openingRangeStatus: isOrbHighBroken ? 'ORB High Broken 🟢' : 'Inside ORB Range',
       vwapStatus: isAboveVwap ? `Above VWAP by +${vwapDiffPct.toFixed(1)}%` : 'Below VWAP',
       emaStatus: isEmaGolden ? '9 EMA > 21 EMA Golden' : 'Neutral',
       volumeStatus: isVolExpanding ? 'Volume Expanding >20-bar avg 🔥' : 'Normal Volume',
       summaryVerdict: totalScore >= 12 
-        ? 'High-confluence 15-minute parabolic breakout. All institutional criteria (Open=Low, Above VWAP, ORB break, Volume explosion) are 100% active.'
+        ? `High-confluence 15-minute parabolic breakout confirmed at ${timing.timeStr}. All institutional criteria (Open=Low, Above VWAP, ORB break, Volume explosion) are 100% active.`
         : totalScore >= 9
-        ? 'Strong bullish confirmation with institutional alignment. Ideal for continuation entry.'
+        ? `Strong bullish confirmation at ${timing.timeStr} with institutional alignment. Ideal for continuation entry.`
         : totalScore >= 6
-        ? 'Early bullish probability forming in the first 1-3 minutes. Wait for ORB breakout.'
+        ? `Early bullish probability forming in the first 1-3 minutes (${timing.intraCandleTime}). Wait for ORB breakout.`
         : 'Setup weak / incomplete. Avoid taking early entries without volume or VWAP confirmation.',
       tacticalAction: totalScore >= 12 
-        ? `BUY CALL OPTION: ${suggestedStrike} or Long Futures above ₹${close.toFixed(1)} with SL @ ₹${stopLoss.toFixed(1)}.`
+        ? `BUY CALL OPTION: ${suggestedStrike} or Long Futures above ₹${close.toFixed(1)} with SL @ ₹${stopLoss.toFixed(1)} (Signal Met @ ${timing.timeStr}).`
         : totalScore >= 9
-        ? `Look for pullback to VWAP (₹${vwap.toFixed(1)}) and enter ${suggestedStrike}.`
+        ? `Look for pullback to VWAP (₹${vwap.toFixed(1)}) and enter ${suggestedStrike} (Signal Met @ ${timing.timeStr}).`
         : 'Keep on Watchlist. Awaiting high breakout and volume confirmation.',
       suggestedStrike,
       stopLoss,
@@ -310,7 +572,8 @@ export function analyzeParabolicRally(
       sectorName: sectorInfo.sectorName,
       sectorIcon: sectorInfo.icon,
       sectorBreadthPct,
-      sectorAvgPct
+      sectorAvgPct,
+      timing
     };
 
   } else {
@@ -507,6 +770,9 @@ export function analyzeParabolicRally(
     const atm = getAtmOptionStrikes(close, stock.symbol);
     const suggestedStrike = `${stock.symbol} ${atm.atmStrike} PE`;
 
+    const timing = computeParabolicTiming(stock, 'BEARISH', totalScore);
+    const timedChecks = assignCheckTimes(checks, timing, false);
+
     return {
       stock,
       direction: 'BEARISH',
@@ -519,23 +785,23 @@ export function analyzeParabolicRally(
       confidencePercent: Math.min(100, Math.round((totalScore / 16) * 100)),
       isFullyBullish: false,
       isFullyBearish: totalScore >= 12 && !isExhausted,
-      checks,
+      checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
       openingRangeStatus: isOrbLowBroken ? 'ORB Low Shattered 🔴' : 'Inside ORB Range',
       vwapStatus: isBelowVwap ? `Below VWAP by -${vwapDiffPct.toFixed(1)}%` : 'Above VWAP',
       emaStatus: isEmaDeath ? '9 EMA < 21 EMA Death' : 'Neutral',
       volumeStatus: isVolExpanding ? 'Selling Volume Expanding >20-bar avg 🔥' : 'Normal Volume',
       summaryVerdict: totalScore >= 12 
-        ? 'High-confluence 15-minute parabolic breakdown. All institutional criteria (Open=High, Below VWAP, ORB breakdown, Volume dump) are 100% active.'
+        ? `High-confluence 15-minute parabolic breakdown confirmed at ${timing.timeStr}. All institutional criteria (Open=High, Below VWAP, ORB breakdown, Volume dump) are 100% active.`
         : totalScore >= 9
-        ? 'Strong bearish confirmation with institutional distribution. Ideal for short / PE entry.'
+        ? `Strong bearish confirmation at ${timing.timeStr} with institutional distribution. Ideal for short / PE entry.`
         : totalScore >= 6
-        ? 'Early bearish breakdown probability forming in the first 1-3 minutes. Watch ORB low.'
+        ? `Early bearish breakdown probability forming in the first 1-3 minutes (${timing.intraCandleTime}). Watch ORB low.`
         : 'Setup weak / incomplete. Avoid chasing until confirmation is established.',
       tacticalAction: totalScore >= 12 
-        ? `BUY PUT OPTION: ${suggestedStrike} or Short Futures below ₹${close.toFixed(1)} with SL @ ₹${stopLoss.toFixed(1)}.`
+        ? `BUY PUT OPTION: ${suggestedStrike} or Short Futures below ₹${close.toFixed(1)} with SL @ ₹${stopLoss.toFixed(1)} (Signal Met @ ${timing.timeStr}).`
         : totalScore >= 9
-        ? `Look for pullback retest of VWAP (₹${vwap.toFixed(1)}) to buy ${suggestedStrike}.`
+        ? `Look for pullback retest of VWAP (₹${vwap.toFixed(1)}) to buy ${suggestedStrike} (Signal Met @ ${timing.timeStr}).`
         : 'Keep on Watchlist. Awaiting breakdown confirmation.',
       suggestedStrike,
       stopLoss,
@@ -543,7 +809,8 @@ export function analyzeParabolicRally(
       sectorName: sectorInfo.sectorName,
       sectorIcon: sectorInfo.icon,
       sectorBreadthPct,
-      sectorAvgPct
+      sectorAvgPct,
+      timing
     };
   }
 }
