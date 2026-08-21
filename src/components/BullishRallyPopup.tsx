@@ -46,6 +46,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   onOpenPositionSizer
 }) => {
   const [filterDirection, setFilterDirection] = useState<'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY'>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'BREAKOUT' | 'PARABOLIC' | '100_PCT' | 'RALLY_STARTED'>('ALL');
+  const [onlyRecentHits, setOnlyRecentHits] = useState<boolean>(true); // Strictly filter recent hits by default
   const [minAccuracyThreshold, setMinAccuracyThreshold] = useState<number>(80); // 80% or 90%
   const [minConfluences, setMinConfluences] = useState<number>(3); // 3 (Majority) or 4 (Maximum)
   const [maxPicksLimit, setMaxPicksLimit] = useState<number>(5); // Top 3, Top 5 (Default best match), or 0 (All)
@@ -70,9 +72,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const ROTATE_INTERVAL_MS = 5000; // 5 seconds per slide
   const PROGRESS_TICK_MS = 50;
 
-  // Scan stocks whenever stocks or filters change - only show stocks that match most confluences & top elite picks
+  // Scan stocks whenever stocks or filters change - only show stocks that just hit qualifying triggers
   useEffect(() => {
-    const rawDetected = getAllRallySignals(stocks, filterDirection, sortPreference, minConfluences, 0, safeOnly);
+    const rawDetected = getAllRallySignals(
+      stocks, 
+      filterDirection, 
+      sortPreference, 
+      minConfluences, 
+      0, 
+      safeOnly, 
+      categoryFilter, 
+      onlyRecentHits
+    );
     const filtered = rawDetected.filter((s) => s.confidenceScore >= minAccuracyThreshold);
     setTotalQualifiedCount(filtered.length);
 
@@ -81,14 +92,14 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     setRallySignals(curatedSignals);
 
     if (curatedSignals.length > 0) {
-      const currentKeys = new Set(curatedSignals.map((d) => `${d.symbol}_${d.direction}`));
+      const currentKeys = new Set(curatedSignals.map((d) => `${d.symbol}_${d.direction}_${d.triggerType}`));
       let hasNewRally = false;
       let newDirection: RallyDirection = 'BULLISH';
 
       for (const key of currentKeys) {
         if (!previousRallySymbolsRef.current.has(key)) {
           hasNewRally = true;
-          const found = curatedSignals.find((d) => `${d.symbol}_${d.direction}` === key);
+          const found = curatedSignals.find((d) => `${d.symbol}_${d.direction}_${d.triggerType}` === key);
           if (found) newDirection = found.direction;
           break;
         }
@@ -112,7 +123,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     if (currentIndex >= curatedSignals.length) {
       setCurrentIndex(0);
     }
-  }, [stocks, filterDirection, minAccuracyThreshold, minConfluences, maxPicksLimit, safeOnly, sortPreference, soundEnabled]);
+  }, [stocks, filterDirection, categoryFilter, onlyRecentHits, minAccuracyThreshold, minConfluences, maxPicksLimit, safeOnly, sortPreference, soundEnabled]);
 
   const handleNextSlide = useCallback(() => {
     if (rallySignals.length <= 1) return;
@@ -222,6 +233,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <span className={`px-1.5 py-0.2 rounded text-[10px] ${isBull ? 'bg-emerald-500/30 text-white' : 'bg-rose-500/30 text-white'}`}>
                   {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
                 </span>
+                <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-black border ${currentRally.triggerColorClass}`}>
+                  {currentRally.triggerBadge}
+                </span>
                 {currentIndex === 0 ? (
                   <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold">
                     👑 #1 BEST
@@ -231,10 +245,6 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     ⭐ #{currentIndex + 1}
                   </span>
                 )}
-                <span className="bg-purple-400/20 text-purple-200 border border-purple-400/30 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
-                  <ShieldCheck className="w-2.5 h-2.5 text-purple-300" />
-                  {currentRally.confluenceRatio}
-                </span>
                 <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5 border ${
                   currentRally.isFresh 
                     ? 'bg-amber-400/20 text-yellow-200 border-amber-400/40 animate-pulse' 
@@ -247,8 +257,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               
               {rallySignals.length > 1 && (
                 <div className="text-[10px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
-                  <span>Top Setups ({currentIndex + 1}/{rallySignals.length})</span>
-                  <span className="text-[9px] text-slate-400">• Best Match ({currentRally.confluenceRatio})</span>
+                  <span>Recent Hits ({currentIndex + 1}/{rallySignals.length})</span>
+                  <span className="text-[9px] text-slate-400">• {currentRally.rallyType}</span>
                 </div>
               )}
             </div>
@@ -421,111 +431,138 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         </div>
 
         {/* Filter & Strictness Quick Bar */}
-        <div className="bg-slate-950/80 px-3 py-1.5 flex items-center justify-between border-b border-slate-800 text-[10px] flex-wrap gap-1">
-          <div className="flex items-center space-x-1 text-slate-400">
-            <Filter className="w-3 h-3 text-slate-400" />
-            <span>Filter:</span>
-            <button
-              onClick={() => { setFilterDirection('ALL'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold transition-colors ${filterDirection === 'ALL' ? 'bg-slate-700 text-white' : 'hover:text-slate-200'}`}
-            >
-              All ({rallySignals.length})
-            </button>
-            <button
-              onClick={() => { setFilterDirection('BULLISH_ONLY'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold transition-colors ${filterDirection === 'BULLISH_ONLY' ? 'bg-emerald-900/80 text-emerald-300' : 'hover:text-emerald-300'}`}
-            >
-              🟢 Bullish
-            </button>
-            <button
-              onClick={() => { setFilterDirection('BEARISH_ONLY'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold transition-colors ${filterDirection === 'BEARISH_ONLY' ? 'bg-rose-900/80 text-rose-300' : 'hover:text-rose-300'}`}
-            >
-              🔴 Bearish
-            </button>
-          </div>
-
-          <div className="flex items-center space-x-1 flex-wrap gap-y-1">
-            {/* Elite Curation Limit (Top 5 Best vs Top 3 Elite vs All) */}
-            <div className="flex items-center bg-slate-900/90 border border-slate-700/80 rounded p-0.5 space-x-0.5">
+        <div className="bg-slate-950/90 px-3 py-1.5 border-b border-slate-800 text-[10px] space-y-1.5">
+          {/* Row 1: Direction & Major Settings */}
+          <div className="flex items-center justify-between flex-wrap gap-1">
+            <div className="flex items-center space-x-1 text-slate-400">
+              <Filter className="w-3 h-3 text-slate-400" />
+              <span>Direction:</span>
               <button
-                onClick={() => { setMaxPicksLimit(3); setCurrentIndex(0); }}
-                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all ${
-                  maxPicksLimit === 3 ? 'bg-amber-400/20 text-yellow-300 shadow-sm' : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Show only top 3 absolute highest quality best confluence stocks"
+                onClick={() => { setFilterDirection('ALL'); setCurrentIndex(0); }}
+                className={`px-1.5 py-0.5 rounded font-semibold transition-colors cursor-pointer ${filterDirection === 'ALL' ? 'bg-slate-700 text-white' : 'hover:text-slate-200'}`}
               >
-                Top 3
+                All ({rallySignals.length})
               </button>
               <button
-                onClick={() => { setMaxPicksLimit(5); setCurrentIndex(0); }}
-                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all ${
-                  maxPicksLimit === 5 ? 'bg-amber-500/30 text-amber-200 shadow-sm' : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Show top 5 best match stocks (Recommended)"
+                onClick={() => { setFilterDirection('BULLISH_ONLY'); setCurrentIndex(0); }}
+                className={`px-1.5 py-0.5 rounded font-semibold transition-colors cursor-pointer ${filterDirection === 'BULLISH_ONLY' ? 'bg-emerald-900/80 text-emerald-300' : 'hover:text-emerald-300'}`}
               >
-                Top 5 (Best)
+                🟢 Bullish
               </button>
               <button
-                onClick={() => { setMaxPicksLimit(0); setCurrentIndex(0); }}
-                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all ${
-                  maxPicksLimit === 0 ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Show all stocks passing confluence threshold"
+                onClick={() => { setFilterDirection('BEARISH_ONLY'); setCurrentIndex(0); }}
+                className={`px-1.5 py-0.5 rounded font-semibold transition-colors cursor-pointer ${filterDirection === 'BEARISH_ONLY' ? 'bg-rose-900/80 text-rose-300' : 'hover:text-rose-300'}`}
               >
-                All ({totalQualifiedCount})
+                🔴 Bearish
               </button>
             </div>
 
-            {/* Confluence Selector Toggle */}
-            <button
-              onClick={() => {
-                setMinConfluences((prev) => (prev === 3 ? 4 : 3));
-                setCurrentIndex(0);
-              }}
-              className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-0.5 ${
-                minConfluences >= 4
-                  ? 'bg-purple-950 text-purple-300 border-purple-500/50 shadow-sm'
-                  : 'bg-slate-800 text-slate-300 border-slate-700'
-              }`}
-              title="Filter by technical confluence depth (3+/6 Majority or 4+/6 Ultra Max)"
-            >
-              <ShieldCheck className="w-2.5 h-2.5 text-purple-300" />
-              <span>{minConfluences >= 4 ? '💎 4+/6 Max' : '🎯 3+/6 Most'}</span>
-            </button>
+            <div className="flex items-center space-x-1 flex-wrap gap-y-1">
+              {/* Only Recent Hits Filter Toggle */}
+              <button
+                onClick={() => {
+                  setOnlyRecentHits((prev) => !prev);
+                  setCurrentIndex(0);
+                }}
+                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-1 cursor-pointer ${
+                  onlyRecentHits
+                    ? 'bg-amber-400/20 text-yellow-300 border-amber-400/60 shadow-sm animate-pulse'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+                title="When ON: Shows only stocks that JUST HIT triggers recently (<30m)"
+              >
+                <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
+                <span>{onlyRecentHits ? '⚡ Recent Hits Only' : 'All Session'}</span>
+              </button>
 
-            {/* Anti-Trap Safe-Only Filter */}
-            <button
-              onClick={() => {
-                setSafeOnly((prev) => !prev);
-                setCurrentIndex(0);
-              }}
-              className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-1 ${
-                safeOnly
-                  ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50 shadow-sm'
-                  : 'bg-slate-800 text-slate-400 border-slate-700'
-              }`}
-              title="Filter out overextended trap setups (stocks that moved too far from VWAP)"
-            >
-              <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
-              <span>{safeOnly ? '🛡️ Safe Only' : 'All Traps Incl.'}</span>
-            </button>
+              {/* Anti-Trap Safe-Only Filter */}
+              <button
+                onClick={() => {
+                  setSafeOnly((prev) => !prev);
+                  setCurrentIndex(0);
+                }}
+                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-1 cursor-pointer ${
+                  safeOnly
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50 shadow-sm'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}
+                title="Filter out overextended trap setups"
+              >
+                <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                <span>{safeOnly ? '🛡️ Safe Only' : 'All'}</span>
+              </button>
 
-            {/* Sort Mode Toggle (Recency vs Accuracy) */}
+              {/* Sort Mode Toggle */}
+              <button
+                onClick={() => {
+                  setSortPreference((prev) => (prev === 'RECENCY_FIRST' ? 'ACCURACY_FIRST' : 'RECENCY_FIRST'));
+                  setCurrentIndex(0);
+                }}
+                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-1 cursor-pointer ${
+                  sortPreference === 'RECENCY_FIRST'
+                    ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50 shadow-sm'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}
+                title="Intelligent Intraday Sorting: Prioritize stocks that passed closest to refresh time"
+              >
+                <Clock className="w-2.5 h-2.5 text-cyan-400" />
+                <span>{sortPreference === 'RECENCY_FIRST' ? '⚡ Freshest' : '★ Score'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: Trigger Category Filters */}
+          <div className="flex items-center space-x-1 pt-1 border-t border-slate-800/80 overflow-x-auto no-scrollbar pb-0.5">
+            <span className="text-slate-400 shrink-0 font-medium">Trigger:</span>
             <button
-              onClick={() => {
-                setSortPreference((prev) => (prev === 'RECENCY_FIRST' ? 'ACCURACY_FIRST' : 'RECENCY_FIRST'));
-                setCurrentIndex(0);
-              }}
-              className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-1 ${
-                sortPreference === 'RECENCY_FIRST'
-                  ? 'bg-cyan-950 text-cyan-300 border-cyan-500/50 shadow-sm'
-                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              onClick={() => { setCategoryFilter('ALL'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'ALL'
+                  ? 'bg-slate-700 text-white shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-slate-200'
               }`}
-              title="Intelligent Intraday Sorting: Prioritize stocks that passed closest to refresh time"
             >
-              <Zap className="w-2.5 h-2.5 text-cyan-400" />
-              <span>{sortPreference === 'RECENCY_FIRST' ? '⚡ Freshest' : '★ Score'}</span>
+              ⚡ All Hits
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('BREAKOUT'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'BREAKOUT'
+                  ? 'bg-amber-500/30 text-yellow-300 border border-amber-400/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-yellow-300'
+              }`}
+            >
+              💥 Breakouts
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('PARABOLIC'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'PARABOLIC'
+                  ? 'bg-teal-500/30 text-teal-300 border border-teal-400/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-teal-300'
+              }`}
+            >
+              🚀 Parabolic Rally
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('100_PCT'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === '100_PCT'
+                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-emerald-300'
+              }`}
+            >
+              🟢 100% Moves
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('RALLY_STARTED'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'RALLY_STARTED'
+                  ? 'bg-blue-500/30 text-blue-300 border border-blue-400/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-blue-300'
+              }`}
+            >
+              📈 Rally Started
             </button>
           </div>
         </div>
@@ -607,13 +644,13 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           <div className="p-3 max-h-72 overflow-y-auto space-y-1.5 bg-slate-950/95">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1">
               <span className="flex items-center gap-1.5">
-                <span>Top Setups ({rallySignals.length}{totalQualifiedCount > rallySignals.length ? ` of ${totalQualifiedCount}` : ''})</span>
+                <span>Recent Hits ({rallySignals.length}{totalQualifiedCount > rallySignals.length ? ` of ${totalQualifiedCount}` : ''})</span>
                 <span className="text-[9px] text-purple-300 bg-purple-950/80 border border-purple-800/60 px-1.5 py-0.2 rounded font-mono">
                   {minConfluences}+ of 6 Confluences
                 </span>
-                {sortPreference === 'RECENCY_FIRST' && (
-                  <span className="text-[9.5px] text-cyan-300 font-normal bg-cyan-950/80 border border-cyan-800/60 px-1.5 py-0.2 rounded">
-                    Freshest first
+                {onlyRecentHits && (
+                  <span className="text-[9.5px] text-amber-300 font-normal bg-amber-950/80 border border-amber-800/60 px-1.5 py-0.2 rounded">
+                    ⚡ Just Hit &lt;30m
                   </span>
                 )}
               </span>
@@ -646,6 +683,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
                         <span>{signal.symbol}</span>
                         <span className="text-[10px] text-slate-400 font-normal">₹{signal.currentPrice.toFixed(1)}</span>
+                        <span className={`px-1 py-0.2 rounded text-[8.5px] font-mono font-black border ${signal.triggerColorClass}`}>
+                          {signal.triggerBadge}
+                        </span>
                         {idx === 0 ? (
                           <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
                             👑 #1 BEST
@@ -655,10 +695,6 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                             #{idx + 1}
                           </span>
                         )}
-                        <span className="bg-purple-400/20 text-purple-200 border border-purple-400/30 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
-                          <ShieldCheck className="w-2 h-2 text-purple-300" />
-                          {signal.confluenceRatio}
-                        </span>
                         {signal.isFresh && (
                           <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
                             <Zap className="w-2 h-2 fill-current" />
@@ -666,8 +702,13 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                           </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-[170px]">
-                        {signal.rallyType}
+                      <div className="text-[10px] text-slate-400 truncate max-w-[170px] flex items-center gap-1">
+                        <span>{signal.rallyType}</span>
+                        {signal.parabolicScore && (
+                          <span className="text-[9px] text-teal-300 font-mono font-bold">
+                            • Parabolic {signal.parabolicScore}/16
+                          </span>
+                        )}
                       </div>
                       <div className="text-[9px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
                         <Clock className="w-2.5 h-2.5 text-cyan-400" />
@@ -697,6 +738,11 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                    {/* Trigger Event Badge */}
+                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono border shadow-sm flex items-center gap-1 ${currentRally.triggerColorClass}`}>
+                      {currentRally.triggerBadge}
+                    </span>
+
                     {currentIndex === 0 ? (
                       <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/50 text-[10px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1 shadow-sm">
                         👑 #1 Best Confluence Match
@@ -716,10 +762,14 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     }`}>
                       {currentRally.confidenceBadge}
                     </span>
-                    <span className="bg-purple-950/90 text-purple-200 border border-purple-500/40 text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1">
-                      <ShieldCheck className="w-2.5 h-2.5 text-purple-300" />
-                      {currentRally.confluenceRatio} Confluences Matched
-                    </span>
+                    
+                    {currentRally.parabolicScore && (
+                      <span className="bg-teal-950/90 text-teal-300 border border-teal-500/50 text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1">
+                        <Flame className="w-2.5 h-2.5 text-teal-300" />
+                        Parabolic {currentRally.parabolicScore}/16
+                      </span>
+                    )}
+
                     <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 border ${
                       currentRally.isFresh
                         ? 'bg-amber-950/90 text-yellow-300 border-amber-500/50 shadow-sm animate-pulse'
@@ -762,8 +812,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               {/* Exact Timing Analysis Banner */}
               <div className="mt-2 bg-slate-900/95 border border-slate-700/80 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-[10.5px]">
                 <div className="flex items-center space-x-1.5">
-                  <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span className="text-slate-300 font-medium">Exact Rule Passed Timing:</span>
+                  <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                  <span className="text-slate-300 font-medium">Just Hit At:</span>
                   <span className="font-mono font-bold text-cyan-300">{currentRally.rulePassedTime}</span>
                   {currentRally.isMarketHours && (
                     <span className="text-[9.5px] text-amber-300 font-mono font-bold">
@@ -773,7 +823,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 </div>
                 <span className="text-[9px] text-purple-300 font-mono flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3 text-purple-400" />
-                  {currentRally.confluenceRatio} Confluences Matched
+                  {currentRally.confluenceRatio} Confluences
                 </span>
               </div>
             </div>

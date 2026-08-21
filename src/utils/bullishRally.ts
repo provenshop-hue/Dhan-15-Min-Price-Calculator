@@ -3,8 +3,18 @@ import { is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishS
 import { isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirst15mCandle } from './gann';
 import { analyzeBullishCombinations } from './bullishCombinations';
 import { getExactNseStrikeStep, roundToExactNseStrike, formatStrikePrice } from './nseStrikeMaster';
+import { analyzeParabolicRally, ParabolicRallyAnalysis } from './parabolicRallyEngine';
 
 export type RallyDirection = 'BULLISH' | 'BEARISH';
+
+export type PopunderTriggerType =
+  | 'BREAKOUT_JUST_HIT'
+  | 'PARABOLIC_BULLISH_RALLY_STARTED'
+  | 'PARABOLIC_BEARISH_RALLY_STARTED'
+  | 'ONE_HUNDRED_PCT_BULLISH'
+  | 'ONE_HUNDRED_PCT_BEARISH'
+  | 'BULLISH_RALLY_STARTED'
+  | 'BEARISH_RALLY_STARTED';
 
 export interface HighAccuracyTradePlan {
   action: 'BUY (Cash/Futures)' | 'SELL (Short Futures)';
@@ -31,6 +41,12 @@ export interface RallySignal {
   openPrice: number;
   pctChange: number;
   rallyType: string;
+  triggerType: PopunderTriggerType;
+  triggerBadge: string;
+  triggerColorClass: string;
+  isJustHit: boolean; // True if this signal was just hit recently
+  parabolicScore?: number;
+  parabolicStage?: string;
   confidenceScore: number; // 75 - 98%
   confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT';
   reason: string;
@@ -407,6 +423,12 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   const isAbove15m = isAboveFirst15mCandle(stock);
   const isAboveBuyLevel = stock.buyAbove ? cmp >= stock.buyAbove : false;
   const comboAnalysis = analyzeBullishCombinations(stock);
+  const parabolicAnalysis = analyzeParabolicRally(stock);
+  const isParabolicBull = parabolicAnalysis.score >= 8 || 
+    parabolicAnalysis.stage === 'PARABOLIC_RALLY' || 
+    parabolicAnalysis.stage === 'BULLISH_CONFIRMED' || 
+    parabolicAnalysis.stage === 'BULLISH_EARLY';
+  
   const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
   let scoreWeight = 0;
@@ -491,6 +513,29 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     return null;
   }
 
+  // Determine Trigger Category Classification:
+  // 1. 100% Bullish Move
+  // 2. Parabolic Bullish Rally Started
+  // 3. Breakout Just Hit
+  // 4. Bullish Rally Started
+  let triggerType: PopunderTriggerType = 'BULLISH_RALLY_STARTED';
+  let triggerBadge = '📈 Bullish Rally Started';
+  let triggerColorClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+
+  if (is100Bull) {
+    triggerType = 'ONE_HUNDRED_PCT_BULLISH';
+    triggerBadge = '🟢 100% Bullish Move';
+    triggerColorClass = 'bg-emerald-500/25 text-emerald-200 border-emerald-400/50 shadow-sm';
+  } else if (isParabolicBull) {
+    triggerType = 'PARABOLIC_BULLISH_RALLY_STARTED';
+    triggerBadge = '🚀 Parabolic Bullish Rally Started';
+    triggerColorClass = 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white border-emerald-300 shadow-md animate-pulse';
+  } else if (isAbove15m || isAboveBuyLevel || isOpenLow) {
+    triggerType = 'BREAKOUT_JUST_HIT';
+    triggerBadge = '💥 Breakout Just Hit';
+    triggerColorClass = 'bg-amber-500/25 text-yellow-300 border-amber-400/50 shadow-sm';
+  }
+
   // Calibrate final accuracy score (80% - 98%) based on confluence depth
   const finalScore = Math.min(98, Math.max(80, Math.round(62 + (scoreWeight * 0.28) + (matchedPillars * 3))));
 
@@ -520,6 +565,8 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
 
   const tradePlan = buildTradePlan(stock, 'BULLISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BULLISH');
+  const isJustHit = !timingInfo.isMarketHours || timingInfo.isFresh || timingInfo.recencyMinutes <= 30;
+
   const triggerPrice = stock.first15mHigh || stock.buyAbove || (open * 1.008);
   const entryConfirmation = `Wait for 5m candle close ABOVE ₹${triggerPrice.toFixed(2)} or enter on pullback to VWAP (₹${(vwap || cmp).toFixed(2)})`;
   const invalidationRule = `Hard Exit if 5m candle closes BELOW VWAP (₹${(vwap ? vwap * 0.997 : tradePlan.stopLoss).toFixed(2)})`;
@@ -535,6 +582,12 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     openPrice: open,
     pctChange: pct,
     rallyType,
+    triggerType,
+    triggerBadge,
+    triggerColorClass,
+    isJustHit,
+    parabolicScore: parabolicAnalysis.score,
+    parabolicStage: parabolicAnalysis.stage,
     confidenceScore: finalScore,
     confidenceBadge,
     confluenceCount: matchedPillars,
@@ -599,6 +652,12 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   const isOpenHigh = isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh);
   const isBelow15m = isBelowFirst15mCandle(stock);
   const isBelowSellLevel = stock.sellBelow ? cmp <= stock.sellBelow : false;
+  const parabolicAnalysis = analyzeParabolicRally(stock);
+  const isParabolicBear = parabolicAnalysis.score >= 8 ||
+    parabolicAnalysis.stage === 'PARABOLIC_BREAKDOWN' ||
+    parabolicAnalysis.stage === 'BEARISH_CONFIRMED' ||
+    parabolicAnalysis.stage === 'BEARISH_EARLY';
+
   const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
   let scoreWeight = 0;
@@ -681,6 +740,25 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     return null;
   }
 
+  // Determine Trigger Category Classification:
+  let triggerType: PopunderTriggerType = 'BEARISH_RALLY_STARTED';
+  let triggerBadge = '📉 Bearish Rally Started';
+  let triggerColorClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+
+  if (is100Bear) {
+    triggerType = 'ONE_HUNDRED_PCT_BEARISH';
+    triggerBadge = '🔴 100% Bearish Move';
+    triggerColorClass = 'bg-rose-500/25 text-rose-200 border-rose-400/50 shadow-sm';
+  } else if (isParabolicBear) {
+    triggerType = 'PARABOLIC_BEARISH_RALLY_STARTED';
+    triggerBadge = '📉 Parabolic Bearish Rally Started';
+    triggerColorClass = 'bg-gradient-to-r from-rose-700 to-red-600 text-white border-rose-300 shadow-md animate-pulse';
+  } else if (isBelow15m || isBelowSellLevel || isOpenHigh) {
+    triggerType = 'BREAKOUT_JUST_HIT';
+    triggerBadge = '💥 Breakdown Just Hit';
+    triggerColorClass = 'bg-amber-500/25 text-yellow-300 border-amber-400/50 shadow-sm';
+  }
+
   const finalScore = Math.min(98, Math.max(80, Math.round(62 + (scoreWeight * 0.28) + (matchedPillars * 3))));
 
   let confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT' = 'CONFIRMED BREAKOUT';
@@ -709,6 +787,8 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
 
   const tradePlan = buildTradePlan(stock, 'BEARISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BEARISH');
+  const isJustHit = !timingInfo.isMarketHours || timingInfo.isFresh || timingInfo.recencyMinutes <= 30;
+
   const triggerPrice = stock.first15mLow || stock.sellBelow || (open * 0.992);
   const entryConfirmation = `Wait for 5m candle close BELOW ₹${triggerPrice.toFixed(2)} or enter on bounce retest to VWAP (₹${(vwap || cmp).toFixed(2)})`;
   const invalidationRule = `Hard Exit if 5m candle closes ABOVE VWAP (₹${(vwap ? vwap * 1.003 : tradePlan.stopLoss).toFixed(2)})`;
@@ -724,6 +804,12 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     openPrice: open,
     pctChange: pct,
     rallyType,
+    triggerType,
+    triggerBadge,
+    triggerColorClass,
+    isJustHit,
+    parabolicScore: parabolicAnalysis.score,
+    parabolicStage: parabolicAnalysis.stage,
     confidenceScore: finalScore,
     confidenceBadge,
     confluenceCount: matchedPillars,
@@ -764,7 +850,9 @@ export function getAllRallySignals(
   sortPreference: 'RECENCY_FIRST' | 'ACCURACY_FIRST' = 'RECENCY_FIRST',
   minConfluences: number = 3,
   limit?: number,
-  safeOnly: boolean = false
+  safeOnly: boolean = false,
+  categoryFilter: 'ALL' | 'BREAKOUT' | 'PARABOLIC' | '100_PCT' | 'RALLY_STARTED' = 'ALL',
+  onlyRecentHits: boolean = true
 ): RallySignal[] {
   const results: RallySignal[] = [];
 
@@ -773,7 +861,20 @@ export function getAllRallySignals(
       const bull = detectBullishRally(s);
       if (bull && bull.confluenceCount >= minConfluences) {
         if (!safeOnly || bull.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
-          results.push(bull);
+          // Category filter check
+          const passesCategory = 
+            categoryFilter === 'ALL' ||
+            (categoryFilter === 'BREAKOUT' && bull.triggerType === 'BREAKOUT_JUST_HIT') ||
+            (categoryFilter === 'PARABOLIC' && bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED') ||
+            (categoryFilter === '100_PCT' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
+            (categoryFilter === 'RALLY_STARTED' && (bull.triggerType === 'BULLISH_RALLY_STARTED' || bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED'));
+
+          // Recent hit check
+          const passesRecent = !onlyRecentHits || bull.isJustHit;
+
+          if (passesCategory && passesRecent) {
+            results.push(bull);
+          }
         }
       }
     }
@@ -781,7 +882,20 @@ export function getAllRallySignals(
       const bear = detectBearishRally(s);
       if (bear && bear.confluenceCount >= minConfluences) {
         if (!safeOnly || bear.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
-          results.push(bear);
+          // Category filter check
+          const passesCategory = 
+            categoryFilter === 'ALL' ||
+            (categoryFilter === 'BREAKOUT' && bear.triggerType === 'BREAKOUT_JUST_HIT') ||
+            (categoryFilter === 'PARABOLIC' && bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED') ||
+            (categoryFilter === '100_PCT' && bear.triggerType === 'ONE_HUNDRED_PCT_BEARISH') ||
+            (categoryFilter === 'RALLY_STARTED' && (bear.triggerType === 'BEARISH_RALLY_STARTED' || bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED'));
+
+          // Recent hit check
+          const passesRecent = !onlyRecentHits || bear.isJustHit;
+
+          if (passesCategory && passesRecent) {
+            results.push(bear);
+          }
         }
       }
     }
@@ -796,23 +910,23 @@ export function getAllRallySignals(
       return trapOrder[b.trapRiskLevel] - trapOrder[a.trapRiskLevel];
     }
 
+    // 1. Freshness tier: Triggers within last 30 mins get top priority
+    const aFresh = a.recencyMinutes <= 30 ? 1 : 0;
+    const bFresh = b.recencyMinutes <= 30 ? 1 : 0;
+    if (bFresh !== aFresh) {
+      return bFresh - aFresh;
+    }
+
     // If in market hours and sorting by Recency First (user's priority):
     if (a.isMarketHours && sortPreference === 'RECENCY_FIRST') {
-      // 1. Freshness tier: Triggers within last 30 mins get top tier
-      const aFresh = a.recencyMinutes <= 30 ? 1 : 0;
-      const bFresh = b.recencyMinutes <= 30 ? 1 : 0;
-      if (bFresh !== aFresh) {
-        return bFresh - aFresh;
-      }
-
-      // 2. Best Confluence Count (e.g. 6/6, 5/6, 4/6 before 3/6)
-      if (b.confluenceCount !== a.confluenceCount) {
-        return b.confluenceCount - a.confluenceCount;
-      }
-
-      // 3. Recency minutes (closest to refresh time)
+      // 2. Recency minutes (closest to refresh time first)
       if (a.recencyMinutes !== b.recencyMinutes) {
         return a.recencyMinutes - b.recencyMinutes;
+      }
+
+      // 3. Best Confluence Count (e.g. 6/6, 5/6, 4/6 before 3/6)
+      if (b.confluenceCount !== a.confluenceCount) {
+        return b.confluenceCount - a.confluenceCount;
       }
 
       // 4. Highest confidence score
