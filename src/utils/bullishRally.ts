@@ -422,10 +422,9 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   const isOpenLow = isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow);
   const isAbove15m = isAboveFirst15mCandle(stock);
   const isAboveBuyLevel = stock.buyAbove ? cmp >= stock.buyAbove : false;
-  const isNearDayHigh = stock.highPrice ? cmp >= stock.highPrice * 0.994 : false;
   const comboAnalysis = analyzeBullishCombinations(stock);
   const parabolicAnalysis = analyzeParabolicRally(stock);
-  const isParabolicBull = parabolicAnalysis.score >= 6 || 
+  const isParabolicBull = parabolicAnalysis.score >= 8 || 
     parabolicAnalysis.stage === 'PARABOLIC_RALLY' || 
     parabolicAnalysis.stage === 'BULLISH_CONFIRMED' || 
     parabolicAnalysis.stage === 'BULLISH_EARLY';
@@ -438,7 +437,7 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   const TOTAL_CONFLUENCES = 6;
   let matchedPillars = 0;
 
-  // Pillar 1: Candle / Intraday Price Action (100% Bullish or Open=Low or Solid Bullish Body)
+  // Pillar 1: Candle / Intraday Price Action (100% Bullish or Open=Low)
   if (is100Bull) {
     scoreWeight += 35;
     matchedPillars++;
@@ -449,14 +448,9 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     matchedPillars++;
     rallyType = 'Institutional Open=Low Breakout';
     confluencePoints.push('Strict Open = Low verified (Buyers aggressively defended opening tick)');
-  } else if (cmp > open * 1.004) {
-    scoreWeight += 18;
-    matchedPillars++;
-    rallyType = 'Strong Bullish Intraday Body';
-    confluencePoints.push('Solid green candle body holding steady gains above open');
   }
 
-  // Pillar 2: Breakout & Structural Clearance (Above 15m High or Gann Buy Above or Day High)
+  // Pillar 2: Breakout & Structural Clearance (Above 15m High or Gann Buy Above)
   if (isAbove15m) {
     scoreWeight += 25;
     matchedPillars++;
@@ -467,11 +461,6 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     matchedPillars++;
     if (!rallyType) rallyType = 'Gann Buy-Above Breakout';
     confluencePoints.push(`Cleared Gann Buy-Above trigger (₹${stock.buyAbove?.toFixed(2)})`);
-  } else if (isNearDayHigh) {
-    scoreWeight += 16;
-    matchedPillars++;
-    if (!rallyType) rallyType = 'Day High Breakout Test';
-    confluencePoints.push('Trading within 0.6% of Day High testing upside expansion');
   }
 
   // Pillar 3: Gann Mathematical Angle & Trend
@@ -489,10 +478,6 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     scoreWeight += 15;
     matchedPillars++;
     confluencePoints.push(`Gann Open Calc (${stock.openCalc.toFixed(2)}) harmonic trigger`);
-  } else if (pct > 0.6) {
-    scoreWeight += 12;
-    matchedPillars++;
-    confluencePoints.push('Ascending trend pattern establishing higher lows');
   }
 
   // Pillar 4: Institutional VWAP Support
@@ -500,10 +485,6 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     scoreWeight += 20;
     matchedPillars++;
     confluencePoints.push(`Holding above VWAP (₹${vwap.toFixed(2)}) institutional baseline`);
-  } else if (vwap && cmp >= vwap * 0.997) {
-    scoreWeight += 14;
-    matchedPillars++;
-    confluencePoints.push(`Holding VWAP bounce threshold (₹${vwap.toFixed(2)})`);
   }
 
   // Pillar 5: RSI Momentum Corridor
@@ -511,13 +492,9 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     scoreWeight += 20;
     matchedPillars++;
     confluencePoints.push(`RSI at ${rsi.toFixed(1)} in ideal continuation acceleration zone`);
-  } else if (rsi !== null && rsi >= 48 && rsi <= 85) {
-    scoreWeight += 14;
-    matchedPillars++;
-    confluencePoints.push(`RSI at ${rsi.toFixed(1)} holding bullish momentum expansion`);
   }
 
-  // Pillar 6: Technical Stack / EMA Alignment / Parabolic Momentum
+  // Pillar 6: Technical Stack / EMA Alignment
   if (comboAnalysis.isAllCombosMet) {
     scoreWeight += 35;
     matchedPillars++;
@@ -528,20 +505,11 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     matchedPillars++;
     if (!rallyType) rallyType = 'EMA & Momentum Acceleration';
     confluencePoints.push('EMA Ribbon expansion & RSI momentum alignment active');
-  } else if (isParabolicBull) {
-    scoreWeight += 22;
-    matchedPillars++;
-    if (!rallyType) rallyType = 'Parabolic Rally Momentum Surge';
-    confluencePoints.push(`Parabolic momentum surge active (Score: ${parabolicAnalysis.score}/16)`);
-  } else if (comboAnalysis.combo1.isMatch || comboAnalysis.combo2.isMatch || comboAnalysis.combo3.isMatch) {
-    scoreWeight += 15;
-    matchedPillars++;
-    confluencePoints.push('Key technical indicator alignment confirmed');
   }
 
   // STRICT MULTI-CONFLUENCE REQUIREMENT:
-  // Must match MOST of the confluence pillars (at least 3 out of 6) and have strong institutional weight
-  if (matchedPillars < 3 || scoreWeight < 38) {
+  // Must match MOST of the confluence pillars (at least 3 out of 6) and have strong institutional weight (>= 45)
+  if (matchedPillars < 3 || scoreWeight < 45) {
     return null;
   }
 
@@ -597,7 +565,7 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
 
   const tradePlan = buildTradePlan(stock, 'BULLISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BULLISH');
-  const isJustHit = !timingInfo.isMarketHours || timingInfo.isFresh || timingInfo.recencyMinutes <= 60;
+  const isJustHit = !timingInfo.isMarketHours || timingInfo.isFresh || timingInfo.recencyMinutes <= 30;
 
   const triggerPrice = stock.first15mHigh || stock.buyAbove || (open * 1.008);
   const entryConfirmation = `Wait for 5m candle close ABOVE ₹${triggerPrice.toFixed(2)} or enter on pullback to VWAP (₹${(vwap || cmp).toFixed(2)})`;
@@ -684,9 +652,8 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   const isOpenHigh = isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh);
   const isBelow15m = isBelowFirst15mCandle(stock);
   const isBelowSellLevel = stock.sellBelow ? cmp <= stock.sellBelow : false;
-  const isNearDayLow = stock.lowPrice ? cmp <= stock.lowPrice * 1.006 : false;
   const parabolicAnalysis = analyzeParabolicRally(stock);
-  const isParabolicBear = parabolicAnalysis.score >= 6 ||
+  const isParabolicBear = parabolicAnalysis.score >= 8 ||
     parabolicAnalysis.stage === 'PARABOLIC_BREAKDOWN' ||
     parabolicAnalysis.stage === 'BEARISH_CONFIRMED' ||
     parabolicAnalysis.stage === 'BEARISH_EARLY';
@@ -699,7 +666,7 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   const TOTAL_CONFLUENCES = 6;
   let matchedPillars = 0;
 
-  // Pillar 1: Candle / Intraday Price Action (100% Bearish or Open=High or Solid Bearish Body)
+  // Pillar 1: Candle / Intraday Price Action (100% Bearish or Open=High)
   if (is100Bear) {
     scoreWeight += 35;
     matchedPillars++;
@@ -710,14 +677,9 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     matchedPillars++;
     rallyType = 'Institutional Open=High Supply';
     confluencePoints.push('Strict Open = High verified (Sellers aggressively dumped opening tick)');
-  } else if (cmp < open * 0.996) {
-    scoreWeight += 18;
-    matchedPillars++;
-    rallyType = 'Strong Bearish Intraday Body';
-    confluencePoints.push('Solid red candle body holding downward pressure');
   }
 
-  // Pillar 2: Breakdown & Support Breach (Below 15m Low or Gann Sell Below or Day Low)
+  // Pillar 2: Breakdown & Support Breach (Below 15m Low or Gann Sell Below)
   if (isBelow15m) {
     scoreWeight += 25;
     matchedPillars++;
@@ -728,11 +690,6 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     matchedPillars++;
     if (!rallyType) rallyType = 'Gann Sell-Below Breakdown';
     confluencePoints.push(`Violated Gann Sell-Below level (₹${stock.sellBelow?.toFixed(2)})`);
-  } else if (isNearDayLow) {
-    scoreWeight += 16;
-    matchedPillars++;
-    if (!rallyType) rallyType = 'Day Low Breakdown Test';
-    confluencePoints.push('Trading within 0.6% of Day Low testing downside expansion');
   }
 
   // Pillar 3: Gann Downward Angle & Trend
@@ -746,14 +703,6 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     matchedPillars++;
     if (!rallyType) rallyType = 'Bearish Trend Flow';
     confluencePoints.push('Negative Gann downward trend structure');
-  } else if (stock.openCalc !== undefined && stock.openCalc < 3.0) {
-    scoreWeight += 15;
-    matchedPillars++;
-    confluencePoints.push(`Gann Open Calc (${stock.openCalc.toFixed(2)}) harmonic trigger`);
-  } else if (pct < -0.6) {
-    scoreWeight += 12;
-    matchedPillars++;
-    confluencePoints.push('Descending structure establishing lower highs');
   }
 
   // Pillar 4: Institutional VWAP Resistance
@@ -761,10 +710,6 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     scoreWeight += 20;
     matchedPillars++;
     confluencePoints.push(`Trading below VWAP (₹${vwap.toFixed(2)}) resistance`);
-  } else if (vwap && cmp <= vwap * 1.003) {
-    scoreWeight += 14;
-    matchedPillars++;
-    confluencePoints.push(`Held under VWAP rejection ceiling (₹${vwap.toFixed(2)})`);
   }
 
   // Pillar 5: RSI Seller Momentum Corridor
@@ -772,22 +717,13 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     scoreWeight += 20;
     matchedPillars++;
     confluencePoints.push(`RSI at ${rsi.toFixed(1)} confirms strong seller momentum`);
-  } else if (rsi !== null && rsi <= 52 && rsi >= 15) {
-    scoreWeight += 14;
-    matchedPillars++;
-    confluencePoints.push(`RSI at ${rsi.toFixed(1)} holding in bearish territory`);
   }
 
-  // Pillar 6: Selling Pressure Impulse & Volume / ADX / Parabolic
+  // Pillar 6: Selling Pressure Impulse & Volume / ADX
   if (pct <= -1.0) {
     scoreWeight += 25;
     matchedPillars++;
     confluencePoints.push(`Intraday breakdown expansion (${pct.toFixed(2)}% drop)`);
-  } else if (isParabolicBear) {
-    scoreWeight += 22;
-    matchedPillars++;
-    if (!rallyType) rallyType = 'Parabolic Breakdown Momentum';
-    confluencePoints.push(`Parabolic breakdown active (Score: ${parabolicAnalysis.score}/16)`);
   } else if (stock.adx !== undefined && stock.adx !== null && stock.adx >= 20) {
     scoreWeight += 20;
     matchedPillars++;
@@ -799,7 +735,8 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   }
 
   // STRICT MULTI-CONFLUENCE REQUIREMENT:
-  if (matchedPillars < 3 || scoreWeight < 38) {
+  // Must match MOST of the confluence pillars (at least 3 out of 6) and have strong institutional weight (>= 45)
+  if (matchedPillars < 3 || scoreWeight < 45) {
     return null;
   }
 
@@ -850,7 +787,7 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
 
   const tradePlan = buildTradePlan(stock, 'BEARISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BEARISH');
-  const isJustHit = !timingInfo.isMarketHours || timingInfo.isFresh || timingInfo.recencyMinutes <= 60;
+  const isJustHit = !timingInfo.isMarketHours || timingInfo.isFresh || timingInfo.recencyMinutes <= 30;
 
   const triggerPrice = stock.first15mLow || stock.sellBelow || (open * 0.992);
   const entryConfirmation = `Wait for 5m candle close BELOW ₹${triggerPrice.toFixed(2)} or enter on bounce retest to VWAP (₹${(vwap || cmp).toFixed(2)})`;
