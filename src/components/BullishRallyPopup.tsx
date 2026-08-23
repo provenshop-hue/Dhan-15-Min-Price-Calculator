@@ -47,10 +47,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 }) => {
   const [filterDirection, setFilterDirection] = useState<'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'BREAKOUT' | 'PARABOLIC' | '100_PCT' | 'RALLY_STARTED'>('ALL');
-  const [onlyRecentHits, setOnlyRecentHits] = useState<boolean>(true); // Strictly filter recent hits by default
-  const [minAccuracyThreshold, setMinAccuracyThreshold] = useState<number>(80); // 80% or 90%
+  const [onlyRecentHits, setOnlyRecentHits] = useState<boolean>(false); // Show all qualified stocks by default, with 1-click recent filter
+  const [minAccuracyThreshold, setMinAccuracyThreshold] = useState<number>(75); // 75% or 85%
   const [minConfluences, setMinConfluences] = useState<number>(3); // 3 (Majority) or 4 (Maximum)
-  const [maxPicksLimit, setMaxPicksLimit] = useState<number>(5); // Top 3, Top 5 (Default best match), or 0 (All)
+  const [maxPicksLimit, setMaxPicksLimit] = useState<number>(15); // Default 15 picks (Top 5, Top 15, Top 25, or 0 for All)
   const [safeOnly, setSafeOnly] = useState<boolean>(true); // Anti-Trap: Filter out overextended high-risk traps
   const [sortPreference, setSortPreference] = useState<'RECENCY_FIRST' | 'ACCURACY_FIRST'>('RECENCY_FIRST');
   const [rallySignals, setRallySignals] = useState<RallySignal[]>([]);
@@ -432,7 +432,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
         {/* Filter & Strictness Quick Bar */}
         <div className="bg-slate-950/90 px-3 py-1.5 border-b border-slate-800 text-[10px] space-y-1.5">
-          {/* Row 1: Direction & Major Settings */}
+          {/* Row 1: Direction, Stock Limit & Major Settings */}
           <div className="flex items-center justify-between flex-wrap gap-1">
             <div className="flex items-center space-x-1 text-slate-400">
               <Filter className="w-3 h-3 text-slate-400" />
@@ -457,6 +457,49 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               </button>
             </div>
 
+            {/* Picks Limit Selector */}
+            <div className="flex items-center space-x-1">
+              <span className="text-slate-400 font-medium">Show:</span>
+              <div className="flex items-center bg-slate-900/90 border border-slate-700/80 rounded p-0.5 space-x-0.5">
+                <button
+                  onClick={() => { setMaxPicksLimit(5); setCurrentIndex(0); }}
+                  className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all cursor-pointer ${
+                    maxPicksLimit === 5 ? 'bg-amber-400/20 text-yellow-300 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Show top 5 elite picks"
+                >
+                  5
+                </button>
+                <button
+                  onClick={() => { setMaxPicksLimit(15); setCurrentIndex(0); }}
+                  className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all cursor-pointer ${
+                    maxPicksLimit === 15 ? 'bg-amber-500/30 text-amber-200 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Show top 15 high-conviction picks"
+                >
+                  15 (Default)
+                </button>
+                <button
+                  onClick={() => { setMaxPicksLimit(25); setCurrentIndex(0); }}
+                  className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all cursor-pointer ${
+                    maxPicksLimit === 25 ? 'bg-amber-500/30 text-amber-200 shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Show top 25 picks"
+                >
+                  25
+                </button>
+                <button
+                  onClick={() => { setMaxPicksLimit(0); setCurrentIndex(0); }}
+                  className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all cursor-pointer ${
+                    maxPicksLimit === 0 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Show all qualified stocks"
+                >
+                  All ({totalQualifiedCount})
+                </button>
+              </div>
+            </div>
+
             <div className="flex items-center space-x-1 flex-wrap gap-y-1">
               {/* Only Recent Hits Filter Toggle */}
               <button
@@ -469,10 +512,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     ? 'bg-amber-400/20 text-yellow-300 border-amber-400/60 shadow-sm animate-pulse'
                     : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
                 }`}
-                title="When ON: Shows only stocks that JUST HIT triggers recently (<30m)"
+                title="When ON: Shows only stocks that triggered recently (<60m)"
               >
                 <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
-                <span>{onlyRecentHits ? '⚡ Recent Hits Only' : 'All Session'}</span>
+                <span>{onlyRecentHits ? '⚡ Fresh (<60m)' : 'All Session'}</span>
               </button>
 
               {/* Anti-Trap Safe-Only Filter */}
@@ -489,7 +532,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 title="Filter out overextended trap setups"
               >
                 <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
-                <span>{safeOnly ? '🛡️ Safe Only' : 'All'}</span>
+                <span>{safeOnly ? '🛡️ Safe' : 'All'}</span>
               </button>
 
               {/* Sort Mode Toggle */}
@@ -506,7 +549,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 title="Intelligent Intraday Sorting: Prioritize stocks that passed closest to refresh time"
               >
                 <Clock className="w-2.5 h-2.5 text-cyan-400" />
-                <span>{sortPreference === 'RECENCY_FIRST' ? '⚡ Freshest' : '★ Score'}</span>
+                <span>{sortPreference === 'RECENCY_FIRST' ? '⚡ Fresh' : '★ Score'}</span>
               </button>
             </div>
           </div>
