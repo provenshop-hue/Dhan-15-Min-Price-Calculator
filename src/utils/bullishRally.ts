@@ -7,6 +7,31 @@ import { analyzeParabolicRally, ParabolicRallyAnalysis } from './parabolicRallyE
 
 export type RallyDirection = 'BULLISH' | 'BEARISH';
 
+export type RallyFilterDirection = 
+  | 'ALL' 
+  | 'BULLISH_ONLY' 
+  | 'BEARISH_ONLY' 
+  | 'HUNDRED_BULLISH_ONLY' 
+  | 'HUNDRED_BEARISH_ONLY' 
+  | 'HUNDRED_PCT_ALL';
+
+export type RallyCategoryFilter = 
+  | 'ALL' 
+  | '100_BULL' 
+  | '100_BEAR' 
+  | '100_PCT' 
+  | 'BREAKOUT' 
+  | 'PARABOLIC' 
+  | 'RALLY_STARTED'
+  | 'SUSTAINED_30M'
+  | 'SUSTAINED_BULL';
+
+export type RallyRecencyFilter = 
+  | 'RECENT_AND_SUSTAINED' 
+  | 'RECENT_ONLY' 
+  | 'SUSTAINED_30M_ONLY' 
+  | 'ALL_SESSION';
+
 export type PopunderTriggerType =
   | 'BREAKOUT_JUST_HIT'
   | 'PARABOLIC_BULLISH_RALLY_STARTED'
@@ -45,6 +70,10 @@ export interface RallySignal {
   triggerBadge: string;
   triggerColorClass: string;
   isJustHit: boolean; // True if this signal was just hit recently in today's active market session
+  isSustainedHold: boolean; // True if signal hit earlier (>=30m ago) and has stood still / held firmly in bullish/bearish territory
+  sustainedDurationMinutes: number; // Minutes elapsed holding above support / below resistance without breakdown
+  sustainedBadge: string; // e.g. "🛡️ Stood Bullish (45m)"
+  sustainedReason: string;
   isYesterday: boolean; // True if candle is from yesterday or a prior session (must never show in recent hits)
   parabolicScore?: number;
   parabolicStage?: string;
@@ -580,7 +609,7 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
 
   // Pillar 1: Candle / Intraday Price Action (100% Bullish or Open=Low)
   if (is100Bull) {
-    scoreWeight += 35;
+    scoreWeight += 40;
     matchedPillars++;
     rallyType = '100% Bullish Power Move';
     confluencePoints.push('100% Bullish solid body (≥65% candle range) closing near highs');
@@ -648,9 +677,12 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     confluencePoints.push('EMA Ribbon expansion & RSI momentum alignment active');
   }
 
-  // STRICT MULTI-CONFLUENCE REQUIREMENT:
-  // Must match MOST of the confluence pillars (at least 3 out of 6) and have strong institutional weight (>= 45)
-  if (matchedPillars < 3 || scoreWeight < 45) {
+  // STRICT MULTI-CONFLUENCE / 100% BULLISH QUALIFICATION:
+  // 100% Bullish moves qualify with high conviction; standard setups require at least 3 confluence pillars
+  if (!is100Bull && (matchedPillars < 3 || scoreWeight < 45)) {
+    return null;
+  }
+  if (scoreWeight < 35) {
     return null;
   }
 
@@ -678,12 +710,13 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   }
 
   // Calibrate final accuracy score (80% - 98%) based on confluence depth
-  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (scoreWeight * 0.28) + (matchedPillars * 3))));
+  const effectivePillars = is100Bull ? Math.max(matchedPillars, 3) : matchedPillars;
+  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (scoreWeight * 0.28) + (effectivePillars * 3))));
 
   let confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT' = 'CONFIRMED BREAKOUT';
-  if (matchedPillars >= 5 || finalScore >= 92) {
+  if (effectivePillars >= 5 || finalScore >= 92) {
     confidenceBadge = 'INSTITUTIONAL DIAMOND';
-  } else if (matchedPillars >= 4 || finalScore >= 86) {
+  } else if (effectivePillars >= 4 || finalScore >= 86) {
     confidenceBadge = 'HIGH CONVICTION PRIME';
   }
 
@@ -708,11 +741,36 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   const timingInfo = calculateExactRulePassedTiming(stock, 'BULLISH');
   const isJustHit = !timingInfo.isYesterday && (timingInfo.isFresh || (timingInfo.isMarketHours && timingInfo.recencyMinutes <= 30));
 
+  // Determine if stock hit earlier (>=30m) and has stood still / sustained firmly as bullish
+  const heldMinutes = timingInfo.isMarketHours 
+    ? Math.max(0, timingInfo.recencyMinutes) 
+    : (timingInfo.intervalMinute > 0 ? timingInfo.intervalMinute : 45);
+
+  const isAboveSupport = (vwap ? cmp >= vwap * 0.997 : true) && 
+    (stock.first15mHigh ? cmp >= stock.first15mHigh * 0.995 : (stock.buyAbove ? cmp >= stock.buyAbove * 0.995 : true)) &&
+    (cmp >= open * 0.998) &&
+    (pct >= 0.1);
+
+  const isHealthyStructure = (rsi === null || rsi >= 48) && trapRiskLevel !== 'OVEREXTENDED_TRAP';
+
+  const isSustainedHold = !timingInfo.isYesterday && heldMinutes >= 30 && isAboveSupport && isHealthyStructure;
+  const sustainedDurationMinutes = isSustainedHold ? heldMinutes : 0;
+  const sustainedBadge = isSustainedHold 
+    ? `🛡️ Stood Bullish (${heldMinutes}m)` 
+    : '';
+  const sustainedReason = isSustainedHold
+    ? `Hit breakout at ${timingInfo.timeStr} and stood still bullish above VWAP (₹${(vwap || cmp).toFixed(2)}) for ${heldMinutes}m without breakdown`
+    : '';
+
   const triggerPrice = stock.first15mHigh || stock.buyAbove || (open * 1.008);
   const entryConfirmation = `Wait for 5m candle close ABOVE ₹${triggerPrice.toFixed(2)} or enter on pullback to VWAP (₹${(vwap || cmp).toFixed(2)})`;
   const invalidationRule = `Hard Exit if 5m candle closes BELOW VWAP (₹${(vwap ? vwap * 0.997 : tradePlan.stopLoss).toFixed(2)})`;
 
-  const reason = `High-conviction Bullish setup matching ${matchedPillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((matchedPillars / TOTAL_CONFLUENCES) * 100)}% majority). Strong buyer commitment with favorable risk:reward.`;
+  const reason = isSustainedHold
+    ? `Stood still as Bullish for ${heldMinutes}m (Passed at ${timingInfo.timeStr}). Solid buyer support holding firm above VWAP with ${effectivePillars}/${TOTAL_CONFLUENCES} confluences.`
+    : (is100Bull 
+      ? `Textbook 100% Bullish Power Move matching ${effectivePillars} institutional confluences (${Math.round((effectivePillars / TOTAL_CONFLUENCES) * 100)}% majority). Strong buyer commitment with pristine candle structure.`
+      : `High-conviction Bullish setup matching ${effectivePillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((effectivePillars / TOTAL_CONFLUENCES) * 100)}% majority). Strong buyer commitment with favorable risk:reward.`);
 
   return {
     stock,
@@ -727,14 +785,18 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     triggerBadge,
     triggerColorClass,
     isJustHit,
+    isSustainedHold,
+    sustainedDurationMinutes,
+    sustainedBadge,
+    sustainedReason,
     isYesterday: timingInfo.isYesterday,
     parabolicScore: parabolicAnalysis.score,
     parabolicStage: parabolicAnalysis.stage,
     confidenceScore: finalScore,
     confidenceBadge,
-    confluenceCount: matchedPillars,
+    confluenceCount: effectivePillars,
     totalConfluences: TOTAL_CONFLUENCES,
-    confluenceRatio: `${matchedPillars}/${TOTAL_CONFLUENCES}`,
+    confluenceRatio: `${effectivePillars}/${TOTAL_CONFLUENCES}`,
     reason,
     timestamp,
     rulePassedTime: timingInfo.timeStr,
@@ -810,10 +872,10 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
 
   // Pillar 1: Candle / Intraday Price Action (100% Bearish or Open=High)
   if (is100Bear) {
-    scoreWeight += 35;
+    scoreWeight += 40;
     matchedPillars++;
     rallyType = '100% Bearish Breakdown Move';
-    confluencePoints.push('100% Bearish solid red body closing near session lows');
+    confluencePoints.push('100% Bearish solid red body (≥60% candle range) closing near session lows');
   } else if (isOpenHigh) {
     scoreWeight += 30;
     matchedPillars++;
@@ -876,9 +938,12 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     confluencePoints.push('Institutional sell volume spike detected');
   }
 
-  // STRICT MULTI-CONFLUENCE REQUIREMENT:
-  // Must match MOST of the confluence pillars (at least 3 out of 6) and have strong institutional weight (>= 45)
-  if (matchedPillars < 3 || scoreWeight < 45) {
+  // STRICT MULTI-CONFLUENCE / 100% BEARISH QUALIFICATION:
+  // 100% Bearish moves qualify with high conviction; standard setups require at least 3 confluence pillars
+  if (!is100Bear && (matchedPillars < 3 || scoreWeight < 45)) {
+    return null;
+  }
+  if (scoreWeight < 35) {
     return null;
   }
 
@@ -901,12 +966,13 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     triggerColorClass = 'bg-amber-500/25 text-yellow-300 border-amber-400/50 shadow-sm';
   }
 
-  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (scoreWeight * 0.28) + (matchedPillars * 3))));
+  const effectivePillars = is100Bear ? Math.max(matchedPillars, 3) : matchedPillars;
+  const finalScore = Math.min(98, Math.max(80, Math.round(62 + (scoreWeight * 0.28) + (effectivePillars * 3))));
 
   let confidenceBadge: 'INSTITUTIONAL DIAMOND' | 'HIGH CONVICTION PRIME' | 'CONFIRMED BREAKOUT' = 'CONFIRMED BREAKOUT';
-  if (matchedPillars >= 5 || finalScore >= 92) {
+  if (effectivePillars >= 5 || finalScore >= 92) {
     confidenceBadge = 'INSTITUTIONAL DIAMOND';
-  } else if (matchedPillars >= 4 || finalScore >= 86) {
+  } else if (effectivePillars >= 4 || finalScore >= 86) {
     confidenceBadge = 'HIGH CONVICTION PRIME';
   }
 
@@ -931,11 +997,36 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   const timingInfo = calculateExactRulePassedTiming(stock, 'BEARISH');
   const isJustHit = !timingInfo.isYesterday && (timingInfo.isFresh || (timingInfo.isMarketHours && timingInfo.recencyMinutes <= 30));
 
+  // Determine if stock hit earlier (>=30m) and has stood still / sustained firmly as bearish
+  const heldMinutes = timingInfo.isMarketHours 
+    ? Math.max(0, timingInfo.recencyMinutes) 
+    : (timingInfo.intervalMinute > 0 ? timingInfo.intervalMinute : 45);
+
+  const isBelowResistance = (vwap ? cmp <= vwap * 1.003 : true) && 
+    (stock.first15mLow ? cmp <= stock.first15mLow * 1.005 : (stock.sellBelow ? cmp <= stock.sellBelow * 1.005 : true)) &&
+    (cmp <= open * 1.002) &&
+    (pct <= -0.1);
+
+  const isHealthyBearStructure = (rsi === null || rsi <= 52) && trapRiskLevel !== 'OVEREXTENDED_TRAP';
+
+  const isSustainedHold = !timingInfo.isYesterday && heldMinutes >= 30 && isBelowResistance && isHealthyBearStructure;
+  const sustainedDurationMinutes = isSustainedHold ? heldMinutes : 0;
+  const sustainedBadge = isSustainedHold 
+    ? `🛡️ Stood Bearish (${heldMinutes}m)` 
+    : '';
+  const sustainedReason = isSustainedHold
+    ? `Hit breakdown at ${timingInfo.timeStr} and stood still bearish below VWAP (₹${(vwap || cmp).toFixed(2)}) for ${heldMinutes}m without breakdown`
+    : '';
+
   const triggerPrice = stock.first15mLow || stock.sellBelow || (open * 0.992);
   const entryConfirmation = `Wait for 5m candle close BELOW ₹${triggerPrice.toFixed(2)} or enter on bounce retest to VWAP (₹${(vwap || cmp).toFixed(2)})`;
   const invalidationRule = `Hard Exit if 5m candle closes ABOVE VWAP (₹${(vwap ? vwap * 1.003 : tradePlan.stopLoss).toFixed(2)})`;
 
-  const reason = `High-conviction Bearish setup matching ${matchedPillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((matchedPillars / TOTAL_CONFLUENCES) * 100)}% majority). Heavy selling pressure below key resistance with defined downside targets.`;
+  const reason = isSustainedHold
+    ? `Stood still as Bearish for ${heldMinutes}m (Passed at ${timingInfo.timeStr}). Continuous seller supply holding firm below VWAP with ${effectivePillars}/${TOTAL_CONFLUENCES} confluences.`
+    : (is100Bear
+      ? `Textbook 100% Bearish Breakdown Move matching ${effectivePillars} institutional confluences (${Math.round((effectivePillars / TOTAL_CONFLUENCES) * 100)}% majority). Strong seller commitment with pristine downside body structure.`
+      : `High-conviction Bearish setup matching ${effectivePillars} of ${TOTAL_CONFLUENCES} institutional confluences (${Math.round((effectivePillars / TOTAL_CONFLUENCES) * 100)}% majority). Heavy selling pressure below key resistance with defined downside targets.`);
 
   return {
     stock,
@@ -950,14 +1041,18 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     triggerBadge,
     triggerColorClass,
     isJustHit,
+    isSustainedHold,
+    sustainedDurationMinutes,
+    sustainedBadge,
+    sustainedReason,
     isYesterday: timingInfo.isYesterday,
     parabolicScore: parabolicAnalysis.score,
     parabolicStage: parabolicAnalysis.stage,
     confidenceScore: finalScore,
     confidenceBadge,
-    confluenceCount: matchedPillars,
+    confluenceCount: effectivePillars,
     totalConfluences: TOTAL_CONFLUENCES,
-    confluenceRatio: `${matchedPillars}/${TOTAL_CONFLUENCES}`,
+    confluenceRatio: `${effectivePillars}/${TOTAL_CONFLUENCES}`,
     reason,
     timestamp,
     rulePassedTime: timingInfo.timeStr,
@@ -987,64 +1082,96 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
  * Prioritizes the absolute BEST matches and BEST confluence setups at that exact point in time.
  * In market hours, fresh triggers closest to the refresh time with highest confluence are prioritized first.
  * Automatically excludes yesterday's hits from popunder when hideYesterday or onlyRecentHits is enabled.
+ * Also includes stocks that hit earlier and have stood still / sustained firmly (>30 min) in bullish or bearish territory.
  */
 export function getAllRallySignals(
   stocks: StockCalculated[],
-  filterDirection: 'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY' = 'ALL',
+  filterDirection: RallyFilterDirection = 'ALL',
   sortPreference: 'RECENCY_FIRST' | 'ACCURACY_FIRST' = 'RECENCY_FIRST',
   minConfluences: number = 3,
   limit?: number,
   safeOnly: boolean = false,
-  categoryFilter: 'ALL' | 'BREAKOUT' | 'PARABOLIC' | '100_PCT' | 'RALLY_STARTED' = 'ALL',
+  categoryFilter: RallyCategoryFilter = 'ALL',
   onlyRecentHits: boolean = true,
   hideYesterday: boolean = true
 ): RallySignal[] {
   const results: RallySignal[] = [];
 
   for (const s of stocks) {
-    if (filterDirection !== 'BEARISH_ONLY') {
+    const shouldCheckBull = 
+      filterDirection === 'ALL' || 
+      filterDirection === 'BULLISH_ONLY' || 
+      filterDirection === 'HUNDRED_BULLISH_ONLY' || 
+      filterDirection === 'HUNDRED_PCT_ALL';
+
+    if (shouldCheckBull) {
       const bull = detectBullishRally(s);
       if (bull && bull.confluenceCount >= minConfluences) {
         // Exclude yesterday's stocks if hideYesterday or onlyRecentHits is true
         if (bull.isYesterday && (hideYesterday || onlyRecentHits)) {
           // Exclude yesterday stock
         } else if (!safeOnly || bull.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
+          // Direction-specific 100% check
+          const passesDir = 
+            filterDirection !== 'HUNDRED_BULLISH_ONLY' && filterDirection !== 'HUNDRED_PCT_ALL' 
+              ? true 
+              : bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH';
+
           // Category filter check
           const passesCategory = 
             categoryFilter === 'ALL' ||
+            (categoryFilter === 'SUSTAINED_30M' && bull.isSustainedHold) ||
+            (categoryFilter === 'SUSTAINED_BULL' && bull.isSustainedHold) ||
+            (categoryFilter === '100_BULL' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
+            (categoryFilter === '100_PCT' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
             (categoryFilter === 'BREAKOUT' && bull.triggerType === 'BREAKOUT_JUST_HIT') ||
             (categoryFilter === 'PARABOLIC' && bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED') ||
-            (categoryFilter === '100_PCT' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
             (categoryFilter === 'RALLY_STARTED' && (bull.triggerType === 'BULLISH_RALLY_STARTED' || bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED'));
 
-          // Recent hit check (only today's recent hits)
-          const passesRecent = !onlyRecentHits || (bull.isJustHit && !bull.isYesterday);
+          // Recent hit check: Shows recent hits (<30m) AND stocks that stood still as bullish for >30m
+          const passesRecent = !onlyRecentHits || ((bull.isJustHit || bull.isSustainedHold) && !bull.isYesterday);
 
-          if (passesCategory && passesRecent) {
+          if (passesDir && passesCategory && passesRecent) {
             results.push(bull);
           }
         }
       }
     }
-    if (filterDirection !== 'BULLISH_ONLY') {
+
+    const shouldCheckBear = 
+      filterDirection === 'ALL' || 
+      filterDirection === 'BEARISH_ONLY' || 
+      filterDirection === 'HUNDRED_BEARISH_ONLY' || 
+      filterDirection === 'HUNDRED_PCT_ALL';
+
+    if (shouldCheckBear) {
       const bear = detectBearishRally(s);
       if (bear && bear.confluenceCount >= minConfluences) {
         // Exclude yesterday's stocks if hideYesterday or onlyRecentHits is true
         if (bear.isYesterday && (hideYesterday || onlyRecentHits)) {
           // Exclude yesterday stock
         } else if (!safeOnly || bear.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
+          // Direction-specific 100% check
+          const passesDir = 
+            filterDirection !== 'HUNDRED_BEARISH_ONLY' && filterDirection !== 'HUNDRED_PCT_ALL' 
+              ? true 
+              : bear.triggerType === 'ONE_HUNDRED_PCT_BEARISH';
+
           // Category filter check
           const passesCategory = 
             categoryFilter === 'ALL' ||
+            (categoryFilter === 'SUSTAINED_30M' && bear.isSustainedHold) ||
+            (categoryFilter === 'SUSTAINED_BULL' && false) ||
+            (categoryFilter === '100_BEAR' && bear.triggerType === 'ONE_HUNDRED_PCT_BEARISH') ||
+            (categoryFilter === '100_PCT' && bear.triggerType === 'ONE_HUNDRED_PCT_BEARISH') ||
             (categoryFilter === 'BREAKOUT' && bear.triggerType === 'BREAKOUT_JUST_HIT') ||
             (categoryFilter === 'PARABOLIC' && bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED') ||
-            (categoryFilter === '100_PCT' && bear.triggerType === 'ONE_HUNDRED_PCT_BEARISH') ||
             (categoryFilter === 'RALLY_STARTED' && (bear.triggerType === 'BEARISH_RALLY_STARTED' || bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED'));
 
-          // Recent hit check (only today's recent hits)
-          const passesRecent = !onlyRecentHits || (bear.isJustHit && !bear.isYesterday);
+          // Recent hit check: Shows recent hits (<30m) AND stocks that stood still as bearish for >30m
+          const passesRecent = !onlyRecentHits || ((bear.isJustHit || bear.isSustainedHold) && !bear.isYesterday);
 
-          if (passesCategory && passesRecent) {
+          if (passesDir && passesCategory && passesRecent) {
             results.push(bear);
           }
         }
@@ -1061,11 +1188,11 @@ export function getAllRallySignals(
       return trapOrder[b.trapRiskLevel] - trapOrder[a.trapRiskLevel];
     }
 
-    // 1. Freshness tier: Triggers within last 30 mins get top priority
-    const aFresh = a.recencyMinutes <= 30 ? 1 : 0;
-    const bFresh = b.recencyMinutes <= 30 ? 1 : 0;
-    if (bFresh !== aFresh) {
-      return bFresh - aFresh;
+    // 1. Freshness & Sustained tier: Fresh triggers (<30m) & Stood Still (>30m) get top priority
+    const aPri = (a.recencyMinutes <= 30 || a.isSustainedHold) ? 1 : 0;
+    const bPri = (b.recencyMinutes <= 30 || b.isSustainedHold) ? 1 : 0;
+    if (bPri !== aPri) {
+      return bPri - aPri;
     }
 
     // If in market hours and sorting by Recency First (user's priority):

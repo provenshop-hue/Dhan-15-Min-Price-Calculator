@@ -31,7 +31,9 @@ import {
   getAllRallySignals, 
   playBullishRallySound, 
   playBearishRallySound,
-  RallyDirection 
+  RallyDirection,
+  RallyFilterDirection,
+  RallyCategoryFilter
 } from '../utils/bullishRally';
 
 interface BullishRallyPopupProps {
@@ -45,9 +47,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   onSelectStockDetail,
   onOpenPositionSizer
 }) => {
-  const [filterDirection, setFilterDirection] = useState<'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY'>('ALL');
-  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'BREAKOUT' | 'PARABOLIC' | '100_PCT' | 'RALLY_STARTED'>('ALL');
-  const [onlyRecentHits, setOnlyRecentHits] = useState<boolean>(true); // Strictly filter recent hits by default
+  const [filterDirection, setFilterDirection] = useState<RallyFilterDirection>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<RallyCategoryFilter>('ALL');
+  const [recencyMode, setRecencyMode] = useState<'FRESH_AND_SUSTAINED' | 'FRESH_ONLY' | 'SUSTAINED_ONLY' | 'ALL_SESSION'>('FRESH_AND_SUSTAINED');
   const [hideYesterday, setHideYesterday] = useState<boolean>(true); // Strictly exclude yesterday's stocks by default
   const [minAccuracyThreshold, setMinAccuracyThreshold] = useState<number>(80); // 80% or 90%
   const [minConfluences, setMinConfluences] = useState<number>(3); // 3 (Majority) or 4 (Maximum)
@@ -73,7 +75,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const ROTATE_INTERVAL_MS = 5000; // 5 seconds per slide
   const PROGRESS_TICK_MS = 50;
 
-  // Scan stocks whenever stocks or filters change - only show stocks that just hit qualifying triggers
+  // Scan stocks whenever stocks or filters change - shows recent hits and stocks that stood still as bullish >30m
   useEffect(() => {
     const rawDetected = getAllRallySignals(
       stocks, 
@@ -83,10 +85,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
       0, 
       safeOnly, 
       categoryFilter, 
-      onlyRecentHits,
+      recencyMode !== 'ALL_SESSION',
       hideYesterday
     );
-    const filtered = rawDetected.filter((s) => s.confidenceScore >= minAccuracyThreshold);
+
+    const recencyFiltered = rawDetected.filter((s) => {
+      if (recencyMode === 'FRESH_ONLY') return s.isFresh && !s.isYesterday;
+      if (recencyMode === 'SUSTAINED_ONLY') return s.isSustainedHold && !s.isYesterday;
+      if (recencyMode === 'FRESH_AND_SUSTAINED') return (s.isJustHit || s.isSustainedHold) && !s.isYesterday;
+      return true;
+    });
+
+    const filtered = recencyFiltered.filter((s) => s.confidenceScore >= minAccuracyThreshold);
     setTotalQualifiedCount(filtered.length);
 
     // Strict Elite Selection: Cap to top 3 or 5 best matches & confluence
@@ -94,14 +104,14 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     setRallySignals(curatedSignals);
 
     if (curatedSignals.length > 0) {
-      const currentKeys = new Set(curatedSignals.map((d) => `${d.symbol}_${d.direction}_${d.triggerType}`));
+      const currentKeys = new Set(curatedSignals.map((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}`));
       let hasNewRally = false;
       let newDirection: RallyDirection = 'BULLISH';
 
       for (const key of currentKeys) {
         if (!previousRallySymbolsRef.current.has(key)) {
           hasNewRally = true;
-          const found = curatedSignals.find((d) => `${d.symbol}_${d.direction}_${d.triggerType}` === key);
+          const found = curatedSignals.find((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}` === key);
           if (found) newDirection = found.direction;
           break;
         }
@@ -125,7 +135,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     if (currentIndex >= curatedSignals.length) {
       setCurrentIndex(0);
     }
-  }, [stocks, filterDirection, categoryFilter, onlyRecentHits, hideYesterday, minAccuracyThreshold, minConfluences, maxPicksLimit, safeOnly, sortPreference, soundEnabled]);
+  }, [stocks, filterDirection, categoryFilter, recencyMode, hideYesterday, minAccuracyThreshold, minConfluences, maxPicksLimit, safeOnly, sortPreference, soundEnabled]);
 
   const handleNextSlide = useCallback(() => {
     if (rallySignals.length <= 1) return;
@@ -238,6 +248,12 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-black border ${currentRally.triggerColorClass}`}>
                   {currentRally.triggerBadge}
                 </span>
+                {currentRally.isSustainedHold && (
+                  <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 px-1.5 py-0.2 rounded text-[8.5px] font-mono font-black flex items-center gap-0.5 shadow-sm">
+                    <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                    🛡️ STOOD &gt;30M ({currentRally.sustainedDurationMinutes}m)
+                  </span>
+                )}
                 {currentIndex === 0 ? (
                   <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold">
                     👑 #1 BEST
@@ -259,7 +275,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               
               {rallySignals.length > 1 && (
                 <div className="text-[10px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
-                  <span>Recent Hits ({currentIndex + 1}/{rallySignals.length})</span>
+                  <span>{currentRally.isSustainedHold ? '🛡️ Stood Still Firm (>30m)' : 'Recent Hits'} ({currentIndex + 1}/{rallySignals.length})</span>
                   <span className="text-[9px] text-slate-400">• {currentRally.rallyType}</span>
                 </div>
               )}
@@ -334,7 +350,21 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               <TrendingDown className="w-4 h-4 text-yellow-200 animate-pulse" />
             )}
             <span className="text-xs font-black tracking-wider uppercase text-white flex items-center gap-1.5 flex-wrap">
-              <span>{isBull ? 'Bullish Rally' : 'Bearish Breakdown'}</span>
+              <span>
+                {currentRally.triggerType === 'ONE_HUNDRED_PCT_BULLISH'
+                  ? '🟢 100% Bullish Move'
+                  : currentRally.triggerType === 'ONE_HUNDRED_PCT_BEARISH'
+                  ? '🔴 100% Bearish Move'
+                  : currentRally.isSustainedHold
+                  ? (isBull ? `🛡️ Stood Bullish (${currentRally.sustainedDurationMinutes}m)` : `🛡️ Stood Bearish (${currentRally.sustainedDurationMinutes}m)`)
+                  : currentRally.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED'
+                  ? '🚀 Parabolic Bullish Rally'
+                  : currentRally.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED'
+                  ? '📉 Parabolic Bearish Breakdown'
+                  : currentRally.triggerType === 'BREAKOUT_JUST_HIT'
+                  ? (isBull ? '💥 Breakout Just Hit' : '💥 Breakdown Just Hit')
+                  : (isBull ? '📈 Bullish Rally' : '📉 Bearish Breakdown')}
+              </span>
               <span className="bg-black/40 text-yellow-200 text-[10px] px-2 py-0.5 rounded-full font-bold border border-yellow-300/40">
                 {currentRally.confidenceScore}% Accuracy
               </span>
@@ -342,19 +372,26 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <ShieldCheck className="w-3 h-3 text-purple-300" />
                 {currentRally.confluenceRatio} Confluences
               </span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border flex items-center gap-1 ${
-                currentRally.isFresh
-                  ? 'bg-amber-400/30 text-yellow-200 border-amber-300/60 shadow-[0_0_10px_rgba(251,191,36,0.3)]'
-                  : 'bg-black/40 text-cyan-200 border-cyan-300/40'
-              }`}>
-                {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5" />}
-                {currentRally.rulePassedTime}
-                {currentRally.isMarketHours && currentRally.recencyMinutes <= 30 && (
-                  <span className="text-[9px] text-amber-200 ml-0.5 font-sans">
-                    ({currentRally.recencyMinutes === 0 ? 'Fresh' : `${currentRally.recencyMinutes}m ago`})
-                  </span>
-                )}
-              </span>
+              {currentRally.isSustainedHold ? (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border bg-emerald-950/80 text-emerald-200 border-emerald-400/60 shadow-[0_0_10px_rgba(16,185,129,0.3)] flex items-center gap-1">
+                  <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                  Stood &gt;30m Firm ({currentRally.sustainedDurationMinutes}m)
+                </span>
+              ) : (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border flex items-center gap-1 ${
+                  currentRally.isFresh
+                    ? 'bg-amber-400/30 text-yellow-200 border-amber-300/60 shadow-[0_0_10px_rgba(251,191,36,0.3)]'
+                    : 'bg-black/40 text-cyan-200 border-cyan-300/40'
+                }`}>
+                  {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5" />}
+                  {currentRally.rulePassedTime}
+                  {currentRally.isMarketHours && currentRally.recencyMinutes <= 30 && (
+                    <span className="text-[9px] text-amber-200 ml-0.5 font-sans">
+                      ({currentRally.recencyMinutes === 0 ? 'Fresh' : `${currentRally.recencyMinutes}m ago`})
+                    </span>
+                  )}
+                </span>
+              )}
             </span>
           </div>
 
@@ -436,7 +473,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         <div className="bg-slate-950/90 px-3 py-1.5 border-b border-slate-800 text-[10px] space-y-1.5">
           {/* Row 1: Direction & Major Settings */}
           <div className="flex items-center justify-between flex-wrap gap-1">
-            <div className="flex items-center space-x-1 text-slate-400">
+            <div className="flex items-center space-x-1 text-slate-400 flex-wrap gap-y-0.5">
               <Filter className="w-3 h-3 text-slate-400" />
               <span>Direction:</span>
               <button
@@ -457,24 +494,64 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               >
                 🔴 Bearish
               </button>
+              <button
+                onClick={() => { setFilterDirection('HUNDRED_BULLISH_ONLY'); setCurrentIndex(0); }}
+                className={`px-1.5 py-0.5 rounded font-semibold transition-colors cursor-pointer ${filterDirection === 'HUNDRED_BULLISH_ONLY' ? 'bg-emerald-600 text-white font-bold shadow-sm' : 'text-emerald-400/80 hover:text-emerald-300'}`}
+              >
+                🟢 100% Bull
+              </button>
+              <button
+                onClick={() => { setFilterDirection('HUNDRED_BEARISH_ONLY'); setCurrentIndex(0); }}
+                className={`px-1.5 py-0.5 rounded font-semibold transition-colors cursor-pointer ${filterDirection === 'HUNDRED_BEARISH_ONLY' ? 'bg-rose-600 text-white font-bold shadow-sm' : 'text-rose-400/80 hover:text-rose-300'}`}
+              >
+                🔴 100% Bear
+              </button>
             </div>
 
             <div className="flex items-center space-x-1 flex-wrap gap-y-1">
-              {/* Only Recent Hits Filter Toggle */}
+              {/* Recency & Sustained Hold Filter Toggle */}
               <button
                 onClick={() => {
-                  setOnlyRecentHits((prev) => !prev);
+                  setRecencyMode((prev) => {
+                    if (prev === 'FRESH_AND_SUSTAINED') return 'SUSTAINED_ONLY';
+                    if (prev === 'SUSTAINED_ONLY') return 'FRESH_ONLY';
+                    if (prev === 'FRESH_ONLY') return 'ALL_SESSION';
+                    return 'FRESH_AND_SUSTAINED';
+                  });
                   setCurrentIndex(0);
                 }}
                 className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-1 cursor-pointer ${
-                  onlyRecentHits
-                    ? 'bg-amber-400/20 text-yellow-300 border-amber-400/60 shadow-sm animate-pulse'
+                  recencyMode === 'FRESH_AND_SUSTAINED'
+                    ? 'bg-amber-400/20 text-yellow-300 border-amber-400/60 shadow-sm'
+                    : recencyMode === 'SUSTAINED_ONLY'
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-500/70 shadow-sm'
+                    : recencyMode === 'FRESH_ONLY'
+                    ? 'bg-cyan-950 text-cyan-300 border-cyan-500/60'
                     : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
                 }`}
-                title="When ON: Shows only stocks that JUST HIT triggers recently (<30m)"
+                title="Filter between Fresh Hits (<30m) & Stocks that stood still as bullish (>30m), Stood Bullish only, Fresh only, or All Session"
               >
-                <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
-                <span>{onlyRecentHits ? '⚡ Recent Hits Only' : 'All Session'}</span>
+                {recencyMode === 'FRESH_AND_SUSTAINED' && (
+                  <>
+                    <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
+                    <span>⚡+🛡️ Fresh &amp; Stood &gt;30m</span>
+                  </>
+                )}
+                {recencyMode === 'SUSTAINED_ONLY' && (
+                  <>
+                    <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                    <span>🛡️ Stood &gt;30m Only</span>
+                  </>
+                )}
+                {recencyMode === 'FRESH_ONLY' && (
+                  <>
+                    <Zap className="w-2.5 h-2.5 text-cyan-300 fill-current" />
+                    <span>⚡ Fresh &lt;30m Only</span>
+                  </>
+                )}
+                {recencyMode === 'ALL_SESSION' && (
+                  <span>📅 All Session</span>
+                )}
               </button>
 
               {/* Hide Yesterday Filter Toggle */}
@@ -543,6 +620,68 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               ⚡ All Hits
             </button>
             <button
+              onClick={() => { setCategoryFilter('SUSTAINED_BULL'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'SUSTAINED_BULL'
+                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-sm font-bold'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-emerald-300'
+              }`}
+              title="Show stocks that hit and stood still / stayed as bullish for >30 minutes"
+            >
+              🛡️ Stood Bullish &gt;30m
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('100_BULL'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === '100_BULL'
+                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-sm font-bold'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-emerald-300'
+              }`}
+            >
+              🟢 100% Bullish
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('100_BEAR'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === '100_BEAR'
+                  ? 'bg-rose-500/30 text-rose-300 border border-rose-400/50 shadow-sm font-bold'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-rose-300'
+              }`}
+            >
+              🔴 100% Bearish
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('SUSTAINED_30M'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'SUSTAINED_30M'
+                  ? 'bg-teal-500/30 text-teal-300 border border-teal-400/50 shadow-sm font-bold'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-teal-300'
+              }`}
+              title="Show any stock that has stood still firm for >30 minutes"
+            >
+              🏛️ Stood Still &gt;30m
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('100_PCT'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === '100_PCT'
+                  ? 'bg-teal-500/30 text-teal-300 border border-teal-400/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-teal-300'
+              }`}
+            >
+              🟢🔴 100% Moves
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('PARABOLIC'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'PARABOLIC'
+                  ? 'bg-purple-500/30 text-purple-300 border border-purple-400/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-purple-300'
+              }`}
+            >
+              🚀 Parabolic Rally
+            </button>
+            <button
               onClick={() => { setCategoryFilter('BREAKOUT'); setCurrentIndex(0); }}
               className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
                 categoryFilter === 'BREAKOUT'
@@ -551,26 +690,6 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               }`}
             >
               💥 Breakouts
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('PARABOLIC'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === 'PARABOLIC'
-                  ? 'bg-teal-500/30 text-teal-300 border border-teal-400/50 shadow-sm'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-teal-300'
-              }`}
-            >
-              🚀 Parabolic Rally
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('100_PCT'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === '100_PCT'
-                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-sm'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-emerald-300'
-              }`}
-            >
-              🟢 100% Moves
             </button>
             <button
               onClick={() => { setCategoryFilter('RALLY_STARTED'); setCurrentIndex(0); }}
@@ -666,9 +785,19 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <span className="text-[9px] text-purple-300 bg-purple-950/80 border border-purple-800/60 px-1.5 py-0.2 rounded font-mono">
                   {minConfluences}+ of 6 Confluences
                 </span>
-                {onlyRecentHits && (
+                {recencyMode === 'FRESH_AND_SUSTAINED' && (
                   <span className="text-[9.5px] text-amber-300 font-normal bg-amber-950/80 border border-amber-800/60 px-1.5 py-0.2 rounded">
-                    ⚡ Just Hit &lt;30m
+                    ⚡ Fresh &amp; 🛡️ Stood &gt;30m
+                  </span>
+                )}
+                {recencyMode === 'SUSTAINED_ONLY' && (
+                  <span className="text-[9.5px] text-emerald-300 font-normal bg-emerald-950/80 border border-emerald-800/60 px-1.5 py-0.2 rounded">
+                    🛡️ Stood &gt;30m Only
+                  </span>
+                )}
+                {recencyMode === 'FRESH_ONLY' && (
+                  <span className="text-[9.5px] text-cyan-300 font-normal bg-cyan-950/80 border border-cyan-800/60 px-1.5 py-0.2 rounded">
+                    ⚡ Fresh &lt;30m Only
                   </span>
                 )}
               </span>
@@ -713,12 +842,17 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                             #{idx + 1}
                           </span>
                         )}
-                        {signal.isFresh && (
+                        {signal.isSustainedHold ? (
+                          <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 px-1 py-0.2 rounded text-[8px] font-mono font-black flex items-center gap-0.5 shadow-sm">
+                            <ShieldCheck className="w-2 h-2 text-emerald-400" />
+                            STOOD &gt;30M ({signal.sustainedDurationMinutes}m)
+                          </span>
+                        ) : signal.isFresh ? (
                           <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
                             <Zap className="w-2 h-2 fill-current" />
                             FRESH
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       <div className="text-[10px] text-slate-400 truncate max-w-[170px] flex items-center gap-1">
                         <span>{signal.rallyType}</span>
@@ -730,7 +864,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       </div>
                       <div className="text-[9px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
                         <Clock className="w-2.5 h-2.5 text-cyan-400" />
-                        <span>Passed: {signal.rulePassedTime} {signal.isMarketHours && `(${signal.recencyMinutes === 0 ? 'Just now' : `${signal.recencyMinutes}m ago`})`}</span>
+                        <span>Passed: {signal.rulePassedTime} {signal.isMarketHours && `(${signal.recencyMinutes === 0 ? 'Just now' : `${signal.recencyMinutes}m ago`}${signal.isSustainedHold ? ' • Stood Firm' : ''})`}</span>
                       </div>
                     </div>
                   </div>
@@ -788,9 +922,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       </span>
                     )}
 
+                    {currentRally.isSustainedHold && (
+                      <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/70 text-[10px] px-2 py-0.5 rounded font-mono font-black flex items-center gap-1 shadow-sm">
+                        <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                        🛡️ Stood Firm &gt;30m ({currentRally.sustainedDurationMinutes}m)
+                      </span>
+                    )}
+
                     <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 border ${
                       currentRally.isFresh
                         ? 'bg-amber-950/90 text-yellow-300 border-amber-500/50 shadow-sm animate-pulse'
+                        : currentRally.isSustainedHold
+                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
                         : 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40'
                     }`}>
                       {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5 text-cyan-400" />}
@@ -804,7 +947,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   </div>
 
                   <h4 className={`text-sm font-extrabold leading-tight mt-1.5 ${isBull ? 'text-emerald-300' : 'text-rose-300'}`}>
-                    {isBull ? 'Bullish rally' : 'Bearish breakdown'} is going on with{' '}
+                    {currentRally.isSustainedHold
+                      ? (isBull ? 'Bullish strength stood still & held firm >30m on ' : 'Bearish pressure stood still & held firm >30m on ')
+                      : (isBull ? 'Bullish rally is going on with ' : 'Bearish breakdown is going on with ')}
                     <span className="text-white underline decoration-2 font-black">{currentRally.symbol}</span>!
                   </h4>
                   <p className="text-[11px] text-slate-300 truncate max-w-[240px] mt-0.5">
@@ -829,14 +974,25 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
               {/* Exact Timing Analysis Banner */}
               <div className="mt-2 bg-slate-900/95 border border-slate-700/80 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-[10.5px]">
-                <div className="flex items-center space-x-1.5">
-                  <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-                  <span className="text-slate-300 font-medium">Just Hit At:</span>
-                  <span className="font-mono font-bold text-cyan-300">{currentRally.rulePassedTime}</span>
-                  {currentRally.isMarketHours && (
-                    <span className="text-[9.5px] text-amber-300 font-mono font-bold">
-                      ({currentRally.recencyMinutes === 0 ? '⚡ Just now' : `⚡ ${currentRally.recencyMinutes}m ago`})
-                    </span>
+                <div className="flex items-center space-x-1.5 flex-wrap">
+                  {currentRally.isSustainedHold ? (
+                    <>
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span className="text-slate-300 font-medium">Stood Bullish/Firm For:</span>
+                      <span className="font-mono font-bold text-emerald-300">{currentRally.sustainedDurationMinutes} mins</span>
+                      <span className="text-[9.5px] text-slate-400 font-mono">(Hit at {currentRally.rulePassedTime})</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                      <span className="text-slate-300 font-medium">Just Hit At:</span>
+                      <span className="font-mono font-bold text-cyan-300">{currentRally.rulePassedTime}</span>
+                      {currentRally.isMarketHours && (
+                        <span className="text-[9.5px] text-amber-300 font-mono font-bold">
+                          ({currentRally.recencyMinutes === 0 ? '⚡ Just now' : `⚡ ${currentRally.recencyMinutes}m ago`})
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
                 <span className="text-[9px] text-purple-300 font-mono flex items-center gap-1">
