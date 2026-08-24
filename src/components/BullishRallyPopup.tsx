@@ -48,6 +48,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const [filterDirection, setFilterDirection] = useState<'ALL' | 'BULLISH_ONLY' | 'BEARISH_ONLY'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'BREAKOUT' | 'PARABOLIC' | '100_PCT' | 'RALLY_STARTED'>('ALL');
   const [onlyRecentHits, setOnlyRecentHits] = useState<boolean>(true); // Strictly filter recent hits by default
+  const [hideYesterday, setHideYesterday] = useState<boolean>(true); // Strictly exclude yesterday's stocks by default
   const [minAccuracyThreshold, setMinAccuracyThreshold] = useState<number>(80); // 80% or 90%
   const [minConfluences, setMinConfluences] = useState<number>(3); // 3 (Majority) or 4 (Maximum)
   const [maxPicksLimit, setMaxPicksLimit] = useState<number>(5); // Top 3, Top 5 (Default best match), or 0 (All)
@@ -82,7 +83,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
       0, 
       safeOnly, 
       categoryFilter, 
-      onlyRecentHits
+      onlyRecentHits,
+      hideYesterday
     );
     const filtered = rawDetected.filter((s) => s.confidenceScore >= minAccuracyThreshold);
     setTotalQualifiedCount(filtered.length);
@@ -123,7 +125,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     if (currentIndex >= curatedSignals.length) {
       setCurrentIndex(0);
     }
-  }, [stocks, filterDirection, categoryFilter, onlyRecentHits, minAccuracyThreshold, minConfluences, maxPicksLimit, safeOnly, sortPreference, soundEnabled]);
+  }, [stocks, filterDirection, categoryFilter, onlyRecentHits, hideYesterday, minAccuracyThreshold, minConfluences, maxPicksLimit, safeOnly, sortPreference, soundEnabled]);
 
   const handleNextSlide = useCallback(() => {
     if (rallySignals.length <= 1) return;
@@ -473,6 +475,22 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               >
                 <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
                 <span>{onlyRecentHits ? '⚡ Recent Hits Only' : 'All Session'}</span>
+              </button>
+
+              {/* Hide Yesterday Filter Toggle */}
+              <button
+                onClick={() => {
+                  setHideYesterday((prev) => !prev);
+                  setCurrentIndex(0);
+                }}
+                className={`px-1.5 py-0.5 rounded font-mono font-bold transition-all border flex items-center gap-1 cursor-pointer ${
+                  hideYesterday
+                    ? 'bg-rose-950/80 text-rose-300 border-rose-600/50 shadow-sm'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+                title={hideYesterday ? 'Excluding Yesterday recent hits (Today only)' : 'Including yesterday hits'}
+              >
+                <span>{hideYesterday ? '🚫 No Yesterday' : '📅 All Dates'}</span>
               </button>
 
               {/* Anti-Trap Safe-Only Filter */}

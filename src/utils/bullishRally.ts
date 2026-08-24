@@ -44,7 +44,8 @@ export interface RallySignal {
   triggerType: PopunderTriggerType;
   triggerBadge: string;
   triggerColorClass: string;
-  isJustHit: boolean; // True if this signal was just hit recently
+  isJustHit: boolean; // True if this signal was just hit recently in today's active market session
+  isYesterday: boolean; // True if candle is from yesterday or a prior session (must never show in recent hits)
   parabolicScore?: number;
   parabolicStage?: string;
   confidenceScore: number; // 75 - 98%
@@ -77,6 +78,131 @@ export interface RallySignal {
 
 // Backward compatibility alias
 export type BullishRallySignal = RallySignal;
+
+/**
+ * Accurately gets current Indian Standard Time (IST, Asia/Kolkata) date and time.
+ */
+export function getISTNow(): {
+  dateStr: string; // "YYYY-MM-DD"
+  hours: number;
+  minutes: number;
+  dayOfWeek: number; // 0 = Sun, 6 = Sat
+  totalMinutes: number;
+  isMarketHours: boolean;
+} {
+  const now = new Date();
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    });
+    const formatted = formatter.format(now);
+    const [datePart, timePart] = formatted.split(', ');
+    const [hStr, mStr] = (timePart || '09:15').split(':');
+    const hours = parseInt(hStr, 10);
+    const minutes = parseInt(mStr, 10);
+
+    const dayFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'short'
+    });
+    const dayStr = dayFormatter.format(now);
+    const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const dayOfWeek = dayMap[dayStr] ?? now.getDay();
+
+    const totalMinutes = hours * 60 + minutes;
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isMarketHours = !isWeekend && totalMinutes >= (9 * 60 + 15) && totalMinutes <= (15 * 60 + 30);
+
+    return {
+      dateStr: datePart.trim(),
+      hours,
+      minutes,
+      dayOfWeek,
+      totalMinutes,
+      isMarketHours
+    };
+  } catch (e) {
+    const ist = new Date(now.getTime() + 19800 * 1000);
+    const y = ist.getUTCFullYear();
+    const m = String(ist.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(ist.getUTCDate()).padStart(2, '0');
+    const hours = ist.getUTCHours();
+    const minutes = ist.getUTCMinutes();
+    const totalMinutes = hours * 60 + minutes;
+    const dayOfWeek = ist.getUTCDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isMarketHours = !isWeekend && totalMinutes >= 555 && totalMinutes <= 930;
+
+    return {
+      dateStr: `${y}-${m}-${d}`,
+      hours,
+      minutes,
+      dayOfWeek,
+      totalMinutes,
+      isMarketHours
+    };
+  }
+}
+
+/**
+ * Evaluates whether a stock's candle timestamp or fetched date is from yesterday or a prior session.
+ */
+export function isStockFromYesterdayOrOlder(stock: StockCalculated): { isYesterday: boolean; dateStr: string } {
+  const ist = getISTNow();
+  const todayDateStr = ist.dateStr; // e.g. "2026-08-24"
+
+  // 1. Check explicit fetchedDate
+  if (stock.fetchedDate) {
+    const clean = stock.fetchedDate.trim();
+    if (clean && clean < todayDateStr) {
+      return { isYesterday: true, dateStr: clean };
+    }
+  }
+
+  // 2. Check candleTimestamp for dates
+  if (stock.candleTimestamp) {
+    const ts = stock.candleTimestamp.trim();
+    
+    // Check for explicit "Yesterday" or "Previous" in label
+    if (/yesterday|prev|prior/i.test(ts)) {
+      return { isYesterday: true, dateStr: 'Yesterday' };
+    }
+
+    // YYYY-MM-DD format
+    const matchYMD = ts.match(/(\d{4}-\d{2}-\d{2})/);
+    if (matchYMD && matchYMD[1]) {
+      const cDate = matchYMD[1];
+      if (cDate < todayDateStr) {
+        return { isYesterday: true, dateStr: cDate };
+      }
+    }
+
+    // DD-MMM-YYYY format (e.g. 22-Aug-2026 or 22-08-2026)
+    const matchDMY = ts.match(/(\d{1,2})[-/]([A-Za-z]{3}|\d{1,2})[-/](\d{4})/);
+    if (matchDMY) {
+      try {
+        const parsedD = new Date(ts);
+        if (!isNaN(parsedD.getTime())) {
+          const y = parsedD.getFullYear();
+          const m = String(parsedD.getMonth() + 1).padStart(2, '0');
+          const d = String(parsedD.getDate()).padStart(2, '0');
+          const fmt = `${y}-${m}-${d}`;
+          if (fmt < todayDateStr) {
+            return { isYesterday: true, dateStr: fmt };
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  return { isYesterday: false, dateStr: todayDateStr };
+}
 
 /**
  * Converts a time string like "10:30 AM" or "03:15 PM" to total minutes from midnight.
@@ -124,20 +250,33 @@ export function calculateExactRulePassedTiming(
   label: string;
   isMarketHours: boolean;
   intervalMinute: number;
+  isYesterday: boolean;
 } {
   const isBull = direction === 'BULLISH';
-  const now = new Date();
-  
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
-  const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
+  const ist = getISTNow();
+  const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
 
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const currentTotalMinutes = hours * 60 + minutes;
+  // If this stock data is from yesterday or a prior date, explicitly mark as yesterday
+  if (yesterdayCheck.isYesterday) {
+    const timeMatch = stock.candleTimestamp ? stock.candleTimestamp.match(/\d{1,2}:\d{2}(\s*(?:AM|PM))?/i) : null;
+    const timeStr = timeMatch ? `${timeMatch[0]} (Prior Day)` : 'Yesterday Close';
+    return {
+      timeStr,
+      rulePassedMinutes: 0,
+      recencyMinutes: 9999,
+      isFresh: false,
+      label: `Passed on ${yesterdayCheck.dateStr} (Yesterday)`,
+      isMarketHours: false,
+      intervalMinute: 0,
+      isYesterday: true
+    };
+  }
+
+  const hours = ist.hours;
+  const minutes = ist.minutes;
+  const currentTotalMinutes = ist.totalMinutes;
   const marketOpenMinutes = 9 * 60 + 15; // 09:15 AM (555 mins)
-  const marketCloseMinutes = 15 * 60 + 30; // 03:30 PM (930 mins)
-
-  const isMarketHours = !isWeekend && currentTotalMinutes >= marketOpenMinutes && currentTotalMinutes <= marketCloseMinutes;
+  const isMarketHours = ist.isMarketHours;
 
   const standardIntervals = [
     { label: '09:15 AM', totalMins: 9 * 60 + 15 },
@@ -170,10 +309,10 @@ export function calculateExactRulePassedTiming(
   // Helper to package the timing result
   const buildResult = (timeStr: string, intervalMin: number, customLabel?: string) => {
     const rulePassedMinutes = parseTimeToMinutes(timeStr);
-    const recencyMinutes = isMarketHours ? Math.max(0, currentTotalMinutes - rulePassedMinutes) : 0;
+    const recencyMinutes = isMarketHours ? Math.max(0, currentTotalMinutes - rulePassedMinutes) : 999;
     const isFresh = isMarketHours && recencyMinutes <= 30;
     const diffLabel = recencyMinutes === 0 ? 'Just now' : `${recencyMinutes}m ago`;
-    const label = customLabel || (isMarketHours ? `Passed at ${timeStr} (${diffLabel})` : `Passed at ${timeStr} (EOD Default)`);
+    const label = customLabel || (isMarketHours ? `Passed at ${timeStr} (${diffLabel})` : `Passed at ${timeStr} (Session Default)`);
 
     return {
       timeStr,
@@ -182,7 +321,8 @@ export function calculateExactRulePassedTiming(
       isFresh,
       label,
       isMarketHours,
-      intervalMinute: intervalMin
+      intervalMinute: intervalMin,
+      isYesterday: false
     };
   };
 
@@ -267,11 +407,12 @@ export function calculateExactRulePassedTiming(
   return {
     timeStr: '03:15 PM',
     rulePassedMinutes: 15 * 60 + 15,
-    recencyMinutes: 0,
+    recencyMinutes: 999,
     isFresh: false,
     label: 'Passed at 03:15 PM (EOD Default)',
     isMarketHours: false,
-    intervalMinute: 360
+    intervalMinute: 360,
+    isYesterday: false
   };
 }
 
@@ -565,7 +706,7 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
 
   const tradePlan = buildTradePlan(stock, 'BULLISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BULLISH');
-  const isJustHit = !timingInfo.isMarketHours || timingInfo.isFresh || timingInfo.recencyMinutes <= 30;
+  const isJustHit = !timingInfo.isYesterday && (timingInfo.isFresh || (timingInfo.isMarketHours && timingInfo.recencyMinutes <= 30));
 
   const triggerPrice = stock.first15mHigh || stock.buyAbove || (open * 1.008);
   const entryConfirmation = `Wait for 5m candle close ABOVE ₹${triggerPrice.toFixed(2)} or enter on pullback to VWAP (₹${(vwap || cmp).toFixed(2)})`;
@@ -586,6 +727,7 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     triggerBadge,
     triggerColorClass,
     isJustHit,
+    isYesterday: timingInfo.isYesterday,
     parabolicScore: parabolicAnalysis.score,
     parabolicStage: parabolicAnalysis.stage,
     confidenceScore: finalScore,
@@ -787,7 +929,7 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
 
   const tradePlan = buildTradePlan(stock, 'BEARISH', cmp);
   const timingInfo = calculateExactRulePassedTiming(stock, 'BEARISH');
-  const isJustHit = !timingInfo.isMarketHours || timingInfo.isFresh || timingInfo.recencyMinutes <= 30;
+  const isJustHit = !timingInfo.isYesterday && (timingInfo.isFresh || (timingInfo.isMarketHours && timingInfo.recencyMinutes <= 30));
 
   const triggerPrice = stock.first15mLow || stock.sellBelow || (open * 0.992);
   const entryConfirmation = `Wait for 5m candle close BELOW ₹${triggerPrice.toFixed(2)} or enter on bounce retest to VWAP (₹${(vwap || cmp).toFixed(2)})`;
@@ -808,6 +950,7 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     triggerBadge,
     triggerColorClass,
     isJustHit,
+    isYesterday: timingInfo.isYesterday,
     parabolicScore: parabolicAnalysis.score,
     parabolicStage: parabolicAnalysis.stage,
     confidenceScore: finalScore,
@@ -843,6 +986,7 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
  * Returns all highly accurate Bullish and Bearish rally stocks matching MOST confluences, intelligently sorted.
  * Prioritizes the absolute BEST matches and BEST confluence setups at that exact point in time.
  * In market hours, fresh triggers closest to the refresh time with highest confluence are prioritized first.
+ * Automatically excludes yesterday's hits from popunder when hideYesterday or onlyRecentHits is enabled.
  */
 export function getAllRallySignals(
   stocks: StockCalculated[],
@@ -852,7 +996,8 @@ export function getAllRallySignals(
   limit?: number,
   safeOnly: boolean = false,
   categoryFilter: 'ALL' | 'BREAKOUT' | 'PARABOLIC' | '100_PCT' | 'RALLY_STARTED' = 'ALL',
-  onlyRecentHits: boolean = true
+  onlyRecentHits: boolean = true,
+  hideYesterday: boolean = true
 ): RallySignal[] {
   const results: RallySignal[] = [];
 
@@ -860,7 +1005,10 @@ export function getAllRallySignals(
     if (filterDirection !== 'BEARISH_ONLY') {
       const bull = detectBullishRally(s);
       if (bull && bull.confluenceCount >= minConfluences) {
-        if (!safeOnly || bull.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
+        // Exclude yesterday's stocks if hideYesterday or onlyRecentHits is true
+        if (bull.isYesterday && (hideYesterday || onlyRecentHits)) {
+          // Exclude yesterday stock
+        } else if (!safeOnly || bull.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
           // Category filter check
           const passesCategory = 
             categoryFilter === 'ALL' ||
@@ -869,8 +1017,8 @@ export function getAllRallySignals(
             (categoryFilter === '100_PCT' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
             (categoryFilter === 'RALLY_STARTED' && (bull.triggerType === 'BULLISH_RALLY_STARTED' || bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED'));
 
-          // Recent hit check
-          const passesRecent = !onlyRecentHits || bull.isJustHit;
+          // Recent hit check (only today's recent hits)
+          const passesRecent = !onlyRecentHits || (bull.isJustHit && !bull.isYesterday);
 
           if (passesCategory && passesRecent) {
             results.push(bull);
@@ -881,7 +1029,10 @@ export function getAllRallySignals(
     if (filterDirection !== 'BULLISH_ONLY') {
       const bear = detectBearishRally(s);
       if (bear && bear.confluenceCount >= minConfluences) {
-        if (!safeOnly || bear.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
+        // Exclude yesterday's stocks if hideYesterday or onlyRecentHits is true
+        if (bear.isYesterday && (hideYesterday || onlyRecentHits)) {
+          // Exclude yesterday stock
+        } else if (!safeOnly || bear.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
           // Category filter check
           const passesCategory = 
             categoryFilter === 'ALL' ||
@@ -890,8 +1041,8 @@ export function getAllRallySignals(
             (categoryFilter === '100_PCT' && bear.triggerType === 'ONE_HUNDRED_PCT_BEARISH') ||
             (categoryFilter === 'RALLY_STARTED' && (bear.triggerType === 'BEARISH_RALLY_STARTED' || bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED'));
 
-          // Recent hit check
-          const passesRecent = !onlyRecentHits || bear.isJustHit;
+          // Recent hit check (only today's recent hits)
+          const passesRecent = !onlyRecentHits || (bear.isJustHit && !bear.isYesterday);
 
           if (passesCategory && passesRecent) {
             results.push(bear);

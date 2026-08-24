@@ -57,6 +57,7 @@ export interface StockCalculated {
   fib382Time?: string | null;
 
   // Fetch status
+  fetchedDate?: string;
   isFetched?: boolean;
   isLoading?: boolean;
   error?: string | null;
