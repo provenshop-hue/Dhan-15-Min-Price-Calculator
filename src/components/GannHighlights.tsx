@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Zap, ArrowUpRight, ArrowDownRight, Sparkles, ChevronRight, Target, ShieldCheck, Percent } from 'lucide-react';
 import { StockCalculated, TrendFilterType } from '../types';
-import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isBothCalcLessThan3 } from '../utils/gann';
+import { calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isBothCalcLessThan3, isOpenLesserDecLesserCloseHigherDec } from '../utils/gann';
 
 interface GannHighlightsProps {
   stocks: StockCalculated[];
@@ -94,6 +94,7 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
   // Gann Calc < 3 stocks
   const gannCalcLess3Count = calculatedStocks.filter((s) => isGannCalcLessThan3(s)).length;
   const bothCalcLess3Count = calculatedStocks.filter((s) => isBothCalcLessThan3(s)).length;
+  const openLessDecLessCloseHigherDecCount = calculatedStocks.filter(isOpenLesserDecLesserCloseHigherDec).length;
 
   return (
     <div className="mb-6 space-y-4">
@@ -142,6 +143,15 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
           >
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>Open = Low ({openLowStocks.length})</span>
+          </button>
+
+          <button
+            onClick={() => handleFilterClick('OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC')}
+            className="flex items-center space-x-1.5 bg-indigo-500/30 hover:bg-indigo-500/50 border border-indigo-400/80 px-3 py-1.5 rounded-xl text-xs font-black text-indigo-200 transition-all cursor-pointer whitespace-nowrap shadow-xs ring-1 ring-indigo-400/40"
+            title="15m Screener: Open Price < Close Price & Open 1st Decimal < Close 1st Decimal (Close price and first decimal are higher)"
+          >
+            <Zap className="w-3.5 h-3.5 text-indigo-300 fill-current" />
+            <span>🟢 15m O&lt;C Dec ({openLessDecLessCloseHigherDecCount})</span>
           </button>
 
           <button
