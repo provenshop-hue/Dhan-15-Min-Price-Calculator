@@ -257,32 +257,32 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
             {currentRally ? (
               <div>
-                <div className="text-xs font-black flex items-center gap-1.5 flex-wrap">
-                  <span className={isBull ? 'text-emerald-300' : 'text-rose-300'}>
+                <div className="text-sm font-black flex items-center gap-1.5 flex-wrap">
+                  <span className={`text-base font-mono tracking-tight ${isBull ? 'text-emerald-300' : 'text-rose-300'}`}>
                     {currentRally.symbol}
                   </span>
-                  <span className={`px-1.5 py-0.2 rounded text-[10px] ${isBull ? 'bg-emerald-500/30 text-white' : 'bg-rose-500/30 text-white'}`}>
+                  <span className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${isBull ? 'bg-emerald-500/30 text-emerald-200' : 'bg-rose-500/30 text-rose-200'}`}>
                     {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
                   </span>
-                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-black border ${currentRally.triggerColorClass}`}>
+                  <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black border ${currentRally.triggerColorClass}`}>
                     {currentRally.triggerBadge}
                   </span>
                   {currentRally.isSustainedHold && (
-                    <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 px-1.5 py-0.2 rounded text-[8.5px] font-mono font-black flex items-center gap-0.5 shadow-sm">
+                    <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 px-1.5 py-0.2 rounded text-[9px] font-mono font-black flex items-center gap-0.5 shadow-sm">
                       <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
-                      🛡️ STOOD &gt;30M ({currentRally.sustainedDurationMinutes}m)
+                      STOOD &gt;30M
                     </span>
                   )}
                   {currentIndex === 0 ? (
-                    <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold">
-                      👑 #1 BEST
+                    <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold">
+                      👑 #1
                     </span>
                   ) : (
-                    <span className="bg-slate-800 text-slate-300 border border-slate-700 px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold">
-                      ⭐ #{currentIndex + 1}
+                    <span className="bg-slate-800 text-slate-300 border border-slate-700 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold">
+                      #{currentIndex + 1}
                     </span>
                   )}
-                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5 border ${
+                  <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold flex items-center gap-0.5 border ${
                     currentRally.isFresh 
                       ? 'bg-amber-400/20 text-yellow-200 border-amber-400/40 animate-pulse' 
                       : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
@@ -293,9 +293,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 </div>
                 
                 {rallySignals.length > 1 && (
-                  <div className="text-[10px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
-                    <span>{currentRally.isSustainedHold ? '🛡️ Stood Still Firm (>30m)' : 'Recent Hits'} ({currentIndex + 1}/{rallySignals.length})</span>
-                    <span className="text-[9px] text-slate-400">• {currentRally.rallyType}</span>
+                  <div className="text-[11px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
+                    <span>{currentRally.isSustainedHold ? '🛡️ Stood Still Firm (>30m)' : 'Active Setups'} ({currentIndex + 1}/{rallySignals.length})</span>
+                    <span className="text-[10px] text-slate-400">• {currentRally.rallyType}</span>
                   </div>
                 )}
               </div>
@@ -368,21 +368,21 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         )}
 
         {/* Top Header Bar */}
-        <div className={`px-3.5 py-2 flex items-center justify-between shadow-md ${
+        <div className={`px-3.5 py-2.5 flex items-center justify-between shadow-md ${
           isBull 
             ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700' 
             : 'bg-gradient-to-r from-rose-700 via-red-600 to-rose-800'
         }`}>
           <div className="flex items-center space-x-2">
             {isBull ? (
-              <Flame className="w-4 h-4 text-yellow-300 fill-current animate-bounce" />
+              <Flame className="w-5 h-5 text-yellow-300 fill-current animate-bounce" />
             ) : (
-              <TrendingDown className="w-4 h-4 text-yellow-200 animate-pulse" />
+              <TrendingDown className="w-5 h-5 text-yellow-200 animate-pulse" />
             )}
-            <span className="text-xs font-black tracking-wider uppercase text-white flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               {currentRally ? (
                 <>
-                  <span>
+                  <span className="text-sm font-black tracking-wider uppercase text-white">
                     {currentRally.triggerType === 'ONE_HUNDRED_PCT_BULLISH'
                       ? '🟢 100% Bullish Move'
                       : currentRally.triggerType === 'ONE_HUNDRED_PCT_BEARISH'
@@ -397,28 +397,24 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       ? (isBull ? '💥 Breakout Just Hit' : '💥 Breakdown Just Hit')
                       : (isBull ? '📈 Bullish Rally' : '📉 Bearish Breakdown')}
                   </span>
-                  <span className="bg-black/40 text-yellow-200 text-[10px] px-2 py-0.5 rounded-full font-bold border border-yellow-300/40">
+                  <span className="bg-black/40 text-yellow-200 text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-yellow-300/40">
                     {currentRally.confidenceScore}% Accuracy
                   </span>
-                  <span className="bg-black/40 text-purple-200 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border border-purple-300/40 flex items-center gap-0.5">
-                    <ShieldCheck className="w-3 h-3 text-purple-300" />
-                    {currentRally.confluenceRatio} Confluences
-                  </span>
                   {currentRally.isSustainedHold ? (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border bg-emerald-950/80 text-emerald-200 border-emerald-400/60 shadow-[0_0_10px_rgba(16,185,129,0.3)] flex items-center gap-1">
-                      <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
-                      Stood &gt;30m Firm ({currentRally.sustainedDurationMinutes}m)
+                    <span className="text-[10.5px] px-2.5 py-0.5 rounded-full font-mono font-black border bg-emerald-950/80 text-emerald-200 border-emerald-400/60 shadow-[0_0_10px_rgba(16,185,129,0.3)] flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      Stood &gt;30m
                     </span>
                   ) : (
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border flex items-center gap-1 ${
+                    <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-mono font-bold border flex items-center gap-1 ${
                       currentRally.isFresh
                         ? 'bg-amber-400/30 text-yellow-200 border-amber-300/60 shadow-[0_0_10px_rgba(251,191,36,0.3)]'
                         : 'bg-black/40 text-cyan-200 border-cyan-300/40'
                     }`}>
-                      {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5" />}
+                      {currentRally.isFresh ? <Zap className="w-3 h-3 text-yellow-300 fill-current" /> : <Clock className="w-3 h-3" />}
                       {currentRally.rulePassedTime}
                       {currentRally.isMarketHours && currentRally.recencyMinutes <= 30 && (
-                        <span className="text-[9px] text-amber-200 ml-0.5 font-sans">
+                        <span className="text-[9.5px] text-amber-200 ml-0.5 font-sans">
                           ({currentRally.recencyMinutes === 0 ? 'Fresh' : `${currentRally.recencyMinutes}m ago`})
                         </span>
                       )}
@@ -427,30 +423,30 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 </>
               ) : (
                 <>
-                  <span>⚡ Rally &amp; Breakout Popunder</span>
-                  <span className="bg-black/40 text-amber-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-400/40">
-                    0 Matching Current Filter
+                  <span className="text-sm font-black uppercase text-white">⚡ Rally &amp; Breakout Popunder</span>
+                  <span className="bg-black/40 text-amber-300 text-xs px-2 py-0.5 rounded-full font-bold border border-amber-400/40">
+                    0 Matches
                   </span>
                 </>
               )}
-            </span>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1.5">
             {/* Anti-Trap Guide Toggle */}
             <button
               onClick={() => {
                 setShowAntiTrapGuide((prev) => !prev);
                 if (!showAntiTrapGuide) setShowAllList(false);
               }}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-all ${
+              className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
                 showAntiTrapGuide 
                   ? 'bg-amber-400 text-slate-950 font-black shadow-md' 
-                  : 'bg-white/10 text-amber-200 hover:bg-white/20'
+                  : 'bg-white/15 text-amber-200 hover:bg-white/25'
               }`}
-              title="How to avoid false breakouts and traps when confluences meet"
+              title="How to avoid false breakouts and traps"
             >
-              <ShieldCheck className="w-3 h-3 text-amber-300" />
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
               <span>Anti-Trap</span>
             </button>
 
@@ -458,12 +454,12 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             {rallySignals.length > 1 && (
               <button
                 onClick={toggleAutoRotate}
-                className={`p-1 rounded transition-colors ${
+                className={`p-1.5 rounded-lg transition-colors ${
                   isAutoRotating ? 'text-yellow-200 hover:bg-white/10' : 'text-white/50 hover:text-white'
                 }`}
                 title={isAutoRotating ? 'Pause Auto-Slider' : 'Resume Auto-Slider (5s)'}
               >
-                {isAutoRotating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                {isAutoRotating ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
             )}
 
@@ -473,39 +469,39 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 setShowAllList((prev) => !prev);
                 if (!showAllList) setShowAntiTrapGuide(false);
               }}
-              className={`p-1 rounded transition-colors ${
+              className={`p-1.5 rounded-lg transition-colors ${
                 showAllList ? 'bg-white/20 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
               title="Show All Rallying Stocks List"
             >
-              <List className="w-3.5 h-3.5" />
+              <List className="w-4 h-4" />
             </button>
 
             {/* Sound Toggle */}
             <button
               onClick={toggleSound}
-              className="p-1 text-white/80 hover:text-white rounded hover:bg-white/10 transition-colors"
+              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
               title={soundEnabled ? 'Mute Alert Sound' : 'Enable Alert Sound'}
             >
-              {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-white/50" />}
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-white/50" />}
             </button>
 
             {/* Minimize Popunder */}
             <button
               onClick={() => setIsMinimized(true)}
-              className="p-1 text-white/80 hover:text-white rounded hover:bg-white/10 transition-colors"
+              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
               title="Minimize to Popunder Pill"
             >
-              <Minimize2 className="w-3.5 h-3.5" />
+              <Minimize2 className="w-4 h-4" />
             </button>
 
             {/* Close */}
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1 text-white/80 hover:text-white rounded hover:bg-white/10 transition-colors"
+              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
               title="Dismiss Alert"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -819,30 +815,27 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             </button>
           </div>
         ) : showAllList ? (
-          <div className="p-3 max-h-72 overflow-y-auto space-y-1.5 bg-slate-950/95">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-300 mb-1">
+          <div className="p-3.5 max-h-80 overflow-y-auto space-y-2 bg-slate-950/95">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-300 pb-1 border-b border-slate-800">
               <span className="flex items-center gap-1.5">
-                <span>Recent Hits ({rallySignals.length}{totalQualifiedCount > rallySignals.length ? ` of ${totalQualifiedCount}` : ''})</span>
-                <span className="text-[9px] text-purple-300 bg-purple-950/80 border border-purple-800/60 px-1.5 py-0.2 rounded font-mono">
-                  {minConfluences}+ of 6 Confluences
-                </span>
+                <span className="text-sm font-black text-white">Active Setups ({rallySignals.length}{totalQualifiedCount > rallySignals.length ? ` of ${totalQualifiedCount}` : ''})</span>
                 {recencyMode === 'FRESH_AND_SUSTAINED' && (
-                  <span className="text-[9.5px] text-amber-300 font-normal bg-amber-950/80 border border-amber-800/60 px-1.5 py-0.2 rounded">
+                  <span className="text-[10px] text-amber-300 font-semibold bg-amber-950/80 border border-amber-800/60 px-2 py-0.5 rounded-md">
                     ⚡ Fresh &amp; 🛡️ Stood &gt;30m
                   </span>
                 )}
                 {recencyMode === 'SUSTAINED_ONLY' && (
-                  <span className="text-[9.5px] text-emerald-300 font-normal bg-emerald-950/80 border border-emerald-800/60 px-1.5 py-0.2 rounded">
-                    🛡️ Stood &gt;30m Only
+                  <span className="text-[10px] text-emerald-300 font-semibold bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-md">
+                    🛡️ Stood &gt;30m
                   </span>
                 )}
                 {recencyMode === 'FRESH_ONLY' && (
-                  <span className="text-[9.5px] text-cyan-300 font-normal bg-cyan-950/80 border border-cyan-800/60 px-1.5 py-0.2 rounded">
-                    ⚡ Fresh &lt;30m Only
+                  <span className="text-[10px] text-cyan-300 font-semibold bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 rounded-md">
+                    ⚡ Fresh &lt;30m
                   </span>
                 )}
               </span>
-              <span className="text-[10px] text-slate-400">Click stock to inspect</span>
+              <span className="text-[11px] text-slate-400">Click stock to inspect</span>
             </div>
             {rallySignals.map((signal, idx) => {
               const sigBull = signal.direction === 'BULLISH';
@@ -855,67 +848,67 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     setShowAllList(false);
                     setSlideProgress(0);
                   }}
-                  className={`w-full text-left p-2 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
+                  className={`w-full text-left p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
                     isSelected 
-                      ? (sigBull ? 'bg-emerald-950/80 border-emerald-500/80 ring-1 ring-emerald-500/40' : 'bg-rose-950/80 border-rose-500/80 ring-1 ring-rose-500/40')
-                      : 'bg-slate-900/60 border-slate-800 hover:bg-slate-800/80'
+                      ? (sigBull ? 'bg-emerald-950/90 border-emerald-500 ring-2 ring-emerald-500/50 shadow-lg' : 'bg-rose-950/90 border-rose-500 ring-2 ring-rose-500/50 shadow-lg')
+                      : 'bg-slate-900/80 border-slate-800 hover:bg-slate-800/90'
                   }`}
                 >
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2.5">
                     {sigBull ? (
-                      <Flame className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <Flame className="w-4 h-4 text-emerald-400 shrink-0" />
                     ) : (
-                      <TrendingDown className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <TrendingDown className="w-4 h-4 text-rose-400 shrink-0" />
                     )}
                     <div>
-                      <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
-                        <span>{signal.symbol}</span>
-                        <span className="text-[10px] text-slate-400 font-normal">₹{signal.currentPrice.toFixed(1)}</span>
-                        <span className={`px-1 py-0.2 rounded text-[8.5px] font-mono font-black border ${signal.triggerColorClass}`}>
+                      <div className="text-sm font-black text-white flex items-center gap-1.5 flex-wrap">
+                        <span className="text-base tracking-tight">{signal.symbol}</span>
+                        <span className="text-xs text-slate-300 font-semibold font-mono">₹{signal.currentPrice.toFixed(1)}</span>
+                        <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black border ${signal.triggerColorClass}`}>
                           {signal.triggerBadge}
                         </span>
                         {idx === 0 ? (
-                          <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
-                            👑 #1 BEST
+                          <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/50 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
+                            👑 #1
                           </span>
                         ) : (
-                          <span className="bg-slate-800 text-slate-300 border border-slate-700 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold">
+                          <span className="bg-slate-800 text-slate-300 border border-slate-700 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold">
                             #{idx + 1}
                           </span>
                         )}
                         {signal.isSustainedHold ? (
-                          <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 px-1 py-0.2 rounded text-[8px] font-mono font-black flex items-center gap-0.5 shadow-sm">
-                            <ShieldCheck className="w-2 h-2 text-emerald-400" />
-                            STOOD &gt;30M ({signal.sustainedDurationMinutes}m)
+                          <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 px-1.5 py-0.2 rounded text-[9px] font-mono font-black flex items-center gap-0.5 shadow-sm">
+                            <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                            STOOD &gt;30M
                           </span>
                         ) : signal.isFresh ? (
-                          <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1 py-0.2 rounded text-[8.5px] font-mono font-bold flex items-center gap-0.5">
-                            <Zap className="w-2 h-2 fill-current" />
+                          <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/40 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
+                            <Zap className="w-2.5 h-2.5 fill-current" />
                             FRESH
                           </span>
                         ) : null}
                       </div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-[170px] flex items-center gap-1">
-                        <span>{signal.rallyType}</span>
+                      <div className="text-xs text-slate-300 truncate max-w-[200px] flex items-center gap-1.5 mt-0.5">
+                        <span className="font-medium">{signal.rallyType}</span>
                         {signal.parabolicScore && (
-                          <span className="text-[9px] text-teal-300 font-mono font-bold">
+                          <span className="text-[10px] text-teal-300 font-mono font-bold">
                             • Parabolic {signal.parabolicScore}/16
                           </span>
                         )}
                       </div>
-                      <div className="text-[9px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
-                        <Clock className="w-2.5 h-2.5 text-cyan-400" />
+                      <div className="text-[10px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-cyan-400" />
                         <span>Passed: {signal.rulePassedTime} {signal.isMarketHours && `(${signal.recencyMinutes === 0 ? 'Just now' : `${signal.recencyMinutes}m ago`}${signal.isSustainedHold ? ' • Stood Firm' : ''})`}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <div className={`text-xs font-black font-mono ${sigBull ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    <div className={`text-base font-black font-mono ${sigBull ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {signal.pctChange >= 0 ? '+' : ''}{signal.pctChange.toFixed(2)}%
                     </div>
-                    <div className="text-[9px] font-mono text-amber-300 font-bold">
-                      {signal.confidenceScore}% Conviction
+                    <div className="text-[10px] font-mono text-amber-300 font-bold">
+                      {signal.confidenceScore}% Accuracy
                     </div>
                   </div>
                 </button>
@@ -1001,191 +994,172 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             </div>
           </div>
         ) : (
-          /* Content Body of Selected Rotating Stock */
-          <div className="p-3.5 space-y-3 transition-all duration-300">
+          /* Content Body of Selected Rotating Stock (Clean, High Contrast, Big Fonts) */
+          <div className="p-4 space-y-3.5 transition-all duration-300">
             
-            {/* Main Headline & Ticker Info */}
+            {/* Main Headline & Ticker Info with BIG FONTS */}
             <div>
-              <div className="flex items-start justify-between gap-2">
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  {/* Badges Row */}
                   <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                    {/* Trigger Event Badge */}
-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md font-mono border shadow-sm flex items-center gap-1 ${currentRally.triggerColorClass}`}>
+                    <span className={`text-[10.5px] font-black uppercase px-2 py-0.5 rounded-md font-mono border shadow-sm flex items-center gap-1 ${currentRally.triggerColorClass}`}>
                       {currentRally.triggerBadge}
                     </span>
 
                     {currentIndex === 0 ? (
-                      <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/50 text-[10px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1 shadow-sm">
-                        👑 #1 Best Confluence Match
+                      <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/50 text-[10.5px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1 shadow-sm">
+                        👑 #1 TOP PICK
                       </span>
                     ) : (
-                      <span className="bg-slate-800/90 text-slate-200 border border-slate-700 text-[10px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1">
-                        ⭐ Top Elite #{currentIndex + 1}
-                      </span>
-                    )}
-
-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded font-mono ${
-                      currentRally.confidenceBadge === 'INSTITUTIONAL DIAMOND'
-                        ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
-                        : currentRally.confidenceBadge === 'HIGH CONVICTION PRIME'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                        : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                    }`}>
-                      {currentRally.confidenceBadge}
-                    </span>
-                    
-                    {currentRally.parabolicScore && (
-                      <span className="bg-teal-950/90 text-teal-300 border border-teal-500/50 text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1">
-                        <Flame className="w-2.5 h-2.5 text-teal-300" />
-                        Parabolic {currentRally.parabolicScore}/16
+                      <span className="bg-slate-800/90 text-slate-200 border border-slate-700 text-[10.5px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1">
+                        ⭐ #{currentIndex + 1}
                       </span>
                     )}
 
                     {currentRally.isSustainedHold && (
-                      <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/70 text-[10px] px-2 py-0.5 rounded font-mono font-black flex items-center gap-1 shadow-sm">
-                        <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
-                        🛡️ Stood Firm &gt;30m ({currentRally.sustainedDurationMinutes}m)
+                      <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/70 text-[10.5px] px-2 py-0.5 rounded font-mono font-black flex items-center gap-1 shadow-sm">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        🛡️ Stood &gt;30m ({currentRally.sustainedDurationMinutes}m)
                       </span>
                     )}
 
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 border ${
+                    <span className={`text-[10.5px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 border ${
                       currentRally.isFresh
                         ? 'bg-amber-950/90 text-yellow-300 border-amber-500/50 shadow-sm animate-pulse'
                         : currentRally.isSustainedHold
                         ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
                         : 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40'
                     }`}>
-                      {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5 text-cyan-400" />}
-                      Rule Passed: {currentRally.rulePassedTime}
+                      {currentRally.isFresh ? <Zap className="w-3 h-3 text-yellow-300 fill-current" /> : <Clock className="w-3 h-3 text-cyan-400" />}
+                      {currentRally.rulePassedTime}
                       {currentRally.isMarketHours && (
-                        <span className="text-[9px] text-slate-300 font-sans ml-0.5">
+                        <span className="text-[10px] text-slate-300 font-sans ml-0.5">
                           ({currentRally.recencyMinutes === 0 ? 'Just now' : `${currentRally.recencyMinutes}m ago`})
                         </span>
                       )}
                     </span>
                   </div>
 
-                  <h4 className={`text-sm font-extrabold leading-tight mt-1.5 ${isBull ? 'text-emerald-300' : 'text-rose-300'}`}>
-                    {currentRally.isSustainedHold
-                      ? (isBull ? 'Bullish strength stood still & held firm >30m on ' : 'Bearish pressure stood still & held firm >30m on ')
-                      : (isBull ? 'Bullish rally is going on with ' : 'Bearish breakdown is going on with ')}
-                    <span className="text-white underline decoration-2 font-black">{currentRally.symbol}</span>!
-                  </h4>
-                  <p className="text-[11px] text-slate-300 truncate max-w-[240px] mt-0.5">
-                    {currentRally.companyName}
-                  </p>
+                  {/* Stock Symbol - LARGE & PROMINENT */}
+                  <div className="pt-0.5">
+                    <h3 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-white flex items-center gap-2">
+                      <span>{currentRally.symbol}</span>
+                    </h3>
+                    <p className="text-xs text-slate-300 font-medium truncate max-w-[240px] mt-0.5">
+                      {currentRally.companyName}
+                    </p>
+                  </div>
                 </div>
 
-                {/* % Change & CMP Badge */}
-                <div className="text-right shrink-0">
-                  <div className="text-base font-black font-mono text-white">
+                {/* % Change & CMP Badge - LARGE & BOLD */}
+                <div className="text-right shrink-0 flex flex-col items-end">
+                  <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight">
                     ₹{currentRally.currentPrice.toFixed(2)}
                   </div>
-                  <div className={`text-xs font-black font-mono px-2 py-0.5 rounded-md border inline-block ${
+                  <div className={`text-sm font-black font-mono px-2.5 py-0.5 rounded-lg border mt-1 shadow-sm ${
                     isBull 
-                      ? 'bg-emerald-950/90 text-emerald-400 border-emerald-600/70' 
-                      : 'bg-rose-950/90 text-rose-400 border-rose-600/70'
+                      ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/80' 
+                      : 'bg-rose-950/90 text-rose-300 border-rose-500/80'
                   }`}>
                     {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
                   </div>
                 </div>
               </div>
 
-              {/* Exact Timing Analysis Banner */}
-              <div className="mt-2 bg-slate-900/95 border border-slate-700/80 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-[10.5px]">
-                <div className="flex items-center space-x-1.5 flex-wrap">
+              {/* Exact Timing Bar */}
+              <div className="mt-2.5 bg-slate-900/95 border border-slate-700/80 rounded-xl px-3 py-1.5 flex items-center justify-between text-xs">
+                <div className="flex items-center space-x-2">
                   {currentRally.isSustainedHold ? (
                     <>
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span className="text-slate-300 font-medium">Stood Bullish/Firm For:</span>
-                      <span className="font-mono font-bold text-emerald-300">{currentRally.sustainedDurationMinutes} mins</span>
-                      <span className="text-[9.5px] text-slate-400 font-mono">(Hit at {currentRally.rulePassedTime})</span>
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="text-slate-300 font-medium">Stood Bullish &amp; Held Firm:</span>
+                      <span className="font-mono font-black text-emerald-300">{currentRally.sustainedDurationMinutes} mins</span>
                     </>
                   ) : (
                     <>
-                      <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-                      <span className="text-slate-300 font-medium">Just Hit At:</span>
-                      <span className="font-mono font-bold text-cyan-300">{currentRally.rulePassedTime}</span>
+                      <Zap className="w-4 h-4 text-yellow-400 shrink-0" />
+                      <span className="text-slate-300 font-medium">Trigger Hit At:</span>
+                      <span className="font-mono font-black text-cyan-300">{currentRally.rulePassedTime}</span>
                       {currentRally.isMarketHours && (
-                        <span className="text-[9.5px] text-amber-300 font-mono font-bold">
+                        <span className="text-[10.5px] text-amber-300 font-mono font-bold">
                           ({currentRally.recencyMinutes === 0 ? '⚡ Just now' : `⚡ ${currentRally.recencyMinutes}m ago`})
                         </span>
                       )}
                     </>
                   )}
                 </div>
-                <span className="text-[9px] text-purple-300 font-mono flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-purple-400" />
-                  {currentRally.confluenceRatio} Confluences
+                <span className="text-[11px] text-amber-300 font-mono font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
+                  {currentRally.rallyType}
                 </span>
               </div>
             </div>
 
-            {/* Actionable High-Profit Trade Plan Box */}
-            <div className={`p-2.5 rounded-xl border ${
+            {/* Actionable High-Profit Trade Plan Box (BIG CLEAR FONTS) */}
+            <div className={`p-3 rounded-xl border ${
               isBull 
-                ? 'bg-emerald-950/40 border-emerald-500/30' 
-                : 'bg-rose-950/40 border-rose-500/30'
+                ? 'bg-emerald-950/40 border-emerald-500/40' 
+                : 'bg-rose-950/40 border-rose-500/40'
             }`}>
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-1.5">
-                  <Target className={`w-3.5 h-3.5 ${isBull ? 'text-emerald-400' : 'text-rose-400'}`} />
-                  <span className="text-[11px] font-extrabold uppercase tracking-wide text-white">
-                    {plan.action} Setup
+                  <Target className={`w-4 h-4 ${isBull ? 'text-emerald-400' : 'text-rose-400'}`} />
+                  <span className="text-xs font-black uppercase tracking-wide text-white">
+                    {plan.action} Setup Plan
                   </span>
                 </div>
-                <div className="text-[10px] font-mono font-bold text-amber-300 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/30">
+                <div className="text-xs font-mono font-black text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-md border border-amber-500/40">
                   R:R {plan.riskRewardRatio}
                 </div>
               </div>
 
-              {/* Grid of Entry, SL, T1, T2 */}
-              <div className="grid grid-cols-4 gap-1.5 text-center text-[10px] font-mono mt-1">
-                <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[9px] font-sans">Trigger</div>
-                  <div className="font-bold text-white">₹{plan.entryTrigger.toFixed(1)}</div>
+              {/* Grid of Entry, SL, T1, T2 with BIG READABLE NUMBERS */}
+              <div className="grid grid-cols-4 gap-2 text-center mt-1.5">
+                <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
+                  <div className="text-slate-400 text-[10px] font-sans font-bold uppercase tracking-wider">Trigger</div>
+                  <div className="text-sm sm:text-base font-black font-mono text-white mt-0.5">₹{plan.entryTrigger.toFixed(1)}</div>
                 </div>
 
-                <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[9px] font-sans">Stop Loss</div>
-                  <div className="font-bold text-rose-400">₹{plan.stopLoss.toFixed(1)}</div>
+                <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
+                  <div className="text-rose-400 text-[10px] font-sans font-bold uppercase tracking-wider">Stop Loss</div>
+                  <div className="text-sm sm:text-base font-black font-mono text-rose-400 mt-0.5">₹{plan.stopLoss.toFixed(1)}</div>
                 </div>
 
-                <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[9px] font-sans">Target 1</div>
-                  <div className="font-bold text-emerald-400">₹{plan.target1.toFixed(1)}</div>
+                <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
+                  <div className="text-emerald-400 text-[10px] font-sans font-bold uppercase tracking-wider">Target 1</div>
+                  <div className="text-sm sm:text-base font-black font-mono text-emerald-400 mt-0.5">₹{plan.target1.toFixed(1)}</div>
                 </div>
 
-                <div className="bg-slate-900/90 p-1.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[9px] font-sans">Target 2</div>
-                  <div className="font-bold text-teal-300">₹{plan.target2.toFixed(1)}</div>
+                <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
+                  <div className="text-teal-300 text-[10px] font-sans font-bold uppercase tracking-wider">Target 2</div>
+                  <div className="text-sm sm:text-base font-black font-mono text-teal-300 mt-0.5">₹{plan.target2.toFixed(1)}</div>
                 </div>
               </div>
 
-              {/* Option Strike Callout */}
+              {/* Option Strike Callout with BIG READABLE STRIKE */}
               <div 
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelectStockDetail(currentRally.stock);
                 }}
-                className="mt-2 pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px] cursor-pointer hover:bg-white/5 px-1 py-0.5 rounded transition-colors"
+                className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs cursor-pointer hover:bg-white/5 px-2 py-1 rounded-lg transition-colors"
                 title="Click to view full Options Strike Analysis & Gann levels"
               >
-                <div className="flex items-center space-x-1">
-                  <Zap className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-                  <span className="font-sans text-slate-300 text-[10px]">Option:</span>
-                  <span className="font-mono font-black text-yellow-300 text-[10px] bg-yellow-950/80 px-1 py-0.2 rounded border border-yellow-500/40">
+                <div className="flex items-center space-x-1.5">
+                  <Zap className="w-4 h-4 text-yellow-400 shrink-0" />
+                  <span className="font-sans text-slate-300 text-xs font-semibold">Recommended Option:</span>
+                  <span className="font-mono font-black text-yellow-300 text-xs sm:text-sm bg-yellow-950/90 px-2 py-0.5 rounded-md border border-yellow-500/50 shadow-sm">
                     {plan.recommendedOptionStrike}
                   </span>
                 </div>
-                <div className="text-[10px] font-mono text-slate-300">
+                <div className="text-xs font-mono text-slate-200">
                   LTP ~<span className="text-white font-bold">₹{plan.optionEntryEst.toFixed(1)}</span> (T1: <span className="text-emerald-400 font-bold">₹{plan.optionTarget1.toFixed(1)}</span>)
                 </div>
               </div>
             </div>
 
-            {/* Anti-Trap Execution & Invalidation Rules Box (Crucial to prevent false breakout losses) */}
-            <div className={`p-2.5 rounded-xl border text-[10.5px] space-y-1.5 ${
+            {/* Anti-Trap Execution & Invalidation Rules (Clean, Big Fonts, No clutter) */}
+            <div className={`p-3 rounded-xl border space-y-2 ${
               currentRally.trapRiskLevel === 'SAFE'
                 ? 'bg-slate-900/90 border-emerald-500/40'
                 : currentRally.trapRiskLevel === 'MODERATE'
@@ -1193,14 +1167,14 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 : 'bg-rose-950/40 border-rose-500/50'
             }`}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-1.5 font-bold">
-                  <ShieldCheck className={`w-3.5 h-3.5 ${
+                <div className="flex items-center space-x-2 font-bold">
+                  <ShieldCheck className={`w-4 h-4 ${
                     currentRally.trapRiskLevel === 'SAFE' ? 'text-emerald-400' : currentRally.trapRiskLevel === 'MODERATE' ? 'text-amber-400' : 'text-rose-400'
                   }`} />
-                  <span className="uppercase text-[10px] tracking-wider text-slate-200">
+                  <span className="uppercase text-[11px] tracking-wider text-slate-200">
                     Anti-Trap Guard:
                   </span>
-                  <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black ${
+                  <span className={`px-2 py-0.5 rounded text-[10.5px] font-mono font-black ${
                     currentRally.trapRiskLevel === 'SAFE'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                       : currentRally.trapRiskLevel === 'MODERATE'
@@ -1212,101 +1186,75 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 </div>
                 <button
                   onClick={() => setShowAntiTrapGuide(true)}
-                  className="text-[9.5px] text-amber-300 hover:underline cursor-pointer flex items-center gap-0.5"
+                  className="text-[10.5px] text-amber-300 hover:underline cursor-pointer flex items-center gap-0.5 font-bold"
                 >
-                  <Info className="w-2.5 h-2.5" />
-                  <span>Trap Rules</span>
+                  <Info className="w-3 h-3" />
+                  <span>Rules</span>
                 </button>
               </div>
 
               {/* Strict Entry Confirmation Trigger */}
-              <div className="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800 space-y-1">
-                <div className="text-slate-300 flex items-start gap-1">
-                  <span className="text-emerald-400 font-bold shrink-0">🎯 Entry Confirmation:</span>
-                  <span className="font-mono text-white text-[10px]">{currentRally.entryConfirmation}</span>
+              <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 space-y-1.5">
+                <div className="text-slate-300 flex items-start gap-1.5 text-xs">
+                  <span className="text-emerald-400 font-bold shrink-0">🎯 Entry Trigger:</span>
+                  <span className="font-mono text-white font-medium">{currentRally.entryConfirmation}</span>
                 </div>
-                <div className="text-slate-300 flex items-start gap-1 border-t border-slate-800/80 pt-1">
+                <div className="text-slate-300 flex items-start gap-1.5 border-t border-slate-800/80 pt-1.5 text-xs">
                   <span className="text-rose-400 font-bold shrink-0">🛑 Invalidation SL:</span>
-                  <span className="font-mono text-rose-300 text-[10px]">{currentRally.invalidationRule}</span>
+                  <span className="font-mono text-rose-300 font-medium">{currentRally.invalidationRule}</span>
                 </div>
-              </div>
-
-              {/* Trap Warning Note */}
-              <div className="text-[9.5px] text-slate-400 leading-snug">
-                💡 <span className="text-slate-300 font-medium">{currentRally.trapWarning}</span>
               </div>
             </div>
 
-            {/* Confluence Points Checklist */}
-            <div className="bg-slate-900/90 border border-slate-800/90 p-2 rounded-xl space-y-1">
-              <div className="text-[10px] font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Verified Confluences ({currentRally.confluenceRatio} Matched):</span>
-                </div>
-                <span className="text-[9px] font-mono text-purple-300 bg-purple-950/80 px-1.5 py-0.2 rounded border border-purple-500/30">
-                  {Math.round((currentRally.confluenceCount / currentRally.totalConfluences) * 100)}% Majority
-                </span>
-              </div>
-              <div className="space-y-0.5 mt-1">
-                {currentRally.confluencePoints.map((point, idx) => (
-                  <div key={idx} className="flex items-start space-x-1.5 text-[10px] text-slate-200">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="leading-tight">{point}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick Technical Badges */}
-            <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono">
+            {/* Quick Technical Badges (VWAP, RSI, 15m Range) */}
+            <div className="grid grid-cols-3 gap-2 text-center font-mono">
               {currentRally.vwap !== undefined && currentRally.vwap !== null && (
-                <div className="bg-slate-900/80 p-1.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[9px] font-sans">VWAP</div>
-                  <div className="font-bold text-purple-300">₹{currentRally.vwap.toFixed(1)}</div>
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">VWAP</div>
+                  <div className="font-black text-sm text-purple-300 mt-0.5">₹{currentRally.vwap.toFixed(1)}</div>
                 </div>
               )}
 
               {currentRally.rsi !== undefined && currentRally.rsi !== null && (
-                <div className="bg-slate-900/80 p-1.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[9px] font-sans">RSI (14)</div>
-                  <div className="font-bold text-blue-300">{currentRally.rsi.toFixed(1)}</div>
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">RSI (14)</div>
+                  <div className="font-black text-sm text-blue-300 mt-0.5">{currentRally.rsi.toFixed(1)}</div>
                 </div>
               )}
 
               {currentRally.first15mHigh !== undefined && currentRally.first15mHigh !== null && isBull && (
-                <div className="bg-slate-900/80 p-1.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[9px] font-sans">15m High</div>
-                  <div className="font-bold text-emerald-400">₹{currentRally.first15mHigh.toFixed(1)}</div>
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">15m High</div>
+                  <div className="font-black text-sm text-emerald-400 mt-0.5">₹{currentRally.first15mHigh.toFixed(1)}</div>
                 </div>
               )}
 
               {currentRally.first15mLow !== undefined && currentRally.first15mLow !== null && !isBull && (
-                <div className="bg-slate-900/80 p-1.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[9px] font-sans">15m Low</div>
-                  <div className="font-bold text-rose-400">₹{currentRally.first15mLow.toFixed(1)}</div>
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">15m Low</div>
+                  <div className="font-black text-sm text-rose-400 mt-0.5">₹{currentRally.first15mLow.toFixed(1)}</div>
                 </div>
               )}
             </div>
 
             {/* Navigation Slider Bar with Auto-Rotate Status & Dot Pills */}
             {rallySignals.length > 1 && (
-              <div className="pt-1.5 border-t border-slate-800/80 space-y-1.5">
+              <div className="pt-2 border-t border-slate-800/80 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <button
                     onClick={handlePrevSlide}
-                    className="p-1 text-slate-400 hover:text-white flex items-center gap-0.5 transition-colors cursor-pointer text-[11px]"
+                    className="px-2 py-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg flex items-center gap-1 transition-colors cursor-pointer text-xs font-bold"
                   >
-                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <ChevronLeft className="w-4 h-4" />
                     <span>Prev</span>
                   </button>
 
-                  <div className="flex items-center space-x-1">
-                    <span className="text-[11px] text-slate-300 font-semibold font-mono">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs text-white font-bold font-mono">
                       Stock {currentIndex + 1} of {rallySignals.length}
                     </span>
                     {isAutoRotating && (
-                      <span className="text-[9px] text-yellow-300 bg-yellow-950/60 px-1 py-0.2 rounded border border-yellow-500/30">
+                      <span className="text-[10px] text-yellow-300 bg-yellow-950/70 px-1.5 py-0.5 rounded border border-yellow-500/30 font-medium">
                         Auto-Rotating (5s)
                       </span>
                     )}
@@ -1314,15 +1262,15 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
                   <button
                     onClick={handleNextSlide}
-                    className="p-1 text-slate-400 hover:text-white flex items-center gap-0.5 transition-colors cursor-pointer text-[11px]"
+                    className="px-2 py-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg flex items-center gap-1 transition-colors cursor-pointer text-xs font-bold"
                   >
                     <span>Next</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
+                    <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
 
                 {/* Dot / Pill Indicators for rapid navigation */}
-                <div className="flex items-center justify-center space-x-1">
+                <div className="flex items-center justify-center space-x-1.5">
                   {rallySignals.map((_, i) => (
                     <button
                       key={i}
@@ -1330,10 +1278,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                         setCurrentIndex(i);
                         setSlideProgress(0);
                       }}
-                      className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                      className={`h-2 rounded-full transition-all cursor-pointer ${
                         i === currentIndex 
-                          ? (isBull ? 'w-5 bg-emerald-400' : 'w-5 bg-rose-400') 
-                          : 'w-1.5 bg-slate-700 hover:bg-slate-500'
+                          ? (isBull ? 'w-6 bg-emerald-400' : 'w-6 bg-rose-400') 
+                          : 'w-2 bg-slate-700 hover:bg-slate-500'
                       }`}
                       title={`Jump to setup #${i + 1}`}
                     />
@@ -1346,23 +1294,23 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             <div className="flex items-center space-x-2 pt-1">
               <button
                 onClick={() => onSelectStockDetail(currentRally.stock)}
-                className={`flex-1 font-extrabold text-xs py-2 px-3 rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer text-white ${
+                className={`flex-1 font-black text-sm py-2.5 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 cursor-pointer text-white hover:scale-[1.01] ${
                   isBull 
-                    ? 'bg-emerald-600 hover:bg-emerald-500' 
-                    : 'bg-rose-600 hover:bg-rose-500'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/60' 
+                    : 'bg-rose-600 hover:bg-rose-500 shadow-rose-950/60'
                 }`}
               >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>View Full Chart & Gann Levels</span>
+                <ExternalLink className="w-4 h-4" />
+                <span>View Full Chart &amp; Gann Levels</span>
               </button>
 
               {onOpenPositionSizer && (
                 <button
                   onClick={() => onOpenPositionSizer(currentRally.stock)}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-xl border border-slate-700 transition-colors"
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2.5 rounded-xl border border-slate-700 transition-colors shadow-md"
                   title="Open Position Sizer & Risk Calculator"
                 >
-                  <Calculator className="w-4 h-4 text-emerald-400" />
+                  <Calculator className="w-5 h-5 text-emerald-400" />
                 </button>
               )}
             </div>
