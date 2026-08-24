@@ -657,6 +657,17 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               ⚡ All Hits
             </button>
             <button
+              onClick={() => { setCategoryFilter('INDEX_HOLD'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'INDEX_HOLD'
+                  ? 'bg-amber-500/30 text-yellow-300 border border-amber-400/50 shadow-sm font-bold ring-1 ring-amber-400/40'
+                  : 'bg-slate-900/80 text-amber-300/80 hover:text-yellow-300'
+              }`}
+              title="Show Benchmark Indices (NIFTY, BANKNIFTY, etc.) holding firm for >30 minutes"
+            >
+              🏛️ Index Holds &gt;30m
+            </button>
+            <button
               onClick={() => { setCategoryFilter('SUSTAINED_BULL'); setCurrentIndex(0); }}
               className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
                 categoryFilter === 'SUSTAINED_BULL'
@@ -946,6 +957,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               >
                 <Flame className="w-3.5 h-3.5 text-yellow-300 fill-current" />
                 <span>⚡ Show All Active Signals</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setCategoryFilter('INDEX_HOLD');
+                  setFilterDirection('ALL');
+                  setRecencyMode('FRESH_AND_SUSTAINED');
+                  setCurrentIndex(0);
+                }}
+                className="px-2.5 py-1.5 bg-amber-950/80 hover:bg-amber-900 text-yellow-300 text-[11px] font-semibold rounded-lg border border-amber-500/40 transition-colors cursor-pointer"
+              >
+                🏛️ Index Holds &gt;30m
               </button>
 
               <button
