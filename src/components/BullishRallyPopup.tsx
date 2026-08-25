@@ -494,7 +494,11 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             {currentRally ? (
               <div>
                 <div className="text-sm font-black flex items-center gap-1.5 flex-wrap">
-                  <span className={`text-base font-mono tracking-tight ${isBull ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  <span className={`text-base sm:text-lg font-black font-mono tracking-tight px-2 py-0.5 rounded-lg border ${
+                    isBull 
+                      ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/60 shadow-sm' 
+                      : 'bg-rose-950/90 text-rose-300 border-rose-500/60 shadow-sm'
+                  }`}>
                     {currentRally.symbol}
                   </span>
                   <span className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${isBull ? 'bg-emerald-500/30 text-emerald-200' : 'bg-rose-500/30 text-rose-200'}`}>
@@ -624,6 +628,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             <div className="flex items-center gap-2 flex-wrap">
               {currentRally ? (
                 <>
+                  <span className="text-base sm:text-lg font-black font-mono bg-black/40 text-yellow-300 px-2 py-0.5 rounded-lg border border-yellow-400/50 tracking-wider">
+                    {currentRally.symbol}
+                  </span>
                   <span className="text-sm font-black tracking-wider uppercase text-white">
                     {currentRally.triggerType === 'ONE_HUNDRED_PCT_BULLISH'
                       ? '🟢 100% Bullish Move'
@@ -789,7 +796,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     }`}
                     title={`Click to view ${sig.symbol} (${sig.companyName}) • Hit: ${sig.rulePassedTime} (${sig.recencyMinutes === 0 ? 'Just now' : `${sig.recencyMinutes}m ago`})`}
                   >
-                    <span className={`text-xs font-black ${isAct ? 'text-white underline underline-offset-2' : (isSigBull ? 'text-emerald-400' : 'text-rose-400')}`}>
+                    <span className={`text-sm sm:text-base font-black font-mono tracking-tight ${isAct ? 'text-white underline underline-offset-4 decoration-yellow-300 decoration-2' : (isSigBull ? 'text-emerald-300' : 'text-rose-300')}`}>
                       {sig.symbol}
                     </span>
                     <span className="text-[11px] font-mono text-slate-300">
@@ -925,7 +932,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     )}
                     <div>
                       <div className="text-sm font-black text-white flex items-center gap-1.5 flex-wrap">
-                        <span className="text-base tracking-tight">{signal.symbol}</span>
+                        <span className="text-base sm:text-lg font-black font-mono text-yellow-300 tracking-tight">{signal.symbol}</span>
                         <span className="text-xs text-slate-300 font-semibold font-mono">₹{signal.currentPrice.toFixed(1)}</span>
                         <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black border ${signal.triggerColorClass}`}>
                           {signal.triggerBadge}
@@ -1033,10 +1040,14 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           /* Content Body of Selected Rotating Stock (Clean, High Contrast, Big Fonts) */
           <div className="p-4 space-y-3.5 transition-all duration-300">
             
-            {/* Main Headline & Ticker Info with BIG FONTS */}
-            <div>
+            {/* Main Headline & Ticker Hero Box with HUGE FONTS & HIGH CONTRAST */}
+            <div className={`p-3.5 rounded-2xl border-2 shadow-xl ${
+              isBull
+                ? 'bg-gradient-to-r from-slate-950 via-emerald-950/80 to-slate-950 border-emerald-500/70 shadow-emerald-950/40'
+                : 'bg-gradient-to-r from-slate-950 via-rose-950/80 to-slate-950 border-rose-500/70 shadow-rose-950/40'
+            }`}>
               <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   {/* Badges Row */}
                   <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
                     <span className={`text-[10.5px] font-black uppercase px-2 py-0.5 rounded-md font-mono border shadow-sm flex items-center gap-1 ${currentRally.triggerColorClass}`}>
@@ -1059,54 +1070,42 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                         🛡️ Stood &gt;30m ({currentRally.sustainedDurationMinutes}m)
                       </span>
                     )}
-
-                    <span className={`text-xs px-2.5 py-1 rounded-lg font-mono font-black flex items-center gap-1.5 border shadow-sm ${
-                      currentRally.isFresh
-                        ? 'bg-amber-950/90 text-yellow-300 border-amber-500/70 animate-pulse'
-                        : currentRally.isSustainedHold
-                        ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/70'
-                        : 'bg-slate-900/90 text-cyan-300 border-cyan-500/50'
-                    }`}>
-                      {currentRally.isFresh ? <Zap className="w-3.5 h-3.5 text-yellow-300 fill-current" /> : <Clock className="w-3.5 h-3.5 text-cyan-400" />}
-                      <span>LAST HIT: {currentRally.rulePassedTime}</span>
-                      {currentRally.isMarketHours && (
-                        <span className="text-[11px] text-slate-300 font-sans font-medium ml-0.5">
-                          ({currentRally.recencyMinutes === 0 ? 'Just now' : `${currentRally.recencyMinutes}m ago`})
-                        </span>
-                      )}
-                    </span>
                   </div>
 
-                  {/* Stock Symbol - LARGE & PROMINENT */}
-                  <div className="pt-0.5">
-                    <h3 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-white flex items-center gap-2">
-                      <span>{currentRally.symbol}</span>
-                    </h3>
-                    <p className="text-xs text-slate-300 font-medium truncate max-w-[240px] mt-0.5">
-                      {currentRally.companyName}
-                    </p>
+                  {/* Stock Symbol - EXTRA LARGE & HIGH CONTRAST */}
+                  <div className="pt-1">
+                    <div className="flex items-baseline gap-2.5 flex-wrap">
+                      <h2 className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] flex items-center gap-2">
+                        <span className={isBull ? 'text-emerald-300' : 'text-rose-300'}>
+                          {currentRally.symbol}
+                        </span>
+                      </h2>
+                      <span className="text-xs sm:text-sm font-bold text-slate-300 truncate max-w-[220px]">
+                        {currentRally.companyName}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 {/* % Change & CMP Badge - LARGE & BOLD + Stock Dismiss Button */}
                 <div className="text-right shrink-0 flex flex-col items-end">
                   <div className="flex items-center gap-1.5">
-                    <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight">
+                    <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight drop-shadow">
                       ₹{currentRally.currentPrice.toFixed(2)}
                     </div>
                     {/* Stock Dismiss button */}
                     <button
                       onClick={(e) => handleDismissStock(currentRally.symbol, e)}
-                      className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors cursor-pointer"
                       title={`Remove ${currentRally.symbol} from popunder selection`}
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className={`text-sm font-black font-mono px-2.5 py-0.5 rounded-lg border mt-1 shadow-sm ${
+                  <div className={`text-sm sm:text-base font-black font-mono px-3 py-0.5 rounded-lg border mt-1.5 shadow-md ${
                     isBull 
-                      ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/80' 
-                      : 'bg-rose-950/90 text-rose-300 border-rose-500/80'
+                      ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400' 
+                      : 'bg-rose-950/90 text-rose-300 border-rose-400'
                   }`}>
                     {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
                   </div>
