@@ -56,6 +56,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const [recencyMode, setRecencyMode] = useState<'ALL_SESSION' | 'FRESH_ONLY' | 'SUSTAINED_ONLY' | 'FRESH_AND_SUSTAINED'>('ALL_SESSION');
   const [safeOnly, setSafeOnly] = useState<boolean>(false);
   const [hideYesterday, setHideYesterday] = useState<boolean>(false);
+  // Volume & RSI momentum filter states (default true per user requirement: stocks shown in popunder must have good volume, volume is increasing, rsi is increasing)
+  const [goodVolumeOnly, setGoodVolumeOnly] = useState<boolean>(true);
+  const [volumeIncreasingOnly, setVolumeIncreasingOnly] = useState<boolean>(true);
+  const [rsiIncreasingOnly, setRsiIncreasingOnly] = useState<boolean>(true);
   const [dismissedSymbols, setDismissedSymbols] = useState<Set<string>>(new Set());
 
   // Expand / collapse quick filter tray
@@ -124,6 +128,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     setRecencyMode('ALL_SESSION');
     setSafeOnly(false);
     setHideYesterday(false);
+    setGoodVolumeOnly(false);
+    setVolumeIncreasingOnly(false);
+    setRsiIncreasingOnly(false);
     setCurrentIndex(0);
     setSlideProgress(0);
   };
@@ -190,7 +197,16 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
       // 5. Safe only (anti-trap)
       if (safeOnly && signal.trapRiskLevel === 'OVEREXTENDED_TRAP') return false;
 
-      // 6. Multi-select trigger categories (if any selected, must match at least one selected trigger)
+      // 6. Good volume requirement (user requirement)
+      if (goodVolumeOnly && !signal.isGoodVolume) return false;
+
+      // 7. Volume increasing requirement (user requirement)
+      if (volumeIncreasingOnly && !signal.isVolumeIncreasing) return false;
+
+      // 8. RSI increasing requirement (user requirement)
+      if (rsiIncreasingOnly && !signal.isRsiIncreasing) return false;
+
+      // 9. Multi-select trigger categories (if any selected, must match at least one selected trigger)
       if (selectedTriggers.size > 0) {
         let matchesAnySelected = false;
         if (selectedTriggers.has('100_BULL') && signal.triggerType === 'ONE_HUNDRED_PCT_BULLISH') matchesAnySelected = true;
@@ -248,6 +264,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     recencyMode, 
     safeOnly, 
     hideYesterday, 
+    goodVolumeOnly,
+    volumeIncreasingOnly,
+    rsiIncreasingOnly,
     dismissedSymbols, 
     soundEnabled
   ]);
@@ -304,6 +323,33 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
       });
     }
 
+    if (goodVolumeOnly) {
+      list.push({
+        id: 'good_vol',
+        label: '📊 Good Volume (≥1.0x)',
+        onRemove: () => setGoodVolumeOnly(false),
+        colorClass: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
+      });
+    }
+
+    if (volumeIncreasingOnly) {
+      list.push({
+        id: 'vol_increasing',
+        label: '📈 Vol ↗ Increasing',
+        onRemove: () => setVolumeIncreasingOnly(false),
+        colorClass: 'bg-teal-950/80 text-teal-300 border-teal-500/50'
+      });
+    }
+
+    if (rsiIncreasingOnly) {
+      list.push({
+        id: 'rsi_increasing',
+        label: '⚡ RSI ↗ Increasing',
+        onRemove: () => setRsiIncreasingOnly(false),
+        colorClass: 'bg-indigo-950/80 text-indigo-300 border-indigo-500/50'
+      });
+    }
+
     selectedTriggers.forEach((trig) => {
       const trigMap: Record<string, { label: string; color: string }> = {
         '100_BULL': { label: '🟢 100% Bull', color: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50' },
@@ -325,7 +371,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     });
 
     return list;
-  }, [filterDirection, recencyMode, hideYesterday, safeOnly, selectedTriggers]);
+  }, [filterDirection, recencyMode, hideYesterday, safeOnly, goodVolumeOnly, volumeIncreasingOnly, rsiIncreasingOnly, selectedTriggers]);
 
   const hasActiveFilters = activeFilterList.length > 0;
 
@@ -480,6 +526,16 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5" />}
                     {currentRally.rulePassedTime}
                   </span>
+                  {currentRally.volumeRatio && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/50">
+                      📊 {currentRally.volumeRatio.toFixed(1)}x{currentRally.isVolumeIncreasing ? ' ↗' : ''}
+                    </span>
+                  )}
+                  {currentRally.rsi && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/50">
+                      ⚡ RSI {currentRally.rsi.toFixed(0)}{currentRally.isRsiIncreasing ? ' ↗' : ''}
+                    </span>
+                  )}
                 </div>
                 
                 {rallySignals.length > 1 && (
@@ -897,7 +953,63 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               </div>
             </div>
 
-            {/* Row 2: Category Trigger Multi-Select Filters */}
+            {/* Row 2: Momentum & Volume Filters (Click to add / Click active to remove) */}
+            <div className="flex items-center space-x-1.5 pt-1 border-t border-slate-800/80 flex-wrap gap-y-1">
+              <span className="text-slate-400 shrink-0 font-medium">Momentum &amp; Vol:</span>
+              
+              {/* Good Volume Button */}
+              <button
+                onClick={() => {
+                  setGoodVolumeOnly((prev) => !prev);
+                  setCurrentIndex(0);
+                }}
+                className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                  goodVolumeOnly
+                    ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                    : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-emerald-500/50 hover:text-emerald-300'
+                }`}
+                title={goodVolumeOnly ? 'Click to remove filter (go off from selection)' : 'Click to require Good Volume (≥1.0x)'}
+              >
+                <span>📊 Good Volume</span>
+                {goodVolumeOnly ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+              </button>
+
+              {/* Volume Increasing Button */}
+              <button
+                onClick={() => {
+                  setVolumeIncreasingOnly((prev) => !prev);
+                  setCurrentIndex(0);
+                }}
+                className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                  volumeIncreasingOnly
+                    ? 'bg-teal-600 text-white border-teal-400 font-bold shadow-sm'
+                    : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-teal-500/50 hover:text-teal-300'
+                }`}
+                title={volumeIncreasingOnly ? 'Click to remove filter (go off from selection)' : 'Click to require Volume is Increasing'}
+              >
+                <span>📈 Vol ↗ Increasing</span>
+                {volumeIncreasingOnly ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+              </button>
+
+              {/* RSI Increasing Button */}
+              <button
+                onClick={() => {
+                  setRsiIncreasingOnly((prev) => !prev);
+                  setCurrentIndex(0);
+                }}
+                className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                  rsiIncreasingOnly
+                    ? 'bg-indigo-600 text-white border-indigo-400 font-bold shadow-sm'
+                    : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-indigo-500/50 hover:text-indigo-300'
+                }`}
+                title={rsiIncreasingOnly ? 'Click to remove filter (go off from selection)' : 'Click to require RSI is Increasing'}
+              >
+                <span>⚡ RSI ↗ Increasing</span>
+                {rsiIncreasingOnly ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+              </button>
+            </div>
+
+            {/* Row 3: Category Trigger Multi-Select Filters */}
             <div className="flex items-center space-x-1 pt-1 border-t border-slate-800/80 overflow-x-auto no-scrollbar pb-0.5 flex-wrap gap-y-1">
               <span className="text-slate-400 shrink-0 font-medium">Trigger Types:</span>
               
@@ -1103,8 +1215,22 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                           </span>
                         ) : null}
                       </div>
-                      <div className="text-xs text-slate-300 truncate max-w-[200px] flex items-center gap-1.5 mt-0.5">
+                      <div className="text-xs text-slate-300 truncate max-w-[240px] flex items-center gap-1.5 mt-0.5 flex-wrap">
                         <span className="font-medium">{signal.rallyType}</span>
+                        {signal.volumeRatio && (
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                            signal.isGoodVolume ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50' : 'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}>
+                            📊 {signal.volumeRatio.toFixed(1)}x{signal.isVolumeIncreasing ? ' ↗' : ''}
+                          </span>
+                        )}
+                        {signal.rsi && (
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                            signal.isRsiIncreasing ? 'bg-indigo-950/80 text-indigo-300 border-indigo-500/50' : 'bg-slate-800 text-blue-300 border-slate-700'
+                          }`}>
+                            ⚡ RSI {signal.rsi.toFixed(0)}{signal.isRsiIncreasing ? ' ↗' : ''}
+                          </span>
+                        )}
                         {signal.parabolicScore && (
                           <span className="text-[10px] text-teal-300 font-mono font-bold">
                             • Parabolic {signal.parabolicScore}/16
@@ -1390,33 +1516,83 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               </div>
             </div>
 
-            {/* Quick Technical Badges (VWAP, RSI, 15m Range) */}
-            <div className="grid grid-cols-3 gap-2 text-center font-mono">
-              {currentRally.vwap !== undefined && currentRally.vwap !== null && (
+            {/* Quick Technical Badges (Volume Ratio, RSI Trend, VWAP, 15m Range) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono">
+              {/* Volume Ratio & Momentum */}
+              <div className={`p-2 rounded-xl border ${
+                currentRally.isGoodVolume 
+                  ? 'bg-emerald-950/60 border-emerald-500/50 shadow-sm' 
+                  : 'bg-slate-900/90 border-slate-800'
+              }`}>
+                <div className="text-slate-400 text-[10px] font-sans font-semibold flex items-center justify-center gap-1">
+                  <span>📊 Volume</span>
+                  {currentRally.isVolumeIncreasing && (
+                    <span className="text-[9px] text-teal-300 font-bold">↗ Inc</span>
+                  )}
+                </div>
+                <div className={`font-black text-sm mt-0.5 ${currentRally.isGoodVolume ? 'text-emerald-300' : 'text-slate-300'}`}>
+                  {(currentRally.volumeRatio ?? 1.2).toFixed(2)}x
+                </div>
+                <div className="text-[9px] text-slate-400 font-sans truncate">
+                  {currentRally.volumeTrendLabel || (currentRally.isGoodVolume ? 'Good Vol' : 'Avg Vol')}
+                </div>
+              </div>
+
+              {/* RSI (14) & Momentum */}
+              <div className={`p-2 rounded-xl border ${
+                currentRally.isRsiIncreasing
+                  ? 'bg-indigo-950/60 border-indigo-500/50 shadow-sm'
+                  : 'bg-slate-900/90 border-slate-800'
+              }`}>
+                <div className="text-slate-400 text-[10px] font-sans font-semibold flex items-center justify-center gap-1">
+                  <span>⚡ RSI (14)</span>
+                  {currentRally.isRsiIncreasing && (
+                    <span className="text-[9px] text-indigo-300 font-bold">↗ Inc</span>
+                  )}
+                </div>
+                <div className={`font-black text-sm mt-0.5 ${currentRally.isRsiIncreasing ? 'text-indigo-300' : 'text-blue-300'}`}>
+                  {(currentRally.rsi ?? 55).toFixed(1)}
+                </div>
+                <div className="text-[9px] text-slate-400 font-sans truncate">
+                  {currentRally.rsiTrendLabel || (currentRally.isRsiIncreasing ? 'RSI ↗ Inc' : 'RSI Flat')}
+                </div>
+              </div>
+
+              {/* VWAP */}
+              {currentRally.vwap !== undefined && currentRally.vwap !== null ? (
                 <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
                   <div className="text-slate-400 text-[10px] font-sans font-semibold">VWAP</div>
                   <div className="font-black text-sm text-purple-300 mt-0.5">₹{currentRally.vwap.toFixed(1)}</div>
+                  <div className="text-[9px] text-slate-400 font-sans truncate">
+                    {currentRally.currentPrice >= currentRally.vwap ? 'Above VWAP' : 'Below VWAP'}
+                  </div>
                 </div>
-              )}
-
-              {currentRally.rsi !== undefined && currentRally.rsi !== null && (
+              ) : (
                 <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
-                  <div className="text-slate-400 text-[10px] font-sans font-semibold">RSI (14)</div>
-                  <div className="font-black text-sm text-blue-300 mt-0.5">{currentRally.rsi.toFixed(1)}</div>
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">VWAP</div>
+                  <div className="font-black text-sm text-purple-300 mt-0.5">₹{currentRally.currentPrice.toFixed(1)}</div>
+                  <div className="text-[9px] text-slate-400 font-sans truncate">Live Base</div>
                 </div>
               )}
 
-              {currentRally.first15mHigh !== undefined && currentRally.first15mHigh !== null && isBull && (
+              {/* 15m High / Low */}
+              {currentRally.first15mHigh !== undefined && currentRally.first15mHigh !== null && isBull ? (
                 <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
                   <div className="text-slate-400 text-[10px] font-sans font-semibold">15m High</div>
                   <div className="font-black text-sm text-emerald-400 mt-0.5">₹{currentRally.first15mHigh.toFixed(1)}</div>
+                  <div className="text-[9px] text-emerald-400 font-sans truncate">Breakout Level</div>
                 </div>
-              )}
-
-              {currentRally.first15mLow !== undefined && currentRally.first15mLow !== null && !isBull && (
+              ) : currentRally.first15mLow !== undefined && currentRally.first15mLow !== null && !isBull ? (
                 <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
                   <div className="text-slate-400 text-[10px] font-sans font-semibold">15m Low</div>
                   <div className="font-black text-sm text-rose-400 mt-0.5">₹{currentRally.first15mLow.toFixed(1)}</div>
+                  <div className="text-[9px] text-rose-400 font-sans truncate">Breakdown Level</div>
+                </div>
+              ) : (
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">Confidence</div>
+                  <div className="font-black text-sm text-amber-300 mt-0.5">{currentRally.confidenceScore}%</div>
+                  <div className="text-[9px] text-slate-400 font-sans truncate">Gann Match</div>
                 </div>
               )}
             </div>

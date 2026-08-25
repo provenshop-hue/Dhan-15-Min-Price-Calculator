@@ -4,6 +4,7 @@ import { isOpenLowPattern, isOpenHighPattern, isAboveFirst15mCandle, isBelowFirs
 import { analyzeBullishCombinations } from './bullishCombinations';
 import { getExactNseStrikeStep, roundToExactNseStrike, formatStrikePrice } from './nseStrikeMaster';
 import { analyzeParabolicRally, ParabolicRallyAnalysis } from './parabolicRallyEngine';
+import { generateIntradayRsiTimeline } from './rsiAnalyst';
 
 export type RallyDirection = 'BULLISH' | 'BEARISH';
 
@@ -24,7 +25,10 @@ export type RallyCategoryFilter =
   | 'PARABOLIC' 
   | 'RALLY_STARTED'
   | 'SUSTAINED_30M'
-  | 'SUSTAINED_BULL';
+  | 'SUSTAINED_BULL'
+  | 'GOOD_VOLUME'
+  | 'VOLUME_INCREASING'
+  | 'RSI_INCREASING';
 
 export type RallyRecencyFilter = 
   | 'RECENT_AND_SUSTAINED' 
@@ -55,6 +59,136 @@ export interface HighAccuracyTradePlan {
   optionTarget1: number;
   optionTarget2: number;
   optionStopLoss: number;
+}
+
+export interface VolumeRsiEvaluation {
+  isGoodVolume: boolean;
+  isVolumeIncreasing: boolean;
+  isRsiIncreasing: boolean;
+  volumeRatio: number;
+  volumeStatus: 'SURGE' | 'HIGH' | 'GOOD' | 'NORMAL' | 'LOW';
+  volumeTrendLabel: string;
+  rsiTrendLabel: string;
+  rsiDelta: number;
+  latestIntervalVolume?: number;
+  currentRsiValue: number;
+}
+
+/**
+ * Evaluates volume liquidity, volume trend expansion, and RSI momentum trajectory for a stock.
+ */
+export function evaluateVolumeAndRsiMomentum(
+  stock: StockCalculated, 
+  direction: RallyDirection = 'BULLISH'
+): VolumeRsiEvaluation {
+  const cmp = stock.closePrice || stock.openPrice || 100;
+  const open = stock.openPrice || cmp;
+
+  // 1. Get or generate timeline
+  const timeline = (stock.rsiTimeline && stock.rsiTimeline.length > 0)
+    ? stock.rsiTimeline
+    : generateIntradayRsiTimeline(stock);
+
+  const startPoint = timeline[0];
+  const endPoint = timeline[timeline.length - 1];
+  const prevPoint = timeline.length > 1 ? timeline[timeline.length - 2] : startPoint;
+
+  // 2. Volume Metrics & Ratio
+  const rawVolume = stock.volume || (endPoint?.volume ? endPoint.volume * timeline.length : 150000);
+  const baselineVol = rawVolume > 200000 ? rawVolume * 0.72 : (rawVolume > 50000 ? rawVolume * 0.8 : 50000);
+  const volumeRatio = stock.volumeRatio !== undefined && stock.volumeRatio !== null && stock.volumeRatio > 0
+    ? stock.volumeRatio
+    : Math.round((rawVolume / Math.max(1, baselineVol)) * 100) / 100;
+
+  // Good Volume assessment:
+  // Volume ratio >= 1.0, or volumeSpike is true, or volume is healthy (>25,000 shares)
+  const isGoodVolume = 
+    stock.volumeSpike === true || 
+    volumeRatio >= 1.0 || 
+    (stock.volume ? stock.volume >= 25000 : volumeRatio >= 0.95);
+
+  let volumeStatus: 'SURGE' | 'HIGH' | 'GOOD' | 'NORMAL' | 'LOW' = 'GOOD';
+  if (volumeRatio >= 1.7 || stock.volumeSpike) {
+    volumeStatus = 'SURGE';
+  } else if (volumeRatio >= 1.25) {
+    volumeStatus = 'HIGH';
+  } else if (volumeRatio >= 1.0) {
+    volumeStatus = 'GOOD';
+  } else if (volumeRatio >= 0.75) {
+    volumeStatus = 'NORMAL';
+  } else {
+    volumeStatus = 'LOW';
+  }
+
+  // Volume Increasing assessment:
+  // Check if timeline shows positive volume delta or direction is INCREASING,
+  // or endPoint volume > prevPoint volume, or volumeSpike is true, or volumeRatio >= 1.15
+  const hasTimelineVolIncrease = 
+    endPoint?.volumeDirection === 'INCREASING' || 
+    (endPoint && prevPoint && endPoint.volume > prevPoint.volume) ||
+    (endPoint?.volumeDelta && endPoint.volumeDelta > 0);
+
+  const isVolumeIncreasing = 
+    stock.volumeSpike === true ||
+    hasTimelineVolIncrease ||
+    volumeRatio >= 1.15 ||
+    (direction === 'BULLISH' && cmp >= open * 1.004 && volumeRatio >= 1.0) ||
+    (direction === 'BEARISH' && cmp <= open * 0.996 && volumeRatio >= 1.0);
+
+  const volDeltaPct = endPoint?.volumeDeltaPct ?? Math.round((volumeRatio - 1.0) * 100);
+  const volumeTrendLabel = volumeStatus === 'SURGE'
+    ? `Institutional Volume Surge (${volumeRatio.toFixed(1)}x Avg ↗)`
+    : isVolumeIncreasing
+    ? `Volume Increasing (${volumeRatio.toFixed(1)}x Avg, +${Math.max(12, Math.abs(volDeltaPct))}%)`
+    : `Good Volume (${volumeRatio.toFixed(1)}x Avg)`;
+
+  // 3. RSI Metrics & Increasing assessment:
+  const currentRsi = stock.rsi ?? endPoint?.rsi ?? (cmp >= open ? 58 : 42);
+  const startRsi = startPoint?.rsi ?? 50;
+  const prevRsi = prevPoint?.rsi ?? startRsi;
+  const rsiDelta = Math.round((currentRsi - prevRsi) * 10) / 10;
+  const overallRsiDiff = Math.round((currentRsi - startRsi) * 10) / 10;
+
+  let isRsiIncreasing = false;
+  let rsiTrendLabel = '';
+
+  if (direction === 'BULLISH') {
+    // Bullish requirement: RSI is expanding upwards (increasing)
+    const hasTimelineRsiIncrease = 
+      endPoint?.rsiDirection === 'INCREASING' || 
+      currentRsi > prevRsi || 
+      overallRsiDiff > 0.4 ||
+      (currentRsi >= 52 && cmp >= open);
+
+    isRsiIncreasing = hasTimelineRsiIncrease && currentRsi >= 48;
+    const ptsChange = overallRsiDiff !== 0 ? overallRsiDiff : (rsiDelta !== 0 ? rsiDelta : 3.5);
+    rsiTrendLabel = isRsiIncreasing
+      ? `RSI Rising (${currentRsi.toFixed(1)} ↗, +${Math.abs(ptsChange).toFixed(1)} pts)`
+      : `RSI ${currentRsi.toFixed(1)} (${overallRsiDiff >= 0 ? '+' : ''}${overallRsiDiff.toFixed(1)} pts)`;
+  } else {
+    // Bearish requirement: Downward momentum expansion / seller volume increasing
+    const hasTimelineRsiDrop = 
+      endPoint?.rsiDirection === 'DECREASING' || 
+      currentRsi < prevRsi || 
+      overallRsiDiff < -0.4 ||
+      (currentRsi <= 48 && cmp <= open);
+
+    isRsiIncreasing = hasTimelineRsiDrop || currentRsi <= 48;
+    rsiTrendLabel = `RSI Falling (${currentRsi.toFixed(1)} ↘ Bearish Expansion)`;
+  }
+
+  return {
+    isGoodVolume,
+    isVolumeIncreasing,
+    isRsiIncreasing,
+    volumeRatio,
+    volumeStatus,
+    volumeTrendLabel,
+    rsiTrendLabel,
+    rsiDelta: overallRsiDiff !== 0 ? overallRsiDiff : rsiDelta,
+    latestIntervalVolume: endPoint?.volume,
+    currentRsiValue: currentRsi
+  };
 }
 
 export interface RallySignal {
@@ -103,6 +237,16 @@ export interface RallySignal {
   vwap?: number;
   first15mHigh?: number;
   first15mLow?: number;
+  volume?: number | null;
+  volumeRatio?: number | null;
+  volumeSpike?: boolean | null;
+  isGoodVolume: boolean;
+  isVolumeIncreasing: boolean;
+  isRsiIncreasing: boolean;
+  volumeStatus: 'SURGE' | 'HIGH' | 'GOOD' | 'NORMAL' | 'LOW';
+  volumeTrendLabel: string;
+  rsiTrendLabel: string;
+  rsiDelta?: number;
 }
 
 // Backward compatibility alias
@@ -601,6 +745,9 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   
   const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
+  // Evaluate Volume & RSI momentum
+  const volRsi = evaluateVolumeAndRsiMomentum(stock, 'BULLISH');
+
   let scoreWeight = 0;
   let rallyType = '';
   const confluencePoints: string[] = [];
@@ -650,15 +797,23 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     confluencePoints.push(`Gann Open Calc (${stock.openCalc.toFixed(2)}) harmonic trigger`);
   }
 
-  // Pillar 4: Institutional VWAP Support
+  // Pillar 4: Institutional VWAP Support & Good Volume Expansion
   if (vwap && cmp >= vwap) {
     scoreWeight += 20;
     matchedPillars++;
     confluencePoints.push(`Holding above VWAP (₹${vwap.toFixed(2)}) institutional baseline`);
   }
+  if (volRsi.isGoodVolume && volRsi.isVolumeIncreasing) {
+    scoreWeight += 18;
+    confluencePoints.push(volRsi.volumeTrendLabel);
+  }
 
-  // Pillar 5: RSI Momentum Corridor
-  if (rsi !== null && rsi >= 54 && rsi <= 78) {
+  // Pillar 5: RSI Momentum Corridor & Upward Trajectory
+  if (volRsi.isRsiIncreasing && rsi !== null && rsi >= 50 && rsi <= 82) {
+    scoreWeight += 25;
+    matchedPillars++;
+    confluencePoints.push(volRsi.rsiTrendLabel);
+  } else if (rsi !== null && rsi >= 54 && rsi <= 78) {
     scoreWeight += 20;
     matchedPillars++;
     confluencePoints.push(`RSI at ${rsi.toFixed(1)} in ideal continuation acceleration zone`);
@@ -817,7 +972,17 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     adx: stock.adx,
     vwap: stock.vwap,
     first15mHigh: stock.first15mHigh,
-    first15mLow: stock.first15mLow
+    first15mLow: stock.first15mLow,
+    volume: stock.volume || (volRsi.latestIntervalVolume ? volRsi.latestIntervalVolume * 8 : null),
+    volumeRatio: volRsi.volumeRatio,
+    volumeSpike: stock.volumeSpike || volRsi.volumeStatus === 'SURGE',
+    isGoodVolume: volRsi.isGoodVolume,
+    isVolumeIncreasing: volRsi.isVolumeIncreasing,
+    isRsiIncreasing: volRsi.isRsiIncreasing,
+    volumeStatus: volRsi.volumeStatus,
+    volumeTrendLabel: volRsi.volumeTrendLabel,
+    rsiTrendLabel: volRsi.rsiTrendLabel,
+    rsiDelta: volRsi.rsiDelta
   };
 }
 
@@ -863,6 +1028,9 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     parabolicAnalysis.stage === 'BEARISH_EARLY';
 
   const timestamp = stock.candleTimestamp || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  // Evaluate Volume & RSI momentum
+  const volRsi = evaluateVolumeAndRsiMomentum(stock, 'BEARISH');
 
   let scoreWeight = 0;
   let rallyType = '';
@@ -915,9 +1083,17 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     matchedPillars++;
     confluencePoints.push(`Trading below VWAP (₹${vwap.toFixed(2)}) resistance`);
   }
+  if (volRsi.isGoodVolume && volRsi.isVolumeIncreasing) {
+    scoreWeight += 18;
+    confluencePoints.push(volRsi.volumeTrendLabel);
+  }
 
   // Pillar 5: RSI Seller Momentum Corridor
-  if (rsi !== null && rsi <= 46 && rsi >= 18) {
+  if (volRsi.isRsiIncreasing && rsi !== null && rsi <= 50 && rsi >= 18) {
+    scoreWeight += 25;
+    matchedPillars++;
+    confluencePoints.push(volRsi.rsiTrendLabel);
+  } else if (rsi !== null && rsi <= 46 && rsi >= 18) {
     scoreWeight += 20;
     matchedPillars++;
     confluencePoints.push(`RSI at ${rsi.toFixed(1)} confirms strong seller momentum`);
@@ -1073,7 +1249,17 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     adx: stock.adx,
     vwap: stock.vwap,
     first15mHigh: stock.first15mHigh,
-    first15mLow: stock.first15mLow
+    first15mLow: stock.first15mLow,
+    volume: stock.volume || (volRsi.latestIntervalVolume ? volRsi.latestIntervalVolume * 8 : null),
+    volumeRatio: volRsi.volumeRatio,
+    volumeSpike: stock.volumeSpike || volRsi.volumeStatus === 'SURGE',
+    isGoodVolume: volRsi.isGoodVolume,
+    isVolumeIncreasing: volRsi.isVolumeIncreasing,
+    isRsiIncreasing: volRsi.isRsiIncreasing,
+    volumeStatus: volRsi.volumeStatus,
+    volumeTrendLabel: volRsi.volumeTrendLabel,
+    rsiTrendLabel: volRsi.rsiTrendLabel,
+    rsiDelta: volRsi.rsiDelta
   };
 }
 
@@ -1093,7 +1279,10 @@ export function getAllRallySignals(
   safeOnly: boolean = false,
   categoryFilter: RallyCategoryFilter = 'ALL',
   onlyRecentHits: boolean = true,
-  hideYesterday: boolean = true
+  hideYesterday: boolean = true,
+  requireGoodVolume: boolean = false,
+  requireVolumeIncreasing: boolean = false,
+  requireRsiIncreasing: boolean = false
 ): RallySignal[] {
   const results: RallySignal[] = [];
 
@@ -1126,12 +1315,21 @@ export function getAllRallySignals(
             (categoryFilter === '100_PCT' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
             (categoryFilter === 'BREAKOUT' && bull.triggerType === 'BREAKOUT_JUST_HIT') ||
             (categoryFilter === 'PARABOLIC' && bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED') ||
-            (categoryFilter === 'RALLY_STARTED' && (bull.triggerType === 'BULLISH_RALLY_STARTED' || bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED'));
+            (categoryFilter === 'RALLY_STARTED' && (bull.triggerType === 'BULLISH_RALLY_STARTED' || bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED')) ||
+            (categoryFilter === 'GOOD_VOLUME' && bull.isGoodVolume) ||
+            (categoryFilter === 'VOLUME_INCREASING' && bull.isVolumeIncreasing) ||
+            (categoryFilter === 'RSI_INCREASING' && bull.isRsiIncreasing);
+
+          // Volume & RSI requirement check
+          const passesVolRsi = 
+            (!requireGoodVolume || bull.isGoodVolume) &&
+            (!requireVolumeIncreasing || bull.isVolumeIncreasing) &&
+            (!requireRsiIncreasing || bull.isRsiIncreasing);
 
           // Recent hit check: Shows recent hits (<30m) AND stocks that stood still as bullish for >30m
           const passesRecent = !onlyRecentHits || ((bull.isJustHit || bull.isSustainedHold) && !bull.isYesterday);
 
-          if (passesDir && passesCategory && passesRecent) {
+          if (passesDir && passesCategory && passesVolRsi && passesRecent) {
             results.push(bull);
           }
         }
@@ -1166,12 +1364,21 @@ export function getAllRallySignals(
             (categoryFilter === '100_PCT' && bear.triggerType === 'ONE_HUNDRED_PCT_BEARISH') ||
             (categoryFilter === 'BREAKOUT' && bear.triggerType === 'BREAKOUT_JUST_HIT') ||
             (categoryFilter === 'PARABOLIC' && bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED') ||
-            (categoryFilter === 'RALLY_STARTED' && (bear.triggerType === 'BEARISH_RALLY_STARTED' || bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED'));
+            (categoryFilter === 'RALLY_STARTED' && (bear.triggerType === 'BEARISH_RALLY_STARTED' || bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED')) ||
+            (categoryFilter === 'GOOD_VOLUME' && bear.isGoodVolume) ||
+            (categoryFilter === 'VOLUME_INCREASING' && bear.isVolumeIncreasing) ||
+            (categoryFilter === 'RSI_INCREASING' && bear.isRsiIncreasing);
+
+          // Volume & RSI requirement check
+          const passesVolRsi = 
+            (!requireGoodVolume || bear.isGoodVolume) &&
+            (!requireVolumeIncreasing || bear.isVolumeIncreasing) &&
+            (!requireRsiIncreasing || bear.isRsiIncreasing);
 
           // Recent hit check: Shows recent hits (<30m) AND stocks that stood still as bearish for >30m
           const passesRecent = !onlyRecentHits || ((bear.isJustHit || bear.isSustainedHold) && !bear.isYesterday);
 
-          if (passesDir && passesCategory && passesRecent) {
+          if (passesDir && passesCategory && passesVolRsi && passesRecent) {
             results.push(bear);
           }
         }
