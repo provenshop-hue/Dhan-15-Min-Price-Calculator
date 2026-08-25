@@ -4,9 +4,7 @@ import {
   TrendingUp, 
   TrendingDown,
   ChevronRight, 
-  ChevronLeft,
-  ChevronDown,
-  ChevronUp,
+  ChevronLeft, 
   X, 
   ExternalLink, 
   Calculator, 
@@ -63,43 +61,11 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
-  const [isExpandedModal, setIsExpandedModal] = useState<boolean>(false);
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [showAllList, setShowAllList] = useState<boolean>(false);
   const [showAntiTrapGuide, setShowAntiTrapGuide] = useState<boolean>(false);
   const [slideProgress, setSlideProgress] = useState<number>(0);
-
-  // Collapsible section states to save space inside the popunder
-  const [collapsedSections, setCollapsedSections] = useState<{
-    signalReason: boolean;
-    tradePlan: boolean;
-    antiTrap: boolean;
-    confluences: boolean;
-    technicalMetrics: boolean;
-  }>({
-    signalReason: false,
-    tradePlan: false,
-    antiTrap: false,
-    confluences: false,
-    technicalMetrics: false,
-  });
-
-  const toggleSection = (key: 'signalReason' | 'tradePlan' | 'antiTrap' | 'confluences' | 'technicalMetrics') => {
-    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const isAllCollapsed = Object.values(collapsedSections).every(Boolean);
-  const toggleAllSections = () => {
-    const nextState = !isAllCollapsed;
-    setCollapsedSections({
-      signalReason: nextState,
-      tradePlan: nextState,
-      antiTrap: nextState,
-      confluences: nextState,
-      technicalMetrics: nextState,
-    });
-  };
 
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     return localStorage.getItem('rally_sound_enabled') !== 'false';
@@ -298,31 +264,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   <span className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${isBull ? 'bg-emerald-500/30 text-emerald-200' : 'bg-rose-500/30 text-rose-200'}`}>
                     {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
                   </span>
-                  
-                  {/* Minimized Pill Explicit Signal Classification Badge */}
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-black border shadow-sm ${
-                    currentRally.signalClassification === 'BREAKOUT' || currentRally.signalClassification === 'BREAKDOWN'
-                      ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
-                      : currentRally.signalClassification === 'ONE_HUNDRED_BULLISH'
-                      ? 'bg-emerald-400 text-slate-950 border-emerald-300 font-black'
-                      : currentRally.signalClassification === 'ONE_HUNDRED_BEARISH'
-                      ? 'bg-rose-500 text-white border-rose-300 font-black'
-                      : currentRally.signalClassification === 'INDEX_HOLD'
-                      ? 'bg-yellow-400 text-slate-950 border-yellow-300 font-black'
-                      : currentRally.signalClassification === 'PARABOLIC_RALLY'
-                      ? 'bg-purple-500 text-white border-purple-300 font-black'
-                      : currentRally.triggerColorClass
-                  }`}>
-                    {currentRally.signalClassification === 'BREAKOUT' && '💥 Breakout'}
-                    {currentRally.signalClassification === 'BREAKDOWN' && '💥 Breakdown'}
-                    {currentRally.signalClassification === 'ONE_HUNDRED_BULLISH' && '🟢 100% Bull'}
-                    {currentRally.signalClassification === 'ONE_HUNDRED_BEARISH' && '🔴 100% Bear'}
-                    {currentRally.signalClassification === 'INDEX_HOLD' && '🏛️ Index Hold >30m'}
-                    {currentRally.signalClassification === 'PARABOLIC_RALLY' && '🚀 Parabolic'}
-                    {currentRally.signalClassification === 'BULLISH_RALLY' && '📈 Bull Rally'}
-                    {currentRally.signalClassification === 'BEARISH_RALLY' && '📉 Bear Rally'}
+                  <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black border ${currentRally.triggerColorClass}`}>
+                    {currentRally.triggerBadge}
                   </span>
-
                   {currentRally.isSustainedHold && (
                     <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 px-1.5 py-0.2 rounded text-[9px] font-mono font-black flex items-center gap-0.5 shadow-sm">
                       <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
@@ -350,8 +294,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 
                 {rallySignals.length > 1 && (
                   <div className="text-[11px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
-                    <span className="font-semibold text-white">{currentRally.signalCategoryName}</span>
-                    <span className="text-[10px] text-slate-400">({currentIndex + 1}/{rallySignals.length})</span>
+                    <span>{currentRally.isSustainedHold ? '🛡️ Stood Still Firm (>30m)' : 'Active Setups'} ({currentIndex + 1}/{rallySignals.length})</span>
+                    <span className="text-[10px] text-slate-400">• {currentRally.rallyType}</span>
                   </div>
                 )}
               </div>
@@ -403,27 +347,19 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   // Render Full Popup / Popunder Alert Card with Auto-Rotating Slider
   return (
     <div 
-      className={
-        isExpandedModal
-          ? "fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in"
-          : "fixed bottom-4 right-4 z-40 w-[450px] max-w-[calc(100vw-1.5rem)] animate-slide-up"
-      }
+      className="fixed bottom-4 right-4 z-40 w-[420px] max-w-[calc(100vw-1.5rem)] animate-slide-up"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className={`bg-gradient-to-br from-slate-950 via-slate-900 border-2 rounded-2xl shadow-2xl overflow-hidden ring-4 backdrop-blur-md text-white flex flex-col transition-all duration-200 ${
-        isExpandedModal
-          ? 'w-full max-w-4xl max-h-[92vh] border-amber-500/80 ring-amber-500/20'
-          : `max-h-[calc(100vh-2rem)] ${
-              isBull 
-                ? 'to-emerald-950/95 border-emerald-500/80 ring-emerald-500/20' 
-                : 'to-rose-950/95 border-rose-500/80 ring-rose-500/20'
-            }`
+      <div className={`bg-gradient-to-br from-slate-950 via-slate-900 border-2 rounded-2xl shadow-2xl overflow-hidden ring-4 backdrop-blur-md text-white ${
+        isBull 
+          ? 'to-emerald-950/95 border-emerald-500/80 ring-emerald-500/20' 
+          : 'to-rose-950/95 border-rose-500/80 ring-rose-500/20'
       }`}>
         
         {/* Auto-Slide Progress Bar */}
         {rallySignals.length > 1 && isAutoRotating && (
-          <div className="h-1 w-full bg-black/40 overflow-hidden shrink-0">
+          <div className="h-1 w-full bg-black/40 overflow-hidden">
             <div 
               className={`h-full transition-all duration-75 ${isBull ? 'bg-emerald-400' : 'bg-rose-400'}`}
               style={{ width: `${slideProgress}%` }}
@@ -432,7 +368,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         )}
 
         {/* Top Header Bar */}
-        <div className={`px-3.5 py-2.5 flex items-center justify-between shadow-md shrink-0 ${
+        <div className={`px-3.5 py-2.5 flex items-center justify-between shadow-md ${
           isBull 
             ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700' 
             : 'bg-gradient-to-r from-rose-700 via-red-600 to-rose-800'
@@ -447,21 +383,19 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               {currentRally ? (
                 <>
                   <span className="text-sm font-black tracking-wider uppercase text-white">
-                    {currentRally.signalCategoryName || (
-                      currentRally.signalClassification === 'ONE_HUNDRED_BULLISH'
-                        ? '🟢 100% Bullish Move'
-                        : currentRally.signalClassification === 'ONE_HUNDRED_BEARISH'
-                        ? '🔴 100% Bearish Move'
-                        : currentRally.signalClassification === 'INDEX_HOLD'
-                        ? '🏛️ Benchmark Index Held Firm (>30m)'
-                        : currentRally.signalClassification === 'BREAKOUT'
-                        ? '💥 Breakout Just Hit'
-                        : currentRally.signalClassification === 'BREAKDOWN'
-                        ? '💥 Breakdown Just Hit'
-                        : currentRally.signalClassification === 'PARABOLIC_RALLY'
-                        ? (isBull ? '🚀 Parabolic Bullish Rally' : '📉 Parabolic Bearish Breakdown')
-                        : (isBull ? '📈 Bullish Rally Started' : '📉 Bearish Rally Started')
-                    )}
+                    {currentRally.triggerType === 'ONE_HUNDRED_PCT_BULLISH'
+                      ? '🟢 100% Bullish Move'
+                      : currentRally.triggerType === 'ONE_HUNDRED_PCT_BEARISH'
+                      ? '🔴 100% Bearish Move'
+                      : currentRally.isSustainedHold
+                      ? (isBull ? `🛡️ Stood Bullish (${currentRally.sustainedDurationMinutes}m)` : `🛡️ Stood Bearish (${currentRally.sustainedDurationMinutes}m)`)
+                      : currentRally.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED'
+                      ? '🚀 Parabolic Bullish Rally'
+                      : currentRally.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED'
+                      ? '📉 Parabolic Bearish Breakdown'
+                      : currentRally.triggerType === 'BREAKOUT_JUST_HIT'
+                      ? (isBull ? '💥 Breakout Just Hit' : '💥 Breakdown Just Hit')
+                      : (isBull ? '📈 Bullish Rally' : '📉 Bearish Breakdown')}
                   </span>
                   <span className="bg-black/40 text-yellow-200 text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-yellow-300/40">
                     {currentRally.confidenceScore}% Accuracy
@@ -552,29 +486,14 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-white/50" />}
             </button>
 
-            {/* Expand Modal / Popunder Toggle */}
+            {/* Minimize Popunder */}
             <button
-              onClick={() => setIsExpandedModal((prev) => !prev)}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isExpandedModal 
-                  ? 'bg-amber-400 text-slate-950 font-bold shadow-md' 
-                  : 'text-white/80 hover:text-white hover:bg-white/10'
-              }`}
-              title={isExpandedModal ? "Restore to Corner Popunder" : "Expand Popunder to Large Window"}
+              onClick={() => setIsMinimized(true)}
+              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              title="Minimize to Popunder Pill"
             >
-              {isExpandedModal ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              <Minimize2 className="w-4 h-4" />
             </button>
-
-            {/* Minimize Popunder to Pill */}
-            {!isExpandedModal && (
-              <button
-                onClick={() => setIsMinimized(true)}
-                className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-                title="Minimize to Popunder Pill"
-              >
-                <ChevronDown className="w-4 h-4" />
-              </button>
-            )}
 
             {/* Close */}
             <button
@@ -726,7 +645,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
           {/* Row 2: Trigger Category Filters */}
           <div className="flex items-center space-x-1 pt-1 border-t border-slate-800/80 overflow-x-auto no-scrollbar pb-0.5">
-            <span className="text-slate-400 shrink-0 font-medium">Signal:</span>
+            <span className="text-slate-400 shrink-0 font-medium">Trigger:</span>
             <button
               onClick={() => { setCategoryFilter('ALL'); setCurrentIndex(0); }}
               className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
@@ -735,62 +654,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   : 'bg-slate-900/80 text-slate-400 hover:text-slate-200'
               }`}
             >
-              ⚡ All Signals
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('BREAKOUT'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === 'BREAKOUT'
-                  ? 'bg-amber-500/30 text-yellow-300 border border-amber-400/50 shadow-sm font-bold ring-1 ring-amber-400/40'
-                  : 'bg-slate-900/80 text-amber-300/80 hover:text-yellow-300'
-              }`}
-              title="Show Confirmed Breakouts (15m Range / Gann Buy Trigger Breaks)"
-            >
-              💥 Breakouts
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('100_BULL'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === '100_BULL'
-                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-sm font-bold ring-1 ring-emerald-400/40'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-emerald-300'
-              }`}
-              title="Show 100% Bullish Power Moves (Open=Low + Day High Close)"
-            >
-              🟢 100% Bullish
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('100_BEAR'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === '100_BEAR'
-                  ? 'bg-rose-500/30 text-rose-300 border border-rose-400/50 shadow-sm font-bold ring-1 ring-rose-400/40'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-rose-300'
-              }`}
-              title="Show 100% Bearish Breakdown Moves (Open=High + Day Low Dump)"
-            >
-              🔴 100% Bearish
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('BULLISH_RALLY'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === 'BULLISH_RALLY'
-                  ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/50 shadow-sm font-bold'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-cyan-300'
-              }`}
-              title="Show Bullish Multi-Confluence Rallies (Above VWAP + Trend Continuation)"
-            >
-              📈 Bullish Rally
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('BEARISH_RALLY'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === 'BEARISH_RALLY'
-                  ? 'bg-rose-500/30 text-rose-300 border border-rose-400/50 shadow-sm font-bold'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-rose-300'
-              }`}
-              title="Show Bearish Multi-Confluence Breakdowns"
-            >
-              📉 Bearish Rally
+              ⚡ All Hits
             </button>
             <button
               onClick={() => { setCategoryFilter('INDEX_HOLD'); setCurrentIndex(0); }}
@@ -813,6 +677,26 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               title="Show stocks that hit and stood still / stayed as bullish for >30 minutes"
             >
               🛡️ Stood Bullish &gt;30m
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('100_BULL'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === '100_BULL'
+                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-sm font-bold'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-emerald-300'
+              }`}
+            >
+              🟢 100% Bullish
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('100_BEAR'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === '100_BEAR'
+                  ? 'bg-rose-500/30 text-rose-300 border border-rose-400/50 shadow-sm font-bold'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-rose-300'
+              }`}
+            >
+              🔴 100% Bearish
             </button>
             <button
               onClick={() => { setCategoryFilter('SUSTAINED_30M'); setCurrentIndex(0); }}
@@ -844,6 +728,26 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               }`}
             >
               🚀 Parabolic Rally
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('BREAKOUT'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'BREAKOUT'
+                  ? 'bg-amber-500/30 text-yellow-300 border border-amber-400/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-yellow-300'
+              }`}
+            >
+              💥 Breakouts
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('RALLY_STARTED'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'RALLY_STARTED'
+                  ? 'bg-blue-500/30 text-blue-300 border border-blue-400/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-blue-300'
+              }`}
+            >
+              📈 Rally Started
             </button>
           </div>
         </div>
@@ -971,29 +875,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       <div className="text-sm font-black text-white flex items-center gap-1.5 flex-wrap">
                         <span className="text-base tracking-tight">{signal.symbol}</span>
                         <span className="text-xs text-slate-300 font-semibold font-mono">₹{signal.currentPrice.toFixed(1)}</span>
-                        
-                        {/* List View Signal Classification Badge */}
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black border shadow-sm ${
-                          signal.signalClassification === 'BREAKOUT' || signal.signalClassification === 'BREAKDOWN'
-                            ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
-                            : signal.signalClassification === 'ONE_HUNDRED_BULLISH'
-                            ? 'bg-emerald-400 text-slate-950 border-emerald-300 font-black'
-                            : signal.signalClassification === 'ONE_HUNDRED_BEARISH'
-                            ? 'bg-rose-500 text-white border-rose-300 font-black'
-                            : signal.signalClassification === 'INDEX_HOLD'
-                            ? 'bg-yellow-400 text-slate-950 border-yellow-300 font-black'
-                            : signal.signalClassification === 'PARABOLIC_RALLY'
-                            ? 'bg-purple-500 text-white border-purple-300 font-black'
-                            : signal.triggerColorClass
-                        }`}>
-                          {signal.signalClassification === 'BREAKOUT' && '💥 Breakout'}
-                          {signal.signalClassification === 'BREAKDOWN' && '💥 Breakdown'}
-                          {signal.signalClassification === 'ONE_HUNDRED_BULLISH' && '🟢 100% Bull'}
-                          {signal.signalClassification === 'ONE_HUNDRED_BEARISH' && '🔴 100% Bear'}
-                          {signal.signalClassification === 'INDEX_HOLD' && '🏛️ Index Hold >30m'}
-                          {signal.signalClassification === 'PARABOLIC_RALLY' && '🚀 Parabolic'}
-                          {signal.signalClassification === 'BULLISH_RALLY' && '📈 Bull Rally'}
-                          {signal.signalClassification === 'BEARISH_RALLY' && '📉 Bear Rally'}
+                        <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black border ${signal.triggerColorClass}`}>
+                          {signal.triggerBadge}
                         </span>
                         {idx === 0 ? (
                           <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/50 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
@@ -1134,8 +1017,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             </div>
           </div>
         ) : (
-          /* Content Body of Selected Rotating Stock (Clean, High Contrast, Big Fonts, Scrollable) */
-          <div className="flex-1 overflow-y-auto max-h-[calc(100vh-210px)] p-3.5 space-y-3 custom-scrollbar transition-all duration-300">
+          /* Content Body of Selected Rotating Stock (Clean, High Contrast, Big Fonts) */
+          <div className="p-4 space-y-3.5 transition-all duration-300">
             
             {/* Main Headline & Ticker Info with BIG FONTS */}
             <div>
@@ -1235,207 +1118,78 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               </div>
             </div>
 
-            {/* Quick Section Controls Header */}
-            <div className="flex items-center justify-between px-1 text-[11px] text-slate-400 pt-0.5">
-              <span className="font-semibold text-slate-300">📊 Signal Breakdown &amp; Trade Strategy</span>
-              <button
-                onClick={toggleAllSections}
-                className="text-[10.5px] font-mono font-bold text-amber-300 hover:text-yellow-200 bg-slate-900/80 hover:bg-slate-800 px-2.5 py-0.5 rounded border border-slate-700/80 transition-colors flex items-center gap-1 cursor-pointer"
-                title={isAllCollapsed ? "Expand all sections" : "Collapse all sections to save space"}
-              >
-                {isAllCollapsed ? (
-                  <>
-                    <ChevronDown className="w-3 h-3 text-amber-300" />
-                    <span>Expand All</span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronUp className="w-3 h-3 text-amber-300" />
-                    <span>Collapse All</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* 1. HERO SIGNAL CLASSIFICATION & VALIDATION BANNER (COLLAPSIBLE) */}
-            <div className={`rounded-xl border shadow-md transition-all ${
-              currentRally.signalClassification === 'BREAKOUT' || currentRally.signalClassification === 'BREAKDOWN'
-                ? 'bg-amber-950/60 border-amber-500/80 ring-1 ring-amber-500/30'
-                : currentRally.signalClassification === 'ONE_HUNDRED_BULLISH'
-                ? 'bg-emerald-950/70 border-emerald-400/80 ring-1 ring-emerald-400/40'
-                : currentRally.signalClassification === 'ONE_HUNDRED_BEARISH'
-                ? 'bg-rose-950/70 border-rose-400/80 ring-1 ring-rose-400/40'
-                : currentRally.signalClassification === 'INDEX_HOLD'
-                ? 'bg-yellow-950/70 border-yellow-400/80 ring-1 ring-yellow-400/40'
-                : currentRally.signalClassification === 'PARABOLIC_RALLY'
-                ? 'bg-purple-950/70 border-purple-400/80 ring-1 ring-purple-400/40'
-                : isBull
-                ? 'bg-teal-950/60 border-teal-500/60'
-                : 'bg-rose-950/60 border-rose-500/60'
-            }`}>
-              {/* Header Toggle */}
-              <div 
-                onClick={() => toggleSection('signalReason')}
-                className="p-2.5 flex items-center justify-between flex-wrap gap-1.5 cursor-pointer select-none hover:bg-white/5 transition-colors rounded-xl"
-                title="Click to toggle Signal Classification details"
-              >
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-300">
-                    Signal Type:
-                  </span>
-                  <span className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono tracking-tight flex items-center gap-1.5 shadow-md ${
-                    currentRally.signalClassification === 'BREAKOUT'
-                      ? 'bg-amber-400 text-slate-950 font-black'
-                      : currentRally.signalClassification === 'BREAKDOWN'
-                      ? 'bg-amber-400 text-slate-950 font-black'
-                      : currentRally.signalClassification === 'ONE_HUNDRED_BULLISH'
-                      ? 'bg-emerald-400 text-slate-950 font-black'
-                      : currentRally.signalClassification === 'ONE_HUNDRED_BEARISH'
-                      ? 'bg-rose-500 text-white font-black'
-                      : currentRally.signalClassification === 'INDEX_HOLD'
-                      ? 'bg-yellow-400 text-slate-950 font-black'
-                      : currentRally.signalClassification === 'PARABOLIC_RALLY'
-                      ? 'bg-purple-500 text-white font-black'
-                      : isBull
-                      ? 'bg-emerald-500 text-slate-950 font-black'
-                      : 'bg-rose-600 text-white font-black'
-                  }`}>
-                    {currentRally.signalClassification === 'BREAKOUT' && '💥 BREAKOUT (15m High Range Break)'}
-                    {currentRally.signalClassification === 'BREAKDOWN' && '💥 BREAKDOWN (15m Low Range Break)'}
-                    {currentRally.signalClassification === 'ONE_HUNDRED_BULLISH' && '🟢 100% BULLISH POWER MOVE (Open=Low)'}
-                    {currentRally.signalClassification === 'ONE_HUNDRED_BEARISH' && '🔴 100% BEARISH MOVE (Open=High)'}
-                    {currentRally.signalClassification === 'INDEX_HOLD' && '🏛️ BENCHMARK INDEX HELD FIRM (>30m)'}
-                    {currentRally.signalClassification === 'PARABOLIC_RALLY' && (isBull ? '🚀 PARABOLIC BULLISH RALLY' : '📉 PARABOLIC BEARISH BREAKDOWN')}
-                    {currentRally.signalClassification === 'BULLISH_RALLY' && '📈 BULLISH MULTI-CONFLUENCE RALLY'}
-                    {currentRally.signalClassification === 'BEARISH_RALLY' && '📉 BEARISH MULTI-CONFLUENCE RALLY'}
-                  </span>
-                </div>
-
-                <div className="flex items-center space-x-1.5">
-                  {/* Verified Signal Status */}
-                  <div className="flex items-center gap-1 text-[10.5px] font-mono font-bold bg-slate-900/90 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-500/40">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Verified</span>
-                  </div>
-
-                  <div className="p-1 rounded-md text-slate-300 hover:text-white bg-slate-900/60 border border-slate-700/60">
-                    {collapsedSections.signalReason ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                  </div>
-                </div>
-              </div>
-
-              {/* Collapsible Body */}
-              {!collapsedSections.signalReason && (
-                <div className="px-2.5 pb-2.5 pt-0">
-                  <div className="text-xs text-slate-200 leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-start gap-2">
-                    <Info className="w-4 h-4 text-cyan-300 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="text-amber-300 font-bold font-mono mr-1">Classification Reason:</span>
-                      <span>{currentRally.signalExplanation || currentRally.reason}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 2. ACTIONABLE HIGH-PROFIT TRADE PLAN BOX (COLLAPSIBLE) */}
-            <div className={`rounded-xl border transition-all ${
+            {/* Actionable High-Profit Trade Plan Box (BIG CLEAR FONTS) */}
+            <div className={`p-3 rounded-xl border ${
               isBull 
                 ? 'bg-emerald-950/40 border-emerald-500/40' 
                 : 'bg-rose-950/40 border-rose-500/40'
             }`}>
-              {/* Header Toggle */}
-              <div 
-                onClick={() => toggleSection('tradePlan')}
-                className="p-2.5 flex items-center justify-between flex-wrap gap-1.5 cursor-pointer select-none hover:bg-white/5 transition-colors rounded-xl"
-                title="Click to toggle Trade Plan & Option Strikes"
-              >
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-1.5">
                   <Target className={`w-4 h-4 ${isBull ? 'text-emerald-400' : 'text-rose-400'}`} />
                   <span className="text-xs font-black uppercase tracking-wide text-white">
                     {plan.action} Setup Plan
                   </span>
                 </div>
-
-                <div className="flex items-center space-x-1.5">
-                  {collapsedSections.tradePlan && (
-                    <span className="text-[10.5px] font-mono text-slate-300 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
-                      Entry: <strong className="text-white">₹{plan.entryTrigger.toFixed(1)}</strong> | SL: <strong className="text-rose-400">₹{plan.stopLoss.toFixed(1)}</strong> | T1: <strong className="text-emerald-400">₹{plan.target1.toFixed(1)}</strong>
-                    </span>
-                  )}
-                  <div className="text-xs font-mono font-black text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-md border border-amber-500/40">
-                    R:R {plan.riskRewardRatio}
-                  </div>
-                  <div className="p-1 rounded-md text-slate-300 hover:text-white bg-slate-900/60 border border-slate-700/60">
-                    {collapsedSections.tradePlan ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                  </div>
+                <div className="text-xs font-mono font-black text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-md border border-amber-500/40">
+                  R:R {plan.riskRewardRatio}
                 </div>
               </div>
 
-              {/* Collapsible Body */}
-              {!collapsedSections.tradePlan && (
-                <div className="px-2.5 pb-2.5 pt-0">
-                  {/* Grid of Entry, SL, T1, T2 with BIG READABLE NUMBERS */}
-                  <div className="grid grid-cols-4 gap-2 text-center mt-1">
-                    <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
-                      <div className="text-slate-400 text-[10px] font-sans font-bold uppercase tracking-wider">Trigger</div>
-                      <div className="text-sm sm:text-base font-black font-mono text-white mt-0.5">₹{plan.entryTrigger.toFixed(1)}</div>
-                    </div>
-
-                    <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
-                      <div className="text-rose-400 text-[10px] font-sans font-bold uppercase tracking-wider">Stop Loss</div>
-                      <div className="text-sm sm:text-base font-black font-mono text-rose-400 mt-0.5">₹{plan.stopLoss.toFixed(1)}</div>
-                    </div>
-
-                    <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
-                      <div className="text-emerald-400 text-[10px] font-sans font-bold uppercase tracking-wider">Target 1</div>
-                      <div className="text-sm sm:text-base font-black font-mono text-emerald-400 mt-0.5">₹{plan.target1.toFixed(1)}</div>
-                    </div>
-
-                    <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
-                      <div className="text-teal-300 text-[10px] font-sans font-bold uppercase tracking-wider">Target 2</div>
-                      <div className="text-sm sm:text-base font-black font-mono text-teal-300 mt-0.5">₹{plan.target2.toFixed(1)}</div>
-                    </div>
-                  </div>
-
-                  {/* Option Strike Callout with BIG READABLE STRIKE */}
-                  <div 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectStockDetail(currentRally.stock);
-                    }}
-                    className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs cursor-pointer hover:bg-white/5 px-2 py-1 rounded-lg transition-colors"
-                    title="Click to view full Options Strike Analysis & Gann levels"
-                  >
-                    <div className="flex items-center space-x-1.5">
-                      <Zap className="w-4 h-4 text-yellow-400 shrink-0" />
-                      <span className="font-sans text-slate-300 text-xs font-semibold">Recommended Option:</span>
-                      <span className="font-mono font-black text-yellow-300 text-xs sm:text-sm bg-yellow-950/90 px-2 py-0.5 rounded-md border border-yellow-500/50 shadow-sm">
-                        {plan.recommendedOptionStrike}
-                      </span>
-                    </div>
-                    <div className="text-xs font-mono text-slate-200">
-                      LTP ~<span className="text-white font-bold">₹{plan.optionEntryEst.toFixed(1)}</span> (T1: <span className="text-emerald-400 font-bold">₹{plan.optionTarget1.toFixed(1)}</span>)
-                    </div>
-                  </div>
+              {/* Grid of Entry, SL, T1, T2 with BIG READABLE NUMBERS */}
+              <div className="grid grid-cols-4 gap-2 text-center mt-1.5">
+                <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
+                  <div className="text-slate-400 text-[10px] font-sans font-bold uppercase tracking-wider">Trigger</div>
+                  <div className="text-sm sm:text-base font-black font-mono text-white mt-0.5">₹{plan.entryTrigger.toFixed(1)}</div>
                 </div>
-              )}
+
+                <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
+                  <div className="text-rose-400 text-[10px] font-sans font-bold uppercase tracking-wider">Stop Loss</div>
+                  <div className="text-sm sm:text-base font-black font-mono text-rose-400 mt-0.5">₹{plan.stopLoss.toFixed(1)}</div>
+                </div>
+
+                <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
+                  <div className="text-emerald-400 text-[10px] font-sans font-bold uppercase tracking-wider">Target 1</div>
+                  <div className="text-sm sm:text-base font-black font-mono text-emerald-400 mt-0.5">₹{plan.target1.toFixed(1)}</div>
+                </div>
+
+                <div className="bg-slate-900/95 p-2 rounded-xl border border-slate-800 shadow-sm">
+                  <div className="text-teal-300 text-[10px] font-sans font-bold uppercase tracking-wider">Target 2</div>
+                  <div className="text-sm sm:text-base font-black font-mono text-teal-300 mt-0.5">₹{plan.target2.toFixed(1)}</div>
+                </div>
+              </div>
+
+              {/* Option Strike Callout with BIG READABLE STRIKE */}
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectStockDetail(currentRally.stock);
+                }}
+                className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs cursor-pointer hover:bg-white/5 px-2 py-1 rounded-lg transition-colors"
+                title="Click to view full Options Strike Analysis & Gann levels"
+              >
+                <div className="flex items-center space-x-1.5">
+                  <Zap className="w-4 h-4 text-yellow-400 shrink-0" />
+                  <span className="font-sans text-slate-300 text-xs font-semibold">Recommended Option:</span>
+                  <span className="font-mono font-black text-yellow-300 text-xs sm:text-sm bg-yellow-950/90 px-2 py-0.5 rounded-md border border-yellow-500/50 shadow-sm">
+                    {plan.recommendedOptionStrike}
+                  </span>
+                </div>
+                <div className="text-xs font-mono text-slate-200">
+                  LTP ~<span className="text-white font-bold">₹{plan.optionEntryEst.toFixed(1)}</span> (T1: <span className="text-emerald-400 font-bold">₹{plan.optionTarget1.toFixed(1)}</span>)
+                </div>
+              </div>
             </div>
 
-            {/* 3. ANTI-TRAP EXECUTION & INVALIDATION RULES (COLLAPSIBLE) */}
-            <div className={`rounded-xl border transition-all ${
+            {/* Anti-Trap Execution & Invalidation Rules (Clean, Big Fonts, No clutter) */}
+            <div className={`p-3 rounded-xl border space-y-2 ${
               currentRally.trapRiskLevel === 'SAFE'
                 ? 'bg-slate-900/90 border-emerald-500/40'
                 : currentRally.trapRiskLevel === 'MODERATE'
                 ? 'bg-amber-950/40 border-amber-500/40'
                 : 'bg-rose-950/40 border-rose-500/50'
             }`}>
-              {/* Header Toggle */}
-              <div 
-                onClick={() => toggleSection('antiTrap')}
-                className="p-2.5 flex items-center justify-between flex-wrap gap-1.5 cursor-pointer select-none hover:bg-white/5 transition-colors rounded-xl"
-                title="Click to toggle Anti-Trap Guard & Invalidation Rules"
-              >
+              <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2 font-bold">
                   <ShieldCheck className={`w-4 h-4 ${
                     currentRally.trapRiskLevel === 'SAFE' ? 'text-emerald-400' : currentRally.trapRiskLevel === 'MODERATE' ? 'text-amber-400' : 'text-rose-400'
@@ -1453,160 +1207,55 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     {currentRally.trapRiskLevel === 'SAFE' ? '🛡️ Prime Base (Safe Entry)' : currentRally.trapRiskLevel === 'MODERATE' ? '⚠️ Moderate Extension' : '🚨 Overextended Trap Risk'}
                   </span>
                 </div>
-
-                <div className="flex items-center space-x-1.5">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowAntiTrapGuide(true);
-                    }}
-                    className="text-[10.5px] text-amber-300 hover:underline cursor-pointer flex items-center gap-0.5 font-bold px-1.5 py-0.5 rounded bg-slate-950/60 border border-slate-700/60"
-                  >
-                    <Info className="w-3 h-3" />
-                    <span>Rules</span>
-                  </button>
-
-                  <div className="p-1 rounded-md text-slate-300 hover:text-white bg-slate-900/60 border border-slate-700/60">
-                    {collapsedSections.antiTrap ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                  </div>
-                </div>
+                <button
+                  onClick={() => setShowAntiTrapGuide(true)}
+                  className="text-[10.5px] text-amber-300 hover:underline cursor-pointer flex items-center gap-0.5 font-bold"
+                >
+                  <Info className="w-3 h-3" />
+                  <span>Rules</span>
+                </button>
               </div>
 
-              {/* Collapsible Body */}
-              {!collapsedSections.antiTrap && (
-                <div className="px-2.5 pb-2.5 pt-0">
-                  {/* Strict Entry Confirmation Trigger */}
-                  <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 space-y-1.5">
-                    <div className="text-slate-300 flex items-start gap-1.5 text-xs">
-                      <span className="text-emerald-400 font-bold shrink-0">🎯 Entry Trigger:</span>
-                      <span className="font-mono text-white font-medium">{currentRally.entryConfirmation}</span>
-                    </div>
-                    <div className="text-slate-300 flex items-start gap-1.5 border-t border-slate-800/80 pt-1.5 text-xs">
-                      <span className="text-rose-400 font-bold shrink-0">🛑 Invalidation SL:</span>
-                      <span className="font-mono text-rose-300 font-medium">{currentRally.invalidationRule}</span>
-                    </div>
-                  </div>
+              {/* Strict Entry Confirmation Trigger */}
+              <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 space-y-1.5">
+                <div className="text-slate-300 flex items-start gap-1.5 text-xs">
+                  <span className="text-emerald-400 font-bold shrink-0">🎯 Entry Trigger:</span>
+                  <span className="font-mono text-white font-medium">{currentRally.entryConfirmation}</span>
                 </div>
-              )}
+                <div className="text-slate-300 flex items-start gap-1.5 border-t border-slate-800/80 pt-1.5 text-xs">
+                  <span className="text-rose-400 font-bold shrink-0">🛑 Invalidation SL:</span>
+                  <span className="font-mono text-rose-300 font-medium">{currentRally.invalidationRule}</span>
+                </div>
+              </div>
             </div>
 
-            {/* 4. MULTI-CONFLUENCE VALIDATION CHECKLIST (COLLAPSIBLE) */}
-            <div className="bg-slate-900/70 rounded-xl border border-slate-800 transition-all">
-              {/* Header Toggle */}
-              <div 
-                onClick={() => toggleSection('confluences')}
-                className="p-2.5 flex items-center justify-between flex-wrap gap-1.5 cursor-pointer select-none hover:bg-white/5 transition-colors rounded-xl"
-                title="Click to toggle Institutional Confluence Points"
-              >
-                <div className="flex items-center space-x-1.5">
-                  <Flame className="w-4 h-4 text-amber-400" />
-                  <span className="text-xs font-bold uppercase tracking-wide text-slate-300">
-                    Confluence Checklist ({currentRally.confluenceRatio})
-                  </span>
-                </div>
-
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-[10.5px] font-mono font-bold text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
-                    {currentRally.confluencesPassed} Passed
-                  </span>
-                  <div className="p-1 rounded-md text-slate-300 hover:text-white bg-slate-900/60 border border-slate-700/60">
-                    {collapsedSections.confluences ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                  </div>
-                </div>
-              </div>
-
-              {/* Collapsible Body */}
-              {!collapsedSections.confluences && (
-                <div className="px-2.5 pb-2.5 pt-0">
-                  <div className="space-y-1.5">
-                    {currentRally.confluenceDetails.map((detail, idx) => (
-                      <div 
-                        key={idx} 
-                        className={`text-xs px-2.5 py-1.5 rounded-lg border flex items-center justify-between ${
-                          detail.passed 
-                            ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-200' 
-                            : 'bg-slate-950/50 border-slate-800 text-slate-400'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-1.5">
-                          {detail.passed ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          ) : (
-                            <div className="w-3.5 h-3.5 rounded-full border border-slate-600 flex items-center justify-center shrink-0">
-                              <span className="text-[8px] text-slate-500">✕</span>
-                            </div>
-                          )}
-                          <span className="font-medium">{detail.name}</span>
-                        </div>
-                        <span className="font-mono text-[10.5px] text-slate-300">{detail.detail}</span>
-                      </div>
-                    ))}
-                  </div>
+            {/* Quick Technical Badges (VWAP, RSI, 15m Range) */}
+            <div className="grid grid-cols-3 gap-2 text-center font-mono">
+              {currentRally.vwap !== undefined && currentRally.vwap !== null && (
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">VWAP</div>
+                  <div className="font-black text-sm text-purple-300 mt-0.5">₹{currentRally.vwap.toFixed(1)}</div>
                 </div>
               )}
-            </div>
 
-            {/* 5. QUICK TECHNICAL BADGES / INDICATORS (COLLAPSIBLE) */}
-            <div className="bg-slate-900/70 rounded-xl border border-slate-800 transition-all">
-              {/* Header Toggle */}
-              <div 
-                onClick={() => toggleSection('technicalMetrics')}
-                className="p-2.5 flex items-center justify-between flex-wrap gap-1.5 cursor-pointer select-none hover:bg-white/5 transition-colors rounded-xl"
-                title="Click to toggle Technical Indicators (VWAP, RSI, 15m Range)"
-              >
-                <div className="flex items-center space-x-1.5">
-                  <Layers className="w-4 h-4 text-cyan-400" />
-                  <span className="text-xs font-bold uppercase tracking-wide text-slate-300">
-                    Key Technical Indicators
-                  </span>
+              {currentRally.rsi !== undefined && currentRally.rsi !== null && (
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">RSI (14)</div>
+                  <div className="font-black text-sm text-blue-300 mt-0.5">{currentRally.rsi.toFixed(1)}</div>
                 </div>
+              )}
 
-                <div className="flex items-center space-x-1.5">
-                  {collapsedSections.technicalMetrics && (
-                    <div className="flex items-center gap-1 text-[10px] font-mono">
-                      {currentRally.vwap && <span className="bg-purple-950/80 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30">VWAP: ₹{currentRally.vwap.toFixed(1)}</span>}
-                      {currentRally.rsi && <span className="bg-blue-950/80 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/30">RSI: {currentRally.rsi.toFixed(1)}</span>}
-                    </div>
-                  )}
-
-                  <div className="p-1 rounded-md text-slate-300 hover:text-white bg-slate-900/60 border border-slate-700/60">
-                    {collapsedSections.technicalMetrics ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-                  </div>
+              {currentRally.first15mHigh !== undefined && currentRally.first15mHigh !== null && isBull && (
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">15m High</div>
+                  <div className="font-black text-sm text-emerald-400 mt-0.5">₹{currentRally.first15mHigh.toFixed(1)}</div>
                 </div>
-              </div>
+              )}
 
-              {/* Collapsible Body */}
-              {!collapsedSections.technicalMetrics && (
-                <div className="px-2.5 pb-2.5 pt-0">
-                  <div className="grid grid-cols-3 gap-2 text-center font-mono">
-                    {currentRally.vwap !== undefined && currentRally.vwap !== null && (
-                      <div className="bg-slate-950/90 p-2 rounded-xl border border-slate-800/90">
-                        <div className="text-slate-400 text-[10px] font-sans font-semibold">VWAP</div>
-                        <div className="font-black text-sm text-purple-300 mt-0.5">₹{currentRally.vwap.toFixed(1)}</div>
-                      </div>
-                    )}
-
-                    {currentRally.rsi !== undefined && currentRally.rsi !== null && (
-                      <div className="bg-slate-950/90 p-2 rounded-xl border border-slate-800/90">
-                        <div className="text-slate-400 text-[10px] font-sans font-semibold">RSI (14)</div>
-                        <div className="font-black text-sm text-blue-300 mt-0.5">{currentRally.rsi.toFixed(1)}</div>
-                      </div>
-                    )}
-
-                    {currentRally.first15mHigh !== undefined && currentRally.first15mHigh !== null && isBull && (
-                      <div className="bg-slate-950/90 p-2 rounded-xl border border-slate-800/90">
-                        <div className="text-slate-400 text-[10px] font-sans font-semibold">15m High</div>
-                        <div className="font-black text-sm text-emerald-400 mt-0.5">₹{currentRally.first15mHigh.toFixed(1)}</div>
-                      </div>
-                    )}
-
-                    {currentRally.first15mLow !== undefined && currentRally.first15mLow !== null && !isBull && (
-                      <div className="bg-slate-950/90 p-2 rounded-xl border border-slate-800/90">
-                        <div className="text-slate-400 text-[10px] font-sans font-semibold">15m Low</div>
-                        <div className="font-black text-sm text-rose-400 mt-0.5">₹{currentRally.first15mLow.toFixed(1)}</div>
-                      </div>
-                    )}
-                  </div>
+              {currentRally.first15mLow !== undefined && currentRally.first15mLow !== null && !isBull && (
+                <div className="bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                  <div className="text-slate-400 text-[10px] font-sans font-semibold">15m Low</div>
+                  <div className="font-black text-sm text-rose-400 mt-0.5">₹{currentRally.first15mLow.toFixed(1)}</div>
                 </div>
               )}
             </div>
@@ -1681,7 +1330,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               {onOpenPositionSizer && (
                 <button
                   onClick={() => onOpenPositionSizer(currentRally.stock)}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2.5 rounded-xl border border-slate-700 transition-colors shadow-md cursor-pointer"
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2.5 rounded-xl border border-slate-700 transition-colors shadow-md"
                   title="Open Position Sizer & Risk Calculator"
                 >
                   <Calculator className="w-5 h-5 text-emerald-400" />

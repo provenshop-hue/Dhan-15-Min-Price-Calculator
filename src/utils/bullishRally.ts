@@ -21,9 +21,7 @@ export type RallyCategoryFilter =
   | '100_BULL' 
   | '100_BEAR' 
   | '100_PCT' 
-  | 'BREAKOUT'
-  | 'BULLISH_RALLY'
-  | 'BEARISH_RALLY'
+  | 'BREAKOUT' 
   | 'PARABOLIC' 
   | 'RALLY_STARTED'
   | 'SUSTAINED_30M'
@@ -38,23 +36,12 @@ export type RallyRecencyFilter =
 export type PopunderTriggerType =
   | 'INDEX_HOLD_SUSTAINED'
   | 'BREAKOUT_JUST_HIT'
-  | 'BREAKDOWN_JUST_HIT'
   | 'PARABOLIC_BULLISH_RALLY_STARTED'
   | 'PARABOLIC_BEARISH_RALLY_STARTED'
   | 'ONE_HUNDRED_PCT_BULLISH'
   | 'ONE_HUNDRED_PCT_BEARISH'
   | 'BULLISH_RALLY_STARTED'
   | 'BEARISH_RALLY_STARTED';
-
-export type SignalClassificationType =
-  | 'BREAKOUT'
-  | 'BREAKDOWN'
-  | 'ONE_HUNDRED_BULLISH'
-  | 'ONE_HUNDRED_BEARISH'
-  | 'BULLISH_RALLY'
-  | 'BEARISH_RALLY'
-  | 'PARABOLIC_RALLY'
-  | 'INDEX_HOLD';
 
 export interface HighAccuracyTradePlan {
   action: 'BUY (Cash/Futures)' | 'SELL (Short Futures)';
@@ -82,10 +69,6 @@ export interface RallySignal {
   pctChange: number;
   rallyType: string;
   triggerType: PopunderTriggerType;
-  signalClassification: SignalClassificationType;
-  signalCategoryName: string;
-  signalExplanation: string;
-  isVerifiedTrueSignal: boolean;
   triggerBadge: string;
   triggerColorClass: string;
   isIndex?: boolean; // True if symbol is a major benchmark or sectoral index (e.g. NIFTY, BANKNIFTY, SENSEX)
@@ -838,32 +821,6 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   const entryConfirmation = `Wait for 5m candle close ABOVE ₹${triggerPrice.toFixed(2)} or enter on pullback to VWAP (₹${(vwap || cmp).toFixed(2)})`;
   const invalidationRule = `Hard Exit if 5m candle closes BELOW VWAP (₹${(vwap ? vwap * 0.997 : tradePlan.stopLoss).toFixed(2)})`;
 
-  // Explicit Signal Classification determination
-  let signalClassification: SignalClassificationType = 'BULLISH_RALLY';
-  let signalCategoryName = '📈 Bullish Rally Started';
-  let signalExplanation = `Multi-confluence Bullish Rally in progress: Holding firmly above VWAP (₹${(vwap || cmp).toFixed(2)}) with positive Gann structure and ${effectivePillars}/${TOTAL_CONFLUENCES} confluences.`;
-
-  if (isIndexHold) {
-    signalClassification = 'INDEX_HOLD';
-    signalCategoryName = '🏛️ Benchmark Index Held Firm (>30m)';
-    signalExplanation = `Major Benchmark Index ${stock.symbol} holding institutional support (₹${(vwap || cmp).toFixed(2)}) firmly for ${heldMinutes}m without breakdown, establishing macro market stability.`;
-  } else if (is100Bull) {
-    signalClassification = 'ONE_HUNDRED_BULLISH';
-    signalCategoryName = '🟢 100% Bullish Move';
-    signalExplanation = `Textbook 100% Bullish Move: Open=Low (₹${open.toFixed(2)}) defended with solid green body closing near day highs above VWAP with high institutional conviction.`;
-  } else if (isAbove15m || isAboveBuyLevel || isOpenLow) {
-    signalClassification = 'BREAKOUT';
-    signalCategoryName = '💥 Breakout Just Hit';
-    const breakLevel = stock.first15mHigh || stock.buyAbove || (open * 1.008);
-    signalExplanation = `Confirmed Breakout: CMP (₹${cmp.toFixed(2)}) crossed strictly above breakout trigger level (₹${breakLevel.toFixed(2)}) with buyer volume support.`;
-  } else if (isParabolicBull) {
-    signalClassification = 'PARABOLIC_RALLY';
-    signalCategoryName = '🚀 Parabolic Bullish Rally';
-    signalExplanation = `Parabolic Momentum Expansion: Rapid price acceleration with EMA ribbon expanding and aggressive institutional market buying.`;
-  }
-
-  const isVerifiedTrueSignal = (pct >= 0) && (vwap ? cmp >= vwap * 0.995 : true) && (trapRiskLevel !== 'OVEREXTENDED_TRAP') && (effectivePillars >= 3 || isIndex || is100Bull);
-
   const reason = isIndexHold
     ? `Benchmark Index ${stock.symbol} has held steady bullish for ${heldMinutes}m (Passed at ${timingInfo.timeStr}). Robust institutional support holding firm above VWAP with ${effectivePillars}/${TOTAL_CONFLUENCES} confluences.`
     : (isSustainedHold
@@ -882,10 +839,6 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     pctChange: pct,
     rallyType,
     triggerType,
-    signalClassification,
-    signalCategoryName,
-    signalExplanation,
-    isVerifiedTrueSignal,
     triggerBadge,
     triggerColorClass,
     isIndex,
@@ -1068,7 +1021,7 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     triggerBadge = '📉 Parabolic Bearish Rally Started';
     triggerColorClass = 'bg-gradient-to-r from-rose-700 to-red-600 text-white border-rose-300 shadow-md animate-pulse';
   } else if (isBelow15m || isBelowSellLevel || isOpenHigh) {
-    triggerType = 'BREAKDOWN_JUST_HIT';
+    triggerType = 'BREAKOUT_JUST_HIT';
     triggerBadge = '💥 Breakdown Just Hit';
     triggerColorClass = 'bg-amber-500/25 text-yellow-300 border-amber-400/50 shadow-sm';
   }
@@ -1144,32 +1097,6 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
   const entryConfirmation = `Wait for 5m candle close BELOW ₹${triggerPrice.toFixed(2)} or enter on bounce retest to VWAP (₹${(vwap || cmp).toFixed(2)})`;
   const invalidationRule = `Hard Exit if 5m candle closes ABOVE VWAP (₹${(vwap ? vwap * 1.003 : tradePlan.stopLoss).toFixed(2)})`;
 
-  // Explicit Signal Classification determination
-  let signalClassification: SignalClassificationType = 'BEARISH_RALLY';
-  let signalCategoryName = '📉 Bearish Rally Started';
-  let signalExplanation = `Multi-confluence Bearish Rally in progress: Sustaining below VWAP (₹${(vwap || cmp).toFixed(2)}) with negative Gann trajectory and ${effectivePillars}/${TOTAL_CONFLUENCES} confluences.`;
-
-  if (isIndexHold) {
-    signalClassification = 'INDEX_HOLD';
-    signalCategoryName = '🏛️ Benchmark Index Breakdown (>30m)';
-    signalExplanation = `Major Benchmark Index ${stock.symbol} sustaining below key resistance (₹${(vwap || cmp).toFixed(2)}) firmly for ${heldMinutes}m without recovery.`;
-  } else if (is100Bear) {
-    signalClassification = 'ONE_HUNDRED_BEARISH';
-    signalCategoryName = '🔴 100% Bearish Move';
-    signalExplanation = `Textbook 100% Bearish Move: Open=High (₹${open.toFixed(2)}) rejected with solid red body dumping near session lows below VWAP.`;
-  } else if (isBelow15m || isBelowSellLevel || isOpenHigh) {
-    signalClassification = 'BREAKDOWN';
-    signalCategoryName = '💥 Breakdown Just Hit';
-    const breakLevel = stock.first15mLow || stock.sellBelow || (open * 0.992);
-    signalExplanation = `Confirmed Breakdown: CMP (₹${cmp.toFixed(2)}) crossed strictly below support level (₹${breakLevel.toFixed(2)}) with seller volume expansion.`;
-  } else if (isParabolicBear) {
-    signalClassification = 'PARABOLIC_RALLY';
-    signalCategoryName = '📉 Parabolic Bearish Breakdown';
-    signalExplanation = `Parabolic Downside Expansion: Rapid selling acceleration with EMA ribbon expanding downwards and aggressive market supply.`;
-  }
-
-  const isVerifiedTrueSignal = (pct <= 0) && (vwap ? cmp <= vwap * 1.005 : true) && (trapRiskLevel !== 'OVEREXTENDED_TRAP') && (effectivePillars >= 3 || isIndex || is100Bear);
-
   const reason = isIndexHold
     ? `Benchmark Index ${stock.symbol} has held steady bearish for ${heldMinutes}m (Passed at ${timingInfo.timeStr}). Heavy supply holding below VWAP with ${effectivePillars}/${TOTAL_CONFLUENCES} confluences.`
     : (isSustainedHold
@@ -1188,10 +1115,6 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     pctChange: pct,
     rallyType,
     triggerType,
-    signalClassification,
-    signalCategoryName,
-    signalExplanation,
-    isVerifiedTrueSignal,
     triggerBadge,
     triggerColorClass,
     isIndex,
@@ -1280,12 +1203,11 @@ export function getAllRallySignals(
             (categoryFilter === 'INDEX_HOLD' && (bull.isIndexHold || (bull.isIndex && bull.isSustainedHold))) ||
             (categoryFilter === 'SUSTAINED_30M' && bull.isSustainedHold) ||
             (categoryFilter === 'SUSTAINED_BULL' && bull.isSustainedHold) ||
-            (categoryFilter === '100_BULL' && bull.signalClassification === 'ONE_HUNDRED_BULLISH') ||
-            (categoryFilter === '100_PCT' && bull.signalClassification === 'ONE_HUNDRED_BULLISH') ||
-            (categoryFilter === 'BREAKOUT' && (bull.signalClassification === 'BREAKOUT' || bull.triggerType === 'BREAKOUT_JUST_HIT')) ||
-            (categoryFilter === 'BULLISH_RALLY' && (bull.signalClassification === 'BULLISH_RALLY' || bull.signalClassification === 'PARABOLIC_RALLY')) ||
-            (categoryFilter === 'PARABOLIC' && bull.signalClassification === 'PARABOLIC_RALLY') ||
-            (categoryFilter === 'RALLY_STARTED' && (bull.signalClassification === 'BULLISH_RALLY' || bull.signalClassification === 'PARABOLIC_RALLY'));
+            (categoryFilter === '100_BULL' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
+            (categoryFilter === '100_PCT' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
+            (categoryFilter === 'BREAKOUT' && bull.triggerType === 'BREAKOUT_JUST_HIT') ||
+            (categoryFilter === 'PARABOLIC' && bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED') ||
+            (categoryFilter === 'RALLY_STARTED' && (bull.triggerType === 'BULLISH_RALLY_STARTED' || bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED'));
 
           // Recent hit check: Shows recent hits (<30m) AND stocks/indices that stood still as bullish for >30m
           const passesRecent = !onlyRecentHits || ((bull.isJustHit || bull.isSustainedHold || bull.isIndexHold) && !bull.isYesterday);
@@ -1322,12 +1244,11 @@ export function getAllRallySignals(
             (categoryFilter === 'INDEX_HOLD' && (bear.isIndexHold || (bear.isIndex && bear.isSustainedHold))) ||
             (categoryFilter === 'SUSTAINED_30M' && bear.isSustainedHold) ||
             (categoryFilter === 'SUSTAINED_BULL' && false) ||
-            (categoryFilter === '100_BEAR' && bear.signalClassification === 'ONE_HUNDRED_BEARISH') ||
-            (categoryFilter === '100_PCT' && bear.signalClassification === 'ONE_HUNDRED_BEARISH') ||
-            (categoryFilter === 'BREAKOUT' && (bear.signalClassification === 'BREAKDOWN' || bear.triggerType === 'BREAKDOWN_JUST_HIT' || bear.triggerType === 'BREAKOUT_JUST_HIT')) ||
-            (categoryFilter === 'BEARISH_RALLY' && (bear.signalClassification === 'BEARISH_RALLY' || bear.signalClassification === 'PARABOLIC_RALLY')) ||
-            (categoryFilter === 'PARABOLIC' && bear.signalClassification === 'PARABOLIC_RALLY') ||
-            (categoryFilter === 'RALLY_STARTED' && (bear.signalClassification === 'BEARISH_RALLY' || bear.signalClassification === 'PARABOLIC_RALLY'));
+            (categoryFilter === '100_BEAR' && bear.triggerType === 'ONE_HUNDRED_PCT_BEARISH') ||
+            (categoryFilter === '100_PCT' && bear.triggerType === 'ONE_HUNDRED_PCT_BEARISH') ||
+            (categoryFilter === 'BREAKOUT' && bear.triggerType === 'BREAKOUT_JUST_HIT') ||
+            (categoryFilter === 'PARABOLIC' && bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED') ||
+            (categoryFilter === 'RALLY_STARTED' && (bear.triggerType === 'BEARISH_RALLY_STARTED' || bear.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED'));
 
           // Recent hit check: Shows recent hits (<30m) AND stocks/indices that stood still as bearish for >30m
           const passesRecent = !onlyRecentHits || ((bear.isJustHit || bear.isSustainedHold || bear.isIndexHold) && !bear.isYesterday);
