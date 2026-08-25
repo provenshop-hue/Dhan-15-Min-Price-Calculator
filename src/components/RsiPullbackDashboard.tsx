@@ -2574,7 +2574,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                                   e.stopPropagation();
                                   setInspectHighConfidenceStock(stock);
                                 }}
-                                title={`High-Confidence Trade: ${hc.metCount}/14 Confluences Met. Entry Trigger: ${hc.isEntryTriggerActive ? 'ACTIVE' : 'Pending'}. Click to inspect full 14-point checklist.`}
+                                title={`High-Confidence Trade: ${hc.passedConditionsCount}/14 Confluences Met. Entry Trigger: ${hc.isEntryTriggerActive ? 'ACTIVE' : 'Pending'}. Click to inspect full 14-point checklist.`}
                                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black shadow-2xs border cursor-pointer transition-all hover:scale-105 ${
                                   hc.isEntryTriggerActive
                                     ? 'bg-amber-400 text-slate-950 border-yellow-300 ring-2 ring-yellow-400 animate-pulse'
@@ -2584,7 +2584,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                                 <Flame className="w-3 h-3 fill-current text-yellow-400 animate-bounce" />
                                 <span>{hc.isEntryTriggerActive ? '🚀 HC ENTRY TRIGGER' : '🎯 14 CONFLUENCES'}</span>
                                 <span className="font-mono text-[9px] bg-slate-900 text-yellow-300 px-1 py-0.2 rounded font-bold">
-                                  {hc.metCount}/14
+                                  {hc.passedConditionsCount}/14
                                 </span>
                               </button>
                             );
@@ -3228,7 +3228,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                         ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400' 
                         : 'bg-amber-500/20 text-amber-300 border-amber-400'
                     }`}>
-                      {hc.isHighConfidence ? '🎯 14/14 ALL CONFLUENCES MET' : `⚠️ ${hc.metCount}/14 Confluences Met`}
+                      {hc.isHighConfidence ? '🎯 14/14 ALL CONFLUENCES MET' : `⚠️ ${hc.passedConditionsCount}/14 Confluences Met`}
                     </span>
                     {hc.isEntryTriggerActive && (
                       <span className="bg-amber-400 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full border border-yellow-300 animate-pulse">
@@ -3241,7 +3241,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                     <span>Change: <strong className={(inspectHighConfidenceStock.pctChange || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                       {(inspectHighConfidenceStock.pctChange || 0) >= 0 ? '+' : ''}{(inspectHighConfidenceStock.pctChange || 0).toFixed(2)}%
                     </strong></span>
-                    <span>Score: <strong className="text-yellow-400">{hc.score}/100</strong></span>
+                    <span>Score: <strong className="text-yellow-400">{hc.scorePercent}/100</strong></span>
                   </div>
                 </div>
 
@@ -3265,7 +3265,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                     <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>High-Confidence System Validation</span>
                   </div>
-                  <p>{hc.summary}</p>
+                  <p>{hc.summaryReason}</p>
                 </div>
 
                 {/* Final Trigger Status Card */}
@@ -3286,15 +3286,15 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono pt-1">
                     <div className={`p-2 rounded-xl border ${hc.isHighConfidence ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
                       <div className="text-[9.5px] uppercase font-bold text-slate-400">14 Mandatory Rules</div>
-                      <div className="font-black">{hc.isHighConfidence ? '✅ ALL TRUE' : `❌ ${hc.metCount}/14 MET`}</div>
+                      <div className="font-black">{hc.isHighConfidence ? '✅ ALL TRUE' : `❌ ${hc.passedConditionsCount}/14 MET`}</div>
                     </div>
-                    <div className={`p-2 rounded-xl border ${hc.finalTrigger.currentCandleBullish ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
+                    <div className={`p-2 rounded-xl border ${hc.finalTrigger.isCurrentCandleBullish ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
                       <div className="text-[9.5px] uppercase font-bold text-slate-400">Current Candle</div>
-                      <div className="font-black">{hc.finalTrigger.currentCandleBullish ? '✅ BULLISH (GREEN)' : '❌ RED CANDLE'}</div>
+                      <div className="font-black">{hc.finalTrigger.isCurrentCandleBullish ? '✅ BULLISH (GREEN)' : '❌ RED CANDLE'}</div>
                     </div>
-                    <div className={`p-2 rounded-xl border ${hc.finalTrigger.closeAbovePrevHigh ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
+                    <div className={`p-2 rounded-xl border ${hc.finalTrigger.isCloseAbovePrevHigh ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
                       <div className="text-[9.5px] uppercase font-bold text-slate-400">Close &gt; Prev High</div>
-                      <div className="font-black">{hc.finalTrigger.closeAbovePrevHigh ? '✅ BREAKOUT HIGH' : '❌ BELOW PREV HIGH'}</div>
+                      <div className="font-black">{hc.finalTrigger.isCloseAbovePrevHigh ? '✅ BREAKOUT HIGH' : '❌ BELOW PREV HIGH'}</div>
                     </div>
                   </div>
                 </div>
@@ -3303,7 +3303,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                 <div className="space-y-2">
                   <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
                     <span>14 Mandatory Confluences</span>
-                    <span>{hc.metCount} / {hc.totalConditions} Met</span>
+                    <span>{hc.passedConditionsCount} / {hc.totalConditionsCount} Met</span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -3311,32 +3311,32 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                       <div
                         key={idx}
                         className={`p-2.5 rounded-xl border text-xs transition-colors flex items-start gap-2.5 ${
-                          cond.met
+                          cond.passed
                             ? 'bg-slate-950/80 border-emerald-500/40 text-slate-200'
                             : 'bg-slate-950/50 border-slate-800/80 text-slate-400'
                         }`}
                       >
                         <div className={`p-1 rounded-md shrink-0 mt-0.5 ${
-                          cond.met ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                          cond.passed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
                         }`}>
-                          {cond.met ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                          {cond.passed ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
                         </div>
                         <div className="space-y-0.5 flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <span className={`font-black text-[11px] truncate ${cond.met ? 'text-white' : 'text-slate-400'}`}>
+                            <span className={`font-black text-[11px] truncate ${cond.passed ? 'text-white' : 'text-slate-400'}`}>
                               {idx + 1}. {cond.name}
                             </span>
                             <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded shrink-0 ${
-                              cond.met ? 'bg-emerald-900/60 text-emerald-300' : 'bg-rose-950/60 text-rose-400'
+                              cond.passed ? 'bg-emerald-900/60 text-emerald-300' : 'bg-rose-950/60 text-rose-400'
                             }`}>
-                              {cond.met ? 'PASS' : 'FAIL'}
+                              {cond.passed ? 'PASS' : 'FAIL'}
                             </span>
                           </div>
                           <div className="text-[10px] text-slate-400 font-mono">
-                            Actual: <span className={cond.met ? 'text-emerald-300' : 'text-rose-300'}>{cond.actualValue}</span>
+                            Actual: <span className={cond.passed ? 'text-emerald-300' : 'text-rose-300'}>{cond.actualValue}</span>
                           </div>
                           <div className="text-[9.5px] text-slate-500">
-                            Required: {cond.rule}
+                            Required: {cond.requiredCriteria}
                           </div>
                         </div>
                       </div>
