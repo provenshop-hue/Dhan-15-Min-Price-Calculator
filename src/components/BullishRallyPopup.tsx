@@ -1040,79 +1040,6 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           /* Content Body of Selected Rotating Stock (Clean, High Contrast, Big Fonts) */
           <div className="p-4 space-y-3.5 transition-all duration-300">
             
-            {/* Main Headline & Ticker Hero Box with HUGE FONTS & HIGH CONTRAST */}
-            <div className={`p-3.5 rounded-2xl border-2 shadow-xl ${
-              isBull
-                ? 'bg-gradient-to-r from-slate-950 via-emerald-950/80 to-slate-950 border-emerald-500/70 shadow-emerald-950/40'
-                : 'bg-gradient-to-r from-slate-950 via-rose-950/80 to-slate-950 border-rose-500/70 shadow-rose-950/40'
-            }`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1 min-w-0">
-                  {/* Badges Row */}
-                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                    <span className={`text-[10.5px] font-black uppercase px-2 py-0.5 rounded-md font-mono border shadow-sm flex items-center gap-1 ${currentRally.triggerColorClass}`}>
-                      {currentRally.triggerBadge}
-                    </span>
-
-                    {currentIndex === 0 ? (
-                      <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/50 text-[10.5px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1 shadow-sm">
-                        👑 #1 TOP PICK
-                      </span>
-                    ) : (
-                      <span className="bg-slate-800/90 text-slate-200 border border-slate-700 text-[10.5px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1">
-                        ⭐ #{currentIndex + 1}
-                      </span>
-                    )}
-
-                    {currentRally.isSustainedHold && (
-                      <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/70 text-[10.5px] px-2 py-0.5 rounded font-mono font-black flex items-center gap-1 shadow-sm">
-                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                        🛡️ Stood &gt;30m ({currentRally.sustainedDurationMinutes}m)
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Stock Symbol - EXTRA LARGE & HIGH CONTRAST */}
-                  <div className="pt-1">
-                    <div className="flex items-baseline gap-2.5 flex-wrap">
-                      <h2 className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] flex items-center gap-2">
-                        <span className={isBull ? 'text-emerald-300' : 'text-rose-300'}>
-                          {currentRally.symbol}
-                        </span>
-                      </h2>
-                      <span className="text-xs sm:text-sm font-bold text-slate-300 truncate max-w-[220px]">
-                        {currentRally.companyName}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* % Change & CMP Badge - LARGE & BOLD + Stock Dismiss Button */}
-                <div className="text-right shrink-0 flex flex-col items-end">
-                  <div className="flex items-center gap-1.5">
-                    <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight drop-shadow">
-                      ₹{currentRally.currentPrice.toFixed(2)}
-                    </div>
-                    {/* Stock Dismiss button */}
-                    <button
-                      onClick={(e) => handleDismissStock(currentRally.symbol, e)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors cursor-pointer"
-                      title={`Remove ${currentRally.symbol} from popunder selection`}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className={`text-sm sm:text-base font-black font-mono px-3 py-0.5 rounded-lg border mt-1.5 shadow-md ${
-                    isBull 
-                      ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400' 
-                      : 'bg-rose-950/90 text-rose-300 border-rose-400'
-                  }`}>
-                    {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* 1. ANTI-TRAP GUARD & INVALIDATION STATUS (TOP OF CARD) */}
             <div className={`p-3 rounded-xl border space-y-2 ${
               currentRally.trapRiskLevel === 'SAFE'
@@ -1220,6 +1147,88 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 </div>
                 <div className="text-xs font-mono text-slate-200">
                   LTP ~<span className="text-white font-bold">₹{plan.optionEntryEst.toFixed(1)}</span> (T1: <span className="text-emerald-400 font-bold">₹{plan.optionTarget1.toFixed(1)}</span>)
+                </div>
+              </div>
+            </div>
+
+            {/* 3. DEDICATED STOCK NAME & PRICE SPOTLIGHT HERO CARD (MOVED DOWN FOR MAXIMUM VISIBILITY) */}
+            <div className={`p-4 rounded-2xl border-2 shadow-2xl ${
+              isBull
+                ? 'bg-gradient-to-r from-slate-950 via-emerald-950/90 to-slate-950 border-emerald-400/80 shadow-emerald-950/50 ring-1 ring-emerald-500/30'
+                : 'bg-gradient-to-r from-slate-950 via-rose-950/90 to-slate-950 border-rose-400/80 shadow-rose-950/50 ring-1 ring-rose-500/30'
+            }`}>
+              <div className="text-[10px] font-sans font-black uppercase tracking-wider text-slate-400 mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1 text-yellow-300">
+                  <span>🎯 ACTIVE STOCK</span>
+                </span>
+                <span className="text-slate-400 font-mono">
+                  Stock #{currentIndex + 1} of {rallySignals.length}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1 min-w-0">
+                  {/* Badges Row */}
+                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                    <span className={`text-[10.5px] font-black uppercase px-2 py-0.5 rounded-md font-mono border shadow-sm flex items-center gap-1 ${currentRally.triggerColorClass}`}>
+                      {currentRally.triggerBadge}
+                    </span>
+
+                    {currentIndex === 0 ? (
+                      <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/50 text-[10.5px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1 shadow-sm">
+                        👑 #1 TOP PICK
+                      </span>
+                    ) : (
+                      <span className="bg-slate-800/90 text-slate-200 border border-slate-700 text-[10.5px] font-black uppercase px-2 py-0.5 rounded font-mono flex items-center gap-1">
+                        ⭐ #{currentIndex + 1}
+                      </span>
+                    )}
+
+                    {currentRally.isSustainedHold && (
+                      <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/70 text-[10.5px] px-2 py-0.5 rounded font-mono font-black flex items-center gap-1 shadow-sm">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        🛡️ Stood &gt;30m
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Stock Symbol & Full Company Name - EXTRA LARGE, PROMINENT & HIGH CONTRAST */}
+                  <div className="pt-1">
+                    <div className="flex items-baseline gap-2.5 flex-wrap">
+                      <h2 className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)] flex items-center gap-2">
+                        <span className={isBull ? 'text-emerald-300' : 'text-rose-300'}>
+                          {currentRally.symbol}
+                        </span>
+                      </h2>
+                      <span className="text-xs sm:text-sm font-bold text-slate-200 truncate max-w-[240px]">
+                        {currentRally.companyName}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* % Change & CMP Badge - LARGE & BOLD + Stock Dismiss Button */}
+                <div className="text-right shrink-0 flex flex-col items-end">
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight drop-shadow">
+                      ₹{currentRally.currentPrice.toFixed(2)}
+                    </div>
+                    {/* Stock Dismiss button */}
+                    <button
+                      onClick={(e) => handleDismissStock(currentRally.symbol, e)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors cursor-pointer"
+                      title={`Remove ${currentRally.symbol} from popunder selection`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className={`text-sm sm:text-base font-black font-mono px-3 py-0.5 rounded-lg border mt-1.5 shadow-md ${
+                    isBull 
+                      ? 'bg-emerald-950/90 text-emerald-300 border-emerald-400' 
+                      : 'bg-rose-950/90 text-rose-300 border-rose-400'
+                  }`}>
+                    {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
+                  </div>
                 </div>
               </div>
             </div>
