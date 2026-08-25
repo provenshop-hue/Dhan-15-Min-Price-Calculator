@@ -74,6 +74,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [showAllList, setShowAllList] = useState<boolean>(false);
   const [showAntiTrapGuide, setShowAntiTrapGuide] = useState<boolean>(false);
+  const [showHighConfidenceGuide, setShowHighConfidenceGuide] = useState<boolean>(false);
   const [slideProgress, setSlideProgress] = useState<number>(0);
 
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
@@ -185,6 +186,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
       if (filterDirection === 'HUNDRED_BULLISH_ONLY' && signal.triggerType !== 'ONE_HUNDRED_PCT_BULLISH') return false;
       if (filterDirection === 'HUNDRED_BEARISH_ONLY' && signal.triggerType !== 'ONE_HUNDRED_PCT_BEARISH') return false;
       if (filterDirection === 'HUNDRED_PCT_ALL' && signal.triggerType !== 'ONE_HUNDRED_PCT_BULLISH' && signal.triggerType !== 'ONE_HUNDRED_PCT_BEARISH') return false;
+      if (filterDirection === 'HIGH_CONFIDENCE_ONLY' && !signal.highConfidence?.isHighConfidence && !signal.highConfidence?.isEntryTriggerActive) return false;
 
       // 3. Recency filter
       if (recencyMode === 'FRESH_ONLY' && (!signal.isFresh || signal.isYesterday)) return false;
@@ -209,12 +211,13 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
       // 9. Multi-select trigger categories (if any selected, must match at least one selected trigger)
       if (selectedTriggers.size > 0) {
         let matchesAnySelected = false;
+        if (selectedTriggers.has('HIGH_CONFIDENCE') && (signal.highConfidence?.isHighConfidence || signal.highConfidence?.isEntryTriggerActive)) matchesAnySelected = true;
         if (selectedTriggers.has('100_BULL') && signal.triggerType === 'ONE_HUNDRED_PCT_BULLISH') matchesAnySelected = true;
         if (selectedTriggers.has('100_BEAR') && signal.triggerType === 'ONE_HUNDRED_PCT_BEARISH') matchesAnySelected = true;
         if (selectedTriggers.has('100_PCT') && (signal.triggerType === 'ONE_HUNDRED_PCT_BULLISH' || signal.triggerType === 'ONE_HUNDRED_PCT_BEARISH')) matchesAnySelected = true;
         if (selectedTriggers.has('BREAKOUT') && signal.triggerType === 'BREAKOUT_JUST_HIT') matchesAnySelected = true;
         if (selectedTriggers.has('PARABOLIC') && (signal.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED' || signal.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED')) matchesAnySelected = true;
-        if (selectedTriggers.has('RALLY_STARTED') && (signal.triggerType === 'BULLISH_RALLY_STARTED' || signal.triggerType === 'BEARISH_RALLY_STARTED' || signal.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED' || signal.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED')) matchesAnySelected = true;
+        if (selectedTriggers.has('RALLY_STARTED') && (signal.triggerType === 'BULLISH_RALLY_STARTED' || signal.triggerType === 'BEARISH_RALLY_STARTED' || signal.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED' || signal.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED' || signal.triggerType === 'HIGH_CONFIDENCE_TRADE')) matchesAnySelected = true;
         if (selectedTriggers.has('SUSTAINED_30M') && signal.isSustainedHold) matchesAnySelected = true;
         if (selectedTriggers.has('SUSTAINED_BULL') && signal.isSustainedHold && signal.direction === 'BULLISH') matchesAnySelected = true;
         if (!matchesAnySelected) return false;
@@ -281,13 +284,18 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         BEARISH_ONLY: '🔴 Bearish Only',
         HUNDRED_BULLISH_ONLY: '🟢 100% Bullish',
         HUNDRED_BEARISH_ONLY: '🔴 100% Bearish',
-        HUNDRED_PCT_ALL: '🟢🔴 100% Target Moves'
+        HUNDRED_PCT_ALL: '🟢🔴 100% Target Moves',
+        HIGH_CONFIDENCE_ONLY: '🎯 High Confidence Trade'
       };
       list.push({
         id: `dir_${filterDirection}`,
         label: labelMap[filterDirection] || filterDirection,
         onRemove: () => setFilterDirection('ALL'),
-        colorClass: filterDirection.includes('BEAR') ? 'bg-rose-950/80 text-rose-300 border-rose-500/50' : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
+        colorClass: filterDirection === 'HIGH_CONFIDENCE_ONLY' 
+          ? 'bg-amber-500 text-slate-950 border-amber-300 font-black'
+          : filterDirection.includes('BEAR') 
+          ? 'bg-rose-950/80 text-rose-300 border-rose-500/50' 
+          : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
       });
     }
 
@@ -352,6 +360,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
     selectedTriggers.forEach((trig) => {
       const trigMap: Record<string, { label: string; color: string }> = {
+        'HIGH_CONFIDENCE': { label: '🎯 High Confidence Trade', color: 'bg-amber-500 text-slate-950 border-amber-300 font-black' },
         '100_BULL': { label: '🟢 100% Bull', color: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50' },
         '100_BEAR': { label: '🔴 100% Bear', color: 'bg-rose-950/80 text-rose-300 border-rose-500/50' },
         '100_PCT': { label: '🎯 100% Targets', color: 'bg-teal-950/80 text-teal-300 border-teal-500/50' },
@@ -694,11 +703,34 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               <span>Filters{hasActiveFilters ? ` (${activeFilterList.length})` : ''}</span>
             </button>
 
+            {/* High-Confidence 14-Condition Guide Toggle */}
+            <button
+              onClick={() => {
+                setShowHighConfidenceGuide((prev) => !prev);
+                if (!showHighConfidenceGuide) {
+                  setShowAntiTrapGuide(false);
+                  setShowAllList(false);
+                }
+              }}
+              className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                showHighConfidenceGuide 
+                  ? 'bg-amber-400 text-slate-950 font-black shadow-md ring-2 ring-amber-300' 
+                  : 'bg-amber-500/20 text-yellow-300 border border-amber-500/40 hover:bg-amber-500/30'
+              }`}
+              title="14 Mandatory Confluences & Entry Trigger Validation"
+            >
+              <Flame className="w-3.5 h-3.5 text-yellow-300 fill-current" />
+              <span>🎯 14 Confluences</span>
+            </button>
+
             {/* Anti-Trap Guide Toggle */}
             <button
               onClick={() => {
                 setShowAntiTrapGuide((prev) => !prev);
-                if (!showAntiTrapGuide) setShowAllList(false);
+                if (!showAntiTrapGuide) {
+                  setShowAllList(false);
+                  setShowHighConfidenceGuide(false);
+                }
               }}
               className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                 showAntiTrapGuide 
@@ -895,6 +927,131 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors cursor-pointer"
             >
               Got It — Back to Signals
+            </button>
+          </div>
+        ) : showHighConfidenceGuide ? (
+          /* High-Confidence 14-Mandatory Conditions & Entry Trigger Inspection Panel */
+          <div className="p-3.5 max-h-96 overflow-y-auto space-y-3 bg-slate-950/98 text-slate-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-1.5">
+                <Flame className="w-4 h-4 text-yellow-300 fill-current animate-pulse" />
+                <h4 className="text-xs font-black uppercase text-yellow-300 tracking-wider">
+                  HIGH-CONFIDENCE TRADE SYSTEM (14 Mandatory Conditions + Final Entry Trigger)
+                </h4>
+              </div>
+              <button
+                onClick={() => setShowHighConfidenceGuide(false)}
+                className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {currentRally && currentRally.highConfidence ? (
+              <div className="space-y-2.5">
+                {/* Active Stock Confluence Score Banner */}
+                <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                  currentRally.highConfidence.isHighConfidence
+                    ? 'bg-emerald-950/90 border-emerald-500/80 text-white shadow-lg'
+                    : 'bg-amber-950/60 border-amber-500/60 text-amber-200'
+                }`}>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-black font-mono text-white">{currentRally.symbol}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase font-mono border ${
+                        currentRally.highConfidence.isHighConfidence
+                          ? 'bg-emerald-500 text-slate-950 border-emerald-300'
+                          : 'bg-amber-500/20 text-yellow-300 border-amber-500/40'
+                      }`}>
+                        {currentRally.highConfidence.isHighConfidence ? '🎯 14/14 ALL MANDATORY CONDITIONS MET' : `${currentRally.highConfidence.metCount}/14 CONDITIONS MET`}
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-300 mt-1 leading-tight font-sans">
+                      {currentRally.highConfidence.summary}
+                    </p>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="text-xs font-bold text-slate-400">Entry Trigger</div>
+                    <span className={`text-[11px] font-black font-mono px-2 py-0.5 rounded border inline-block mt-0.5 ${
+                      currentRally.highConfidence.isEntryTriggerActive
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-300 animate-pulse'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {currentRally.highConfidence.isEntryTriggerActive ? '🚀 ACTIVE NOW' : '⏳ PENDING'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Final Trigger Box */}
+                <div className="bg-slate-900/90 border border-slate-700/80 p-2.5 rounded-xl space-y-1.5 font-mono">
+                  <div className="text-[11px] font-bold text-amber-300 font-sans flex items-center justify-between border-b border-slate-800 pb-1">
+                    <span>⚡ Final Entry Trigger Rule:</span>
+                    <span className={currentRally.highConfidence.isEntryTriggerActive ? 'text-emerald-400' : 'text-slate-400'}>
+                      {currentRally.highConfidence.isEntryTriggerActive ? '✅ FULL TRIGGER MET' : '⏳ Awaiting Bullish Candle > Prev High'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[10.5px] pt-0.5">
+                    <div className="flex items-center gap-1">
+                      <span>{currentRally.highConfidence.isHighConfidence ? '✅' : '❌'}</span>
+                      <span className={currentRally.highConfidence.isHighConfidence ? 'text-emerald-300' : 'text-slate-400'}>All 14 Mandatory = TRUE</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>{currentRally.highConfidence.entryTrigger.isBullishCandle ? '✅' : '❌'}</span>
+                      <span className={currentRally.highConfidence.entryTrigger.isBullishCandle ? 'text-emerald-300' : 'text-slate-400'}>Current Candle = Bullish</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>{currentRally.highConfidence.entryTrigger.isCloseAbovePrevHigh ? '✅' : '❌'}</span>
+                      <span className={currentRally.highConfidence.entryTrigger.isCloseAbovePrevHigh ? 'text-emerald-300' : 'text-slate-400'}>Close &gt; Prev High</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 14 Mandatory Checklist Grid */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-sans">
+                    14 Mandatory Confluence Checklist:
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px]">
+                    {currentRally.highConfidence.conditions.map((cond, cIdx) => (
+                      <div
+                        key={cond.id}
+                        className={`p-2 rounded-lg border flex items-start justify-between gap-1.5 font-mono ${
+                          cond.isMet
+                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-200'
+                            : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                        }`}
+                      >
+                        <div className="flex items-start gap-1.5 min-w-0">
+                          <span className="shrink-0">{cond.isMet ? '✅' : '❌'}</span>
+                          <div>
+                            <div className="font-bold text-slate-200">{cIdx + 1}. {cond.label}</div>
+                            <div className="text-[9.5px] text-slate-400 font-sans mt-0.5">{cond.ruleDescription}</div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold ${
+                            cond.isMet ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-400'
+                          }`}>
+                            {cond.valueText}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-slate-400 text-xs font-mono">
+                No signal selected to inspect.
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowHighConfidenceGuide(false)}
+              className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors cursor-pointer mt-2"
+            >
+              Back to Alert Card
             </button>
           </div>
         ) : showAllList ? (
@@ -1189,6 +1346,24 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                         <ShieldCheck className="w-3 h-3 text-emerald-400" />
                         🛡️ Stood &gt;30m
                       </span>
+                    )}
+
+                    {currentRally.highConfidence && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowHighConfidenceGuide(true);
+                        }}
+                        className={`text-[10.5px] px-2.5 py-0.5 rounded font-mono font-black border flex items-center gap-1 shadow-sm cursor-pointer transition-all hover:scale-105 ${
+                          currentRally.highConfidence.isHighConfidence
+                            ? 'bg-amber-400 text-slate-950 border-yellow-300 ring-2 ring-yellow-300/50 animate-pulse'
+                            : 'bg-amber-950/80 text-yellow-300 border-amber-500/50 hover:bg-amber-900/80'
+                        }`}
+                        title="Click to view 14 Mandatory Confluences & Entry Trigger verification"
+                      >
+                        <Flame className="w-3 h-3 fill-current text-yellow-500" />
+                        <span>{currentRally.highConfidence.isHighConfidence ? '🎯 14/14 HIGH CONFIDENCE' : `🎯 ${currentRally.highConfidence.metCount}/14 CONFLUENCES`}</span>
+                      </button>
                     )}
                   </div>
 
@@ -1573,6 +1748,19 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   {filterDirection === 'BEARISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
                 </button>
                 <button
+                  onClick={() => handleDirectionClick('HIGH_CONFIDENCE_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'HIGH_CONFIDENCE_ONLY'
+                      ? 'bg-amber-500 text-slate-950 border-amber-300 font-black shadow-sm'
+                      : 'bg-amber-950/80 text-yellow-300 border-amber-500/40 hover:border-amber-400'
+                  }`}
+                  title={filterDirection === 'HIGH_CONFIDENCE_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter High Confidence Trades (14 Mandatory conditions + Entry trigger)'}
+                >
+                  <Flame className="w-2.5 h-2.5 text-yellow-300 fill-current" />
+                  <span>🎯 High Confidence</span>
+                  {filterDirection === 'HIGH_CONFIDENCE_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+                <button
                   onClick={() => handleDirectionClick('HUNDRED_BULLISH_ONLY')}
                   className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
                     filterDirection === 'HUNDRED_BULLISH_ONLY'
@@ -1728,6 +1916,20 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               <div className="flex items-center space-x-1 pt-1.5 border-t border-slate-800/80 overflow-x-auto no-scrollbar pb-0.5 flex-wrap gap-y-1">
                 <span className="text-slate-400 shrink-0 font-medium">Trigger Types:</span>
                 
+                <button
+                  onClick={() => toggleTriggerFilter('HIGH_CONFIDENCE')}
+                  className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                    selectedTriggers.has('HIGH_CONFIDENCE')
+                      ? 'bg-amber-500 text-slate-950 border-amber-300 font-bold shadow-sm'
+                      : 'bg-amber-950/80 text-yellow-300 border-amber-500/40 hover:border-amber-400/80'
+                  }`}
+                  title={selectedTriggers.has('HIGH_CONFIDENCE') ? 'Click to remove High Confidence filter (go off)' : 'Click to add High Confidence filter'}
+                >
+                  <Flame className="w-2.5 h-2.5 text-yellow-300 fill-current" />
+                  <span>🎯 High Confidence</span>
+                  {selectedTriggers.has('HIGH_CONFIDENCE') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+                </button>
+
                 <button
                   onClick={() => toggleTriggerFilter('BREAKOUT')}
                   className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${

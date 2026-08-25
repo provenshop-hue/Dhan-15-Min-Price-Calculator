@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { StockCalculated, FadedStockRecord } from '../types';
 import { analyzeRsiPullback, RsiPullbackAnalysis, is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishScore, get100PercentBearishScore, get100PercentBullishFadeReason, get100PercentBearishFadeReason } from '../utils/rsiPullback';
 import { analyzeBullishCombinations } from '../utils/bullishCombinations';
+import { evaluateHighConfidenceTrade, HighConfidenceTradeAnalysis } from '../utils/highConfidenceTrade';
 import { BullishFilterSection } from './BullishFilterSection';
 import { calculateRSI, isOpenLowPattern, isOpenHighPattern, isHighClosePattern } from '../utils/gann';
 import { 
@@ -35,7 +36,8 @@ import {
   SlidersHorizontal,
   CheckSquare,
   Square,
-  RotateCcw
+  RotateCcw,
+  X
 } from 'lucide-react';
 
 interface RsiPullbackDashboardProps {
@@ -54,6 +56,7 @@ interface RsiPullbackDashboardProps {
 
 type PullbackFilterType = 
   | 'ALL' 
+  | 'HIGH_CONFIDENCE_TRADE'
   | 'HIGH_CONFLUENCE'
   | 'TRIGGERED_TODAY'
   | 'HIGH_SUCCESS'
@@ -92,6 +95,8 @@ export interface PresetRecipe {
 
 export const RECIPE_OPTIONS: RecipeOption[] = [
   // Confluence & Signals
+  { id: 'HIGH_CONFIDENCE_TRADE', label: '🎯 High-Confidence Trade (14 Confluences)', category: 'Confluence & Signals', description: 'All 14 mandatory conditions: Higher TF Bullish, Close>VWAP, EMA20>50, Close>EMA20, HH+HL, Breakout+Retest, Hold>=30m, Vol>1.2x, RSI 55-75, RR>=2, Dist to Res>=2xSL' },
+  { id: 'HIGH_CONFIDENCE_ENTRY', label: '🚀 High-Confidence Entry Trigger Active', category: 'Confluence & Signals', description: '14 Mandatory Conditions = TRUE + Current Candle Bullish + Close > Prev High' },
   { id: 'HIGH_CONFLUENCE', label: '🛡️ Verified High Confluence', category: 'Confluence & Signals', description: 'Met 4+ bullish/bearish alignment factors' },
   { id: 'TRIGGERED_TODAY', label: '⏱️ Triggered Confluence Today', category: 'Confluence & Signals', description: 'Intraday confluence trigger timestamp met' },
   { id: 'HIGH_SUCCESS', label: '🎯 High Signal Success (≥70%)', category: 'Confluence & Signals', description: 'Signal success rate >= 70% from entry' },
@@ -127,6 +132,13 @@ export const RECIPE_OPTIONS: RecipeOption[] = [
 ];
 
 export const PRESET_RECIPES: PresetRecipe[] = [
+  {
+    id: 'HIGH_CONFIDENCE_SYSTEM',
+    name: '🎯 14-Confluence High Confidence',
+    description: '14 Mandatory Conditions (Trend, VWAP, EMA, HH/HL, Breakout, Retest, 30m Hold, Vol>1.2x, RSI 55-75, RR>=2)',
+    optionKeys: ['HIGH_CONFIDENCE_TRADE', 'HIGH_CONFIDENCE_ENTRY'],
+    badge: '14-Point Confluence'
+  },
   {
     id: 'ULTRA_CONFLUENCE',
     name: '⚡ Ultra High Confluence',
@@ -182,6 +194,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [expandedChecklistStockId, setExpandedChecklistStockId] = useState<string | null>(null);
+  const [inspectHighConfidenceStock, setInspectHighConfidenceStock] = useState<StockCalculated | null>(null);
 
   // 🧪 Filter Recipe State
   const [selectedRecipeOptions, setSelectedRecipeOptions] = useState<string[]>([]);
@@ -191,6 +204,14 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   const checkRecipeCondition = React.useCallback((stock: StockCalculated, analysis: RsiPullbackAnalysis, key: string): boolean => {
     const ltp = stock.closePrice || stock.openPrice || 0;
     switch (key) {
+      case 'HIGH_CONFIDENCE_TRADE': {
+        const hc = evaluateHighConfidenceTrade(stock);
+        return hc.isHighConfidence;
+      }
+      case 'HIGH_CONFIDENCE_ENTRY': {
+        const hc = evaluateHighConfidenceTrade(stock);
+        return hc.isEntryTriggerActive;
+      }
       case 'HIGH_CONFLUENCE':
         return analysis.confluenceValidation.status === 'HIGH_CONFLUENCE';
       case 'TRIGGERED_TODAY':
@@ -350,6 +371,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
   // Statistics
   const stats = useMemo(() => {
+    let highConfidenceCount = 0;
+    let highConfidenceTriggerActiveCount = 0;
     let highConfluenceCount = 0;
     let falseSignalRiskCount = 0;
     let triggeredTodayCount = 0;
@@ -372,6 +395,10 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let highSuccessCount = 0;
 
     analyzedStocks.forEach(({ stock, analysis }) => {
+      const hc = evaluateHighConfidenceTrade(stock);
+      if (hc.isHighConfidence) highConfidenceCount++;
+      if (hc.isEntryTriggerActive) highConfidenceTriggerActiveCount++;
+
       if (analysis.confluenceValidation.status === 'HIGH_CONFLUENCE') highConfluenceCount++;
       if (analysis.confluenceValidation.status === 'FALSE_BREAKOUT_RISK') falseSignalRiskCount++;
       const isTriggered = analysis.intradayConfluence.bullishConfluenceTime !== 'Not Met' || analysis.intradayConfluence.bearishConfluenceTime !== 'Not Met';
@@ -414,6 +441,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
     return {
       total: stocks.length,
+      highConfidenceCount,
+      highConfidenceTriggerActiveCount,
       highConfluenceCount,
       falseSignalRiskCount,
       triggeredTodayCount,
@@ -456,6 +485,10 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
 
       // Filter category
+      if (activeFilter === 'HIGH_CONFIDENCE_TRADE') {
+        const hc = evaluateHighConfidenceTrade(stock);
+        return hc.isHighConfidence;
+      }
       if (activeFilter === 'HIGH_CONFLUENCE') {
         return analysis.confluenceValidation.status === 'HIGH_CONFLUENCE';
       }
@@ -1542,6 +1575,35 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </div>
         </button>
 
+        {/* High-Confidence Trade System (14 Mandatory Conditions) */}
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'HIGH_CONFIDENCE_TRADE' ? 'ALL' : 'HIGH_CONFIDENCE_TRADE')}
+          className={`p-4 rounded-2xl border text-left transition-all col-span-2 sm:col-span-2 cursor-pointer ${
+            activeFilter === 'HIGH_CONFIDENCE_TRADE'
+              ? 'bg-amber-500 text-slate-950 border-amber-300 ring-2 ring-yellow-300 font-bold shadow-md'
+              : 'bg-gradient-to-br from-slate-900 via-amber-950/80 to-slate-900 text-white border-amber-500/60 hover:border-amber-400 shadow-2xs'
+          }`}
+          title="Click to filter stocks meeting all 14 mandatory conditions (Higher TF Trend, VWAP, EMA, HH/HL, Breakout, Retest, 30m Hold, Vol>1.2x, RSI 55-75, RR>=2)"
+        >
+          <div className="text-[11px] font-black uppercase tracking-wider text-yellow-300 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Flame className="w-4 h-4 text-yellow-400 fill-current animate-pulse" />
+              <span>🎯 High-Confidence Trade</span>
+            </span>
+            <span className="text-[10px] font-mono font-black bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded">
+              14/14 Confluence
+            </span>
+          </div>
+          <div className="flex items-baseline space-x-2 mt-1">
+            <span className="text-2xl font-black text-white font-mono">{stats.highConfidenceCount}</span>
+            <span className="text-xs text-yellow-200 font-bold font-mono">14 Conditions Met</span>
+          </div>
+          <div className="text-[10.5px] mt-1 font-bold text-slate-300 flex items-center justify-between border-t border-slate-800 pt-1">
+            <span>{stats.highConfidenceTriggerActiveCount} Entry Triggers Active</span>
+            <span className="text-emerald-400">Strict Rules</span>
+          </div>
+        </button>
+
         {/* Total Scanned */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
           <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Scanned</div>
@@ -2108,6 +2170,18 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveFilter(activeFilter === 'HIGH_CONFIDENCE_TRADE' ? 'ALL' : 'HIGH_CONFIDENCE_TRADE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
+              activeFilter === 'HIGH_CONFIDENCE_TRADE'
+                ? 'bg-amber-500 text-slate-950 border-amber-300 font-extrabold shadow-sm ring-2 ring-yellow-300'
+                : 'bg-amber-50 text-amber-950 hover:bg-amber-100 border-amber-300/80 font-bold'
+            }`}
+          >
+            <Flame className="w-3.5 h-3.5 text-amber-500 fill-current animate-pulse" />
+            <span>🎯 High-Confidence ({stats.highConfidenceCount})</span>
+          </button>
+
+          <button
             onClick={() => setActiveFilter('BEARISH_RALLY')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
               activeFilter === 'BEARISH_RALLY'
@@ -2490,6 +2564,33 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
                             <span>15M BOUNCE ({analysis.pullback15mBounce.bounceTime})</span>
                           </span>
                         )}
+                        {(() => {
+                          const hc = evaluateHighConfidenceTrade(stock);
+                          if (hc.isHighConfidence || hc.isEntryTriggerActive) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInspectHighConfidenceStock(stock);
+                                }}
+                                title={`High-Confidence Trade: ${hc.metCount}/14 Confluences Met. Entry Trigger: ${hc.isEntryTriggerActive ? 'ACTIVE' : 'Pending'}. Click to inspect full 14-point checklist.`}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-black shadow-2xs border cursor-pointer transition-all hover:scale-105 ${
+                                  hc.isEntryTriggerActive
+                                    ? 'bg-amber-400 text-slate-950 border-yellow-300 ring-2 ring-yellow-400 animate-pulse'
+                                    : 'bg-amber-950/80 text-amber-300 border-amber-500'
+                                }`}
+                              >
+                                <Flame className="w-3 h-3 fill-current text-yellow-400 animate-bounce" />
+                                <span>{hc.isEntryTriggerActive ? '🚀 HC ENTRY TRIGGER' : '🎯 14 CONFLUENCES'}</span>
+                                <span className="font-mono text-[9px] bg-slate-900 text-yellow-300 px-1 py-0.2 rounded font-bold">
+                                  {hc.metCount}/14
+                                </span>
+                              </button>
+                            );
+                          }
+                          return null;
+                        })()}
                         {(() => {
                           const comboAnalysis = analyzeBullishCombinations(stock);
                           if (comboAnalysis.isAnyComboMet) {
@@ -3107,6 +3208,181 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           })}
         </div>
       )}
+
+      {/* 🎯 14-POINT HIGH-CONFIDENCE TRADE INSPECTION MODAL */}
+      {inspectHighConfidenceStock && (() => {
+        const hc = evaluateHighConfidenceTrade(inspectHighConfidenceStock);
+        const ltp = inspectHighConfidenceStock.closePrice || inspectHighConfidenceStock.openPrice || 0;
+        return (
+          <div className="fixed inset-0 bg-black/75 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-700 text-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              
+              {/* Modal Header */}
+              <div className="p-5 border-b border-slate-800 flex items-start justify-between bg-slate-950">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xl font-black text-white">{inspectHighConfidenceStock.symbol}</span>
+                    <span className="text-sm font-semibold text-slate-400">{inspectHighConfidenceStock.companyName}</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${
+                      hc.isHighConfidence 
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400' 
+                        : 'bg-amber-500/20 text-amber-300 border-amber-400'
+                    }`}>
+                      {hc.isHighConfidence ? '🎯 14/14 ALL CONFLUENCES MET' : `⚠️ ${hc.metCount}/14 Confluences Met`}
+                    </span>
+                    {hc.isEntryTriggerActive && (
+                      <span className="bg-amber-400 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full border border-yellow-300 animate-pulse">
+                        🚀 ENTRY TRIGGER ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
+                    <span>LTP: <strong className="text-white">₹{ltp.toFixed(2)}</strong></span>
+                    <span>Change: <strong className={(inspectHighConfidenceStock.pctChange || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                      {(inspectHighConfidenceStock.pctChange || 0) >= 0 ? '+' : ''}{(inspectHighConfidenceStock.pctChange || 0).toFixed(2)}%
+                    </strong></span>
+                    <span>Score: <strong className="text-yellow-400">{hc.score}/100</strong></span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setInspectHighConfidenceStock(null)}
+                  className="text-slate-400 hover:text-white p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Body - 14 Confluences Checklist */}
+              <div className="p-5 overflow-y-auto space-y-4">
+                {/* Summary Banner */}
+                <div className={`p-3.5 rounded-2xl border text-xs leading-relaxed ${
+                  hc.isHighConfidence
+                    ? 'bg-emerald-950/80 border-emerald-500/80 text-emerald-200'
+                    : 'bg-amber-950/80 border-amber-500/80 text-amber-200'
+                }`}>
+                  <div className="font-extrabold flex items-center gap-1.5 mb-1">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>High-Confidence System Validation</span>
+                  </div>
+                  <p>{hc.summary}</p>
+                </div>
+
+                {/* Final Trigger Status Card */}
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <Flame className="w-4 h-4 text-yellow-400 fill-current" />
+                      <span>Final Entry Trigger Execution</span>
+                    </span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      hc.isEntryTriggerActive 
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400' 
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}>
+                      {hc.isEntryTriggerActive ? 'EXECUTE BUY NOW' : 'WAIT FOR TRIGGER'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono pt-1">
+                    <div className={`p-2 rounded-xl border ${hc.isHighConfidence ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
+                      <div className="text-[9.5px] uppercase font-bold text-slate-400">14 Mandatory Rules</div>
+                      <div className="font-black">{hc.isHighConfidence ? '✅ ALL TRUE' : `❌ ${hc.metCount}/14 MET`}</div>
+                    </div>
+                    <div className={`p-2 rounded-xl border ${hc.finalTrigger.currentCandleBullish ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
+                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Current Candle</div>
+                      <div className="font-black">{hc.finalTrigger.currentCandleBullish ? '✅ BULLISH (GREEN)' : '❌ RED CANDLE'}</div>
+                    </div>
+                    <div className={`p-2 rounded-xl border ${hc.finalTrigger.closeAbovePrevHigh ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
+                      <div className="text-[9.5px] uppercase font-bold text-slate-400">Close &gt; Prev High</div>
+                      <div className="font-black">{hc.finalTrigger.closeAbovePrevHigh ? '✅ BREAKOUT HIGH' : '❌ BELOW PREV HIGH'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 14 Mandatory Conditions List */}
+                <div className="space-y-2">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                    <span>14 Mandatory Confluences</span>
+                    <span>{hc.metCount} / {hc.totalConditions} Met</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {hc.conditions.map((cond, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-2.5 rounded-xl border text-xs transition-colors flex items-start gap-2.5 ${
+                          cond.met
+                            ? 'bg-slate-950/80 border-emerald-500/40 text-slate-200'
+                            : 'bg-slate-950/50 border-slate-800/80 text-slate-400'
+                        }`}
+                      >
+                        <div className={`p-1 rounded-md shrink-0 mt-0.5 ${
+                          cond.met ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                        }`}>
+                          {cond.met ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                        </div>
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className={`font-black text-[11px] truncate ${cond.met ? 'text-white' : 'text-slate-400'}`}>
+                              {idx + 1}. {cond.name}
+                            </span>
+                            <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                              cond.met ? 'bg-emerald-900/60 text-emerald-300' : 'bg-rose-950/60 text-rose-400'
+                            }`}>
+                              {cond.met ? 'PASS' : 'FAIL'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            Actual: <span className={cond.met ? 'text-emerald-300' : 'text-rose-300'}>{cond.actualValue}</span>
+                          </div>
+                          <div className="text-[9.5px] text-slate-500">
+                            Required: {cond.rule}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-slate-800 bg-slate-950 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      onOpenRsiAnalyst(inspectHighConfidenceStock);
+                      setInspectHighConfidenceStock(null);
+                    }}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>RSI Timeline</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      onOpenPositionSizer(inspectHighConfidenceStock);
+                      setInspectHighConfidenceStock(null);
+                    }}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5"
+                  >
+                    <Calculator className="w-3.5 h-3.5" />
+                    <span>Position Size</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setInspectHighConfidenceStock(null)}
+                  className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

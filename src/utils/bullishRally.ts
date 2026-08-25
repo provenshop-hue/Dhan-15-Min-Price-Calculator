@@ -5,6 +5,7 @@ import { analyzeBullishCombinations } from './bullishCombinations';
 import { getExactNseStrikeStep, roundToExactNseStrike, formatStrikePrice } from './nseStrikeMaster';
 import { analyzeParabolicRally, ParabolicRallyAnalysis } from './parabolicRallyEngine';
 import { generateIntradayRsiTimeline } from './rsiAnalyst';
+import { evaluateHighConfidenceTrade, HighConfidenceTradeAnalysis } from './highConfidenceTrade';
 
 export type RallyDirection = 'BULLISH' | 'BEARISH';
 
@@ -14,10 +15,12 @@ export type RallyFilterDirection =
   | 'BEARISH_ONLY' 
   | 'HUNDRED_BULLISH_ONLY' 
   | 'HUNDRED_BEARISH_ONLY' 
-  | 'HUNDRED_PCT_ALL';
+  | 'HUNDRED_PCT_ALL'
+  | 'HIGH_CONFIDENCE_ONLY';
 
 export type RallyCategoryFilter = 
   | 'ALL' 
+  | 'HIGH_CONFIDENCE'
   | '100_BULL' 
   | '100_BEAR' 
   | '100_PCT' 
@@ -37,6 +40,7 @@ export type RallyRecencyFilter =
   | 'ALL_SESSION';
 
 export type PopunderTriggerType =
+  | 'HIGH_CONFIDENCE_TRADE'
   | 'BREAKOUT_JUST_HIT'
   | 'PARABOLIC_BULLISH_RALLY_STARTED'
   | 'PARABOLIC_BEARISH_RALLY_STARTED'
@@ -247,6 +251,7 @@ export interface RallySignal {
   volumeTrendLabel: string;
   rsiTrendLabel: string;
   rsiDelta?: number;
+  highConfidence?: HighConfidenceTradeAnalysis;
 }
 
 // Backward compatibility alias
@@ -834,16 +839,23 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     return null;
   }
 
+  const highConfidence = evaluateHighConfidenceTrade(stock);
+
   // Determine Trigger Category Classification:
-  // 1. 100% Bullish Move
-  // 2. Parabolic Bullish Rally Started
-  // 3. Breakout Just Hit
-  // 4. Bullish Rally Started
+  // 1. High-Confidence Trade (14 confluences + final entry trigger)
+  // 2. 100% Bullish Move
+  // 3. Parabolic Bullish Rally Started
+  // 4. Breakout Just Hit
+  // 5. Bullish Rally Started
   let triggerType: PopunderTriggerType = 'BULLISH_RALLY_STARTED';
   let triggerBadge = '📈 Bullish Rally Started';
   let triggerColorClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
 
-  if (is100Bull) {
+  if (highConfidence.isEntryTriggerActive) {
+    triggerType = 'HIGH_CONFIDENCE_TRADE';
+    triggerBadge = '🎯 High-Confidence Trade';
+    triggerColorClass = 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white border-emerald-300 shadow-md ring-2 ring-emerald-400 animate-pulse';
+  } else if (is100Bull) {
     triggerType = 'ONE_HUNDRED_PCT_BULLISH';
     triggerBadge = '🟢 100% Bullish Move';
     triggerColorClass = 'bg-emerald-500/25 text-emerald-200 border-emerald-400/50 shadow-sm';
@@ -975,7 +987,8 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     volumeStatus: volRsi.volumeStatus,
     volumeTrendLabel: volRsi.volumeTrendLabel,
     rsiTrendLabel: volRsi.rsiTrendLabel,
-    rsiDelta: volRsi.rsiDelta
+    rsiDelta: volRsi.rsiDelta,
+    highConfidence
   };
 }
 
@@ -1284,7 +1297,8 @@ export function getAllRallySignals(
       filterDirection === 'ALL' || 
       filterDirection === 'BULLISH_ONLY' || 
       filterDirection === 'HUNDRED_BULLISH_ONLY' || 
-      filterDirection === 'HUNDRED_PCT_ALL';
+      filterDirection === 'HUNDRED_PCT_ALL' ||
+      filterDirection === 'HIGH_CONFIDENCE_ONLY';
 
     if (shouldCheckBull) {
       const bull = detectBullishRally(s);
@@ -1293,22 +1307,25 @@ export function getAllRallySignals(
         if (bull.isYesterday && (hideYesterday || onlyRecentHits)) {
           // Exclude yesterday stock
         } else if (!safeOnly || bull.trapRiskLevel !== 'OVEREXTENDED_TRAP') {
-          // Direction-specific 100% check
+          // Direction-specific 100% or High Confidence check
           const passesDir = 
-            filterDirection !== 'HUNDRED_BULLISH_ONLY' && filterDirection !== 'HUNDRED_PCT_ALL' 
-              ? true 
-              : bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH';
+            filterDirection === 'HUNDRED_BULLISH_ONLY' || filterDirection === 'HUNDRED_PCT_ALL'
+              ? bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH'
+              : filterDirection === 'HIGH_CONFIDENCE_ONLY'
+              ? !!(bull.highConfidence && (bull.highConfidence.isHighConfidence || bull.highConfidence.isEntryTriggerActive))
+              : true;
 
           // Category filter check
           const passesCategory = 
             categoryFilter === 'ALL' ||
+            (categoryFilter === 'HIGH_CONFIDENCE' && !!(bull.highConfidence && (bull.highConfidence.isHighConfidence || bull.highConfidence.isEntryTriggerActive))) ||
             (categoryFilter === 'SUSTAINED_30M' && bull.isSustainedHold) ||
             (categoryFilter === 'SUSTAINED_BULL' && bull.isSustainedHold) ||
             (categoryFilter === '100_BULL' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
             (categoryFilter === '100_PCT' && bull.triggerType === 'ONE_HUNDRED_PCT_BULLISH') ||
             (categoryFilter === 'BREAKOUT' && bull.triggerType === 'BREAKOUT_JUST_HIT') ||
             (categoryFilter === 'PARABOLIC' && bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED') ||
-            (categoryFilter === 'RALLY_STARTED' && (bull.triggerType === 'BULLISH_RALLY_STARTED' || bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED')) ||
+            (categoryFilter === 'RALLY_STARTED' && (bull.triggerType === 'BULLISH_RALLY_STARTED' || bull.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED' || bull.triggerType === 'HIGH_CONFIDENCE_TRADE')) ||
             (categoryFilter === 'GOOD_VOLUME' && bull.isGoodVolume) ||
             (categoryFilter === 'VOLUME_INCREASING' && bull.isVolumeIncreasing) ||
             (categoryFilter === 'RSI_INCREASING' && bull.isRsiIncreasing);
