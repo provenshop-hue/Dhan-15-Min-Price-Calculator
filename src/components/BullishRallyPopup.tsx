@@ -762,13 +762,13 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
         {/* RECENTLY HIT STOCKS STRIP: Quick horizontal selector under popunder header */}
         {rallySignals.length > 0 && (
-          <div className="bg-slate-950/95 border-b border-slate-800 px-3 py-1.5 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-inner">
-            <div className="flex items-center gap-1 text-[11px] font-mono font-black text-yellow-300 uppercase tracking-wider shrink-0">
+          <div className="bg-slate-950 border-b border-slate-800 px-3 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-inner">
+            <div className="flex items-center gap-1.5 text-xs font-mono font-black text-yellow-300 uppercase tracking-wider shrink-0 bg-amber-950/80 px-2 py-1 rounded-lg border border-amber-500/50">
               <Zap className="w-3.5 h-3.5 text-yellow-400 fill-current animate-pulse" />
               <span>RECENT HITS ({rallySignals.length}):</span>
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {rallySignals.slice(0, 10).map((sig, idx) => {
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+              {rallySignals.map((sig, idx) => {
                 const isAct = idx === currentIndex && !showAllList && !showAntiTrapGuide;
                 const isSigBull = sig.direction === 'BULLISH';
                 return (
@@ -780,28 +780,36 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       setShowAllList(false);
                       setShowAntiTrapGuide(false);
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold shrink-0 transition-all border flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold shrink-0 transition-all border flex items-center gap-2 cursor-pointer shadow-md ${
                       isAct
                         ? (isSigBull 
-                            ? 'bg-emerald-600 text-white border-emerald-300 font-black shadow-emerald-950/80 ring-2 ring-emerald-400/50 scale-105' 
-                            : 'bg-rose-600 text-white border-rose-300 font-black shadow-rose-950/80 ring-2 ring-rose-400/50 scale-105')
-                        : 'bg-slate-900/90 text-slate-300 border-slate-700/90 hover:border-slate-500 hover:text-white'
+                            ? 'bg-emerald-600 text-white border-emerald-300 font-black shadow-emerald-950/80 ring-2 ring-emerald-400/70 scale-105' 
+                            : 'bg-rose-600 text-white border-rose-300 font-black shadow-rose-950/80 ring-2 ring-rose-400/70 scale-105')
+                        : 'bg-slate-900/95 text-slate-300 border-slate-700 hover:border-cyan-500/60 hover:text-white hover:bg-slate-850'
                     }`}
-                    title={`View ${sig.symbol} • Last Hit: ${sig.rulePassedTime} (${sig.recencyMinutes === 0 ? 'Just now' : `${sig.recencyMinutes}m ago`})`}
+                    title={`Click to view ${sig.symbol} (${sig.companyName}) • Hit: ${sig.rulePassedTime} (${sig.recencyMinutes === 0 ? 'Just now' : `${sig.recencyMinutes}m ago`})`}
                   >
-                    <span className={isAct ? 'text-white' : (isSigBull ? 'text-emerald-400 font-black' : 'text-rose-400 font-black')}>
+                    <span className={`text-xs font-black ${isAct ? 'text-white underline underline-offset-2' : (isSigBull ? 'text-emerald-400' : 'text-rose-400')}`}>
                       {sig.symbol}
                     </span>
-                    <span className={isAct ? 'text-yellow-200' : 'text-slate-400'}>
+                    <span className="text-[11px] font-mono text-slate-300">
+                      ₹{sig.currentPrice.toFixed(1)}
+                    </span>
+                    <span className={`text-[11px] font-bold ${isAct ? 'text-yellow-200' : (sig.pctChange >= 0 ? 'text-emerald-300' : 'text-rose-300')}`}>
                       {sig.pctChange >= 0 ? '+' : ''}{sig.pctChange.toFixed(1)}%
                     </span>
-                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-black ${
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-black ${
                       isAct 
-                        ? 'bg-black/40 text-yellow-200' 
-                        : (sig.isFresh ? 'bg-amber-950/80 text-yellow-300 border border-amber-500/40' : 'bg-slate-950 text-cyan-300 border border-slate-800')
+                        ? 'bg-black/50 text-yellow-200 border border-yellow-300/40' 
+                        : (sig.isFresh ? 'bg-amber-950 text-yellow-300 border border-amber-500/50' : 'bg-slate-950 text-cyan-300 border border-slate-800')
                     }`}>
                       {sig.rulePassedTime}
                     </span>
+                    {isAct && (
+                      <span className="text-[10px] bg-yellow-400 text-slate-950 px-1.5 py-0.2 rounded font-black uppercase">
+                        ACTIVE
+                      </span>
+                    )}
                   </button>
                 );
               })}
