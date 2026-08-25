@@ -264,9 +264,31 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   <span className={`px-2 py-0.5 rounded-md font-mono text-xs font-bold ${isBull ? 'bg-emerald-500/30 text-emerald-200' : 'bg-rose-500/30 text-rose-200'}`}>
                     {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
                   </span>
-                  <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black border ${currentRally.triggerColorClass}`}>
-                    {currentRally.triggerBadge}
+                  
+                  {/* Minimized Pill Explicit Signal Classification Badge */}
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-black border shadow-sm ${
+                    currentRally.signalClassification === 'BREAKOUT' || currentRally.signalClassification === 'BREAKDOWN'
+                      ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
+                      : currentRally.signalClassification === 'ONE_HUNDRED_BULLISH'
+                      ? 'bg-emerald-400 text-slate-950 border-emerald-300 font-black'
+                      : currentRally.signalClassification === 'ONE_HUNDRED_BEARISH'
+                      ? 'bg-rose-500 text-white border-rose-300 font-black'
+                      : currentRally.signalClassification === 'INDEX_HOLD'
+                      ? 'bg-yellow-400 text-slate-950 border-yellow-300 font-black'
+                      : currentRally.signalClassification === 'PARABOLIC_RALLY'
+                      ? 'bg-purple-500 text-white border-purple-300 font-black'
+                      : currentRally.triggerColorClass
+                  }`}>
+                    {currentRally.signalClassification === 'BREAKOUT' && '💥 Breakout'}
+                    {currentRally.signalClassification === 'BREAKDOWN' && '💥 Breakdown'}
+                    {currentRally.signalClassification === 'ONE_HUNDRED_BULLISH' && '🟢 100% Bull'}
+                    {currentRally.signalClassification === 'ONE_HUNDRED_BEARISH' && '🔴 100% Bear'}
+                    {currentRally.signalClassification === 'INDEX_HOLD' && '🏛️ Index Hold >30m'}
+                    {currentRally.signalClassification === 'PARABOLIC_RALLY' && '🚀 Parabolic'}
+                    {currentRally.signalClassification === 'BULLISH_RALLY' && '📈 Bull Rally'}
+                    {currentRally.signalClassification === 'BEARISH_RALLY' && '📉 Bear Rally'}
                   </span>
+
                   {currentRally.isSustainedHold && (
                     <span className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 px-1.5 py-0.2 rounded text-[9px] font-mono font-black flex items-center gap-0.5 shadow-sm">
                       <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
@@ -294,8 +316,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 
                 {rallySignals.length > 1 && (
                   <div className="text-[11px] text-slate-300 font-medium flex items-center gap-1 mt-0.5">
-                    <span>{currentRally.isSustainedHold ? '🛡️ Stood Still Firm (>30m)' : 'Active Setups'} ({currentIndex + 1}/{rallySignals.length})</span>
-                    <span className="text-[10px] text-slate-400">• {currentRally.rallyType}</span>
+                    <span className="font-semibold text-white">{currentRally.signalCategoryName}</span>
+                    <span className="text-[10px] text-slate-400">({currentIndex + 1}/{rallySignals.length})</span>
                   </div>
                 )}
               </div>
@@ -383,19 +405,21 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               {currentRally ? (
                 <>
                   <span className="text-sm font-black tracking-wider uppercase text-white">
-                    {currentRally.triggerType === 'ONE_HUNDRED_PCT_BULLISH'
-                      ? '🟢 100% Bullish Move'
-                      : currentRally.triggerType === 'ONE_HUNDRED_PCT_BEARISH'
-                      ? '🔴 100% Bearish Move'
-                      : currentRally.isSustainedHold
-                      ? (isBull ? `🛡️ Stood Bullish (${currentRally.sustainedDurationMinutes}m)` : `🛡️ Stood Bearish (${currentRally.sustainedDurationMinutes}m)`)
-                      : currentRally.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED'
-                      ? '🚀 Parabolic Bullish Rally'
-                      : currentRally.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED'
-                      ? '📉 Parabolic Bearish Breakdown'
-                      : currentRally.triggerType === 'BREAKOUT_JUST_HIT'
-                      ? (isBull ? '💥 Breakout Just Hit' : '💥 Breakdown Just Hit')
-                      : (isBull ? '📈 Bullish Rally' : '📉 Bearish Breakdown')}
+                    {currentRally.signalCategoryName || (
+                      currentRally.signalClassification === 'ONE_HUNDRED_BULLISH'
+                        ? '🟢 100% Bullish Move'
+                        : currentRally.signalClassification === 'ONE_HUNDRED_BEARISH'
+                        ? '🔴 100% Bearish Move'
+                        : currentRally.signalClassification === 'INDEX_HOLD'
+                        ? '🏛️ Benchmark Index Held Firm (>30m)'
+                        : currentRally.signalClassification === 'BREAKOUT'
+                        ? '💥 Breakout Just Hit'
+                        : currentRally.signalClassification === 'BREAKDOWN'
+                        ? '💥 Breakdown Just Hit'
+                        : currentRally.signalClassification === 'PARABOLIC_RALLY'
+                        ? (isBull ? '🚀 Parabolic Bullish Rally' : '📉 Parabolic Bearish Breakdown')
+                        : (isBull ? '📈 Bullish Rally Started' : '📉 Bearish Rally Started')
+                    )}
                   </span>
                   <span className="bg-black/40 text-yellow-200 text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-yellow-300/40">
                     {currentRally.confidenceScore}% Accuracy
@@ -645,7 +669,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
           {/* Row 2: Trigger Category Filters */}
           <div className="flex items-center space-x-1 pt-1 border-t border-slate-800/80 overflow-x-auto no-scrollbar pb-0.5">
-            <span className="text-slate-400 shrink-0 font-medium">Trigger:</span>
+            <span className="text-slate-400 shrink-0 font-medium">Signal:</span>
             <button
               onClick={() => { setCategoryFilter('ALL'); setCurrentIndex(0); }}
               className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
@@ -654,7 +678,62 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   : 'bg-slate-900/80 text-slate-400 hover:text-slate-200'
               }`}
             >
-              ⚡ All Hits
+              ⚡ All Signals
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('BREAKOUT'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'BREAKOUT'
+                  ? 'bg-amber-500/30 text-yellow-300 border border-amber-400/50 shadow-sm font-bold ring-1 ring-amber-400/40'
+                  : 'bg-slate-900/80 text-amber-300/80 hover:text-yellow-300'
+              }`}
+              title="Show Confirmed Breakouts (15m Range / Gann Buy Trigger Breaks)"
+            >
+              💥 Breakouts
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('100_BULL'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === '100_BULL'
+                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-sm font-bold ring-1 ring-emerald-400/40'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-emerald-300'
+              }`}
+              title="Show 100% Bullish Power Moves (Open=Low + Day High Close)"
+            >
+              🟢 100% Bullish
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('100_BEAR'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === '100_BEAR'
+                  ? 'bg-rose-500/30 text-rose-300 border border-rose-400/50 shadow-sm font-bold ring-1 ring-rose-400/40'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-rose-300'
+              }`}
+              title="Show 100% Bearish Breakdown Moves (Open=High + Day Low Dump)"
+            >
+              🔴 100% Bearish
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('BULLISH_RALLY'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'BULLISH_RALLY'
+                  ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/50 shadow-sm font-bold'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-cyan-300'
+              }`}
+              title="Show Bullish Multi-Confluence Rallies (Above VWAP + Trend Continuation)"
+            >
+              📈 Bullish Rally
+            </button>
+            <button
+              onClick={() => { setCategoryFilter('BEARISH_RALLY'); setCurrentIndex(0); }}
+              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
+                categoryFilter === 'BEARISH_RALLY'
+                  ? 'bg-rose-500/30 text-rose-300 border border-rose-400/50 shadow-sm font-bold'
+                  : 'bg-slate-900/80 text-slate-400 hover:text-rose-300'
+              }`}
+              title="Show Bearish Multi-Confluence Breakdowns"
+            >
+              📉 Bearish Rally
             </button>
             <button
               onClick={() => { setCategoryFilter('INDEX_HOLD'); setCurrentIndex(0); }}
@@ -677,26 +756,6 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               title="Show stocks that hit and stood still / stayed as bullish for >30 minutes"
             >
               🛡️ Stood Bullish &gt;30m
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('100_BULL'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === '100_BULL'
-                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-sm font-bold'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-emerald-300'
-              }`}
-            >
-              🟢 100% Bullish
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('100_BEAR'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === '100_BEAR'
-                  ? 'bg-rose-500/30 text-rose-300 border border-rose-400/50 shadow-sm font-bold'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-rose-300'
-              }`}
-            >
-              🔴 100% Bearish
             </button>
             <button
               onClick={() => { setCategoryFilter('SUSTAINED_30M'); setCurrentIndex(0); }}
@@ -728,26 +787,6 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               }`}
             >
               🚀 Parabolic Rally
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('BREAKOUT'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === 'BREAKOUT'
-                  ? 'bg-amber-500/30 text-yellow-300 border border-amber-400/50 shadow-sm'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-yellow-300'
-              }`}
-            >
-              💥 Breakouts
-            </button>
-            <button
-              onClick={() => { setCategoryFilter('RALLY_STARTED'); setCurrentIndex(0); }}
-              className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all ${
-                categoryFilter === 'RALLY_STARTED'
-                  ? 'bg-blue-500/30 text-blue-300 border border-blue-400/50 shadow-sm'
-                  : 'bg-slate-900/80 text-slate-400 hover:text-blue-300'
-              }`}
-            >
-              📈 Rally Started
             </button>
           </div>
         </div>
@@ -875,8 +914,29 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       <div className="text-sm font-black text-white flex items-center gap-1.5 flex-wrap">
                         <span className="text-base tracking-tight">{signal.symbol}</span>
                         <span className="text-xs text-slate-300 font-semibold font-mono">₹{signal.currentPrice.toFixed(1)}</span>
-                        <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black border ${signal.triggerColorClass}`}>
-                          {signal.triggerBadge}
+                        
+                        {/* List View Signal Classification Badge */}
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black border shadow-sm ${
+                          signal.signalClassification === 'BREAKOUT' || signal.signalClassification === 'BREAKDOWN'
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
+                            : signal.signalClassification === 'ONE_HUNDRED_BULLISH'
+                            ? 'bg-emerald-400 text-slate-950 border-emerald-300 font-black'
+                            : signal.signalClassification === 'ONE_HUNDRED_BEARISH'
+                            ? 'bg-rose-500 text-white border-rose-300 font-black'
+                            : signal.signalClassification === 'INDEX_HOLD'
+                            ? 'bg-yellow-400 text-slate-950 border-yellow-300 font-black'
+                            : signal.signalClassification === 'PARABOLIC_RALLY'
+                            ? 'bg-purple-500 text-white border-purple-300 font-black'
+                            : signal.triggerColorClass
+                        }`}>
+                          {signal.signalClassification === 'BREAKOUT' && '💥 Breakout'}
+                          {signal.signalClassification === 'BREAKDOWN' && '💥 Breakdown'}
+                          {signal.signalClassification === 'ONE_HUNDRED_BULLISH' && '🟢 100% Bull'}
+                          {signal.signalClassification === 'ONE_HUNDRED_BEARISH' && '🔴 100% Bear'}
+                          {signal.signalClassification === 'INDEX_HOLD' && '🏛️ Index Hold >30m'}
+                          {signal.signalClassification === 'PARABOLIC_RALLY' && '🚀 Parabolic'}
+                          {signal.signalClassification === 'BULLISH_RALLY' && '📈 Bull Rally'}
+                          {signal.signalClassification === 'BEARISH_RALLY' && '📉 Bear Rally'}
                         </span>
                         {idx === 0 ? (
                           <span className="bg-amber-400/20 text-yellow-300 border border-amber-400/50 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold flex items-center gap-0.5">
@@ -1115,6 +1175,72 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 <span className="text-[11px] text-amber-300 font-mono font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
                   {currentRally.rallyType}
                 </span>
+              </div>
+            </div>
+
+            {/* HERO SIGNAL CLASSIFICATION & VALIDATION BANNER */}
+            <div className={`p-3 rounded-xl border space-y-2 shadow-md ${
+              currentRally.signalClassification === 'BREAKOUT' || currentRally.signalClassification === 'BREAKDOWN'
+                ? 'bg-amber-950/60 border-amber-500/80 ring-1 ring-amber-500/30'
+                : currentRally.signalClassification === 'ONE_HUNDRED_BULLISH'
+                ? 'bg-emerald-950/70 border-emerald-400/80 ring-1 ring-emerald-400/40'
+                : currentRally.signalClassification === 'ONE_HUNDRED_BEARISH'
+                ? 'bg-rose-950/70 border-rose-400/80 ring-1 ring-rose-400/40'
+                : currentRally.signalClassification === 'INDEX_HOLD'
+                ? 'bg-yellow-950/70 border-yellow-400/80 ring-1 ring-yellow-400/40'
+                : currentRally.signalClassification === 'PARABOLIC_RALLY'
+                ? 'bg-purple-950/70 border-purple-400/80 ring-1 ring-purple-400/40'
+                : isBull
+                ? 'bg-teal-950/60 border-teal-500/60'
+                : 'bg-rose-950/60 border-rose-500/60'
+            }`}>
+              <div className="flex items-center justify-between flex-wrap gap-1.5">
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-300">
+                    Signal Type:
+                  </span>
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono tracking-tight flex items-center gap-1.5 shadow-md ${
+                    currentRally.signalClassification === 'BREAKOUT'
+                      ? 'bg-amber-400 text-slate-950 font-black'
+                      : currentRally.signalClassification === 'BREAKDOWN'
+                      ? 'bg-amber-400 text-slate-950 font-black'
+                      : currentRally.signalClassification === 'ONE_HUNDRED_BULLISH'
+                      ? 'bg-emerald-400 text-slate-950 font-black'
+                      : currentRally.signalClassification === 'ONE_HUNDRED_BEARISH'
+                      ? 'bg-rose-500 text-white font-black'
+                      : currentRally.signalClassification === 'INDEX_HOLD'
+                      ? 'bg-yellow-400 text-slate-950 font-black'
+                      : currentRally.signalClassification === 'PARABOLIC_RALLY'
+                      ? 'bg-purple-500 text-white font-black'
+                      : isBull
+                      ? 'bg-emerald-500 text-slate-950 font-black'
+                      : 'bg-rose-600 text-white font-black'
+                  }`}>
+                    {currentRally.signalClassification === 'BREAKOUT' && '💥 BREAKOUT (15m High Range Break)'}
+                    {currentRally.signalClassification === 'BREAKDOWN' && '💥 BREAKDOWN (15m Low Range Break)'}
+                    {currentRally.signalClassification === 'ONE_HUNDRED_BULLISH' && '🟢 100% BULLISH POWER MOVE (Open=Low)'}
+                    {currentRally.signalClassification === 'ONE_HUNDRED_BEARISH' && '🔴 100% BEARISH MOVE (Open=High)'}
+                    {currentRally.signalClassification === 'INDEX_HOLD' && '🏛️ BENCHMARK INDEX HELD FIRM (>30m)'}
+                    {currentRally.signalClassification === 'PARABOLIC_RALLY' && (isBull ? '🚀 PARABOLIC BULLISH RALLY' : '📉 PARABOLIC BEARISH BREAKDOWN')}
+                    {currentRally.signalClassification === 'BULLISH_RALLY' && '📈 BULLISH MULTI-CONFLUENCE RALLY'}
+                    {currentRally.signalClassification === 'BEARISH_RALLY' && '📉 BEARISH MULTI-CONFLUENCE RALLY'}
+                  </span>
+                </div>
+
+                {/* Verified Signal Status */}
+                <div className="flex items-center gap-1 text-[10.5px] font-mono font-bold bg-slate-900/90 text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-500/40">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>True Verified Signal</span>
+                </div>
+              </div>
+
+              {/* Exact Signal Trigger Mechanics Explanation */}
+              <div className="text-xs text-slate-200 leading-relaxed bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 flex items-start gap-2">
+                <Info className="w-4 h-4 text-cyan-300 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-amber-300 font-bold font-mono mr-1">Classification Reason:</span>
+                  <span>{currentRally.signalExplanation || currentRally.reason}</span>
+                </div>
               </div>
             </div>
 
