@@ -518,21 +518,17 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       #{currentIndex + 1}
                     </span>
                   )}
-                  <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold flex items-center gap-0.5 border ${
-                    currentRally.isFresh 
-                      ? 'bg-amber-400/20 text-yellow-200 border-amber-400/40 animate-pulse' 
-                      : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                  }`}>
-                    {currentRally.isFresh ? <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" /> : <Clock className="w-2.5 h-2.5" />}
-                    {currentRally.rulePassedTime}
+                  <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-black flex items-center gap-1 border bg-amber-950/90 text-yellow-200 border-amber-400/70 shadow-sm">
+                    {currentRally.isFresh ? <Zap className="w-3 h-3 text-yellow-300 fill-current animate-pulse" /> : <Clock className="w-3 h-3 text-cyan-300" />}
+                    <span>HIT: {currentRally.rulePassedTime}</span>
                   </span>
                   {currentRally.volumeRatio && (
-                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/50">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/50">
                       📊 {currentRally.volumeRatio.toFixed(1)}x{currentRally.isVolumeIncreasing ? ' ↗' : ''}
                     </span>
                   )}
                   {currentRally.rsi && (
-                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/50">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/50">
                       ⚡ RSI {currentRally.rsi.toFixed(0)}{currentRally.isRsiIncreasing ? ' ↗' : ''}
                     </span>
                   )}
@@ -643,25 +639,21 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       ? (isBull ? '💥 Breakout Just Hit' : '💥 Breakdown Just Hit')
                       : (isBull ? '📈 Bullish Rally' : '📉 Bearish Breakdown')}
                   </span>
-                  <span className="bg-black/40 text-yellow-200 text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-yellow-300/40">
+                  <span className="bg-black/40 text-yellow-200 text-xs px-2.5 py-0.5 rounded-full font-bold border border-yellow-300/40">
                     {currentRally.confidenceScore}% Accuracy
                   </span>
                   {currentRally.isSustainedHold ? (
-                    <span className="text-[10.5px] px-2.5 py-0.5 rounded-full font-mono font-black border bg-emerald-950/80 text-emerald-200 border-emerald-400/60 shadow-[0_0_10px_rgba(16,185,129,0.3)] flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                      Stood &gt;30m
+                    <span className="text-xs px-2.5 py-1 rounded-lg font-mono font-black border bg-emerald-950/90 text-emerald-200 border-emerald-400/80 shadow-[0_0_12px_rgba(16,185,129,0.4)] flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>STOOD &gt;30M</span>
                     </span>
                   ) : (
-                    <span className={`text-[10.5px] px-2 py-0.5 rounded-full font-mono font-bold border flex items-center gap-1 ${
-                      currentRally.isFresh
-                        ? 'bg-amber-400/30 text-yellow-200 border-amber-300/60 shadow-[0_0_10px_rgba(251,191,36,0.3)]'
-                        : 'bg-black/40 text-cyan-200 border-cyan-300/40'
-                    }`}>
-                      {currentRally.isFresh ? <Zap className="w-3 h-3 text-yellow-300 fill-current" /> : <Clock className="w-3 h-3" />}
-                      {currentRally.rulePassedTime}
-                      {currentRally.isMarketHours && currentRally.recencyMinutes <= 30 && (
-                        <span className="text-[9.5px] text-amber-200 ml-0.5 font-sans">
-                          ({currentRally.recencyMinutes === 0 ? 'Fresh' : `${currentRally.recencyMinutes}m ago`})
+                    <span className="text-xs px-2.5 py-1 rounded-lg font-mono font-black border flex items-center gap-1.5 bg-slate-950/85 text-yellow-300 border-yellow-400/80 shadow-md">
+                      <Zap className="w-3.5 h-3.5 text-yellow-300 fill-current animate-pulse" />
+                      <span className="tracking-wide">HIT: {currentRally.rulePassedTime}</span>
+                      {currentRally.isMarketHours && (
+                        <span className="text-[11px] text-amber-200 font-sans font-bold">
+                          ({currentRally.recencyMinutes === 0 ? 'Just now' : `${currentRally.recencyMinutes}m ago`})
                         </span>
                       )}
                     </span>
@@ -813,6 +805,55 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             >
               Restore All
             </button>
+          </div>
+        )}
+
+        {/* RECENTLY HIT STOCKS STRIP: Quick horizontal selector under popunder */}
+        {rallySignals.length > 0 && (
+          <div className="bg-slate-950/95 border-b border-slate-800 px-3 py-1.5 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-inner">
+            <div className="flex items-center gap-1 text-[11px] font-mono font-black text-yellow-300 uppercase tracking-wider shrink-0">
+              <Zap className="w-3.5 h-3.5 text-yellow-400 fill-current animate-pulse" />
+              <span>RECENT HITS ({rallySignals.length}):</span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              {rallySignals.slice(0, 10).map((sig, idx) => {
+                const isAct = idx === currentIndex && !showAllList && !showAntiTrapGuide;
+                const isSigBull = sig.direction === 'BULLISH';
+                return (
+                  <button
+                    key={`rec_pill_${sig.symbol}_${idx}`}
+                    onClick={() => {
+                      setCurrentIndex(idx);
+                      setSlideProgress(0);
+                      setShowAllList(false);
+                      setShowAntiTrapGuide(false);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold shrink-0 transition-all border flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                      isAct
+                        ? (isSigBull 
+                            ? 'bg-emerald-600 text-white border-emerald-300 font-black shadow-emerald-950/80 ring-2 ring-emerald-400/50 scale-105' 
+                            : 'bg-rose-600 text-white border-rose-300 font-black shadow-rose-950/80 ring-2 ring-rose-400/50 scale-105')
+                        : 'bg-slate-900/90 text-slate-300 border-slate-700/90 hover:border-slate-500 hover:text-white'
+                    }`}
+                    title={`View ${sig.symbol} • Last Hit: ${sig.rulePassedTime} (${sig.recencyMinutes === 0 ? 'Just now' : `${sig.recencyMinutes}m ago`})`}
+                  >
+                    <span className={isAct ? 'text-white' : (isSigBull ? 'text-emerald-400 font-black' : 'text-rose-400 font-black')}>
+                      {sig.symbol}
+                    </span>
+                    <span className={isAct ? 'text-yellow-200' : 'text-slate-400'}>
+                      {sig.pctChange >= 0 ? '+' : ''}{sig.pctChange.toFixed(1)}%
+                    </span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-black ${
+                      isAct 
+                        ? 'bg-black/40 text-yellow-200' 
+                        : (sig.isFresh ? 'bg-amber-950/80 text-yellow-300 border border-amber-500/40' : 'bg-slate-950 text-cyan-300 border border-slate-800')
+                    }`}>
+                      {sig.rulePassedTime}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -1237,9 +1278,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                           </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-cyan-300 font-mono mt-0.5 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-cyan-400" />
-                        <span>Passed: {signal.rulePassedTime} {signal.isMarketHours && `(${signal.recencyMinutes === 0 ? 'Just now' : `${signal.recencyMinutes}m ago`}${signal.isSustainedHold ? ' • Stood Firm' : ''})`}</span>
+                      <div className="text-xs text-cyan-300 font-mono font-bold mt-1 flex items-center gap-1.5 bg-slate-950/80 px-2 py-0.5 rounded border border-cyan-500/30 w-fit">
+                        <Clock className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span>LAST HIT: <strong className="text-white font-mono">{signal.rulePassedTime}</strong> {signal.isMarketHours && `(${signal.recencyMinutes === 0 ? 'Just now' : `${signal.recencyMinutes}m ago`}${signal.isSustainedHold ? ' • Stood Firm' : ''})`}</span>
                       </div>
                     </div>
                   </button>
@@ -1324,17 +1365,17 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       </span>
                     )}
 
-                    <span className={`text-[10.5px] px-2 py-0.5 rounded font-mono font-bold flex items-center gap-1 border ${
+                    <span className={`text-xs px-2.5 py-1 rounded-lg font-mono font-black flex items-center gap-1.5 border shadow-sm ${
                       currentRally.isFresh
-                        ? 'bg-amber-950/90 text-yellow-300 border-amber-500/50 shadow-sm animate-pulse'
+                        ? 'bg-amber-950/90 text-yellow-300 border-amber-500/70 animate-pulse'
                         : currentRally.isSustainedHold
-                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
-                        : 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40'
+                        ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/70'
+                        : 'bg-slate-900/90 text-cyan-300 border-cyan-500/50'
                     }`}>
-                      {currentRally.isFresh ? <Zap className="w-3 h-3 text-yellow-300 fill-current" /> : <Clock className="w-3 h-3 text-cyan-400" />}
-                      {currentRally.rulePassedTime}
+                      {currentRally.isFresh ? <Zap className="w-3.5 h-3.5 text-yellow-300 fill-current" /> : <Clock className="w-3.5 h-3.5 text-cyan-400" />}
+                      <span>LAST HIT: {currentRally.rulePassedTime}</span>
                       {currentRally.isMarketHours && (
-                        <span className="text-[10px] text-slate-300 font-sans ml-0.5">
+                        <span className="text-[11px] text-slate-300 font-sans font-medium ml-0.5">
                           ({currentRally.recencyMinutes === 0 ? 'Just now' : `${currentRally.recencyMinutes}m ago`})
                         </span>
                       )}
@@ -1377,31 +1418,44 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 </div>
               </div>
 
-              {/* Exact Timing Bar */}
-              <div className="mt-2.5 bg-slate-900/95 border border-slate-700/80 rounded-xl px-3 py-1.5 flex items-center justify-between text-xs">
-                <div className="flex items-center space-x-2">
-                  {currentRally.isSustainedHold ? (
-                    <>
-                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span className="text-slate-300 font-medium">Stood Bullish &amp; Held Firm:</span>
-                      <span className="font-mono font-black text-emerald-300">{currentRally.sustainedDurationMinutes} mins</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-4 h-4 text-yellow-400 shrink-0" />
-                      <span className="text-slate-300 font-medium">Trigger Hit At:</span>
-                      <span className="font-mono font-black text-cyan-300">{currentRally.rulePassedTime}</span>
-                      {currentRally.isMarketHours && (
-                        <span className="text-[10.5px] text-amber-300 font-mono font-bold">
-                          ({currentRally.recencyMinutes === 0 ? '⚡ Just now' : `⚡ ${currentRally.recencyMinutes}m ago`})
+              {/* Exact Last Hit Timing Banner - LARGE, READABLE & HIGH CONTRAST */}
+              <div className="mt-3 bg-slate-950/95 border-2 border-cyan-500/50 rounded-xl p-3 flex items-center justify-between shadow-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-xl bg-cyan-950/90 border border-cyan-400/60 text-cyan-300 shadow-inner">
+                    <Clock className="w-5 h-5 text-cyan-300 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-sans font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <span>⚡ LAST HIT TIMING</span>
+                      {currentRally.isSustainedHold && (
+                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/40">
+                          Held Firm &gt;30m
                         </span>
                       )}
-                    </>
-                  )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-base sm:text-xl font-black font-mono text-cyan-200 tracking-tight">
+                        {currentRally.rulePassedTime}
+                      </span>
+                      <span className={`text-xs sm:text-sm font-mono font-black px-2.5 py-0.5 rounded-lg border shadow-sm ${
+                        currentRally.recencyMinutes <= 30
+                          ? 'bg-amber-950/90 text-yellow-300 border-amber-400/80 animate-pulse'
+                          : 'bg-slate-800/90 text-slate-200 border-slate-700'
+                      }`}>
+                        {currentRally.recencyMinutes === 0 ? '⚡ Just Now (Fresh Hit)' : `⚡ ${currentRally.recencyMinutes}m ago`}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <span className="text-[11px] text-amber-300 font-mono font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
-                  {currentRally.rallyType}
-                </span>
+
+                <div className="text-right shrink-0">
+                  <div className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400">
+                    Trigger Type
+                  </div>
+                  <div className="text-xs sm:text-sm font-black font-mono text-white mt-0.5 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700">
+                    {currentRally.rallyType}
+                  </div>
+                </div>
               </div>
             </div>
 
