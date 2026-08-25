@@ -760,55 +760,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           </div>
         </div>
 
-        {/* ACTIVE FILTERS STRIP: When clicked, the filter goes OFF from the selection */}
-        {hasActiveFilters && (
-          <div className="bg-slate-950/95 px-3 py-1.5 border-b border-slate-800 flex items-center justify-between gap-1 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider flex items-center gap-0.5">
-                <Filter className="w-3 h-3 text-amber-400" />
-                Active ({activeFilterList.length}):
-              </span>
-              {activeFilterList.map((f) => (
-                <button
-                  key={f.id}
-                  onClick={f.onRemove}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer hover:bg-rose-900/80 hover:text-rose-200 hover:border-rose-500/80 group ${f.colorClass}`}
-                  title="Click to remove this filter from active selection"
-                >
-                  <span>{f.label}</span>
-                  <X className="w-3 h-3 group-hover:rotate-90 transition-transform" />
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={handleClearAllFilters}
-              className="text-[10px] text-rose-400 hover:text-rose-300 font-bold hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
-              title="Reset all filters to show all stocks"
-            >
-              <RotateCcw className="w-2.5 h-2.5" />
-              <span>Clear All</span>
-            </button>
-          </div>
-        )}
-
-        {/* DISMISSED STOCKS BANNER: Allows restoring hidden stocks */}
-        {dismissedSymbols.size > 0 && (
-          <div className="bg-amber-950/40 border-b border-amber-800/50 px-3 py-1 flex items-center justify-between text-[10px] text-amber-300">
-            <div className="flex items-center gap-1">
-              <EyeOff className="w-3 h-3 text-amber-400" />
-              <span>{dismissedSymbols.size} stock{dismissedSymbols.size > 1 ? 's' : ''} removed from popup ({Array.from(dismissedSymbols).join(', ')})</span>
-            </div>
-            <button
-              onClick={handleRestoreDismissed}
-              className="font-bold underline hover:text-yellow-200 cursor-pointer ml-2"
-            >
-              Restore All
-            </button>
-          </div>
-        )}
-
-        {/* RECENTLY HIT STOCKS STRIP: Quick horizontal selector under popunder */}
+        {/* RECENTLY HIT STOCKS STRIP: Quick horizontal selector under popunder header */}
         {rallySignals.length > 0 && (
           <div className="bg-slate-950/95 border-b border-slate-800 px-3 py-1.5 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-inner">
             <div className="flex items-center gap-1 text-[11px] font-mono font-black text-yellow-300 uppercase tracking-wider shrink-0">
@@ -853,271 +805,6 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   </button>
                 );
               })}
-            </div>
-          </div>
-        )}
-
-        {/* INTERACTIVE FILTER BAR: Click to add, click again to take off from selection */}
-        {isFilterBarExpanded && (
-          <div className="bg-slate-950/90 px-3 py-2 border-b border-slate-800 text-[10.5px] space-y-1.5">
-            {/* Row 1: Direction & Major Presets */}
-            <div className="flex items-center justify-between flex-wrap gap-1">
-              <div className="flex items-center space-x-1 text-slate-300 flex-wrap gap-y-1">
-                <span className="text-slate-400 font-medium shrink-0">Direction:</span>
-                <button
-                  onClick={() => setFilterDirection('ALL')}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition-all cursor-pointer ${
-                    filterDirection === 'ALL' 
-                      ? 'bg-slate-700 text-white shadow-sm' 
-                      : 'text-slate-400 hover:text-slate-200 bg-slate-900/60'
-                  }`}
-                  title="Show all directions"
-                >
-                  All ({totalRawCount})
-                </button>
-                <button
-                  onClick={() => handleDirectionClick('BULLISH_ONLY')}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                    filterDirection === 'BULLISH_ONLY'
-                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
-                      : 'bg-slate-900/80 text-emerald-400 border-slate-700 hover:border-emerald-500/50'
-                  }`}
-                  title={filterDirection === 'BULLISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter Bullish only'}
-                >
-                  <span>🟢 Bullish</span>
-                  {filterDirection === 'BULLISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
-                </button>
-                <button
-                  onClick={() => handleDirectionClick('BEARISH_ONLY')}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                    filterDirection === 'BEARISH_ONLY'
-                      ? 'bg-rose-600 text-white border-rose-400 font-bold shadow-sm'
-                      : 'bg-slate-900/80 text-rose-400 border-slate-700 hover:border-rose-500/50'
-                  }`}
-                  title={filterDirection === 'BEARISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter Bearish only'}
-                >
-                  <span>🔴 Bearish</span>
-                  {filterDirection === 'BEARISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
-                </button>
-                <button
-                  onClick={() => handleDirectionClick('HUNDRED_BULLISH_ONLY')}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                    filterDirection === 'HUNDRED_BULLISH_ONLY'
-                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
-                      : 'bg-slate-900/80 text-emerald-300 border-slate-700 hover:border-emerald-500/50'
-                  }`}
-                  title={filterDirection === 'HUNDRED_BULLISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter 100% Bullish only'}
-                >
-                  <span>🟢 100% Bull</span>
-                  {filterDirection === 'HUNDRED_BULLISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
-                </button>
-                <button
-                  onClick={() => handleDirectionClick('HUNDRED_BEARISH_ONLY')}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                    filterDirection === 'HUNDRED_BEARISH_ONLY'
-                      ? 'bg-rose-600 text-white border-rose-400 font-bold shadow-sm'
-                      : 'bg-slate-900/80 text-rose-300 border-slate-700 hover:border-rose-500/50'
-                  }`}
-                  title={filterDirection === 'HUNDRED_BEARISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter 100% Bearish only'}
-                >
-                  <span>🔴 100% Bear</span>
-                  {filterDirection === 'HUNDRED_BEARISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
-                </button>
-              </div>
-
-              {/* Recency & Anti-Trap Quick Switches */}
-              <div className="flex items-center space-x-1 flex-wrap gap-y-1">
-                {/* Fresh Hits Toggle */}
-                <button
-                  onClick={() => handleRecencyClick('FRESH_ONLY')}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                    recencyMode === 'FRESH_ONLY'
-                      ? 'bg-cyan-600 text-white border-cyan-400 font-bold shadow-sm'
-                      : 'bg-slate-900/80 text-cyan-300 border-slate-700 hover:border-cyan-500/50'
-                  }`}
-                  title={recencyMode === 'FRESH_ONLY' ? 'Click to remove filter (go off)' : 'Click to show only Fresh triggers (<30m)'}
-                >
-                  <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
-                  <span>⚡ Fresh &lt;30m</span>
-                  {recencyMode === 'FRESH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
-                </button>
-
-                {/* Stood Bullish >30m Toggle */}
-                <button
-                  onClick={() => handleRecencyClick('SUSTAINED_ONLY')}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                    recencyMode === 'SUSTAINED_ONLY'
-                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
-                      : 'bg-slate-900/80 text-emerald-300 border-slate-700 hover:border-emerald-500/50'
-                  }`}
-                  title={recencyMode === 'SUSTAINED_ONLY' ? 'Click to remove filter (go off)' : 'Click to show only stocks that stood firm (>30m)'}
-                >
-                  <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
-                  <span>🛡️ Stood &gt;30m</span>
-                  {recencyMode === 'SUSTAINED_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
-                </button>
-
-                {/* Hide Yesterday Toggle */}
-                <button
-                  onClick={() => {
-                    setHideYesterday((prev) => !prev);
-                    setCurrentIndex(0);
-                  }}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                    hideYesterday
-                      ? 'bg-amber-600 text-white border-amber-400 font-bold shadow-sm'
-                      : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-slate-500'
-                  }`}
-                  title={hideYesterday ? 'Click to remove filter (go off)' : 'Click to exclude yesterday signals'}
-                >
-                  <span>{hideYesterday ? '🚫 No Yesterday' : '📅 All Dates'}</span>
-                  {hideYesterday && <X className="w-2.5 h-2.5 ml-0.5" />}
-                </button>
-
-                {/* Safe Only (Anti-Trap) Toggle */}
-                <button
-                  onClick={() => {
-                    setSafeOnly((prev) => !prev);
-                    setCurrentIndex(0);
-                  }}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                    safeOnly
-                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
-                      : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-emerald-500/50'
-                  }`}
-                  title={safeOnly ? 'Click to remove filter (go off)' : 'Click to filter out overextended trap setups'}
-                >
-                  <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
-                  <span>🛡️ Safe Only</span>
-                  {safeOnly && <X className="w-2.5 h-2.5 ml-0.5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Row 2: Momentum & Volume Filters (Click to add / Click active to remove) */}
-            <div className="flex items-center space-x-1.5 pt-1 border-t border-slate-800/80 flex-wrap gap-y-1">
-              <span className="text-slate-400 shrink-0 font-medium">Momentum &amp; Vol:</span>
-              
-              {/* Good Volume Button */}
-              <button
-                onClick={() => {
-                  setGoodVolumeOnly((prev) => !prev);
-                  setCurrentIndex(0);
-                }}
-                className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                  goodVolumeOnly
-                    ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
-                    : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-emerald-500/50 hover:text-emerald-300'
-                }`}
-                title={goodVolumeOnly ? 'Click to remove filter (go off from selection)' : 'Click to require Good Volume (≥1.0x)'}
-              >
-                <span>📊 Good Volume</span>
-                {goodVolumeOnly ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
-              </button>
-
-              {/* Volume Increasing Button */}
-              <button
-                onClick={() => {
-                  setVolumeIncreasingOnly((prev) => !prev);
-                  setCurrentIndex(0);
-                }}
-                className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                  volumeIncreasingOnly
-                    ? 'bg-teal-600 text-white border-teal-400 font-bold shadow-sm'
-                    : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-teal-500/50 hover:text-teal-300'
-                }`}
-                title={volumeIncreasingOnly ? 'Click to remove filter (go off from selection)' : 'Click to require Volume is Increasing'}
-              >
-                <span>📈 Vol ↗ Increasing</span>
-                {volumeIncreasingOnly ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
-              </button>
-
-              {/* RSI Increasing Button */}
-              <button
-                onClick={() => {
-                  setRsiIncreasingOnly((prev) => !prev);
-                  setCurrentIndex(0);
-                }}
-                className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
-                  rsiIncreasingOnly
-                    ? 'bg-indigo-600 text-white border-indigo-400 font-bold shadow-sm'
-                    : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-indigo-500/50 hover:text-indigo-300'
-                }`}
-                title={rsiIncreasingOnly ? 'Click to remove filter (go off from selection)' : 'Click to require RSI is Increasing'}
-              >
-                <span>⚡ RSI ↗ Increasing</span>
-                {rsiIncreasingOnly ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
-              </button>
-            </div>
-
-            {/* Row 3: Category Trigger Multi-Select Filters */}
-            <div className="flex items-center space-x-1 pt-1 border-t border-slate-800/80 overflow-x-auto no-scrollbar pb-0.5 flex-wrap gap-y-1">
-              <span className="text-slate-400 shrink-0 font-medium">Trigger Types:</span>
-              
-              <button
-                onClick={() => toggleTriggerFilter('BREAKOUT')}
-                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
-                  selectedTriggers.has('BREAKOUT')
-                    ? 'bg-amber-500 text-slate-950 border-amber-300 font-bold shadow-sm'
-                    : 'bg-slate-900/80 text-yellow-300 border-slate-700 hover:border-amber-400/50'
-                }`}
-                title={selectedTriggers.has('BREAKOUT') ? 'Click to remove Breakout filter (go off)' : 'Click to add Breakouts filter'}
-              >
-                <span>💥 Breakouts</span>
-                {selectedTriggers.has('BREAKOUT') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
-              </button>
-
-              <button
-                onClick={() => toggleTriggerFilter('PARABOLIC')}
-                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
-                  selectedTriggers.has('PARABOLIC')
-                    ? 'bg-purple-600 text-white border-purple-400 font-bold shadow-sm'
-                    : 'bg-slate-900/80 text-purple-300 border-slate-700 hover:border-purple-400/50'
-                }`}
-                title={selectedTriggers.has('PARABOLIC') ? 'Click to remove Parabolic filter (go off)' : 'Click to add Parabolic Rally filter'}
-              >
-                <span>🚀 Parabolic</span>
-                {selectedTriggers.has('PARABOLIC') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
-              </button>
-
-              <button
-                onClick={() => toggleTriggerFilter('RALLY_STARTED')}
-                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
-                  selectedTriggers.has('RALLY_STARTED')
-                    ? 'bg-blue-600 text-white border-blue-400 font-bold shadow-sm'
-                    : 'bg-slate-900/80 text-blue-300 border-slate-700 hover:border-blue-400/50'
-                }`}
-                title={selectedTriggers.has('RALLY_STARTED') ? 'Click to remove Rally Started filter (go off)' : 'Click to add Rally Started filter'}
-              >
-                <span>📈 Rally Started</span>
-                {selectedTriggers.has('RALLY_STARTED') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
-              </button>
-
-              <button
-                onClick={() => toggleTriggerFilter('100_PCT')}
-                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
-                  selectedTriggers.has('100_PCT')
-                    ? 'bg-teal-600 text-white border-teal-400 font-bold shadow-sm'
-                    : 'bg-slate-900/80 text-teal-300 border-slate-700 hover:border-teal-400/50'
-                }`}
-                title={selectedTriggers.has('100_PCT') ? 'Click to remove 100% Target Moves filter (go off)' : 'Click to add 100% Target Moves filter'}
-              >
-                <span>🟢🔴 100% Moves</span>
-                {selectedTriggers.has('100_PCT') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
-              </button>
-
-              <button
-                onClick={() => toggleTriggerFilter('SUSTAINED_30M')}
-                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
-                  selectedTriggers.has('SUSTAINED_30M')
-                    ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
-                    : 'bg-slate-900/80 text-emerald-300 border-slate-700 hover:border-emerald-400/50'
-                }`}
-                title={selectedTriggers.has('SUSTAINED_30M') ? 'Click to remove Stood Still filter (go off)' : 'Click to add Stood Still >30m filter'}
-              >
-                <span>🏛️ Stood Still &gt;30m</span>
-                {selectedTriggers.has('SUSTAINED_30M') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
-              </button>
             </div>
           </div>
         )}
@@ -1417,59 +1104,67 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Exact Last Hit Timing Banner - LARGE, READABLE & HIGH CONTRAST */}
-              <div className="mt-3 bg-slate-950/95 border-2 border-cyan-500/50 rounded-xl p-3 flex items-center justify-between shadow-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 rounded-xl bg-cyan-950/90 border border-cyan-400/60 text-cyan-300 shadow-inner">
-                    <Clock className="w-5 h-5 text-cyan-300 animate-pulse" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-sans font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                      <span>⚡ LAST HIT TIMING</span>
-                      {currentRally.isSustainedHold && (
-                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/40">
-                          Held Firm &gt;30m
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-base sm:text-xl font-black font-mono text-cyan-200 tracking-tight">
-                        {currentRally.rulePassedTime}
-                      </span>
-                      <span className={`text-xs sm:text-sm font-mono font-black px-2.5 py-0.5 rounded-lg border shadow-sm ${
-                        currentRally.recencyMinutes <= 30
-                          ? 'bg-amber-950/90 text-yellow-300 border-amber-400/80 animate-pulse'
-                          : 'bg-slate-800/90 text-slate-200 border-slate-700'
-                      }`}>
-                        {currentRally.recencyMinutes === 0 ? '⚡ Just Now (Fresh Hit)' : `⚡ ${currentRally.recencyMinutes}m ago`}
-                      </span>
-                    </div>
-                  </div>
+            {/* 1. ANTI-TRAP GUARD & INVALIDATION STATUS (TOP OF CARD) */}
+            <div className={`p-3 rounded-xl border space-y-2 ${
+              currentRally.trapRiskLevel === 'SAFE'
+                ? 'bg-slate-900/90 border-emerald-500/50 shadow-md'
+                : currentRally.trapRiskLevel === 'MODERATE'
+                ? 'bg-amber-950/50 border-amber-500/50 shadow-md'
+                : 'bg-rose-950/60 border-rose-500/60 shadow-md'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 font-bold">
+                  <ShieldCheck className={`w-4 h-4 ${
+                    currentRally.trapRiskLevel === 'SAFE' ? 'text-emerald-400' : currentRally.trapRiskLevel === 'MODERATE' ? 'text-amber-400' : 'text-rose-400'
+                  }`} />
+                  <span className="uppercase text-[11px] tracking-wider text-slate-200">
+                    Anti-Trap Guard:
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10.5px] font-mono font-black ${
+                    currentRally.trapRiskLevel === 'SAFE'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : currentRally.trapRiskLevel === 'MODERATE'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
+                  }`}>
+                    {currentRally.trapRiskLevel === 'SAFE' ? '🛡️ Prime Base (Safe Entry)' : currentRally.trapRiskLevel === 'MODERATE' ? '⚠️ Moderate Extension' : '🚨 Overextended Trap Risk'}
+                  </span>
                 </div>
+                <button
+                  onClick={() => setShowAntiTrapGuide(true)}
+                  className="text-[10.5px] text-amber-300 hover:underline cursor-pointer flex items-center gap-0.5 font-bold"
+                >
+                  <Info className="w-3 h-3" />
+                  <span>Rules</span>
+                </button>
+              </div>
 
-                <div className="text-right shrink-0">
-                  <div className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400">
-                    Trigger Type
-                  </div>
-                  <div className="text-xs sm:text-sm font-black font-mono text-white mt-0.5 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700">
-                    {currentRally.rallyType}
-                  </div>
+              {/* Strict Entry Confirmation Trigger & Invalidation SL */}
+              <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 space-y-1.5">
+                <div className="text-slate-300 flex items-start gap-1.5 text-xs">
+                  <span className="text-emerald-400 font-bold shrink-0">🎯 Entry Trigger:</span>
+                  <span className="font-mono text-white font-medium">{currentRally.entryConfirmation}</span>
+                </div>
+                <div className="text-slate-300 flex items-start gap-1.5 border-t border-slate-800/80 pt-1.5 text-xs">
+                  <span className="text-rose-400 font-bold shrink-0">🛑 Invalidation SL:</span>
+                  <span className="font-mono text-rose-300 font-medium">{currentRally.invalidationRule}</span>
                 </div>
               </div>
             </div>
 
-            {/* Actionable High-Profit Trade Plan Box (BIG CLEAR FONTS) */}
+            {/* 2. ACTIONABLE HIGH-PROFIT ENTRY & EXIT TRADE PLAN BOX (TOP OF CARD) */}
             <div className={`p-3 rounded-xl border ${
               isBull 
-                ? 'bg-emerald-950/40 border-emerald-500/40' 
-                : 'bg-rose-950/40 border-rose-500/40'
+                ? 'bg-emerald-950/40 border-emerald-500/40 shadow-md' 
+                : 'bg-rose-950/40 border-rose-500/40 shadow-md'
             }`}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-1.5">
                   <Target className={`w-4 h-4 ${isBull ? 'text-emerald-400' : 'text-rose-400'}`} />
                   <span className="text-xs font-black uppercase tracking-wide text-white">
-                    {plan.action} Setup Plan
+                    {plan.action} Entry &amp; Exit Plan
                   </span>
                 </div>
                 <div className="text-xs font-mono font-black text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-md border border-amber-500/40">
@@ -1522,55 +1217,47 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               </div>
             </div>
 
-            {/* Anti-Trap Execution & Invalidation Rules (Clean, Big Fonts, No clutter) */}
-            <div className={`p-3 rounded-xl border space-y-2 ${
-              currentRally.trapRiskLevel === 'SAFE'
-                ? 'bg-slate-900/90 border-emerald-500/40'
-                : currentRally.trapRiskLevel === 'MODERATE'
-                ? 'bg-amber-950/40 border-amber-500/40'
-                : 'bg-rose-950/40 border-rose-500/50'
-            }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 font-bold">
-                  <ShieldCheck className={`w-4 h-4 ${
-                    currentRally.trapRiskLevel === 'SAFE' ? 'text-emerald-400' : currentRally.trapRiskLevel === 'MODERATE' ? 'text-amber-400' : 'text-rose-400'
-                  }`} />
-                  <span className="uppercase text-[11px] tracking-wider text-slate-200">
-                    Anti-Trap Guard:
-                  </span>
-                  <span className={`px-2 py-0.5 rounded text-[10.5px] font-mono font-black ${
-                    currentRally.trapRiskLevel === 'SAFE'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                      : currentRally.trapRiskLevel === 'MODERATE'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse'
-                  }`}>
-                    {currentRally.trapRiskLevel === 'SAFE' ? '🛡️ Prime Base (Safe Entry)' : currentRally.trapRiskLevel === 'MODERATE' ? '⚠️ Moderate Extension' : '🚨 Overextended Trap Risk'}
-                  </span>
+            {/* 3. EXACT LAST HIT TIMING BANNER */}
+            <div className="bg-slate-950/95 border-2 border-cyan-500/50 rounded-xl p-3 flex items-center justify-between shadow-lg">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 rounded-xl bg-cyan-950/90 border border-cyan-400/60 text-cyan-300 shadow-inner">
+                  <Clock className="w-5 h-5 text-cyan-300 animate-pulse" />
                 </div>
-                <button
-                  onClick={() => setShowAntiTrapGuide(true)}
-                  className="text-[10.5px] text-amber-300 hover:underline cursor-pointer flex items-center gap-0.5 font-bold"
-                >
-                  <Info className="w-3 h-3" />
-                  <span>Rules</span>
-                </button>
+                <div>
+                  <div className="text-[11px] font-sans font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <span>⚡ LAST HIT TIMING</span>
+                    {currentRally.isSustainedHold && (
+                      <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/40">
+                        Held Firm &gt;30m
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-base sm:text-xl font-black font-mono text-cyan-200 tracking-tight">
+                      {currentRally.rulePassedTime}
+                    </span>
+                    <span className={`text-xs sm:text-sm font-mono font-black px-2.5 py-0.5 rounded-lg border shadow-sm ${
+                      currentRally.recencyMinutes <= 30
+                        ? 'bg-amber-950/90 text-yellow-300 border-amber-400/80 animate-pulse'
+                        : 'bg-slate-800/90 text-slate-200 border-slate-700'
+                    }`}>
+                      {currentRally.recencyMinutes === 0 ? '⚡ Just Now (Fresh Hit)' : `⚡ ${currentRally.recencyMinutes}m ago`}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              {/* Strict Entry Confirmation Trigger */}
-              <div className="bg-slate-950/80 p-2 rounded-xl border border-slate-800 space-y-1.5">
-                <div className="text-slate-300 flex items-start gap-1.5 text-xs">
-                  <span className="text-emerald-400 font-bold shrink-0">🎯 Entry Trigger:</span>
-                  <span className="font-mono text-white font-medium">{currentRally.entryConfirmation}</span>
+              <div className="text-right shrink-0">
+                <div className="text-[10px] font-sans font-bold uppercase tracking-wider text-slate-400">
+                  Trigger Type
                 </div>
-                <div className="text-slate-300 flex items-start gap-1.5 border-t border-slate-800/80 pt-1.5 text-xs">
-                  <span className="text-rose-400 font-bold shrink-0">🛑 Invalidation SL:</span>
-                  <span className="font-mono text-rose-300 font-medium">{currentRally.invalidationRule}</span>
+                <div className="text-xs sm:text-sm font-black font-mono text-white mt-0.5 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700">
+                  {currentRally.rallyType}
                 </div>
               </div>
             </div>
 
-            {/* Quick Technical Badges (Volume Ratio, RSI Trend, VWAP, 15m Range) */}
+            {/* 4. Quick Technical Badges (Volume Ratio, RSI Trend, VWAP, 15m Range) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono">
               {/* Volume Ratio & Momentum */}
               <div className={`p-2 rounded-xl border ${
@@ -1731,6 +1418,370 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* FILTERS SECTION: DOWN AT THE BOTTOM OF THE POPUNDER                      */}
+        {/* ========================================================================= */}
+        <div className="border-t border-slate-800 bg-slate-950/95">
+          
+          {/* Active Filter Pills Strip (Click to remove from selection) */}
+          {hasActiveFilters && (
+            <div className="px-3 py-1.5 border-b border-slate-800/80 flex items-center justify-between gap-1 flex-wrap bg-slate-900/60">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider flex items-center gap-0.5">
+                  <Filter className="w-3 h-3 text-amber-400" />
+                  Active ({activeFilterList.length}):
+                </span>
+                {activeFilterList.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={f.onRemove}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer hover:bg-rose-900/80 hover:text-rose-200 hover:border-rose-500/80 group ${f.colorClass}`}
+                    title="Click to remove this filter from active selection"
+                  >
+                    <span>{f.label}</span>
+                    <X className="w-3 h-3 group-hover:rotate-90 transition-transform" />
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={handleClearAllFilters}
+                className="text-[10px] text-rose-400 hover:text-rose-300 font-bold hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
+                title="Reset all filters to show all stocks"
+              >
+                <RotateCcw className="w-2.5 h-2.5" />
+                <span>Clear All</span>
+              </button>
+            </div>
+          )}
+
+          {/* Dismissed Stocks Banner (Allows restoring hidden stocks) */}
+          {dismissedSymbols.size > 0 && (
+            <div className="bg-amber-950/40 border-b border-amber-800/50 px-3 py-1 flex items-center justify-between text-[10px] text-amber-300">
+              <div className="flex items-center gap-1">
+                <EyeOff className="w-3 h-3 text-amber-400" />
+                <span>{dismissedSymbols.size} stock{dismissedSymbols.size > 1 ? 's' : ''} removed ({Array.from(dismissedSymbols).join(', ')})</span>
+              </div>
+              <button
+                onClick={handleRestoreDismissed}
+                className="font-bold underline hover:text-yellow-200 cursor-pointer ml-2"
+              >
+                Restore All
+              </button>
+            </div>
+          )}
+
+          {/* Bottom Filter Controls Header / Toggle Bar */}
+          <div className="px-3 py-2 flex items-center justify-between gap-2 text-xs">
+            <button
+              onClick={() => setIsFilterBarExpanded((prev) => !prev)}
+              className="flex items-center gap-1.5 text-slate-300 hover:text-white font-bold cursor-pointer"
+              title="Toggle Filter Options at Bottom"
+            >
+              <Filter className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[11px] font-sans font-bold uppercase tracking-wider text-amber-300">
+                Filters &amp; Refinements
+              </span>
+              <span className="text-[10.5px] text-slate-400 font-mono">
+                ({rallySignals.length}/{totalRawCount} stocks)
+              </span>
+              <span className="text-[10px] text-slate-400 ml-1">
+                {isFilterBarExpanded ? '▲ Hide' : '▼ Expand'}
+              </span>
+            </button>
+
+            <div className="flex items-center space-x-1.5">
+              {hasActiveFilters && (
+                <button
+                  onClick={handleClearAllFilters}
+                  className="text-[10px] text-rose-400 hover:text-rose-300 font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                  <span>Reset</span>
+                </button>
+              )}
+              <button
+                onClick={() => setIsFilterBarExpanded((prev) => !prev)}
+                className={`px-2 py-0.5 rounded text-[10.5px] font-bold border transition-all cursor-pointer ${
+                  isFilterBarExpanded
+                    ? 'bg-slate-800 text-slate-200 border-slate-700'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                }`}
+              >
+                {isFilterBarExpanded ? 'Collapse' : 'Refine Filters'}
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Expandable Filter Tray */}
+          {isFilterBarExpanded && (
+            <div className="px-3 pb-3 pt-1 text-[10.5px] space-y-2 border-t border-slate-800/80 bg-slate-950">
+              
+              {/* Row 1: Direction & Major Presets */}
+              <div className="flex items-center space-x-1 text-slate-300 flex-wrap gap-y-1">
+                <span className="text-slate-400 font-medium shrink-0">Direction:</span>
+                <button
+                  onClick={() => setFilterDirection('ALL')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all cursor-pointer ${
+                    filterDirection === 'ALL' 
+                      ? 'bg-slate-700 text-white shadow-sm' 
+                      : 'text-slate-400 hover:text-slate-200 bg-slate-900/60'
+                  }`}
+                  title="Show all directions"
+                >
+                  All ({totalRawCount})
+                </button>
+                <button
+                  onClick={() => handleDirectionClick('BULLISH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'BULLISH_ONLY'
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-emerald-400 border-slate-700 hover:border-emerald-500/50'
+                  }`}
+                  title={filterDirection === 'BULLISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter Bullish only'}
+                >
+                  <span>🟢 Bullish</span>
+                  {filterDirection === 'BULLISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+                <button
+                  onClick={() => handleDirectionClick('BEARISH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'BEARISH_ONLY'
+                      ? 'bg-rose-600 text-white border-rose-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-rose-400 border-slate-700 hover:border-rose-500/50'
+                  }`}
+                  title={filterDirection === 'BEARISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter Bearish only'}
+                >
+                  <span>🔴 Bearish</span>
+                  {filterDirection === 'BEARISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+                <button
+                  onClick={() => handleDirectionClick('HUNDRED_BULLISH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'HUNDRED_BULLISH_ONLY'
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-emerald-300 border-slate-700 hover:border-emerald-500/50'
+                  }`}
+                  title={filterDirection === 'HUNDRED_BULLISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter 100% Bullish only'}
+                >
+                  <span>🟢 100% Bull</span>
+                  {filterDirection === 'HUNDRED_BULLISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+                <button
+                  onClick={() => handleDirectionClick('HUNDRED_BEARISH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'HUNDRED_BEARISH_ONLY'
+                      ? 'bg-rose-600 text-white border-rose-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-rose-300 border-slate-700 hover:border-rose-500/50'
+                  }`}
+                  title={filterDirection === 'HUNDRED_BEARISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter 100% Bearish only'}
+                >
+                  <span>🔴 100% Bear</span>
+                  {filterDirection === 'HUNDRED_BEARISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+              </div>
+
+              {/* Row 2: Momentum & Volume Filters */}
+              <div className="flex items-center space-x-1.5 pt-1.5 border-t border-slate-800/80 flex-wrap gap-y-1">
+                <span className="text-slate-400 shrink-0 font-medium">Momentum &amp; Vol:</span>
+                
+                {/* Good Volume Button */}
+                <button
+                  onClick={() => {
+                    setGoodVolumeOnly((prev) => !prev);
+                    setCurrentIndex(0);
+                  }}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    goodVolumeOnly
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-emerald-500/50 hover:text-emerald-300'
+                  }`}
+                  title={goodVolumeOnly ? 'Click to remove filter (go off from selection)' : 'Click to require Good Volume (≥1.0x)'}
+                >
+                  <span>📊 Good Volume</span>
+                  {goodVolumeOnly ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+                </button>
+
+                {/* Volume Increasing Button */}
+                <button
+                  onClick={() => {
+                    setVolumeIncreasingOnly((prev) => !prev);
+                    setCurrentIndex(0);
+                  }}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    volumeIncreasingOnly
+                      ? 'bg-teal-600 text-white border-teal-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-teal-500/50 hover:text-teal-300'
+                  }`}
+                  title={volumeIncreasingOnly ? 'Click to remove filter (go off from selection)' : 'Click to require Volume is Increasing'}
+                >
+                  <span>📈 Vol ↗ Increasing</span>
+                  {volumeIncreasingOnly ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+                </button>
+
+                {/* RSI Increasing Button */}
+                <button
+                  onClick={() => {
+                    setRsiIncreasingOnly((prev) => !prev);
+                    setCurrentIndex(0);
+                  }}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    rsiIncreasingOnly
+                      ? 'bg-indigo-600 text-white border-indigo-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-indigo-500/50 hover:text-indigo-300'
+                  }`}
+                  title={rsiIncreasingOnly ? 'Click to remove filter (go off from selection)' : 'Click to require RSI is Increasing'}
+                >
+                  <span>⚡ RSI ↗ Increasing</span>
+                  {rsiIncreasingOnly ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+                </button>
+              </div>
+
+              {/* Row 3: Recency & Safety Filters */}
+              <div className="flex items-center space-x-1 pt-1.5 border-t border-slate-800/80 flex-wrap gap-y-1">
+                <span className="text-slate-400 shrink-0 font-medium">Recency &amp; Safety:</span>
+
+                {/* Fresh Hits Toggle */}
+                <button
+                  onClick={() => handleRecencyClick('FRESH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    recencyMode === 'FRESH_ONLY'
+                      ? 'bg-cyan-600 text-white border-cyan-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-cyan-300 border-slate-700 hover:border-cyan-500/50'
+                  }`}
+                  title={recencyMode === 'FRESH_ONLY' ? 'Click to remove filter (go off)' : 'Click to show only Fresh triggers (<30m)'}
+                >
+                  <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
+                  <span>⚡ Fresh &lt;30m</span>
+                  {recencyMode === 'FRESH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+
+                {/* Stood Bullish >30m Toggle */}
+                <button
+                  onClick={() => handleRecencyClick('SUSTAINED_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    recencyMode === 'SUSTAINED_ONLY'
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-emerald-300 border-slate-700 hover:border-emerald-500/50'
+                  }`}
+                  title={recencyMode === 'SUSTAINED_ONLY' ? 'Click to remove filter (go off)' : 'Click to show only stocks that stood firm (>30m)'}
+                >
+                  <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                  <span>🛡️ Stood &gt;30m</span>
+                  {recencyMode === 'SUSTAINED_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+
+                {/* Safe Only (Anti-Trap) Toggle */}
+                <button
+                  onClick={() => {
+                    setSafeOnly((prev) => !prev);
+                    setCurrentIndex(0);
+                  }}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    safeOnly
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-emerald-500/50'
+                  }`}
+                  title={safeOnly ? 'Click to remove filter (go off)' : 'Click to filter out overextended trap setups'}
+                >
+                  <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                  <span>🛡️ Safe Only</span>
+                  {safeOnly && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+
+                {/* Hide Yesterday Toggle */}
+                <button
+                  onClick={() => {
+                    setHideYesterday((prev) => !prev);
+                    setCurrentIndex(0);
+                  }}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    hideYesterday
+                      ? 'bg-amber-600 text-white border-amber-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-slate-500'
+                  }`}
+                  title={hideYesterday ? 'Click to remove filter (go off)' : 'Click to exclude yesterday signals'}
+                >
+                  <span>{hideYesterday ? '🚫 No Yesterday' : '📅 All Dates'}</span>
+                  {hideYesterday && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+              </div>
+
+              {/* Row 4: Trigger Types */}
+              <div className="flex items-center space-x-1 pt-1.5 border-t border-slate-800/80 overflow-x-auto no-scrollbar pb-0.5 flex-wrap gap-y-1">
+                <span className="text-slate-400 shrink-0 font-medium">Trigger Types:</span>
+                
+                <button
+                  onClick={() => toggleTriggerFilter('BREAKOUT')}
+                  className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                    selectedTriggers.has('BREAKOUT')
+                      ? 'bg-amber-500 text-slate-950 border-amber-300 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-yellow-300 border-slate-700 hover:border-amber-400/50'
+                  }`}
+                  title={selectedTriggers.has('BREAKOUT') ? 'Click to remove Breakout filter (go off)' : 'Click to add Breakouts filter'}
+                >
+                  <span>💥 Breakouts</span>
+                  {selectedTriggers.has('BREAKOUT') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+                </button>
+
+                <button
+                  onClick={() => toggleTriggerFilter('PARABOLIC')}
+                  className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                    selectedTriggers.has('PARABOLIC')
+                      ? 'bg-purple-600 text-white border-purple-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-purple-300 border-slate-700 hover:border-purple-400/50'
+                  }`}
+                  title={selectedTriggers.has('PARABOLIC') ? 'Click to remove Parabolic filter (go off)' : 'Click to add Parabolic Rally filter'}
+                >
+                  <span>🚀 Parabolic</span>
+                  {selectedTriggers.has('PARABOLIC') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+                </button>
+
+                <button
+                  onClick={() => toggleTriggerFilter('RALLY_STARTED')}
+                  className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                    selectedTriggers.has('RALLY_STARTED')
+                      ? 'bg-blue-600 text-white border-blue-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-blue-300 border-slate-700 hover:border-blue-400/50'
+                  }`}
+                  title={selectedTriggers.has('RALLY_STARTED') ? 'Click to remove Rally Started filter (go off)' : 'Click to add Rally Started filter'}
+                >
+                  <span>📈 Rally Started</span>
+                  {selectedTriggers.has('RALLY_STARTED') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+                </button>
+
+                <button
+                  onClick={() => toggleTriggerFilter('100_PCT')}
+                  className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                    selectedTriggers.has('100_PCT')
+                      ? 'bg-teal-600 text-white border-teal-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-teal-300 border-slate-700 hover:border-teal-400/50'
+                  }`}
+                  title={selectedTriggers.has('100_PCT') ? 'Click to remove 100% Target Moves filter (go off)' : 'Click to add 100% Target Moves filter'}
+                >
+                  <span>🟢🔴 100% Moves</span>
+                  {selectedTriggers.has('100_PCT') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+                </button>
+
+                <button
+                  onClick={() => toggleTriggerFilter('SUSTAINED_30M')}
+                  className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                    selectedTriggers.has('SUSTAINED_30M')
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-emerald-300 border-slate-700 hover:border-emerald-400/50'
+                  }`}
+                  title={selectedTriggers.has('SUSTAINED_30M') ? 'Click to remove Stood Still filter (go off)' : 'Click to add Stood Still >30m filter'}
+                >
+                  <span>🏛️ Stood Still &gt;30m</span>
+                  {selectedTriggers.has('SUSTAINED_30M') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+                </button>
+              </div>
+
+            </div>
+          )}
+
+        </div>
 
       </div>
     </div>
