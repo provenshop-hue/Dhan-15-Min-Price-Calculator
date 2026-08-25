@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, ExternalLink, RefreshCw, Eye, Edit3, TrendingUp, TrendingDown, Check, ArrowUpDown, ChevronLeft, ChevronRight, Layers, ShieldCheck, Target, ArrowUpRight, ArrowDownRight, Calculator, Percent, Pin, Sparkles, Zap, Flame, AlertTriangle, SlidersHorizontal, CheckSquare, Square, RotateCcw, ChevronUp, ChevronDown, Clock } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney } from '../types';
-import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3, isOpenCalc2DecLesserThanClose, isOpenCalc2DecGreaterThanClose, isOpenLesserDecLesserCloseHigherDec, getFirstDecimalDigit, isOpenCalcLessThan3AndCloseGreaterThan10, isOpenCalcGreaterThan10AndCloseLessThan3 } from '../utils/gann';
+import { calculateGann15Min, getAtmOptionStrikes, calculateFibonacci382, isOpenLowPattern, isOpenHighPattern, isHighClosePattern, isAboveFirst15mCandle, isBelowFirst15mCandle, isGannCalcLessThan3, isOpenCalcLessThan3, isCloseCalcLessThan3, isBothCalcLessThan3, isOpenCalc2DecLesserThanClose, isOpenCalc2DecGreaterThanClose, isOpenCalcLessThan3AndCloseGreaterThan10, isOpenCalcGreaterThan10AndCloseLessThan3 } from '../utils/gann';
 import { detect15mHighPullbackBounce, is15mBounce930Bullish, is15mBounce930Bearish, get15mBounce930Info } from '../utils/rsiPullback';
 import { analyzeBullishCombinations } from '../utils/bullishCombinations';
 import { evaluateStockTradeJourney } from '../utils/tradeTracker';
@@ -24,7 +24,6 @@ export interface PresetRecipe15m {
 
 export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
   // 15m Candlestick & Price Patterns
-  { id: 'OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC', label: '🟢 15m Open < Close & Open Dec < Close Dec', category: '15m Candlestick & Price Patterns', description: '15m Candle: Open Price is lower & Open 1st decimal is lower; Close Price is higher & Close 1st decimal is higher' },
   { id: 'BOUNCE_930_BULLISH', label: '🟢 15m Bounce @ 9:30 AM (Bullish)', category: '15m Candlestick & Price Patterns', description: 'Price hits higher and closes higher than the first 15-minute candle with bullish momentum' },
   { id: 'BOUNCE_930_BEARISH', label: '🔴 15m Bounce/Rejection @ 9:30 AM (Bearish)', category: '15m Candlestick & Price Patterns', description: 'Price hits lower and closes lower than the first 15-minute candle with selling pressure' },
   { id: 'OPEN_LOW', label: '🟢 Open = Low Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at low of first 15m candle' },
@@ -65,13 +64,6 @@ export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
 ];
 
 export const PRESET_RECIPES_15M: PresetRecipe15m[] = [
-  {
-    id: 'OPEN_LESS_DEC_LESS_15M',
-    name: '🟢 15m Open & Dec < Close & Dec',
-    description: '15m Open < Close + Open Dec < Close Dec + Bullish',
-    optionKeys: ['OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC', 'BULLISH'],
-    badge: '15m O<C Dec'
-  },
   {
     id: 'BOUNCE_930_BULL_WAVE',
     name: '🟢 9:30 AM Bullish Bounce Wave',
@@ -277,8 +269,6 @@ export const StockTable: React.FC<StockTableProps> = ({
     switch (key) {
       case 'OPEN_LOW':
         return isStockOpenEqualLow(s);
-      case 'OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC':
-        return isOpenLesserDecLesserCloseHigherDec(s);
       case 'OPEN_HIGH':
         return isStockOpenEqualHigh(s);
       case 'HIGH_CLOSE':
@@ -377,7 +367,6 @@ export const StockTable: React.FC<StockTableProps> = ({
 
   // Count metrics
   const openLowCount = stocks.filter(isStockOpenEqualLow).length;
-  const openLessDecLessCloseHigherDecCount = stocks.filter(isOpenLesserDecLesserCloseHigherDec).length;
   const openHighCount = stocks.filter(isStockOpenEqualHigh).length;
   const highCloseCount = stocks.filter(isStockHighEqualClose).length;
   const fib382Count = stocks.filter(isStockFib382Retrace).length;
@@ -410,7 +399,6 @@ export const StockTable: React.FC<StockTableProps> = ({
     if (!matchesSearch) return false;
 
     if (trendFilter === 'OPEN_LOW' && !isStockOpenEqualLow(s)) return false;
-    if (trendFilter === 'OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC' && !isOpenLesserDecLesserCloseHigherDec(s)) return false;
     if (trendFilter === 'OPEN_HIGH' && !isStockOpenEqualHigh(s)) return false;
     if (trendFilter === 'HIGH_CLOSE' && !isStockHighEqualClose(s)) return false;
     if (trendFilter === 'FIB_382_RETRACE' && !isStockFib382Retrace(s)) return false;
@@ -775,18 +763,6 @@ export const StockTable: React.FC<StockTableProps> = ({
               Open = Low ({openLowCount})
             </button>
             <button
-              onClick={() => { setTrendFilter('OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC'); setCurrentPage(1); }}
-              className={`px-2.5 py-1 rounded-lg font-black transition-all flex items-center gap-1 ${
-                trendFilter === 'OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC'
-                  ? 'bg-indigo-700 text-white shadow-2xs ring-2 ring-indigo-400 font-black'
-                  : 'text-indigo-900 bg-indigo-100/90 hover:bg-indigo-200 border border-indigo-300/80 shadow-2xs'
-              }`}
-              title="15m Screener: Open Price is lower & Open 1st decimal is lower; Close Price is higher & Close 1st decimal is higher"
-            >
-              <Zap className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-300 fill-current" />
-              🟢 15m O&lt;C (Dec&lt;Dec) ({openLessDecLessCloseHigherDecCount})
-            </button>
-            <button
               onClick={() => { setTrendFilter('OPEN_HIGH'); setCurrentPage(1); }}
               className={`px-2.5 py-1 rounded-lg font-extrabold transition-colors flex items-center gap-1 ${
                 trendFilter === 'OPEN_HIGH'
@@ -989,22 +965,11 @@ export const StockTable: React.FC<StockTableProps> = ({
           )}
 
           {/* Sub-filter chips for Calc Modes & Decimal Filters */}
-          {(trendFilter === 'GANN_CALC_LESS_3' || trendFilter === 'BOTH_CALC_LESS_3' || trendFilter === 'OPEN_CALC_LESS_3' || trendFilter === 'CLOSE_CALC_LESS_3' || trendFilter === 'OPEN_2DEC_LESS_CLOSE' || trendFilter === 'OPEN_2DEC_GREATER_CLOSE' || trendFilter === 'OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC' || trendFilter === 'OPEN_LESS_3_CLOSE_GREATER_10' || trendFilter === 'OPEN_GREATER_10_CLOSE_LESS_3') && (
+          {(trendFilter === 'GANN_CALC_LESS_3' || trendFilter === 'BOTH_CALC_LESS_3' || trendFilter === 'OPEN_CALC_LESS_3' || trendFilter === 'CLOSE_CALC_LESS_3' || trendFilter === 'OPEN_2DEC_LESS_CLOSE' || trendFilter === 'OPEN_2DEC_GREATER_CLOSE' || trendFilter === 'OPEN_LESS_3_CLOSE_GREATER_10' || trendFilter === 'OPEN_GREATER_10_CLOSE_LESS_3') && (
             <div className="flex items-center gap-1 bg-purple-100 p-1 rounded-xl border border-purple-300 text-xs shadow-2xs overflow-x-auto">
               <span className="text-[10px] font-black text-purple-950 px-1.5 flex items-center gap-1 whitespace-nowrap">
                 <Zap className="w-3 h-3 text-purple-700 fill-current" /> Calc Mode:
               </span>
-              <button
-                onClick={() => { setTrendFilter('OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC'); setCurrentPage(1); }}
-                className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold transition-all whitespace-nowrap flex items-center gap-1 ${
-                  trendFilter === 'OPEN_LESS_DEC_LESS_CLOSE_HIGHER_DEC'
-                    ? 'bg-indigo-700 text-white shadow-2xs ring-1 ring-indigo-400 font-black'
-                    : 'bg-white text-indigo-900 hover:bg-indigo-50 border border-indigo-200'
-                }`}
-                title="15m Screener: Open Price < Close Price AND Open 1st Decimal < Close 1st Decimal (Close price and first decimal are higher)"
-              >
-                🟢 15m Open &lt; Close (Dec &lt; Dec) ({openLessDecLessCloseHigherDecCount})
-              </button>
               <button
                 onClick={() => { setTrendFilter('BOTH_CALC_LESS_3'); setCurrentPage(1); }}
                 className={`px-2 py-0.5 rounded-lg text-[11px] font-black transition-all whitespace-nowrap flex items-center gap-1 ${
@@ -1271,15 +1236,6 @@ export const StockTable: React.FC<StockTableProps> = ({
                           >
                             <Sparkles className="w-3 h-3 text-blue-600" />
                             H=C
-                          </span>
-                        )}
-                        {isOpenLesserDecLesserCloseHigherDec(stock) && (
-                          <span
-                            title={`15m Screener: Open Price (${stock.openPrice}) is lower & 1st dec (.${getFirstDecimalDigit(stock.openPrice)}) is lower; Close Price (${stock.closePrice}) is higher & 1st dec (.${getFirstDecimalDigit(stock.closePrice)}) is higher`}
-                            className="text-[10px] font-black text-indigo-900 bg-indigo-100 border border-indigo-300 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-2xs whitespace-nowrap"
-                          >
-                            <Zap className="w-3 h-3 text-indigo-600 fill-current shrink-0" />
-                            O&lt;C Dec
                           </span>
                         )}
                         {detect15mHighPullbackBounce(stock).isPullbackBounce && (

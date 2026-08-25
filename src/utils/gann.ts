@@ -597,18 +597,6 @@ export function isGannCalcLessThan3(stock: { openCalc?: number | null; closeCalc
 }
 
 /**
- * Gets the first decimal digit (tenths place, 0 to 9) of a number.
- * e.g., 12.3456 -> 3, 100.081 -> 0, 5.89 -> 8
- */
-export function getFirstDecimalDigit(val?: number | null): number | null {
-  if (val === undefined || val === null || isNaN(val)) return null;
-  const str = Math.abs(val).toFixed(2);
-  const parts = str.split('.');
-  if (parts.length < 2 || parts[1].length === 0) return 0;
-  return parseInt(parts[1][0], 10);
-}
-
-/**
  * Gets the first 2 decimal digits of a number as an integer (0 to 99).
  * e.g., 12.3456 -> 34, 100.081 -> 8, 5.0 -> 0
  */
@@ -618,45 +606,6 @@ export function getFirstTwoDecimals(val?: number | null): number | null {
   const parts = str.split('.');
   if (parts.length < 2) return 0;
   return parseInt(parts[1], 10);
-}
-
-/**
- * Filter for 15m Screener:
- * 1) Open Price is lesser than Close Price (openPrice < closePrice, i.e. Close price is higher)
- * 2) First decimal of Open Price is lesser than first decimal of Close Price (openDec < closeDec, i.e. Close 1st decimal is higher).
- */
-export function isOpenLesserDecLesserCloseHigherDec(stock: {
-  openPrice?: number | null;
-  closePrice?: number | null;
-  openCalc?: number | null;
-  closeCalc?: number | null;
-}): boolean {
-  const open = (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0)
-    ? stock.openPrice
-    : stock.openCalc;
-  const close = (stock.closePrice !== undefined && stock.closePrice !== null && stock.closePrice > 0)
-    ? stock.closePrice
-    : stock.closeCalc;
-
-  if (open === undefined || open === null || open <= 0 || close === undefined || close === null || close <= 0) {
-    return false;
-  }
-
-  // 1st condition: Open price is lesser and Close price is higher
-  if (open >= close) {
-    return false;
-  }
-
-  // 2nd condition: First decimal of Open is lesser and first decimal of Close is higher
-  const openDec1 = getFirstDecimalDigit(open);
-  const closeDec1 = getFirstDecimalDigit(close);
-  const openDec2 = getFirstTwoDecimals(open);
-  const closeDec2 = getFirstTwoDecimals(close);
-
-  if (openDec1 === null || closeDec1 === null) return false;
-
-  // First decimal digit of Open is strictly less than Close, or if tenths are equal then 2-decimals of Open are less
-  return openDec1 < closeDec1 || (openDec1 === closeDec1 && openDec2 !== null && closeDec2 !== null && openDec2 < closeDec2);
 }
 
 /**
