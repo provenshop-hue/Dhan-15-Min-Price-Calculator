@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Flame, 
   TrendingUp, 
@@ -22,7 +22,11 @@ import {
   Pause,
   List,
   Layers,
-  Info
+  Info,
+  Filter,
+  Plus,
+  RotateCcw,
+  EyeOff
 } from 'lucide-react';
 import { StockCalculated } from '../types';
 import { 
@@ -30,7 +34,9 @@ import {
   getAllRallySignals, 
   playBullishRallySound, 
   playBearishRallySound,
-  RallyDirection
+  RallyDirection,
+  RallyFilterDirection,
+  RallyCategoryFilter
 } from '../utils/bullishRally';
 
 interface BullishRallyPopupProps {
@@ -44,8 +50,19 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   onSelectStockDetail,
   onOpenPositionSizer
 }) => {
+  // Active Filter states - clicking any active filter removes it / goes off from selection
+  const [filterDirection, setFilterDirection] = useState<RallyFilterDirection>('ALL');
+  const [selectedTriggers, setSelectedTriggers] = useState<Set<RallyCategoryFilter>>(new Set());
+  const [recencyMode, setRecencyMode] = useState<'ALL_SESSION' | 'FRESH_ONLY' | 'SUSTAINED_ONLY' | 'FRESH_AND_SUSTAINED'>('ALL_SESSION');
+  const [safeOnly, setSafeOnly] = useState<boolean>(false);
+  const [hideYesterday, setHideYesterday] = useState<boolean>(false);
+  const [dismissedSymbols, setDismissedSymbols] = useState<Set<string>>(new Set());
+
+  // Expand / collapse quick filter tray
+  const [isFilterBarExpanded, setIsFilterBarExpanded] = useState<boolean>(true);
+
   const [rallySignals, setRallySignals] = useState<RallySignal[]>([]);
-  const [totalQualifiedCount, setTotalQualifiedCount] = useState<number>(0);
+  const [totalRawCount, setTotalRawCount] = useState<number>(0);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
@@ -63,13 +80,82 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   const ROTATE_INTERVAL_MS = 5000; // 5 seconds per slide
   const PROGRESS_TICK_MS = 50;
 
-  // Scan stocks with no restrictive filters so all detected signals appear directly
+  // Toggle or remove a trigger filter
+  const toggleTriggerFilter = (trigger: RallyCategoryFilter) => {
+    setSelectedTriggers((prev) => {
+      const next = new Set(prev);
+      if (next.has(trigger)) {
+        next.delete(trigger); // Clicked -> goes off from selection
+      } else {
+        next.add(trigger); // Add to selection
+      }
+      return next;
+    });
+    setCurrentIndex(0);
+    setSlideProgress(0);
+  };
+
+  // Toggle direction filter (clicking active direction goes off back to 'ALL')
+  const handleDirectionClick = (dir: RallyFilterDirection) => {
+    if (filterDirection === dir) {
+      setFilterDirection('ALL'); // goes off from selection
+    } else {
+      setFilterDirection(dir);
+    }
+    setCurrentIndex(0);
+    setSlideProgress(0);
+  };
+
+  // Toggle recency filter (clicking active recency goes off back to 'ALL_SESSION')
+  const handleRecencyClick = (mode: 'FRESH_ONLY' | 'SUSTAINED_ONLY' | 'FRESH_AND_SUSTAINED') => {
+    if (recencyMode === mode) {
+      setRecencyMode('ALL_SESSION'); // goes off from selection
+    } else {
+      setRecencyMode(mode);
+    }
+    setCurrentIndex(0);
+    setSlideProgress(0);
+  };
+
+  // Clear all filters
+  const handleClearAllFilters = () => {
+    setFilterDirection('ALL');
+    setSelectedTriggers(new Set());
+    setRecencyMode('ALL_SESSION');
+    setSafeOnly(false);
+    setHideYesterday(false);
+    setCurrentIndex(0);
+    setSlideProgress(0);
+  };
+
+  // Dismiss a specific stock from the popunder selection
+  const handleDismissStock = (symbol: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDismissedSymbols((prev) => {
+      const next = new Set(prev);
+      next.add(symbol);
+      return next;
+    });
+    setCurrentIndex(0);
+    setSlideProgress(0);
+  };
+
+  // Restore all dismissed stocks
+  const handleRestoreDismissed = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDismissedSymbols(new Set());
+    setCurrentIndex(0);
+    setSlideProgress(0);
+  };
+
+  // Scan stocks whenever stocks or filters change
   useEffect(() => {
-    const signals = getAllRallySignals(
+    // Get all raw detected signals
+    const allDetected = getAllRallySignals(
       stocks, 
       'ALL', 
       'RECENCY_FIRST', 
-      2, // at least 2 confluence points
+      2, 
       0, 
       false, 
       'ALL', 
@@ -77,18 +163,61 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
       false
     );
 
-    setTotalQualifiedCount(signals.length);
-    setRallySignals(signals);
+    setTotalRawCount(allDetected.length);
 
-    if (signals.length > 0) {
-      const currentKeys = new Set(signals.map((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}`));
+    // Apply active filter selections
+    const filtered = allDetected.filter((signal) => {
+      // 1. Exclude dismissed stocks
+      if (dismissedSymbols.has(signal.symbol)) {
+        return false;
+      }
+
+      // 2. Direction filter
+      if (filterDirection === 'BULLISH_ONLY' && signal.direction !== 'BULLISH') return false;
+      if (filterDirection === 'BEARISH_ONLY' && signal.direction !== 'BEARISH') return false;
+      if (filterDirection === 'HUNDRED_BULLISH_ONLY' && signal.triggerType !== 'ONE_HUNDRED_PCT_BULLISH') return false;
+      if (filterDirection === 'HUNDRED_BEARISH_ONLY' && signal.triggerType !== 'ONE_HUNDRED_PCT_BEARISH') return false;
+      if (filterDirection === 'HUNDRED_PCT_ALL' && signal.triggerType !== 'ONE_HUNDRED_PCT_BULLISH' && signal.triggerType !== 'ONE_HUNDRED_PCT_BEARISH') return false;
+
+      // 3. Recency filter
+      if (recencyMode === 'FRESH_ONLY' && (!signal.isFresh || signal.isYesterday)) return false;
+      if (recencyMode === 'SUSTAINED_ONLY' && (!signal.isSustainedHold || signal.isYesterday)) return false;
+      if (recencyMode === 'FRESH_AND_SUSTAINED' && !((signal.isJustHit || signal.isSustainedHold) && !signal.isYesterday)) return false;
+
+      // 4. Hide yesterday
+      if (hideYesterday && signal.isYesterday) return false;
+
+      // 5. Safe only (anti-trap)
+      if (safeOnly && signal.trapRiskLevel === 'OVEREXTENDED_TRAP') return false;
+
+      // 6. Multi-select trigger categories (if any selected, must match at least one selected trigger)
+      if (selectedTriggers.size > 0) {
+        let matchesAnySelected = false;
+        if (selectedTriggers.has('100_BULL') && signal.triggerType === 'ONE_HUNDRED_PCT_BULLISH') matchesAnySelected = true;
+        if (selectedTriggers.has('100_BEAR') && signal.triggerType === 'ONE_HUNDRED_PCT_BEARISH') matchesAnySelected = true;
+        if (selectedTriggers.has('100_PCT') && (signal.triggerType === 'ONE_HUNDRED_PCT_BULLISH' || signal.triggerType === 'ONE_HUNDRED_PCT_BEARISH')) matchesAnySelected = true;
+        if (selectedTriggers.has('BREAKOUT') && signal.triggerType === 'BREAKOUT_JUST_HIT') matchesAnySelected = true;
+        if (selectedTriggers.has('PARABOLIC') && (signal.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED' || signal.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED')) matchesAnySelected = true;
+        if (selectedTriggers.has('RALLY_STARTED') && (signal.triggerType === 'BULLISH_RALLY_STARTED' || signal.triggerType === 'BEARISH_RALLY_STARTED' || signal.triggerType === 'PARABOLIC_BULLISH_RALLY_STARTED' || signal.triggerType === 'PARABOLIC_BEARISH_RALLY_STARTED')) matchesAnySelected = true;
+        if (selectedTriggers.has('SUSTAINED_30M') && signal.isSustainedHold) matchesAnySelected = true;
+        if (selectedTriggers.has('SUSTAINED_BULL') && signal.isSustainedHold && signal.direction === 'BULLISH') matchesAnySelected = true;
+        if (!matchesAnySelected) return false;
+      }
+
+      return true;
+    });
+
+    setRallySignals(filtered);
+
+    if (filtered.length > 0) {
+      const currentKeys = new Set(filtered.map((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}`));
       let hasNewRally = false;
       let newDirection: RallyDirection = 'BULLISH';
 
       for (const key of currentKeys) {
         if (!previousRallySymbolsRef.current.has(key)) {
           hasNewRally = true;
-          const found = signals.find((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}` === key);
+          const found = filtered.find((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}` === key);
           if (found) newDirection = found.direction;
           break;
         }
@@ -109,10 +238,96 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     }
 
     // Keep currentIndex in bounds
-    if (currentIndex >= signals.length) {
+    if (currentIndex >= filtered.length) {
       setCurrentIndex(0);
     }
-  }, [stocks, soundEnabled]);
+  }, [
+    stocks, 
+    filterDirection, 
+    selectedTriggers, 
+    recencyMode, 
+    safeOnly, 
+    hideYesterday, 
+    dismissedSymbols, 
+    soundEnabled
+  ]);
+
+  // List of active filter pills for the active filter bar
+  const activeFilterList = useMemo(() => {
+    const list: { id: string; label: string; onRemove: () => void; colorClass: string }[] = [];
+
+    if (filterDirection !== 'ALL') {
+      const labelMap: Record<string, string> = {
+        BULLISH_ONLY: '🟢 Bullish Only',
+        BEARISH_ONLY: '🔴 Bearish Only',
+        HUNDRED_BULLISH_ONLY: '🟢 100% Bullish',
+        HUNDRED_BEARISH_ONLY: '🔴 100% Bearish',
+        HUNDRED_PCT_ALL: '🟢🔴 100% Target Moves'
+      };
+      list.push({
+        id: `dir_${filterDirection}`,
+        label: labelMap[filterDirection] || filterDirection,
+        onRemove: () => setFilterDirection('ALL'),
+        colorClass: filterDirection.includes('BEAR') ? 'bg-rose-950/80 text-rose-300 border-rose-500/50' : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
+      });
+    }
+
+    if (recencyMode !== 'ALL_SESSION') {
+      const recencyLabelMap: Record<string, string> = {
+        FRESH_ONLY: '⚡ Fresh (<30m) Only',
+        SUSTAINED_ONLY: '🛡️ Stood >30m Only',
+        FRESH_AND_SUSTAINED: '⚡+🛡️ Fresh & Stood >30m'
+      };
+      list.push({
+        id: `rec_${recencyMode}`,
+        label: recencyLabelMap[recencyMode] || recencyMode,
+        onRemove: () => setRecencyMode('ALL_SESSION'),
+        colorClass: 'bg-cyan-950/80 text-cyan-300 border-cyan-500/50'
+      });
+    }
+
+    if (hideYesterday) {
+      list.push({
+        id: 'hide_yesterday',
+        label: '🚫 Exclude Yesterday',
+        onRemove: () => setHideYesterday(false),
+        colorClass: 'bg-slate-800 text-slate-300 border-slate-600'
+      });
+    }
+
+    if (safeOnly) {
+      list.push({
+        id: 'safe_only',
+        label: '🛡️ Safe Only (Anti-Trap)',
+        onRemove: () => setSafeOnly(false),
+        colorClass: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
+      });
+    }
+
+    selectedTriggers.forEach((trig) => {
+      const trigMap: Record<string, { label: string; color: string }> = {
+        '100_BULL': { label: '🟢 100% Bull', color: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50' },
+        '100_BEAR': { label: '🔴 100% Bear', color: 'bg-rose-950/80 text-rose-300 border-rose-500/50' },
+        '100_PCT': { label: '🎯 100% Targets', color: 'bg-teal-950/80 text-teal-300 border-teal-500/50' },
+        'BREAKOUT': { label: '💥 Breakouts', color: 'bg-amber-950/80 text-yellow-300 border-amber-500/50' },
+        'PARABOLIC': { label: '🚀 Parabolic Rally', color: 'bg-purple-950/80 text-purple-300 border-purple-500/50' },
+        'RALLY_STARTED': { label: '📈 Rally Started', color: 'bg-blue-950/80 text-blue-300 border-blue-500/50' },
+        'SUSTAINED_30M': { label: '🏛️ Stood >30m', color: 'bg-teal-950/80 text-teal-300 border-teal-500/50' },
+        'SUSTAINED_BULL': { label: '🛡️ Stood Bullish', color: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50' }
+      };
+      const info = trigMap[trig] || { label: trig, color: 'bg-slate-800 text-slate-300 border-slate-700' };
+      list.push({
+        id: `trig_${trig}`,
+        label: info.label,
+        onRemove: () => toggleTriggerFilter(trig),
+        colorClass: info.color
+      });
+    });
+
+    return list;
+  }, [filterDirection, recencyMode, hideYesterday, safeOnly, selectedTriggers]);
+
+  const hasActiveFilters = activeFilterList.length > 0;
 
   const handleNextSlide = useCallback(() => {
     if (rallySignals.length <= 1) return;
@@ -176,7 +391,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         >
           <Flame className="w-4 h-4 text-yellow-300 fill-current animate-pulse" />
           <span className="text-xs font-bold font-mono text-emerald-300">
-            ⚡ Rally Signals {totalQualifiedCount > 0 ? `(${totalQualifiedCount})` : ''}
+            ⚡ Rally Signals {rallySignals.length > 0 ? `(${rallySignals.length})` : totalRawCount > 0 ? `(${totalRawCount})` : ''}
           </span>
         </button>
       </div>
@@ -322,7 +537,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   // Render Full Popup / Popunder Alert Card with Auto-Rotating Slider
   return (
     <div 
-      className="fixed bottom-4 right-4 z-40 w-[420px] max-w-[calc(100vw-1.5rem)] animate-slide-up"
+      className="fixed bottom-4 right-4 z-40 w-[440px] max-w-[calc(100vw-1.5rem)] animate-slide-up"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -408,13 +623,29 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           </div>
 
           <div className="flex items-center space-x-1.5">
+            {/* Filter Tray Toggle Button */}
+            <button
+              onClick={() => setIsFilterBarExpanded((prev) => !prev)}
+              className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                hasActiveFilters
+                  ? 'bg-yellow-400 text-slate-950 font-black shadow-md'
+                  : isFilterBarExpanded
+                  ? 'bg-white/25 text-white'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20'
+              }`}
+              title={isFilterBarExpanded ? 'Hide Filter Bar' : 'Show Filter Bar'}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>Filters{hasActiveFilters ? ` (${activeFilterList.length})` : ''}</span>
+            </button>
+
             {/* Anti-Trap Guide Toggle */}
             <button
               onClick={() => {
                 setShowAntiTrapGuide((prev) => !prev);
                 if (!showAntiTrapGuide) setShowAllList(false);
               }}
-              className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
+              className={`px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
                 showAntiTrapGuide 
                   ? 'bg-amber-400 text-slate-950 font-black shadow-md' 
                   : 'bg-white/15 text-amber-200 hover:bg-white/25'
@@ -429,7 +660,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             {rallySignals.length > 1 && (
               <button
                 onClick={toggleAutoRotate}
-                className={`p-1.5 rounded-lg transition-colors ${
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                   isAutoRotating ? 'text-yellow-200 hover:bg-white/10' : 'text-white/50 hover:text-white'
                 }`}
                 title={isAutoRotating ? 'Pause Auto-Slider' : 'Resume Auto-Slider (5s)'}
@@ -444,7 +675,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 setShowAllList((prev) => !prev);
                 if (!showAllList) setShowAntiTrapGuide(false);
               }}
-              className={`p-1.5 rounded-lg transition-colors ${
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                 showAllList ? 'bg-white/20 text-white' : 'text-white/80 hover:text-white hover:bg-white/10'
               }`}
               title="Show All Rallying Stocks List"
@@ -455,7 +686,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             {/* Sound Toggle */}
             <button
               onClick={toggleSound}
-              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
               title={soundEnabled ? 'Mute Alert Sound' : 'Enable Alert Sound'}
             >
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-white/50" />}
@@ -464,7 +695,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             {/* Minimize Popunder */}
             <button
               onClick={() => setIsMinimized(true)}
-              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
               title="Minimize to Popunder Pill"
             >
               <Minimize2 className="w-4 h-4" />
@@ -473,13 +704,270 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             {/* Close */}
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
               title="Dismiss Alert"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
+
+        {/* ACTIVE FILTERS STRIP: When clicked, the filter goes OFF from the selection */}
+        {hasActiveFilters && (
+          <div className="bg-slate-950/95 px-3 py-1.5 border-b border-slate-800 flex items-center justify-between gap-1 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider flex items-center gap-0.5">
+                <Filter className="w-3 h-3 text-amber-400" />
+                Active ({activeFilterList.length}):
+              </span>
+              {activeFilterList.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={f.onRemove}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer hover:bg-rose-900/80 hover:text-rose-200 hover:border-rose-500/80 group ${f.colorClass}`}
+                  title="Click to remove this filter from active selection"
+                >
+                  <span>{f.label}</span>
+                  <X className="w-3 h-3 group-hover:rotate-90 transition-transform" />
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={handleClearAllFilters}
+              className="text-[10px] text-rose-400 hover:text-rose-300 font-bold hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
+              title="Reset all filters to show all stocks"
+            >
+              <RotateCcw className="w-2.5 h-2.5" />
+              <span>Clear All</span>
+            </button>
+          </div>
+        )}
+
+        {/* DISMISSED STOCKS BANNER: Allows restoring hidden stocks */}
+        {dismissedSymbols.size > 0 && (
+          <div className="bg-amber-950/40 border-b border-amber-800/50 px-3 py-1 flex items-center justify-between text-[10px] text-amber-300">
+            <div className="flex items-center gap-1">
+              <EyeOff className="w-3 h-3 text-amber-400" />
+              <span>{dismissedSymbols.size} stock{dismissedSymbols.size > 1 ? 's' : ''} removed from popup ({Array.from(dismissedSymbols).join(', ')})</span>
+            </div>
+            <button
+              onClick={handleRestoreDismissed}
+              className="font-bold underline hover:text-yellow-200 cursor-pointer ml-2"
+            >
+              Restore All
+            </button>
+          </div>
+        )}
+
+        {/* INTERACTIVE FILTER BAR: Click to add, click again to take off from selection */}
+        {isFilterBarExpanded && (
+          <div className="bg-slate-950/90 px-3 py-2 border-b border-slate-800 text-[10.5px] space-y-1.5">
+            {/* Row 1: Direction & Major Presets */}
+            <div className="flex items-center justify-between flex-wrap gap-1">
+              <div className="flex items-center space-x-1 text-slate-300 flex-wrap gap-y-1">
+                <span className="text-slate-400 font-medium shrink-0">Direction:</span>
+                <button
+                  onClick={() => setFilterDirection('ALL')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all cursor-pointer ${
+                    filterDirection === 'ALL' 
+                      ? 'bg-slate-700 text-white shadow-sm' 
+                      : 'text-slate-400 hover:text-slate-200 bg-slate-900/60'
+                  }`}
+                  title="Show all directions"
+                >
+                  All ({totalRawCount})
+                </button>
+                <button
+                  onClick={() => handleDirectionClick('BULLISH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'BULLISH_ONLY'
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-emerald-400 border-slate-700 hover:border-emerald-500/50'
+                  }`}
+                  title={filterDirection === 'BULLISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter Bullish only'}
+                >
+                  <span>🟢 Bullish</span>
+                  {filterDirection === 'BULLISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+                <button
+                  onClick={() => handleDirectionClick('BEARISH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'BEARISH_ONLY'
+                      ? 'bg-rose-600 text-white border-rose-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-rose-400 border-slate-700 hover:border-rose-500/50'
+                  }`}
+                  title={filterDirection === 'BEARISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter Bearish only'}
+                >
+                  <span>🔴 Bearish</span>
+                  {filterDirection === 'BEARISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+                <button
+                  onClick={() => handleDirectionClick('HUNDRED_BULLISH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'HUNDRED_BULLISH_ONLY'
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-emerald-300 border-slate-700 hover:border-emerald-500/50'
+                  }`}
+                  title={filterDirection === 'HUNDRED_BULLISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter 100% Bullish only'}
+                >
+                  <span>🟢 100% Bull</span>
+                  {filterDirection === 'HUNDRED_BULLISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+                <button
+                  onClick={() => handleDirectionClick('HUNDRED_BEARISH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'HUNDRED_BEARISH_ONLY'
+                      ? 'bg-rose-600 text-white border-rose-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-rose-300 border-slate-700 hover:border-rose-500/50'
+                  }`}
+                  title={filterDirection === 'HUNDRED_BEARISH_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter 100% Bearish only'}
+                >
+                  <span>🔴 100% Bear</span>
+                  {filterDirection === 'HUNDRED_BEARISH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+              </div>
+
+              {/* Recency & Anti-Trap Quick Switches */}
+              <div className="flex items-center space-x-1 flex-wrap gap-y-1">
+                {/* Fresh Hits Toggle */}
+                <button
+                  onClick={() => handleRecencyClick('FRESH_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    recencyMode === 'FRESH_ONLY'
+                      ? 'bg-cyan-600 text-white border-cyan-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-cyan-300 border-slate-700 hover:border-cyan-500/50'
+                  }`}
+                  title={recencyMode === 'FRESH_ONLY' ? 'Click to remove filter (go off)' : 'Click to show only Fresh triggers (<30m)'}
+                >
+                  <Zap className="w-2.5 h-2.5 text-yellow-300 fill-current" />
+                  <span>⚡ Fresh &lt;30m</span>
+                  {recencyMode === 'FRESH_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+
+                {/* Stood Bullish >30m Toggle */}
+                <button
+                  onClick={() => handleRecencyClick('SUSTAINED_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    recencyMode === 'SUSTAINED_ONLY'
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-emerald-300 border-slate-700 hover:border-emerald-500/50'
+                  }`}
+                  title={recencyMode === 'SUSTAINED_ONLY' ? 'Click to remove filter (go off)' : 'Click to show only stocks that stood firm (>30m)'}
+                >
+                  <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                  <span>🛡️ Stood &gt;30m</span>
+                  {recencyMode === 'SUSTAINED_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+
+                {/* Hide Yesterday Toggle */}
+                <button
+                  onClick={() => {
+                    setHideYesterday((prev) => !prev);
+                    setCurrentIndex(0);
+                  }}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    hideYesterday
+                      ? 'bg-amber-600 text-white border-amber-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-slate-500'
+                  }`}
+                  title={hideYesterday ? 'Click to remove filter (go off)' : 'Click to exclude yesterday signals'}
+                >
+                  <span>{hideYesterday ? '🚫 No Yesterday' : '📅 All Dates'}</span>
+                  {hideYesterday && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+
+                {/* Safe Only (Anti-Trap) Toggle */}
+                <button
+                  onClick={() => {
+                    setSafeOnly((prev) => !prev);
+                    setCurrentIndex(0);
+                  }}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    safeOnly
+                      ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:border-emerald-500/50'
+                  }`}
+                  title={safeOnly ? 'Click to remove filter (go off)' : 'Click to filter out overextended trap setups'}
+                >
+                  <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                  <span>🛡️ Safe Only</span>
+                  {safeOnly && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2: Category Trigger Multi-Select Filters */}
+            <div className="flex items-center space-x-1 pt-1 border-t border-slate-800/80 overflow-x-auto no-scrollbar pb-0.5 flex-wrap gap-y-1">
+              <span className="text-slate-400 shrink-0 font-medium">Trigger Types:</span>
+              
+              <button
+                onClick={() => toggleTriggerFilter('BREAKOUT')}
+                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                  selectedTriggers.has('BREAKOUT')
+                    ? 'bg-amber-500 text-slate-950 border-amber-300 font-bold shadow-sm'
+                    : 'bg-slate-900/80 text-yellow-300 border-slate-700 hover:border-amber-400/50'
+                }`}
+                title={selectedTriggers.has('BREAKOUT') ? 'Click to remove Breakout filter (go off)' : 'Click to add Breakouts filter'}
+              >
+                <span>💥 Breakouts</span>
+                {selectedTriggers.has('BREAKOUT') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+              </button>
+
+              <button
+                onClick={() => toggleTriggerFilter('PARABOLIC')}
+                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                  selectedTriggers.has('PARABOLIC')
+                    ? 'bg-purple-600 text-white border-purple-400 font-bold shadow-sm'
+                    : 'bg-slate-900/80 text-purple-300 border-slate-700 hover:border-purple-400/50'
+                }`}
+                title={selectedTriggers.has('PARABOLIC') ? 'Click to remove Parabolic filter (go off)' : 'Click to add Parabolic Rally filter'}
+              >
+                <span>🚀 Parabolic</span>
+                {selectedTriggers.has('PARABOLIC') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+              </button>
+
+              <button
+                onClick={() => toggleTriggerFilter('RALLY_STARTED')}
+                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                  selectedTriggers.has('RALLY_STARTED')
+                    ? 'bg-blue-600 text-white border-blue-400 font-bold shadow-sm'
+                    : 'bg-slate-900/80 text-blue-300 border-slate-700 hover:border-blue-400/50'
+                }`}
+                title={selectedTriggers.has('RALLY_STARTED') ? 'Click to remove Rally Started filter (go off)' : 'Click to add Rally Started filter'}
+              >
+                <span>📈 Rally Started</span>
+                {selectedTriggers.has('RALLY_STARTED') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+              </button>
+
+              <button
+                onClick={() => toggleTriggerFilter('100_PCT')}
+                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                  selectedTriggers.has('100_PCT')
+                    ? 'bg-teal-600 text-white border-teal-400 font-bold shadow-sm'
+                    : 'bg-slate-900/80 text-teal-300 border-slate-700 hover:border-teal-400/50'
+                }`}
+                title={selectedTriggers.has('100_PCT') ? 'Click to remove 100% Target Moves filter (go off)' : 'Click to add 100% Target Moves filter'}
+              >
+                <span>🟢🔴 100% Moves</span>
+                {selectedTriggers.has('100_PCT') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+              </button>
+
+              <button
+                onClick={() => toggleTriggerFilter('SUSTAINED_30M')}
+                className={`px-1.5 py-0.5 rounded font-semibold whitespace-nowrap cursor-pointer transition-all border flex items-center gap-0.5 ${
+                  selectedTriggers.has('SUSTAINED_30M')
+                    ? 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-sm'
+                    : 'bg-slate-900/80 text-emerald-300 border-slate-700 hover:border-emerald-400/50'
+                }`}
+                title={selectedTriggers.has('SUSTAINED_30M') ? 'Click to remove Stood Still filter (go off)' : 'Click to add Stood Still >30m filter'}
+              >
+                <span>🏛️ Stood Still &gt;30m</span>
+                {selectedTriggers.has('SUSTAINED_30M') ? <X className="w-2.5 h-2.5 ml-0.5" /> : <Plus className="w-2.5 h-2.5 ml-0.5 opacity-50" />}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Anti-Trap Guide Panel (Explaining how to avoid false breakouts) */}
         {showAntiTrapGuide ? (
@@ -493,7 +981,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               </div>
               <button
                 onClick={() => setShowAntiTrapGuide(false)}
-                className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800"
+                className="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 cursor-pointer"
               >
                 ✕ Close
               </button>
@@ -549,7 +1037,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
             <button
               onClick={() => setShowAntiTrapGuide(false)}
-              className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors"
+              className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow transition-colors cursor-pointer"
             >
               Got It — Back to Signals
             </button>
@@ -558,28 +1046,30 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           <div className="p-3.5 max-h-80 overflow-y-auto space-y-2 bg-slate-950/95">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300 pb-1 border-b border-slate-800">
               <span className="flex items-center gap-1.5">
-                <span className="text-sm font-black text-white">Active Setups ({rallySignals.length})</span>
+                <span className="text-sm font-black text-white">Active Setups ({rallySignals.length}{totalRawCount > rallySignals.length ? ` of ${totalRawCount}` : ''})</span>
               </span>
-              <span className="text-[11px] text-slate-400">Click stock to inspect</span>
+              <span className="text-[11px] text-slate-400">Click stock to view, or ✕ to dismiss</span>
             </div>
             {rallySignals.map((signal, idx) => {
               const sigBull = signal.direction === 'BULLISH';
               const isSelected = idx === currentIndex;
               return (
-                <button
+                <div
                   key={`${signal.symbol}_${idx}`}
-                  onClick={() => {
-                    setCurrentIndex(idx);
-                    setShowAllList(false);
-                    setSlideProgress(0);
-                  }}
-                  className={`w-full text-left p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
+                  className={`w-full p-2.5 rounded-xl border flex items-center justify-between transition-all ${
                     isSelected 
                       ? (sigBull ? 'bg-emerald-950/90 border-emerald-500 ring-2 ring-emerald-500/50 shadow-lg' : 'bg-rose-950/90 border-rose-500 ring-2 ring-rose-500/50 shadow-lg')
                       : 'bg-slate-900/80 border-slate-800 hover:bg-slate-800/90'
                   }`}
                 >
-                  <div className="flex items-center space-x-2.5">
+                  <button
+                    onClick={() => {
+                      setCurrentIndex(idx);
+                      setShowAllList(false);
+                      setSlideProgress(0);
+                    }}
+                    className="flex-1 text-left flex items-center space-x-2.5 cursor-pointer"
+                  >
                     {sigBull ? (
                       <Flame className="w-4 h-4 text-emerald-400 shrink-0" />
                     ) : (
@@ -626,17 +1116,28 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                         <span>Passed: {signal.rulePassedTime} {signal.isMarketHours && `(${signal.recencyMinutes === 0 ? 'Just now' : `${signal.recencyMinutes}m ago`}${signal.isSustainedHold ? ' • Stood Firm' : ''})`}</span>
                       </div>
                     </div>
-                  </div>
+                  </button>
 
-                  <div className="text-right">
-                    <div className={`text-base font-black font-mono ${sigBull ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {signal.pctChange >= 0 ? '+' : ''}{signal.pctChange.toFixed(2)}%
+                  <div className="flex items-center space-x-2 pl-2">
+                    <div className="text-right">
+                      <div className={`text-base font-black font-mono ${sigBull ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {signal.pctChange >= 0 ? '+' : ''}{signal.pctChange.toFixed(2)}%
+                      </div>
+                      <div className="text-[10px] font-mono text-amber-300 font-bold">
+                        {signal.confidenceScore}% Accuracy
+                      </div>
                     </div>
-                    <div className="text-[10px] font-mono text-amber-300 font-bold">
-                      {signal.confidenceScore}% Accuracy
-                    </div>
+
+                    {/* Stock Dismiss Button */}
+                    <button
+                      onClick={(e) => handleDismissStock(signal.symbol, e)}
+                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-900/80 text-slate-400 hover:text-rose-200 border border-slate-700 transition-colors cursor-pointer"
+                      title={`Remove ${signal.symbol} from popunder selection`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -644,16 +1145,26 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           /* Empty State when no signals are currently detected */
           <div className="p-6 space-y-3 text-center bg-slate-950/80">
             <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-700/80 flex items-center justify-center mx-auto text-amber-400 shadow-inner">
-              <Sparkles className="w-6 h-6" />
+              <Filter className="w-6 h-6" />
             </div>
 
             <div>
               <h4 className="text-sm font-black text-slate-100 uppercase tracking-wide">
-                No Active Rally Signals Detected
+                No Signals Match Active Selection
               </h4>
               <p className="text-[11.5px] text-slate-400 mt-1 leading-relaxed max-w-sm mx-auto">
-                Monitoring live price feeds and candle data across all stocks for instant breakout, momentum, and reversal confluences.
+                0 stocks match your current filter selection. Click active filter pills to remove them or reset all.
               </p>
+            </div>
+
+            <div className="pt-2 flex justify-center">
+              <button
+                onClick={handleClearAllFilters}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Show All Signals ({totalRawCount})</span>
+              </button>
             </div>
           </div>
         ) : (
@@ -715,10 +1226,20 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   </div>
                 </div>
 
-                {/* % Change & CMP Badge - LARGE & BOLD */}
+                {/* % Change & CMP Badge - LARGE & BOLD + Stock Dismiss Button */}
                 <div className="text-right shrink-0 flex flex-col items-end">
-                  <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight">
-                    ₹{currentRally.currentPrice.toFixed(2)}
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight">
+                      ₹{currentRally.currentPrice.toFixed(2)}
+                    </div>
+                    {/* Stock Dismiss button */}
+                    <button
+                      onClick={(e) => handleDismissStock(currentRally.symbol, e)}
+                      className="p-1 rounded-md text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                      title={`Remove ${currentRally.symbol} from popunder selection`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
                   <div className={`text-sm font-black font-mono px-2.5 py-0.5 rounded-lg border mt-1 shadow-sm ${
                     isBull 
@@ -970,7 +1491,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               {onOpenPositionSizer && (
                 <button
                   onClick={() => onOpenPositionSizer(currentRally.stock)}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2.5 rounded-xl border border-slate-700 transition-colors shadow-md"
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2.5 rounded-xl border border-slate-700 transition-colors shadow-md cursor-pointer"
                   title="Open Position Sizer & Risk Calculator"
                 >
                   <Calculator className="w-5 h-5 text-emerald-400" />
