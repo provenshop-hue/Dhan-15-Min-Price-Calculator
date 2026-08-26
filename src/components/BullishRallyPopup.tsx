@@ -52,10 +52,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 }) => {
   // Active Filter states - clicking any active filter removes it / goes off from selection
   const [filterDirection, setFilterDirection] = useState<RallyFilterDirection>('ALL');
-  const [selectedTriggers, setSelectedTriggers] = useState<Set<RallyCategoryFilter>>(new Set());
+  const [selectedTriggers, setSelectedTriggers] = useState<Set<RallyCategoryFilter>>(new Set(['HIGH_CONFIDENCE', '100_PCT']));
   const [recencyMode, setRecencyMode] = useState<'ALL_SESSION' | 'FRESH_ONLY' | 'SUSTAINED_ONLY' | 'FRESH_AND_SUSTAINED'>('ALL_SESSION');
-  const [safeOnly, setSafeOnly] = useState<boolean>(false);
-  const [hideYesterday, setHideYesterday] = useState<boolean>(false);
+  const [safeOnly, setSafeOnly] = useState<boolean>(true);
+  const [hideYesterday, setHideYesterday] = useState<boolean>(true);
   // Volume & RSI momentum filter states (default true per user requirement: stocks shown in popunder must have good volume, volume is increasing, rsi is increasing)
   const [goodVolumeOnly, setGoodVolumeOnly] = useState<boolean>(true);
   const [volumeIncreasingOnly, setVolumeIncreasingOnly] = useState<boolean>(true);
@@ -122,16 +122,16 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     setSlideProgress(0);
   };
 
-  // Clear all filters
+  // Reset to recommended profit filters
   const handleClearAllFilters = () => {
     setFilterDirection('ALL');
-    setSelectedTriggers(new Set());
+    setSelectedTriggers(new Set(['HIGH_CONFIDENCE', '100_PCT']));
     setRecencyMode('ALL_SESSION');
-    setSafeOnly(false);
-    setHideYesterday(false);
-    setGoodVolumeOnly(false);
-    setVolumeIncreasingOnly(false);
-    setRsiIncreasingOnly(false);
+    setSafeOnly(true);
+    setHideYesterday(true);
+    setGoodVolumeOnly(true);
+    setVolumeIncreasingOnly(true);
+    setRsiIncreasingOnly(true);
     setCurrentIndex(0);
     setSlideProgress(0);
   };
@@ -1636,14 +1636,35 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 ))}
               </div>
 
-              <button
-                onClick={handleClearAllFilters}
-                className="text-[10px] text-rose-400 hover:text-rose-300 font-bold hover:underline flex items-center gap-0.5 cursor-pointer ml-auto"
-                title="Reset all filters to show all stocks"
-              >
-                <RotateCcw className="w-2.5 h-2.5" />
-                <span>Clear All</span>
-              </button>
+              <div className="flex items-center gap-3 ml-auto">
+                <button
+                  onClick={() => {
+                    setFilterDirection('ALL');
+                    setSelectedTriggers(new Set());
+                    setRecencyMode('ALL_SESSION');
+                    setSafeOnly(false);
+                    setHideYesterday(false);
+                    setGoodVolumeOnly(false);
+                    setVolumeIncreasingOnly(false);
+                    setRsiIncreasingOnly(false);
+                    setCurrentIndex(0);
+                    setSlideProgress(0);
+                  }}
+                  className="text-[10px] text-slate-400 hover:text-slate-300 font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
+                  title="Remove all filters to see every signal"
+                >
+                  <X className="w-2.5 h-2.5" />
+                  <span>Show All</span>
+                </button>
+                <button
+                  onClick={handleClearAllFilters}
+                  className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline flex items-center gap-0.5 cursor-pointer"
+                  title="Reset to 100% accurate recommended profit filters"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                  <span>Reset to Recommended</span>
+                </button>
+              </div>
             </div>
           )}
 
