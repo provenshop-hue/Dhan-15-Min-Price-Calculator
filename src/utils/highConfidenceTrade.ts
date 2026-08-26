@@ -375,13 +375,20 @@ export function evaluateHighConfidenceTrade(
 
   const passedConditionsCount = conditions.filter((c) => c.passed).length;
   const totalConditionsCount = conditions.length; // 14
-  const isHighConfidence = passedConditionsCount === totalConditionsCount;
+
+  // The most profitable trades require core confluences, but not necessarily a perfect 14/14.
+  const coreConditionIds = ['HTF_TREND_BULLISH', 'CLOSE_ABOVE_VWAP', 'VOLUME_SURGE_1_2X', 'RSI_GE_55'];
+  const passedCoreCount = conditions.filter(c => c.passed && coreConditionIds.includes(c.id)).length;
+  const isCoreMet = passedCoreCount === coreConditionIds.length;
+
+  // High Confidence is achieved if CORE conditions pass AND overall match is >= 78% (11/14)
+  const isHighConfidence = isCoreMet && passedConditionsCount >= 11;
   const scorePercent = Math.round((passedConditionsCount / totalConditionsCount) * 100);
 
   // =========================================================================
   // FINAL TRIGGER EVALUATION
   // =========================================================================
-  // ALL MANDATORY CONDITIONS = TRUE
+  // CORE & HIGH CONFIDENCE MET
   // AND Current Candle = Bullish (Close > Open)
   // AND Close > Previous Candle High (Close > prevClose / first15High / open)
   const isCurrentCandleBullish = close > open;
@@ -400,9 +407,9 @@ export function evaluateHighConfidenceTrade(
     triggerTime,
     triggerPrice,
     explanation: isEntryTriggerActive
-      ? `All 14 mandatory conditions passed + Green Candle (₹${close.toFixed(2)} > ₹${open.toFixed(2)}) + Close above previous high (₹${previousHighReference.toFixed(2)}). FULL ENTRY TRIGGER ACTIVE!`
+      ? `Core mandatory conditions passed (${passedConditionsCount}/14) + Green Candle (₹${close.toFixed(2)} > ₹${open.toFixed(2)}) + Close above previous high (₹${previousHighReference.toFixed(2)}). FULL ENTRY TRIGGER ACTIVE!`
       : !isHighConfidence
-      ? `Awaiting remaining ${totalConditionsCount - passedConditionsCount} mandatory conditions before trigger.`
+      ? `Awaiting core conditions and >= 11/14 total confluences before trigger.`
       : !isCurrentCandleBullish
       ? 'Awaiting Green Candle close (Close > Open).'
       : 'Awaiting candle close above previous candle high.'
@@ -418,9 +425,9 @@ export function evaluateHighConfidenceTrade(
     statusColorClass = 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-300 shadow-md animate-pulse';
   } else if (isHighConfidence) {
     statusTier = 'HIGH_CONFIDENCE_SETUP';
-    statusBadge = '🛡️ 14/14 CONFLUENCE CONFIRMED';
+    statusBadge = `🛡️ CORE CONFLUENCE MET (${passedConditionsCount}/14)`;
     statusColorClass = 'bg-emerald-950 text-emerald-300 border-emerald-400/80 shadow-sm';
-  } else if (passedConditionsCount >= 11) {
+  } else if (passedConditionsCount >= 9) {
     statusTier = 'NEAR_CONFLUENCE';
     statusBadge = `⚡ Near Setup (${passedConditionsCount}/14)`;
     statusColorClass = 'bg-amber-950/80 text-yellow-300 border-amber-500/60';
@@ -431,10 +438,10 @@ export function evaluateHighConfidenceTrade(
   }
 
   const summaryReason = isEntryTriggerActive
-    ? `Textbook High-Confidence Trade: All 14 institutional conditions verified + Green Candle breakout above previous high with ${riskRewardRatioStr} R:R.`
+    ? `Textbook High-Confidence Trade: Core institutional conditions verified (${passedConditionsCount}/14) + Green Candle breakout above previous high with ${riskRewardRatioStr} R:R.`
     : isHighConfidence
-    ? `All 14 mandatory conditions satisfied. Ready for entry on next bullish candle close above previous high.`
-    : `Setup matched ${passedConditionsCount} of 14 mandatory criteria (${scorePercent}% score).`;
+    ? `Core mandatory conditions satisfied (${passedConditionsCount}/14). Ready for entry on next bullish candle close above previous high.`
+    : `Setup matched ${passedConditionsCount} of 14 criteria (${scorePercent}% score). Missing core requirements.`;
 
   return {
     stock,

@@ -717,7 +717,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   ? 'bg-amber-400 text-slate-950 font-black shadow-md ring-2 ring-amber-300' 
                   : 'bg-amber-500/20 text-yellow-300 border border-amber-500/40 hover:bg-amber-500/30'
               }`}
-              title="14 Mandatory Confluences & Entry Trigger Validation"
+              title="Core Confluences & Entry Trigger Validation"
             >
               <Flame className="w-3.5 h-3.5 text-yellow-300 fill-current" />
               <span>🎯 14 Confluences</span>
@@ -930,13 +930,13 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             </button>
           </div>
         ) : showHighConfidenceGuide ? (
-          /* High-Confidence 14-Mandatory Conditions & Entry Trigger Inspection Panel */
+          /* High-Confidence Core Conditions & Entry Trigger Inspection Panel */
           <div className="p-3.5 max-h-96 overflow-y-auto space-y-3 bg-slate-950/98 text-slate-200">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-1.5">
                 <Flame className="w-4 h-4 text-yellow-300 fill-current animate-pulse" />
                 <h4 className="text-xs font-black uppercase text-yellow-300 tracking-wider">
-                  HIGH-CONFIDENCE TRADE SYSTEM (14 Mandatory Conditions + Final Entry Trigger)
+                  HIGH-CONFIDENCE TRADE SYSTEM (Core Conditions + Final Entry Trigger)
                 </h4>
               </div>
               <button
@@ -963,7 +963,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                           ? 'bg-emerald-500 text-slate-950 border-emerald-300'
                           : 'bg-amber-500/20 text-yellow-300 border-amber-500/40'
                       }`}>
-                        {currentRally.highConfidence.isHighConfidence ? '🎯 14/14 ALL MANDATORY CONDITIONS MET' : `${currentRally.highConfidence.metCount}/14 CONDITIONS MET`}
+                        {currentRally.highConfidence.isHighConfidence ? '🎯 CORE CONFLUENCES MET' : `${currentRally.highConfidence.passedConditionsCount}/14 CONDITIONS MET`}
                       </span>
                     </div>
                     <p className="text-[10.5px] text-slate-300 mt-1 leading-tight font-sans">
@@ -994,7 +994,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[10.5px] pt-0.5">
                     <div className="flex items-center gap-1">
                       <span>{currentRally.highConfidence.isHighConfidence ? '✅' : '❌'}</span>
-                      <span className={currentRally.highConfidence.isHighConfidence ? 'text-emerald-300' : 'text-slate-400'}>All 14 Mandatory = TRUE</span>
+                      <span className={currentRally.highConfidence.isHighConfidence ? 'text-emerald-300' : 'text-slate-400'}>All Core = TRUE</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <span>{currentRally.highConfidence.entryTrigger.isBullishCandle ? '✅' : '❌'}</span>
@@ -1007,10 +1007,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   </div>
                 </div>
 
-                {/* 14 Mandatory Checklist Grid */}
+                {/* Core Checklist Grid */}
                 <div className="space-y-1.5 pt-1">
                   <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-sans">
-                    14 Mandatory Confluence Checklist:
+                    Core Confluence Checklist:
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10.5px]">
                     {currentRally.highConfidence.conditions.map((cond, cIdx) => (
@@ -1285,10 +1285,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                             ? 'bg-amber-400 text-slate-950 border-yellow-300 ring-2 ring-yellow-300/50 animate-pulse'
                             : 'bg-amber-950/80 text-yellow-300 border-amber-500/50 hover:bg-amber-900/80'
                         }`}
-                        title="Click to view 14 Mandatory Confluences & Entry Trigger verification"
+                        title="Click to view Core Confluences & Entry Trigger verification"
                       >
                         <Flame className="w-3 h-3 fill-current text-yellow-500" />
-                        <span>{currentRally.highConfidence.isHighConfidence ? '🎯 14/14 HIGH CONFIDENCE' : `🎯 ${currentRally.highConfidence.metCount}/14 CONFLUENCES`}</span>
+                        <span>{currentRally.highConfidence.isHighConfidence ? '🎯 HIGH CONFIDENCE' : `🎯 ${currentRally.highConfidence.passedConditionsCount}/14 CONFLUENCES`}</span>
                       </button>
                     )}
                   </div>
@@ -1327,7 +1327,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                             <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-rose-400" /> AI ADVICE: AVOID
                           </div>
                           <div className="text-[13px] sm:text-sm font-black text-rose-200 uppercase tracking-wide mt-0.5 font-mono">
-                            Does not meet all 14 strict confluences
+                            Does not meet core confidence criteria
                           </div>
                         </div>
                       )}
@@ -1728,7 +1728,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                       ? 'bg-amber-500 text-slate-950 border-amber-300 font-black shadow-sm'
                       : 'bg-amber-950/80 text-yellow-300 border-amber-500/40 hover:border-amber-400'
                   }`}
-                  title={filterDirection === 'HIGH_CONFIDENCE_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter High Confidence Trades (14 Mandatory conditions + Entry trigger)'}
+                  title={filterDirection === 'HIGH_CONFIDENCE_ONLY' ? 'Click to remove filter (go off)' : 'Click to filter High Confidence Trades (Core conditions + Entry trigger)'}
                 >
                   <Flame className="w-2.5 h-2.5 text-yellow-300 fill-current" />
                   <span>🎯 High Confidence</span>
