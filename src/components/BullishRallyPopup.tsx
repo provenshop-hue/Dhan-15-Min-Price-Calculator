@@ -1308,17 +1308,26 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                     
                     {/* AI Entry Advice */}
                     <div className="mt-3">
-                      {currentRally.highConfidence.isEntryTriggerActive ? (
+                      {currentRally.highConfidence?.isHighConfidence && currentRally.highConfidence?.isEntryTriggerActive ? (
                         <div className={`border-2 rounded-xl px-4 py-2 font-black text-lg sm:text-xl flex items-center gap-2 shadow-lg ${isBull ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-emerald-900/50 animate-pulse' : 'bg-rose-500/20 border-rose-500 text-rose-300 shadow-rose-900/50 animate-pulse'}`}>
                           <Zap className="w-5 h-5 sm:w-6 sm:h-6" /> AI ADVICE: ENTER NOW!
                         </div>
-                      ) : (
+                      ) : currentRally.highConfidence?.isHighConfidence ? (
                         <div className="bg-amber-500/10 border-2 border-amber-500/50 text-amber-300 rounded-xl px-3 py-1.5 shadow-lg shadow-amber-950/40">
                           <div className="flex items-center gap-1.5 font-bold text-base sm:text-lg">
                             <Clock className="w-4 h-4 sm:w-5 sm:h-5" /> AI ADVICE: WAIT FOR LEVEL
                           </div>
                           <div className="text-[13px] sm:text-sm font-black text-amber-100 uppercase tracking-wide mt-0.5 font-mono">
-                            Wait till {isBull ? 'breakout above' : 'breakdown below'} ₹{currentRally.tradePlan.entryTrigger.toFixed(1)}
+                            Wait till {isBull ? 'breakout above' : 'breakdown below'} ₹{currentRally.tradePlan?.entryTrigger?.toFixed(1) || 'Trigger'}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-rose-950/60 border-2 border-rose-500/50 text-rose-300 rounded-xl px-3 py-1.5 shadow-lg shadow-rose-950/40">
+                          <div className="flex items-center gap-1.5 font-bold text-base sm:text-lg">
+                            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-rose-400" /> AI ADVICE: AVOID
+                          </div>
+                          <div className="text-[13px] sm:text-sm font-black text-rose-200 uppercase tracking-wide mt-0.5 font-mono">
+                            Does not meet all 14 strict confluences
                           </div>
                         </div>
                       )}
