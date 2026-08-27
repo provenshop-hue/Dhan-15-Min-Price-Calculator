@@ -21,6 +21,7 @@ import { TenFifteenPicksHub } from './components/TenFifteenPicksHub';
 import { ParabolicRallyDashboard } from './components/ParabolicRallyDashboard';
 import { UserTradeTracker } from './components/UserTradeTracker';
 import { SectorStrengthDashboard } from './components/SectorStrengthDashboard';
+import { OpenHighLowScanner } from './components/OpenHighLowScanner';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId } from './data/dhanSecurityMap';
@@ -213,7 +214,7 @@ export default function App() {
 
 
   // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'parabolic_rally', 'user_tracker', or 'sector_strength')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength'>('gann');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -1232,6 +1233,13 @@ export default function App() {
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
             onOpenSettings={() => setIsSettingsOpen(true)}
             isLoading={isBulkLoading}
+          />
+        ) : activeDashboardTab === 'open_high_low' ? (
+          /* Dedicated Open = High/Low Strategy Hub */
+          <OpenHighLowScanner
+            stocks={stocks}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
           />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */

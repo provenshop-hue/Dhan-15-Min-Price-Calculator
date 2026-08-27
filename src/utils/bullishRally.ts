@@ -16,7 +16,8 @@ export type RallyFilterDirection =
   | 'HUNDRED_BULLISH_ONLY' 
   | 'HUNDRED_BEARISH_ONLY' 
   | 'HUNDRED_PCT_ALL'
-  | 'HIGH_CONFIDENCE_ONLY';
+  | 'HIGH_CONFIDENCE_ONLY'
+  | 'PARABOLIC_ONLY';
 
 export type RallyCategoryFilter = 
   | 'ALL' 

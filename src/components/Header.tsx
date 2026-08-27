@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -355,6 +355,21 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="bg-gradient-to-r from-yellow-400 to-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   18+ Sectors
                 </span>
+              </span>
+            </button>
+
+            {/* 🎯 Open = High/Low Tab */}
+            <button
+              onClick={() => onChangeDashboardTab('open_high_low')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'open_high_low'
+                  ? 'bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-500/30 ring-1 ring-white/30'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-emerald-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Target className={`w-3.5 h-3.5 ${activeDashboardTab === 'open_high_low' ? 'text-yellow-300' : 'text-emerald-600'}`} />
+                <span>🎯 Open = High/Low</span>
               </span>
             </button>
           </div>

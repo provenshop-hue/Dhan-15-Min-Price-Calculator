@@ -187,6 +187,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
       if (filterDirection === 'HUNDRED_BEARISH_ONLY' && signal.triggerType !== 'ONE_HUNDRED_PCT_BEARISH') return false;
       if (filterDirection === 'HUNDRED_PCT_ALL' && signal.triggerType !== 'ONE_HUNDRED_PCT_BULLISH' && signal.triggerType !== 'ONE_HUNDRED_PCT_BEARISH') return false;
       if (filterDirection === 'HIGH_CONFIDENCE_ONLY' && !signal.highConfidence?.isHighConfidence && !signal.highConfidence?.isEntryTriggerActive) return false;
+      if (filterDirection === 'PARABOLIC_ONLY' && signal.triggerType !== 'PARABOLIC_BULLISH_RALLY_STARTED' && signal.triggerType !== 'PARABOLIC_BEARISH_RALLY_STARTED') return false;
 
       // 3. Recency filter
       if (recencyMode === 'FRESH_ONLY' && (!signal.isFresh || signal.isYesterday)) return false;
@@ -285,7 +286,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         HUNDRED_BULLISH_ONLY: '🟢 100% Bullish',
         HUNDRED_BEARISH_ONLY: '🔴 100% Bearish',
         HUNDRED_PCT_ALL: '🟢🔴 100% Target Moves',
-        HIGH_CONFIDENCE_ONLY: '🎯 High Confidence Trade'
+        HIGH_CONFIDENCE_ONLY: '🎯 High Confidence Trade',
+        PARABOLIC_ONLY: '🚀 Parabolic Rally'
       };
       list.push({
         id: `dir_${filterDirection}`,
@@ -293,6 +295,8 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
         onRemove: () => setFilterDirection('ALL'),
         colorClass: filterDirection === 'HIGH_CONFIDENCE_ONLY' 
           ? 'bg-amber-500 text-slate-950 border-amber-300 font-black'
+          : filterDirection === 'PARABOLIC_ONLY'
+          ? 'bg-purple-600 text-white border-purple-400 font-black shadow-[0_0_10px_rgba(168,85,247,0.5)]'
           : filterDirection.includes('BEAR') 
           ? 'bg-rose-950/80 text-rose-300 border-rose-500/50' 
           : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
@@ -1733,6 +1737,19 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                   <Flame className="w-2.5 h-2.5 text-yellow-300 fill-current" />
                   <span>🎯 High Confidence</span>
                   {filterDirection === 'HIGH_CONFIDENCE_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
+                </button>
+                <button
+                  onClick={() => handleDirectionClick('PARABOLIC_ONLY')}
+                  className={`px-1.5 py-0.5 rounded font-semibold transition-all border cursor-pointer flex items-center gap-0.5 ${
+                    filterDirection === 'PARABOLIC_ONLY'
+                      ? 'bg-purple-600 text-white border-purple-400 font-bold shadow-[0_0_10px_rgba(168,85,247,0.5)]'
+                      : 'bg-purple-950/40 text-purple-300 border-purple-500/30 hover:border-purple-400'
+                  }`}
+                  title={filterDirection === 'PARABOLIC_ONLY' ? 'Click to remove filter' : 'Click to filter Parabolic Rallies'}
+                >
+                  <Sparkles className="w-2.5 h-2.5 text-purple-300" />
+                  <span>🚀 Parabolic</span>
+                  {filterDirection === 'PARABOLIC_ONLY' && <X className="w-2.5 h-2.5 ml-0.5" />}
                 </button>
                 <button
                   onClick={() => handleDirectionClick('HUNDRED_BULLISH_ONLY')}
