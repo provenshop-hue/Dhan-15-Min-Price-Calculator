@@ -16,6 +16,10 @@ export interface StockCalculated {
   lowPrice?: number | null;
   first15mHigh?: number | null;
   first15mLow?: number | null;
+  first1mOpen?: number | null;
+  first1mHigh?: number | null;
+  first1mLow?: number | null;
+  first1mClose?: number | null;
   volume?: number | null;
   volumeRatio?: number | null;
   volumeSpike?: boolean | null;

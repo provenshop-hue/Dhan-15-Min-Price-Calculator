@@ -843,8 +843,8 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   const highConfidence = evaluateHighConfidenceTrade(stock);
 
   // Determine Trigger Category Classification:
-  // 1. High-Confidence Trade (14 confluences + final entry trigger)
-  // 2. 100% Bullish Move
+  // 1. 100% Bullish Move
+  // 2. High-Confidence Trade (14 confluences + final entry trigger)
   // 3. Parabolic Bullish Rally Started
   // 4. Breakout Just Hit
   // 5. Bullish Rally Started
@@ -852,14 +852,14 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
   let triggerBadge = '📈 Bullish Rally Started';
   let triggerColorClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
 
-  if (highConfidence.isEntryTriggerActive) {
-    triggerType = 'HIGH_CONFIDENCE_TRADE';
-    triggerBadge = '🎯 High-Confidence Trade';
-    triggerColorClass = 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white border-emerald-300 shadow-md ring-2 ring-emerald-400 animate-pulse';
-  } else if (is100Bull) {
+  if (is100Bull) {
     triggerType = 'ONE_HUNDRED_PCT_BULLISH';
     triggerBadge = '🟢 100% Bullish Move';
     triggerColorClass = 'bg-emerald-500/25 text-emerald-200 border-emerald-400/50 shadow-sm';
+  } else if (highConfidence.isEntryTriggerActive) {
+    triggerType = 'HIGH_CONFIDENCE_TRADE';
+    triggerBadge = '🎯 High-Confidence Trade';
+    triggerColorClass = 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white border-emerald-300 shadow-md ring-2 ring-emerald-400 animate-pulse';
   } else if (isParabolicBull) {
     triggerType = 'PARABOLIC_BULLISH_RALLY_STARTED';
     triggerBadge = '🚀 Parabolic Bullish Rally Started';

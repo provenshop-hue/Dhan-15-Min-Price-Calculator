@@ -28,9 +28,9 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
         return false;
       }
       
-      const open = s.openPrice;
-      const high = s.highPrice;
-      const low = s.lowPrice;
+      const open = s.first1mOpen ?? s.openPrice;
+      const high = s.first1mHigh ?? s.highPrice;
+      const low = s.first1mLow ?? s.lowPrice;
       
       // Precision check (e.g. up to 1-2 decimal places)
       // For exactly matching, we can check a small tolerance or exact match.
@@ -40,9 +40,9 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       
       return isOpenLow || isOpenHigh;
     }).map(s => {
-      const open = s.openPrice!;
-      const high = s.highPrice!;
-      const low = s.lowPrice!;
+      const open = s.first1mOpen ?? s.openPrice!;
+      const high = s.first1mHigh ?? s.highPrice!;
+      const low = s.first1mLow ?? s.lowPrice!;
       const isOpenLow = Math.abs(open - low) <= 0.05;
       const isOpenHigh = Math.abs(open - high) <= 0.05;
       

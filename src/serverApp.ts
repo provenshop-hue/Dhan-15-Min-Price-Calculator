@@ -468,6 +468,57 @@ export function createExpressApp() {
         };
         const getISTTime = getISTDateTime;
 
+        // Fetch 1-min data just for the 9:15-9:16 AM candle
+        let first1mO = null;
+        let first1mH = null;
+        let first1mL = null;
+        let first1mC = null;
+        
+        try {
+          const payload1m = {
+            securityId: String(secId),
+            exchangeSegment,
+            instrument,
+            instrumentType: instrument,
+            fromDate: foundDate,
+            toDate: foundDate,
+            interval: '1'
+          };
+          const res1m = await fetch('https://api.dhan.co/v2/charts/intraday', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'client-id': clientId,
+              'access-token': accessToken,
+            },
+            body: JSON.stringify(payload1m),
+            signal: AbortSignal.timeout(8000)
+          });
+          const data1m = await res1m.json().catch(() => null);
+          if (res1m.ok && data1m?.open && data1m.open.length > 0) {
+            const tms = data1m.start_time || data1m.timestamp || data1m.t || data1m.time;
+            for (let i = 0; i < data1m.open.length; i++) {
+              const dtParsed = getISTDateTime(tms?.[i]);
+              if (dtParsed && dtParsed.hours === 9 && dtParsed.minutes === 15) {
+                first1mO = Number(data1m.open[i]);
+                first1mH = Number(data1m.high[i]);
+                first1mL = Number(data1m.low[i]);
+                first1mC = Number(data1m.close[i]);
+                break;
+              }
+            }
+            if (first1mO === null) {
+                first1mO = Number(data1m.open[0]);
+                first1mH = Number(data1m.high[0]);
+                first1mL = Number(data1m.low[0]);
+                first1mC = Number(data1m.close[0]);
+            }
+          }
+        } catch(e) {
+          console.error('Failed to fetch 1m candle', String(e));
+        }
+
         // Parse all returned candles into structured objects
         const candlesList: Array<{
           idx: number;
@@ -736,6 +787,10 @@ export function createExpressApp() {
           previousClose: previousDayClose ? Math.round(previousDayClose * 100) / 100 : null,
           first15mHigh: Math.round(first15MinHigh * 100) / 100,
           first15mLow: Math.round(first15MinLow * 100) / 100,
+          first1mOpen: first1mO !== null ? Math.round(first1mO * 100) / 100 : null,
+          first1mHigh: first1mH !== null ? Math.round(first1mH * 100) / 100 : null,
+          first1mLow: first1mL !== null ? Math.round(first1mL * 100) / 100 : null,
+          first1mClose: first1mC !== null ? Math.round(first1mC * 100) / 100 : null,
           volume: sessionTotalVol > 0 ? sessionTotalVol : first15MinVol,
           first15mVolume: first15MinVol,
           totalVolume: sessionTotalVol,
