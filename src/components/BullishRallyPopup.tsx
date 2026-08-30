@@ -52,14 +52,14 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 }) => {
   // Active Filter states - clicking any active filter removes it / goes off from selection
   const [filterDirection, setFilterDirection] = useState<RallyFilterDirection>('ALL');
-  const [selectedTriggers, setSelectedTriggers] = useState<Set<RallyCategoryFilter>>(new Set(['HIGH_CONFIDENCE', '100_PCT']));
+  const [selectedTriggers, setSelectedTriggers] = useState<Set<RallyCategoryFilter>>(new Set(['HIGH_CONFIDENCE', '100_PCT', 'PARABOLIC', 'RALLY_STARTED']));
   const [recencyMode, setRecencyMode] = useState<'ALL_SESSION' | 'FRESH_ONLY' | 'SUSTAINED_ONLY' | 'FRESH_AND_SUSTAINED'>('ALL_SESSION');
   const [safeOnly, setSafeOnly] = useState<boolean>(true);
   const [hideYesterday, setHideYesterday] = useState<boolean>(true);
   // Volume & RSI momentum filter states (default true per user requirement: stocks shown in popunder must have good volume, volume is increasing, rsi is increasing)
-  const [goodVolumeOnly, setGoodVolumeOnly] = useState<boolean>(true);
-  const [volumeIncreasingOnly, setVolumeIncreasingOnly] = useState<boolean>(true);
-  const [rsiIncreasingOnly, setRsiIncreasingOnly] = useState<boolean>(true);
+  const [goodVolumeOnly, setGoodVolumeOnly] = useState<boolean>(false);
+  const [volumeIncreasingOnly, setVolumeIncreasingOnly] = useState<boolean>(false);
+  const [rsiIncreasingOnly, setRsiIncreasingOnly] = useState<boolean>(false);
   const [dismissedSymbols, setDismissedSymbols] = useState<Set<string>>(new Set());
 
   // Expand / collapse quick filter tray
@@ -125,13 +125,13 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   // Reset to recommended profit filters
   const handleClearAllFilters = () => {
     setFilterDirection('ALL');
-    setSelectedTriggers(new Set(['HIGH_CONFIDENCE', '100_PCT']));
+    setSelectedTriggers(new Set(['HIGH_CONFIDENCE', '100_PCT', 'PARABOLIC', 'RALLY_STARTED']));
     setRecencyMode('ALL_SESSION');
     setSafeOnly(true);
     setHideYesterday(true);
-    setGoodVolumeOnly(true);
-    setVolumeIncreasingOnly(true);
-    setRsiIncreasingOnly(true);
+    setGoodVolumeOnly(false);
+    setVolumeIncreasingOnly(false);
+    setRsiIncreasingOnly(false);
     setCurrentIndex(0);
     setSlideProgress(0);
   };

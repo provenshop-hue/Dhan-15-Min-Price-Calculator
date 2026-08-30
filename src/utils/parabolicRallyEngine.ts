@@ -371,14 +371,14 @@ export function analyzeParabolicRally(
     });
 
     // 3. Previous high broken (+2 pts)
-    const isPrevHighBroken = close >= buyAbove * 0.998 || (high > 0 && close >= high * 0.999);
+    const isPrevHighBroken = close >= buyAbove * 0.998 || (first15mHigh > 0 && close >= first15mHigh * 0.999);
     checks.push({
       id: 'prev_high',
       name: 'Previous High Broken',
       points: isPrevHighBroken ? 2 : 0,
       maxPoints: 2,
       passed: isPrevHighBroken,
-      actualValue: `CMP ₹${close.toFixed(1)} ≥ Prev ₹${(buyAbove || high).toFixed(1)}`,
+      actualValue: `CMP ₹${close.toFixed(1)} ≥ Prev ₹${(buyAbove || first15mHigh).toFixed(1)}`,
       detail: isPrevHighBroken ? 'Supply absorption confirmed: took out previous resistance high' : 'Resistance high intact'
     });
 
@@ -608,14 +608,14 @@ export function analyzeParabolicRally(
     });
 
     // 3. Previous low broken (+2 pts)
-    const isPrevLowBroken = close <= sellBelow * 1.002 || (low > 0 && close <= low * 1.001);
+    const isPrevLowBroken = close <= sellBelow * 1.002 || (first15mLow > 0 && close <= first15mLow * 1.001);
     checks.push({
       id: 'prev_low',
       name: 'Previous Low Broken',
       points: isPrevLowBroken ? 2 : 0,
       maxPoints: 2,
       passed: isPrevLowBroken,
-      actualValue: `CMP ₹${close.toFixed(1)} ≤ Prev ₹${(sellBelow || low).toFixed(1)}`,
+      actualValue: `CMP ₹${close.toFixed(1)} ≤ Prev ₹${(sellBelow || first15mLow).toFixed(1)}`,
       detail: isPrevLowBroken ? 'Demand exhaustion confirmed: shattered previous support low' : 'Support low holding'
     });
 
