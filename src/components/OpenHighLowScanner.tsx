@@ -216,7 +216,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                   <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800">
                     <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">Lot Size</div>
                     <div className="text-base font-mono font-black text-indigo-400">
-                      {stock.lotSize || '-'}
+                      {stock.lotSizeAug2026 ?? stock.lotSizeJul2026 ?? stock.lotSizeJun2026 ?? '-'}
                     </div>
                   </div>
                   {stock.volumeRatio !== undefined && (
