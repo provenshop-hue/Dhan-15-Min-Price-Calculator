@@ -1015,6 +1015,8 @@ export default function App() {
     }} />;
   }
 
+  const niftyStock = stocks.find(s => s.symbol === 'NIFTY');
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col selection:bg-blue-600 selection:text-white antialiased">
       
