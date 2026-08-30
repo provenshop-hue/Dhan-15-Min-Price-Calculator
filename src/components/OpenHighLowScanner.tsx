@@ -212,7 +212,13 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                 </div>
 
                 {/* Additional metrics if available */}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800">
+                    <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">Lot Size</div>
+                    <div className="text-base font-mono font-black text-indigo-400">
+                      {stock.lotSize || '-'}
+                    </div>
+                  </div>
                   {stock.volumeRatio !== undefined && (
                     <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800">
                       <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">Vol Spike</div>
