@@ -22,29 +22,24 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
   const [filterType, setFilterType] = useState<'ALL' | 'OPEN_LOW' | 'OPEN_HIGH'>('ALL');
 
   const scannedStocks = useMemo(() => {
-    const list = stocks.filter(s => {
-      // Must have open, high, and low prices to evaluate OHL strategy
-      if (s.openPrice == null || s.highPrice == null || s.lowPrice == null) {
-        return false;
+    const list = stocks.map(s => {
+      // Must have 1-minute data (9:15 AM - 9:16 AM) to evaluate OHL strategy precisely
+      if (s.first1mOpen == null || s.first1mHigh == null || s.first1mLow == null) {
+        return null;
       }
       
-      const open = s.first1mOpen ?? s.openPrice;
-      const high = s.first1mHigh ?? s.highPrice;
-      const low = s.first1mLow ?? s.lowPrice;
+      const open = s.first1mOpen;
+      const high = s.first1mHigh;
+      const low = s.first1mLow;
       
-      // Precision check (e.g. up to 1-2 decimal places)
-      // For exactly matching, we can check a small tolerance or exact match.
-      // Usually, exact match or within 0.05 is considered same in Indian markets.
-      const isOpenLow = Math.abs(open - low) <= 0.05;
-      const isOpenHigh = Math.abs(open - high) <= 0.05;
+      const diffLow = Math.abs(open - low);
+      const diffHigh = Math.abs(open - high);
       
-      return isOpenLow || isOpenHigh;
-    }).map(s => {
-      const open = s.first1mOpen ?? s.openPrice!;
-      const high = s.first1mHigh ?? s.highPrice!;
-      const low = s.first1mLow ?? s.lowPrice!;
-      const isOpenLow = Math.abs(open - low) <= 0.05;
-      const isOpenHigh = Math.abs(open - high) <= 0.05;
+      // We check for a small tolerance (e.g., <= 0.15 difference) 
+      const isOpenLow = diffLow <= 0.15;
+      const isOpenHigh = diffHigh <= 0.15;
+      
+      if (!isOpenLow && !isOpenHigh) return null;
       
       const strategyType = isOpenLow && isOpenHigh 
         ? 'NEUTRAL' // very rare
@@ -52,19 +47,19 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
           ? 'OPEN_LOW' 
           : 'OPEN_HIGH';
           
+      if (strategyType === 'NEUTRAL') return null;
+      
+      const difference = strategyType === 'OPEN_LOW' ? diffLow : diffHigh;
+          
       return {
         ...s,
-        strategyType
+        strategyType,
+        difference
       };
-    }).filter(s => s.strategyType !== 'NEUTRAL');
+    }).filter(Boolean) as (StockCalculated & { strategyType: 'OPEN_LOW' | 'OPEN_HIGH', difference: number })[];
     
-    // Sort by volume ratio if available, otherwise by name
-    return list.sort((a, b) => {
-      const aVol = a.volumeRatio || 0;
-      const bVol = b.volumeRatio || 0;
-      if (bVol !== aVol) return bVol - aVol;
-      return a.symbol.localeCompare(b.symbol);
-    });
+    // Sort by difference ascending (least difference on top)
+    return list.sort((a, b) => a.difference - b.difference);
   }, [stocks]);
 
   const filteredStocks = useMemo(() => {
@@ -95,8 +90,10 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Open = High / Low Scanner</h1>
           </div>
           <p className="text-sm text-slate-400 max-w-xl leading-relaxed">
-            Identifies stocks where the 9:15 AM Open price exactly matches the High or Low. 
-            <strong className="text-emerald-400 mx-1">Open = Low</strong> indicates strong bullish momentum. 
+            Identifies stocks where the 9:15 AM - 9:16 AM (1-minute) Open price matches the High or Low. 
+            Sorted by the <strong className="text-white">least difference</strong> between Open and High/Low.
+            <br />
+            <strong className="text-emerald-400 mr-1">Open = Low</strong> indicates strong bullish momentum. 
             <strong className="text-rose-400 mx-1">Open = High</strong> indicates strong bearish pressure.
           </p>
         </div>
@@ -204,9 +201,12 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                       {isBull ? 'OPEN = LOW' : 'OPEN = HIGH'}
                     </h4>
                     <p className="text-xs font-mono mt-0.5 text-slate-300">
-                      Open: ₹{stock.openPrice?.toFixed(2)}
+                      Open: ₹{stock.first1mOpen?.toFixed(2)}
                       <span className="mx-1 text-slate-500">|</span>
-                      {isBull ? 'Low' : 'High'}: ₹{isBull ? stock.lowPrice?.toFixed(2) : stock.highPrice?.toFixed(2)}
+                      {isBull ? 'Low' : 'High'}: ₹{isBull ? stock.first1mLow?.toFixed(2) : stock.first1mHigh?.toFixed(2)}
+                    </p>
+                    <p className={`text-[11px] font-mono mt-0.5 ${isBull ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      Difference: ₹{(stock as any).difference.toFixed(2)}
                     </p>
                   </div>
                 </div>
