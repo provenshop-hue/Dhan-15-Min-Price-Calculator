@@ -212,6 +212,15 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
 
               {/* Strategy Badge */}
               <div className="p-4 space-y-4">
+                {(stock as any).difference <= 0.05 && (
+                  <div className="bg-emerald-500/20 border border-emerald-500/50 rounded-xl p-3 text-center mb-3 animate-pulse">
+                    <p className="text-emerald-400 font-black text-lg uppercase tracking-widest flex items-center justify-center gap-2">
+                      <Zap className="w-5 h-5" />
+                      AI Recommends
+                    </p>
+                    <p className="text-emerald-500 text-[10px] font-bold mt-1">Exceptional Match</p>
+                  </div>
+                )}
                 <div className={`p-3 rounded-xl border flex items-center gap-3 ${
                   isBull ? 'bg-emerald-950/30 border-emerald-500/30' : 'bg-rose-950/30 border-rose-500/30'
                 }`}>
