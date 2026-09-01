@@ -21,6 +21,7 @@ interface Props {
 export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPositionSizer }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'OPEN_LOW' | 'OPEN_HIGH'>('ALL');
+  const [priceAbove1000, setPriceAbove1000] = useState(false);
 
   const scannedStocks = useMemo(() => {
     const list = stocks.map(s => {
@@ -66,6 +67,10 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
   const filteredStocks = useMemo(() => {
     return scannedStocks.filter(s => {
       if (filterType !== 'ALL' && s.strategyType !== filterType) return false;
+      if (priceAbove1000) {
+        const currentPrice = s.closePrice || s.openPrice || 0;
+        if (currentPrice <= 1000) return false;
+      }
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         return s.symbol.toLowerCase().includes(search) || 
@@ -73,7 +78,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       }
       return true;
     });
-  }, [scannedStocks, filterType, searchTerm]);
+  }, [scannedStocks, filterType, searchTerm, priceAbove1000]);
 
   const openLowCount = scannedStocks.filter(s => s.strategyType === 'OPEN_LOW').length;
   const openHighCount = scannedStocks.filter(s => s.strategyType === 'OPEN_HIGH').length;
@@ -168,6 +173,16 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
         >
           <TrendingDown className="w-4 h-4" />
           <span>Open = High ({openHighCount})</span>
+        </button>
+        <button
+          onClick={() => setPriceAbove1000(!priceAbove1000)}
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm flex items-center space-x-2 ${
+            priceAbove1000
+              ? 'bg-fuchsia-600 text-white border-fuchsia-400 shadow-md ring-2 ring-fuchsia-500/20' 
+              : 'bg-fuchsia-950/20 text-fuchsia-400/70 border border-fuchsia-900/50 hover:bg-fuchsia-900/40'
+          }`}
+        >
+          <span>💰 Price &gt; 1000</span>
         </button>
       </div>
 
