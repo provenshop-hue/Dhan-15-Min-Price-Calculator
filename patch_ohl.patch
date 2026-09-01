@@ -1,0 +1,31 @@
+--- src/components/OpenHighLowScanner.tsx
++++ src/components/OpenHighLowScanner.tsx
+@@ -28,18 +28,19 @@
+   const scannedStocks = useMemo(() => {
+     const list = stocks.map(s => {
+-      // Must have 1-minute data (9:15 AM - 9:16 AM) to evaluate OHL strategy precisely
+-      if (s.first1mOpen == null || s.first1mHigh == null || s.first1mLow == null) {
++      // Use 1-minute data for precision, fallback to 15m or daily if missing
++      const open = s.first1mOpen ?? s.first15mOpen ?? s.openPrice;
++      const high = s.first1mHigh ?? s.first15mHigh ?? s.highPrice;
++      const low = s.first1mLow ?? s.first15mLow ?? s.lowPrice;
++
++      if (open == null || high == null || low == null) {
+         return null;
+       }
+       
+-      const open = s.first1mOpen;
+-      const high = s.first1mHigh;
+-      const low = s.first1mLow;
+-      
+       const diffLow = Math.abs(open - low);
+       const diffHigh = Math.abs(open - high);
+       
+-      // We check for a small tolerance (e.g., <= 0.15 difference) 
+-      const isOpenLow = diffLow <= 0.15;
+-      const isOpenHigh = diffHigh <= 0.15;
++      // Use a percentage-based tolerance (0.15%) for high-priced stocks, or absolute 0.15 for low-priced stocks
++      const isOpenLow = (diffLow / open) * 100 <= 0.15 || diffLow <= 0.15;
++      const isOpenHigh = (diffHigh / open) * 100 <= 0.15 || diffHigh <= 0.15;
+       
+       if (!isOpenLow && !isOpenHigh) return null;
