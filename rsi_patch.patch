@@ -1,0 +1,72 @@
+--- src/components/RsiPullbackDashboard.tsx
++++ src/components/RsiPullbackDashboard.tsx
+@@ -70,7 +70,8 @@
+   | 'OPEN_LOW'
+   | 'OPEN_HIGH'
+   | 'HIGH_CLOSE'
+-  | 'PULLBACK_15M_BOUNCE';
++  | 'PULLBACK_15M_BOUNCE'
++  | 'PRICE_GT_1500';
+ 
+ type SortOption = 'SCORE_DESC' | 'SUCCESS_RATE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
+ 
+@@ -387,6 +388,7 @@
+     let activeSignalCount = 0;
+     let targetHitCount = 0;
+     let highSuccessCount = 0;
++    let priceGt1500Count = 0;
+ 
+     analyzedStocks.forEach(({ stock, analysis }) => {
+       const hc = evaluateHighConfidenceTrade(stock);
+@@ -406,6 +408,11 @@
+       if (analysis.pullbackScore >= 75) highScore++;
+       if (analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce) pullback15mBounceCount++;
+ 
++      const price = stock.closePrice || stock.openPrice || 0;
++      if (price > 1500 && (analysis.bullishRally.score >= 65 || analysis.bearishRally.score >= 65 || (stock.trend && stock.trend !== 'Neutral'))) {
++        priceGt1500Count++;
++      }
++
+       if (stock.openPrice !== undefined && stock.openPrice !== null && stock.openPrice > 0) {
+         if (isOpenLowPattern(stock.openPrice, stock.lowPrice, stock.first15mLow)) openLowCount++;
+         if (isOpenHighPattern(stock.openPrice, stock.highPrice, stock.first15mHigh)) openHighCount++;
+@@ -457,7 +464,8 @@
+       targetHitCount,
+       openLowCount,
+       openHighCount,
+-      highCloseCount
++      highCloseCount,
++      priceGt1500Count
+     };
+   }, [analyzedStocks]);
+ 
+@@ -539,6 +547,12 @@
+           : false;
+       }
+       if (activeFilter === 'PULLBACK_15M_BOUNCE') {
+         if (!(analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce)) return false;
+       }
++      if (activeFilter === 'PRICE_GT_1500') {
++        const price = stock.closePrice || stock.openPrice || 0;
++        const isTrending = analysis.bullishRally.score >= 65 || analysis.bearishRally.score >= 65 || (stock.trend && stock.trend !== 'Neutral');
++        if (!(price > 1500 && isTrending)) return false;
++      }
+ 
+       // 🧪 Filter Recipe multi-checkbox filtering
+@@ -2131,6 +2145,15 @@
+           >
+             <span>⚠️ Faded 100% Moves ({faded100Log?.length || 0})</span>
+           </button>
++          <button
++            onClick={() => setActiveFilter('PRICE_GT_1500')}
++            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1 ${
++              activeFilter === 'PRICE_GT_1500'
++                ? 'bg-fuchsia-700 text-white border-fuchsia-800 shadow-2xs ring-2 ring-fuchsia-300'
++                : 'bg-fuchsia-100 text-fuchsia-950 hover:bg-fuchsia-200 border-fuchsia-300'
++            }`}
++          >
++            <span>💰 Price &gt; 1500 & Trending ({stats.priceGt1500Count})</span>
++          </button>
+           <button
+             onClick={() => setActiveFilter('HIGH_CONFLUENCE')}
+             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${

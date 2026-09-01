@@ -74,7 +74,8 @@ type PullbackFilterType =
   | 'OPEN_LOW'
   | 'OPEN_HIGH'
   | 'HIGH_CLOSE'
-  | 'PULLBACK_15M_BOUNCE';
+  | 'PULLBACK_15M_BOUNCE'
+  | 'PRICE_GT_1500';
 
 type SortOption = 'SCORE_DESC' | 'SUCCESS_RATE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
 
@@ -129,6 +130,7 @@ export const RECIPE_OPTIONS: RecipeOption[] = [
   { id: 'HIGH_CLOSE', label: '🏆 High Close Pattern', category: 'Price Action & Candlesticks', description: 'Closing/CMP near high of 15m candle' },
   { id: 'VOL_INCREASING', label: '🔊 Volume Increasing / Surge', category: 'Price Action & Candlesticks', description: 'Volume exceeds 20-period average' },
   { id: 'POSITIVE_DAY_CHANGE', label: '💚 Positive Day Change (>0%)', category: 'Price Action & Candlesticks', description: 'Stock is green for the day' },
+  { id: 'PRICE_GT_1500_TRENDING', label: '💰 Price > 1500 (Bull/Bear)', category: 'Price Action & Candlesticks', description: 'Price > 1500 and bullish or bearish trend' },
 ];
 
 export const PRESET_RECIPES: PresetRecipe[] = [
@@ -274,6 +276,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
         return analysis.volumeDirection === 'INCREASING';
       case 'POSITIVE_DAY_CHANGE':
         return (stock.pctChange || 0) > 0;
+      case 'PRICE_GT_1500_TRENDING':
+        return ltp > 1500 && (analysis.bullishRally.score >= 50 || analysis.bearishRally.score >= 50 || (stock.trend && stock.trend !== 'Neutral'));
       default:
         return true;
     }
@@ -393,6 +397,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
     let activeSignalCount = 0;
     let targetHitCount = 0;
     let highSuccessCount = 0;
+    let priceGt1500Count = 0;
 
     analyzedStocks.forEach(({ stock, analysis }) => {
       const hc = evaluateHighConfidenceTrade(stock);
@@ -412,6 +417,11 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (analysis.pullbackCategory === 'OVERSOLD_BOUNCE') oversold++;
       if (analysis.pullbackScore >= 75) highScore++;
       if (analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce) pullback15mBounceCount++;
+
+      const price = stock.closePrice || stock.openPrice || 0;
+      if (price > 1500 && (analysis.bullishRally.score >= 50 || analysis.bearishRally.score >= 50 || (stock.trend && stock.trend !== 'Neutral'))) {
+        priceGt1500Count++;
+      }
 
       if (analysis.signalSuccessMetrics && analysis.signalSuccessMetrics.hasSignal) {
         activeSignalCount++;
@@ -461,7 +471,8 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       avgSuccessRate,
       activeSignalCount,
       targetHitCount,
-      highSuccessCount
+      highSuccessCount,
+      priceGt1500Count
     };
   }, [analyzedStocks, stocks.length]);
 
@@ -546,6 +557,11 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       }
       if (activeFilter === 'PULLBACK_15M_BOUNCE') {
         if (!(analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce)) return false;
+      }
+      if (activeFilter === 'PRICE_GT_1500') {
+        const price = stock.closePrice || stock.openPrice || 0;
+        const isTrending = analysis.bullishRally.score >= 50 || analysis.bearishRally.score >= 50 || (stock.trend && stock.trend !== 'Neutral');
+        if (!(price > 1500 && isTrending)) return false;
       }
 
       // 🧪 Filter Recipe multi-checkbox filtering
@@ -2134,6 +2150,16 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
             <span>⚠️ Faded 100% Moves ({faded100Log?.length || 0})</span>
           </button>
 
+          <button
+            onClick={() => setActiveFilter('PRICE_GT_1500')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1 ${
+              activeFilter === 'PRICE_GT_1500'
+                ? 'bg-fuchsia-700 text-white border-fuchsia-800 shadow-2xs ring-2 ring-fuchsia-300'
+                : 'bg-fuchsia-100 text-fuchsia-950 hover:bg-fuchsia-200 border-fuchsia-300'
+            }`}
+          >
+            <span>💰 Price &gt; 1500 & Trending ({stats.priceGt1500Count})</span>
+          </button>
 
           <button
             onClick={() => setActiveFilter('HIGH_CONFLUENCE')}
