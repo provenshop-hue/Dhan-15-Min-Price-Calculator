@@ -24,6 +24,7 @@ interface AnalyzedStock extends StockCalculated {
 
 export function HundredPercentBullishScanner({ stocks, niftyStock, onSelectStockDetail }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [priceFilter, setPriceFilter] = useState<'ALL' | '1000_TO_2500' | 'ABOVE_2500'>('ALL');
 
   const analyzedStocks = useMemo(() => {
     return stocks.map(stock => {
@@ -195,6 +196,15 @@ export function HundredPercentBullishScanner({ stocks, niftyStock, onSelectStock
 
   const filteredStocks = analyzedStocks
     .filter(s => searchTerm === '' || s.symbol.toLowerCase().includes(searchTerm.toLowerCase()) || s.companyName.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(s => {
+      const price = s.closePrice || s.openPrice || 0;
+      if (priceFilter === '1000_TO_2500') {
+        return price > 1000 && price <= 2500;
+      } else if (priceFilter === 'ABOVE_2500') {
+        return price > 2500;
+      }
+      return true;
+    })
     .sort((a, b) => b.score - a.score || b.variance - a.variance); // Sort by score desc, then variance asc
 
   return (
@@ -212,7 +222,6 @@ export function HundredPercentBullishScanner({ stocks, niftyStock, onSelectStock
             <p className="text-sm text-slate-400">Open = Low (≤0.20% Var) + 12 Confluences</p>
           </div>
         </div>
-
         <div className="flex items-center space-x-3 w-full md:w-auto">
           <div className="relative w-full md:w-64">
             <input
@@ -224,6 +233,40 @@ export function HundredPercentBullishScanner({ stocks, niftyStock, onSelectStock
             />
           </div>
         </div>
+      </div>
+
+      {/* Price Filters */}
+      <div className="flex space-x-2 overflow-x-auto no-scrollbar pb-2">
+        <button
+          onClick={() => setPriceFilter('ALL')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm flex items-center space-x-2 ${
+            priceFilter === 'ALL'
+              ? 'bg-slate-700 text-white shadow-md' 
+              : 'bg-slate-900/50 text-slate-400 hover:bg-slate-800 border border-slate-800/50'
+          }`}
+        >
+          <span>All Prices</span>
+        </button>
+        <button
+          onClick={() => setPriceFilter('1000_TO_2500')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm flex items-center space-x-2 ${
+            priceFilter === '1000_TO_2500'
+              ? 'bg-emerald-600 text-white border-emerald-400 shadow-md ring-2 ring-emerald-500/20' 
+              : 'bg-emerald-950/20 text-emerald-400/70 border border-emerald-900/50 hover:bg-emerald-900/40'
+          }`}
+        >
+          <span>₹1000 - ₹2500</span>
+        </button>
+        <button
+          onClick={() => setPriceFilter('ABOVE_2500')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm flex items-center space-x-2 ${
+            priceFilter === 'ABOVE_2500'
+              ? 'bg-emerald-600 text-white border-emerald-400 shadow-md ring-2 ring-emerald-500/20' 
+              : 'bg-emerald-950/20 text-emerald-400/70 border border-emerald-900/50 hover:bg-emerald-900/40'
+          }`}
+        >
+          <span>&gt; ₹2500</span>
+        </button>
       </div>
 
       {/* Results Grid */}
