@@ -74,8 +74,7 @@ type PullbackFilterType =
   | 'OPEN_LOW'
   | 'OPEN_HIGH'
   | 'HIGH_CLOSE'
-  | 'PULLBACK_15M_BOUNCE'
-  | 'PRICE_GT_1500';
+  | 'PULLBACK_15M_BOUNCE';
 
 type SortOption = 'SCORE_DESC' | 'SUCCESS_RATE_DESC' | 'RSI_ASC' | 'RSI_DESC' | 'PCT_CHANGE_DESC' | 'VOLUME_DESC';
 
@@ -192,6 +191,7 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   isBulkLoading = false
 }) => {
   const [activeFilter, setActiveFilter] = useState<PullbackFilterType>('ALL');
+  const [globalPriceFilter, setGlobalPriceFilter] = useState<'ALL' | '1000_TO_2500' | 'ABOVE_2500'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -558,11 +558,6 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
       if (activeFilter === 'PULLBACK_15M_BOUNCE') {
         if (!(analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce)) return false;
       }
-      if (activeFilter === 'PRICE_GT_1500') {
-        const price = stock.closePrice || stock.openPrice || 0;
-        const isTrending = analysis.bullishRally.score >= 50 || analysis.bearishRally.score >= 50 || (stock.trend && stock.trend !== 'Neutral');
-        if (!(price > 1500 && isTrending)) return false;
-      }
 
       // 🧪 Filter Recipe multi-checkbox filtering
       if (selectedRecipeOptions.length > 0) {
@@ -573,6 +568,13 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           const matchesAny = selectedRecipeOptions.some((key) => checkRecipeCondition(stock, analysis, key));
           if (!matchesAny) return false;
         }
+      }
+
+      const p = stock.closePrice || stock.openPrice || 0;
+      if (globalPriceFilter === '1000_TO_2500') {
+        if (p <= 1000 || p > 2500) return false;
+      } else if (globalPriceFilter === 'ABOVE_2500') {
+        if (p <= 2500) return false;
       }
 
       return true;
@@ -2151,17 +2153,6 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveFilter('PRICE_GT_1500')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border flex items-center gap-1 ${
-              activeFilter === 'PRICE_GT_1500'
-                ? 'bg-fuchsia-700 text-white border-fuchsia-800 shadow-2xs ring-2 ring-fuchsia-300'
-                : 'bg-fuchsia-100 text-fuchsia-950 hover:bg-fuchsia-200 border-fuchsia-300'
-            }`}
-          >
-            <span>💰 Price &gt; 1500 & Trending ({stats.priceGt1500Count})</span>
-          </button>
-
-          <button
             onClick={() => setActiveFilter('HIGH_CONFLUENCE')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
               activeFilter === 'HIGH_CONFLUENCE'
@@ -2295,6 +2286,40 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
           >
             <Target className="w-3.5 h-3.5 text-purple-600 shrink-0" />
             <span>🎯 15m High Retest &amp; Bounce ({stats.pullback15mBounceCount})</span>
+          </button>
+        </div>
+
+        {/* Global Price Filters */}
+        <div className="flex items-center space-x-2 w-full md:w-auto border-l md:border-l-0 md:border-r border-slate-200 pl-2 pr-2">
+           <button
+            onClick={() => setGlobalPriceFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
+              globalPriceFilter === 'ALL'
+                ? 'bg-slate-700 text-white shadow-md border-slate-800'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-300'
+            }`}
+          >
+            All Prices
+          </button>
+           <button
+            onClick={() => setGlobalPriceFilter('1000_TO_2500')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
+              globalPriceFilter === '1000_TO_2500'
+                ? 'bg-fuchsia-600 text-white border-fuchsia-700 shadow-md ring-2 ring-fuchsia-300'
+                : 'bg-fuchsia-50 text-fuchsia-900 hover:bg-fuchsia-100 border-fuchsia-200'
+            }`}
+          >
+            ₹1000 - ₹2500
+          </button>
+           <button
+            onClick={() => setGlobalPriceFilter('ABOVE_2500')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1 ${
+              globalPriceFilter === 'ABOVE_2500'
+                ? 'bg-fuchsia-600 text-white border-fuchsia-700 shadow-md ring-2 ring-fuchsia-300'
+                : 'bg-fuchsia-50 text-fuchsia-900 hover:bg-fuchsia-100 border-fuchsia-200'
+            }`}
+          >
+            &gt; ₹2500
           </button>
         </div>
 
