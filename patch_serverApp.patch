@@ -1,0 +1,12 @@
+--- src/serverApp.ts
++++ src/serverApp.ts
+@@ -710,6 +710,9 @@
+ 
+           return {
+             timeStr: c.timeStr,
++            open: c.open,
++            high: c.high,
++            low: c.low,
+             close: c.close,
+             volume: vol,
+             rsi: candleRsi,

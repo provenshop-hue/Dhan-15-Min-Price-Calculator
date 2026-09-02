@@ -73,6 +73,7 @@ export type TrendFilterType =
   | 'VERY_BULLISH'
   | 'BULLISH'
   | 'BOUNCE_930_BULLISH'
+  | 'THIRD_CANDLE_BULLISH'
   | 'VERY_BEARISH'
   | 'BEARISH'
   | 'BOUNCE_930_BEARISH'
@@ -135,6 +136,9 @@ export interface GannCalcResult {
 
 export interface RsiIntradayPoint {
   timeStr: string; // e.g. "09:15 AM", "09:30 AM", "09:45 AM", etc.
+  open?: number;
+  high?: number;
+  low?: number;
   close: number;
   volume?: number;
   rsi: number;

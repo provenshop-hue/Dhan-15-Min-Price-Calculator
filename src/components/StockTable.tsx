@@ -24,6 +24,7 @@ export interface PresetRecipe15m {
 
 export const RECIPE_OPTIONS_15M: RecipeOption15m[] = [
   // 15m Candlestick & Price Patterns
+  { id: 'THIRD_CANDLE_BULLISH', label: '📈 9:45 AM Candle (3rd 15m) Bullish', category: '15m Candlestick & Price Patterns', description: 'The 3rd 15-min candle (9:45 AM - 10:00 AM) closed bullishly (Close > Open)' },
   { id: 'BOUNCE_930_BULLISH', label: '🟢 15m Bounce @ 9:30 AM (Bullish)', category: '15m Candlestick & Price Patterns', description: 'Price hits higher and closes higher than the first 15-minute candle with bullish momentum' },
   { id: 'BOUNCE_930_BEARISH', label: '🔴 15m Bounce/Rejection @ 9:30 AM (Bearish)', category: '15m Candlestick & Price Patterns', description: 'Price hits lower and closes lower than the first 15-minute candle with selling pressure' },
   { id: 'OPEN_LOW', label: '🟢 Open = Low Pattern', category: '15m Candlestick & Price Patterns', description: 'Price opened at low of first 15m candle' },
@@ -263,10 +264,25 @@ export const StockTable: React.FC<StockTableProps> = ({
     return fibData?.isFib382Retraced ?? false;
   };
 
+  const isThirdCandleBullish = (s: StockCalculated): boolean => {
+    if (!s.rsiTimeline || s.rsiTimeline.length < 3) return false;
+    const candle945 = s.rsiTimeline.find(c => c.timeStr === '9:45 AM' || c.timeStr === '09:45 AM');
+    if (!candle945) {
+        if (s.rsiTimeline.length >= 3) {
+           const c = s.rsiTimeline[2];
+           return c.close > (c.open ?? 0);
+        }
+        return false;
+    }
+    return candle945.close > (candle945.open ?? 0);
+  };
+
   // 🧪 Check condition for 15m Filter Recipe
   const checkRecipeCondition15m = React.useCallback((s: StockCalculated, key: string): boolean => {
     const cmp = s.closePrice || s.openPrice || 0;
     switch (key) {
+      case 'THIRD_CANDLE_BULLISH':
+        return isThirdCandleBullish(s);
       case 'OPEN_LOW':
         return isStockOpenEqualLow(s);
       case 'OPEN_HIGH':
@@ -386,6 +402,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   const veryBullishCount = stocks.filter((s) => s.trend === 'Very Bullish').length;
   const bullishCount = stocks.filter((s) => s.trend === 'Bullish' || s.trend === 'Very Bullish').length;
   const bounce930BullCount = stocks.filter(is15mBounce930Bullish).length;
+  const thirdCandleBullCount = stocks.filter(isThirdCandleBullish).length;
   const veryBearishCount = stocks.filter((s) => s.trend === 'Very Bearish').length;
   const bearishCount = stocks.filter((s) => s.trend === 'Bearish' || s.trend === 'Very Bearish').length;
   const bounce930BearCount = stocks.filter(is15mBounce930Bearish).length;
@@ -418,6 +435,7 @@ export const StockTable: React.FC<StockTableProps> = ({
     if (trendFilter === 'VERY_BULLISH' && s.trend !== 'Very Bullish') return false;
     if (trendFilter === 'BULLISH' && s.trend !== 'Bullish' && s.trend !== 'Very Bullish') return false;
     if (trendFilter === 'BOUNCE_930_BULLISH' && !is15mBounce930Bullish(s)) return false;
+    if (trendFilter === 'THIRD_CANDLE_BULLISH' && !isThirdCandleBullish(s)) return false;
     if (trendFilter === 'VERY_BEARISH' && s.trend !== 'Very Bearish') return false;
     if (trendFilter === 'BEARISH' && s.trend !== 'Bearish' && s.trend !== 'Very Bearish') return false;
     if (trendFilter === 'BOUNCE_930_BEARISH' && !is15mBounce930Bearish(s)) return false;
@@ -858,6 +876,18 @@ export const StockTable: React.FC<StockTableProps> = ({
             >
               <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300 stroke-[2.5]" />
               9:30 AM Bounce (Bull) ({bounce930BullCount})
+            </button>
+            <button
+              onClick={() => { setTrendFilter('THIRD_CANDLE_BULLISH'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-lg font-extrabold transition-all flex items-center gap-1 ${
+                trendFilter === 'THIRD_CANDLE_BULLISH'
+                  ? 'bg-blue-900 text-blue-200 ring-2 ring-blue-400 shadow-2xs'
+                  : 'text-blue-900 bg-blue-100/90 hover:bg-blue-200 border border-blue-300/80 shadow-2xs'
+              }`}
+              title="3rd 15-min Candle (9:45 AM - 10:00 AM) Closed Bullish"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-300 stroke-[2.5]" />
+              9:45 AM Bull ({thirdCandleBullCount})
             </button>
             <button
               onClick={() => { setTrendFilter('VERY_BEARISH'); setCurrentPage(1); }}
