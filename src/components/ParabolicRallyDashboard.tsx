@@ -184,7 +184,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
           return a.stock.symbol.localeCompare(b.stock.symbol);
         }
         // Default: SCORE_DESC
-        return (b.score - a.score) || ((b.stock.pctChange || 0) - (a.stock.pctChange || 0));
+        return (b.score - a.score) || (b.timing.rulePassedMinutes - a.timing.rulePassedMinutes) || ((b.stock.pctChange || 0) - (a.stock.pctChange || 0));
       });
   }, [analyses, searchQuery, selectedSector, minScoreFilter, timeWindowFilter, activeFilter, sortBy]);
 
@@ -501,7 +501,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               onChange={(e) => setSortBy(e.target.value as SortOption)}
               className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
             >
-              <option value="SCORE_DESC">Highest Score</option>
+              <option value="SCORE_DESC">⭐ Top Match & Recent Time</option>
               <option value="TIME_NEWEST">🕒 Newest Signal Time</option>
               <option value="GAIN_DESC">Highest % Change</option>
               <option value="SYMBOL_ASC">Alphabetical (A-Z)</option>
