@@ -1,0 +1,16 @@
+--- src/components/ParabolicRallyDashboard.tsx
++++ src/components/ParabolicRallyDashboard.tsx
+@@ -1,4 +1,4 @@
+-import React, { useState, useMemo } from 'react';
++import React, { useState, useMemo, useEffect } from 'react';
+ import {
+   Flame,
+   TrendingUp,
+@@ -37,6 +37,7 @@
+   ParabolicStage
+ } from '../utils/parabolicRallyEngine';
+ import { FifteenMinCandleChartSnapshot } from './FifteenMinCandleChartSnapshot';
++import { saveDailyHits, getHistoricalHits } from '../utils/historyDb';
+ 
+ interface ParabolicRallyDashboardProps {
+   stocks: StockCalculated[];
