@@ -84,6 +84,14 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   const [viewMode, setViewMode] = useState<'LIVE' | 'HISTORY'>('LIVE');
   const [historyRecords, setHistoryRecords] = useState<any[]>([]);
 
+
+
+
+  // Compute all parabolic analyses
+  const analyses = useMemo(() => {
+    return computeAllParabolicRallies(stocks);
+  }, [stocks]);
+
   // Automatically save high-scoring hits for today
   useEffect(() => {
     if (credentials?.date && analyses.length > 0) {
@@ -97,12 +105,6 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
       getHistoricalHits().then(setHistoryRecords);
     }
   }, [viewMode]);
-
-
-  // Compute all parabolic analyses
-  const analyses = useMemo(() => {
-    return computeAllParabolicRallies(stocks);
-  }, [stocks]);
 
   // Unique sectors
   const sectorOptions = useMemo(() => {
