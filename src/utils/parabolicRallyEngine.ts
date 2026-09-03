@@ -818,6 +818,81 @@ export function analyzeParabolicRally(
 /**
  * Evaluates the entire universe of stocks for Parabolic Rally & Breakdown
  */
+
+/**
+ * Simulates the historical 15m timeline to find the peak Parabolic Rally score during the day
+ * and returns the analysis for that peak moment (preserving the earliest trigger time for the peak score).
+ */
+export function analyzeHistoricalPeakParabolicRally(
+  stock: StockCalculated,
+  sectorBreadthOverride?: { breadthPct: number; avgPct: number }
+): ParabolicRallyAnalysis {
+  if (!stock.rsiTimeline || stock.rsiTimeline.length === 0) {
+    return analyzeParabolicRally(stock, sectorBreadthOverride);
+  }
+
+  let peakScore = -1;
+  let peakAnalysis: ParabolicRallyAnalysis | null = null;
+  
+  let accumulatedVol = 0;
+  let accumulatedTpvVol = 0;
+  let dayHigh = -Infinity;
+  let dayLow = Infinity;
+
+  for (let i = 0; i < stock.rsiTimeline.length; i++) {
+    const pt = stock.rsiTimeline[i];
+    const cOpen = pt.open ?? pt.close;
+    const cHigh = pt.high ?? pt.close;
+    const cLow = pt.low ?? pt.close;
+    const cClose = pt.close;
+    const cVol = pt.volume ?? 0;
+    
+    if (cHigh > dayHigh) dayHigh = cHigh;
+    if (cLow < dayLow) dayLow = cLow;
+    
+    accumulatedVol += cVol;
+    const typPrice = (cHigh + cLow + cClose) / 3;
+    accumulatedTpvVol += typPrice * cVol;
+    
+    const simVwap = accumulatedVol > 0 ? accumulatedTpvVol / accumulatedVol : cClose;
+    
+    // Create simulated stock at this point in time
+    const simStock: StockCalculated = {
+      ...stock,
+      openPrice: stock.openPrice ?? cOpen,
+      highPrice: dayHigh,
+      lowPrice: dayLow,
+      closePrice: cClose,
+      volume: accumulatedVol,
+      vwap: simVwap,
+      rsi: pt.rsi,
+      // Truncate timeline so timing engine locks onto this specific candle
+      rsiTimeline: stock.rsiTimeline.slice(0, i + 1),
+    };
+    
+    const analysis = analyzeParabolicRally(simStock, sectorBreadthOverride);
+    
+    if (analysis.score > peakScore) {
+      peakScore = analysis.score;
+      peakAnalysis = analysis;
+    } else if (analysis.score === peakScore && peakScore < 12) {
+      // If weak score, prefer latest. If strong (>=12), prefer the earliest time it hit it!
+      peakAnalysis = analysis;
+    }
+  }
+  
+  // If we found a peak analysis, we override its 'stock' property to be the current real stock 
+  // so the UI shows the current live price and pctChange, but keeps the timing/score of the peak!
+  if (peakAnalysis) {
+    return {
+      ...peakAnalysis,
+      stock: stock
+    };
+  }
+  
+  return analyzeParabolicRally(stock, sectorBreadthOverride);
+}
+
 export function computeAllParabolicRallies(stocks: StockCalculated[]): ParabolicRallyAnalysis[] {
   const sectorMetricsMap = computeAllSectorStrengths(stocks);
 
@@ -829,6 +904,6 @@ export function computeAllParabolicRallies(stocks: StockCalculated[]): Parabolic
       avgPct: secMetric.avgPctChange
     } : undefined;
 
-    return analyzeParabolicRally(stock, breadthOverride);
+    return analyzeHistoricalPeakParabolicRally(stock, breadthOverride);
   });
 }

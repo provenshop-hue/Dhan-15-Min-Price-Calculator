@@ -126,6 +126,11 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   const filteredAnalyses = useMemo(() => {
     return analyses
       .filter((a) => {
+        // Filter out stocks from previous days
+        if (credentials?.date && a.stock.fetchedDate && a.stock.fetchedDate !== credentials.date) {
+          return false;
+        }
+
         // Search
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
