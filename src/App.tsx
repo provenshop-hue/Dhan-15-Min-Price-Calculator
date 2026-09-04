@@ -738,6 +738,35 @@ export default function App() {
       prev.map((s) => ({ ...s, error: null }))
     );
 
+    let bulkMarketFeed: Record<string, any> = {};
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const isToday = !credentials.date || credentials.date === todayStr;
+      
+      if (isToday && stocks.length > 0) {
+        const secIds = stocks.map(s => s.securityId || getDhanSecurityId(s.symbol)).filter(Boolean);
+        if (secIds.length > 0) {
+          const res = await fetch('/api/dhan/bulk-marketfeed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              clientId: credentials.clientId, 
+              accessToken: credentials.accessToken, 
+              securityIds: secIds,
+              exchangeSegment: credentials.segment || 'NSE_EQ'
+            })
+          });
+          const data = await res.json();
+          const seg = credentials.segment || 'NSE_EQ';
+          if (data?.status === 'success' && data?.data?.[seg]) {
+            bulkMarketFeed = data.data[seg];
+          }
+        }
+      }
+    } catch(err) {
+      console.error("Failed to fetch bulk marketfeed", err);
+    }
+
     const CONCURRENCY = 8;
     let completed = 0;
     let authErrorOccurred = false;
@@ -756,12 +785,25 @@ export default function App() {
 
           if (result.success && result.data) {
             const data = result.data;
-            const openPrice = data.open;
-            const closePrice = data.close;
+            const secId = String(result.secId);
+            
+            let openPrice = data.open;
+            let closePrice = data.close;
+            let highPrice = data.high;
+            let lowPrice = data.low;
+            
+            if (bulkMarketFeed[secId]) {
+               const feed = bulkMarketFeed[secId];
+               if (feed.ohlc?.open > 0) openPrice = feed.ohlc.open;
+               if (feed.ohlc?.high > 0) highPrice = Math.max(highPrice, feed.ohlc.high);
+               if (feed.ohlc?.low > 0) lowPrice = Math.min(lowPrice, feed.ohlc.low);
+               if (feed.last_price > 0) closePrice = feed.last_price;
+            }
+
             const rsi = data.rsi;
             const adx = data.adx;
-            const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow, stock.symbol, data.candleTimestamp);
+            const vwap = data.vwap !== undefined ? data.vwap : (highPrice && lowPrice ? Math.round(((highPrice + lowPrice + closePrice) / 3) * 100) / 100 : null);
+            const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, highPrice, lowPrice, 0.001, adx, data.first15mHigh, data.first15mLow, stock.symbol, data.candleTimestamp);
 
             setStocks((prev) =>
               prev.map((s) =>

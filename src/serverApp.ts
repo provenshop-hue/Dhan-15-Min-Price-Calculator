@@ -217,7 +217,35 @@ export function createExpressApp() {
   });
 
   // API Route: Fetch Intraday 15-min Candle Data from Dhan API
-  apiRouter.post('/dhan/intraday-15m', async (req, res) => {
+    apiRouter.post('/dhan/bulk-marketfeed', async (req, res) => {
+    try {
+      const { clientId, accessToken, securityIds, exchangeSegment = 'NSE_EQ' } = req.body;
+      if (!clientId || !accessToken) return res.status(401).json({ error: 'Missing auth' });
+      
+      const payload = {
+        [exchangeSegment]: securityIds.map(Number)
+      };
+      
+      const feedRes = await fetch('https://api.dhan.co/v2/marketfeed/ohlc', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'client-id': clientId,
+          'access-token': accessToken,
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(5000)
+      });
+      
+      const data = await feedRes.json();
+      return res.json(data);
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+apiRouter.post('/dhan/intraday-15m', async (req, res) => {
     try {
       let { clientId, accessToken, securityId, symbol, date } = req.body;
 
@@ -620,7 +648,16 @@ export function createExpressApp() {
 
         // Calculate Previous Day Close from candle stream prior to foundDate
         const prevSessionCandles = candlesList.filter((c) => c.dateStr && c.dateStr < foundDate);
-        const previousDayClose = prevSessionCandles.length > 0 ? prevSessionCandles[prevSessionCandles.length - 1].close : null;
+        let previousDayClose = prevSessionCandles.length > 0 ? prevSessionCandles[prevSessionCandles.length - 1].close : null;
+
+        let accurateOpen = first15MinOpen;
+        let accurateClose = effectiveClose;
+        let accurateHigh = sessionHigh;
+        let accurateLow = sessionLow;
+        let accurateVolume = sessionTotalVol;
+        let accuratePreviousClose = previousDayClose;
+
+
 
         // Calculate 14-period RSI timeline for every candle from 09:15 AM to current time
         const calcRsiForCloses = (closes: number[]): number => {
