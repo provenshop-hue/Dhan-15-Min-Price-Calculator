@@ -68,11 +68,11 @@ export function LowCloseScanner({
     const list: LowCloseAnalyzedStock[] = [];
 
     stocks.forEach((s) => {
-      // Must have price data
-      const open = s.first1mOpen ?? s.first15mOpen ?? s.openPrice;
-      const high = s.first1mHigh ?? s.first15mHigh ?? s.highPrice;
-      const low = s.first1mLow ?? s.first15mLow ?? s.lowPrice;
-      const close = s.first1mClose ?? s.first15mClose ?? s.closePrice;
+      // Use official NSE Day Session data from Dhan API as primary
+      const open = s.openPrice ?? s.first15mOpen ?? s.first1mOpen;
+      const high = s.highPrice ?? s.first15mHigh ?? s.first1mHigh;
+      const low = s.lowPrice ?? s.first15mLow ?? s.first1mLow;
+      const close = s.closePrice ?? s.first15mClose ?? s.first1mClose;
 
       if (open == null || high == null || low == null || close == null) {
         return;

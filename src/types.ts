@@ -51,6 +51,13 @@ export interface StockCalculated {
   isOpenEqualLow?: boolean;
   isOpenEqualHigh?: boolean;
   isHighEqualClose?: boolean;
+  isExactOpenLow?: boolean;
+  isExactOpenHigh?: boolean;
+  isExactLowClose?: boolean;
+  isExactHighClose?: boolean;
+  openLowDiff?: number | null;
+  openHighDiff?: number | null;
+  lowCloseDiff?: number | null;
   openLowDiffPct?: number | null;
   openHighDiffPct?: number | null;
 
@@ -126,6 +133,13 @@ export interface GannCalcResult {
   isOpenEqualLow?: boolean;
   isOpenEqualHigh?: boolean;
   isHighEqualClose?: boolean;
+  isExactOpenLow?: boolean;
+  isExactOpenHigh?: boolean;
+  isExactLowClose?: boolean;
+  isExactHighClose?: boolean;
+  openLowDiff?: number | null;
+  openHighDiff?: number | null;
+  lowCloseDiff?: number | null;
   openLowDiffPct?: number | null;
   openHighDiffPct?: number | null;
   fib382Bull?: number | null;

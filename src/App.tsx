@@ -560,6 +560,13 @@ export default function App() {
         gannScore: calc.gannScore,
         isOpenEqualLow: calc.isOpenEqualLow,
         isOpenEqualHigh: calc.isOpenEqualHigh,
+        isExactOpenLow: calc.isExactOpenLow,
+        isExactOpenHigh: calc.isExactOpenHigh,
+        isExactLowClose: calc.isExactLowClose,
+        isExactHighClose: calc.isExactHighClose,
+        openLowDiff: calc.openLowDiff,
+        openHighDiff: calc.openHighDiff,
+        lowCloseDiff: calc.lowCloseDiff,
         openLowDiffPct: calc.openLowDiffPct,
         openHighDiffPct: calc.openHighDiffPct,
         fib382Bull: calc.fib382Bull,
@@ -773,6 +780,76 @@ export default function App() {
             for (const segKey of Object.keys(data.data)) {
               Object.assign(bulkMarketFeed, data.data[segKey]);
             }
+            // Immediately apply verified Dhan OHLC directly from NSE marketfeed
+            if (Object.keys(bulkMarketFeed).length > 0) {
+              setStocks((prev) =>
+                prev.map((s) => {
+                  const secId = String(s.securityId || getDhanSecurityId(s.symbol));
+                  const feed = bulkMarketFeed[secId] || bulkMarketFeed[Number(secId)];
+                  if (!feed) return s;
+
+                  const ohlc = feed.ohlc;
+                  const exactOpen = ohlc?.open > 0 ? Math.round(ohlc.open * 100) / 100 : (s.openPrice ?? 0);
+                  const exactHigh = ohlc?.high > 0 ? Math.round(ohlc.high * 100) / 100 : (s.highPrice ?? exactOpen);
+                  const exactLow = ohlc?.low > 0 ? Math.round(ohlc.low * 100) / 100 : (s.lowPrice ?? exactOpen);
+                  const exactClose = feed.last_price > 0 ? Math.round(feed.last_price * 100) / 100 : (s.closePrice ?? exactOpen);
+                  const exactPrevClose = ohlc?.close > 0 ? Math.round(ohlc.close * 100) / 100 : (s.previousClose ?? null);
+
+                  const calc = calculateGann15Min(
+                    exactOpen,
+                    exactClose,
+                    s.rsi,
+                    s.vwap,
+                    exactHigh,
+                    exactLow,
+                    0.001,
+                    s.adx,
+                    s.first15mHigh,
+                    s.first15mLow,
+                    s.symbol,
+                    s.candleTimestamp
+                  );
+
+                  return {
+                    ...s,
+                    openPrice: exactOpen,
+                    highPrice: exactHigh,
+                    lowPrice: exactLow,
+                    closePrice: exactClose,
+                    previousClose: exactPrevClose,
+                    first15mOpen: s.first15mOpen ?? exactOpen,
+                    first15mHigh: s.first15mHigh ?? exactHigh,
+                    first15mLow: s.first15mLow ?? exactLow,
+                    first1mOpen: s.first1mOpen ?? exactOpen,
+                    first1mHigh: s.first1mHigh ?? exactHigh,
+                    first1mLow: s.first1mLow ?? exactLow,
+                    first1mClose: s.first1mClose ?? exactClose,
+                    openCalc: calc.openCalc,
+                    closeCalc: calc.closeCalc,
+                    totalCalc: calc.totalCalc,
+                    buyAbove: calc.buyAbove,
+                    sellBelow: calc.sellBelow,
+                    targetsUp: calc.targetsUp,
+                    targetsDown: calc.targetsDown,
+                    trend: calc.trend,
+                    pctChange: calc.pctChange,
+                    gannScore: calc.gannScore,
+                    isOpenEqualLow: calc.isOpenEqualLow,
+                    isOpenEqualHigh: calc.isOpenEqualHigh,
+                    isExactOpenLow: calc.isExactOpenLow,
+                    isExactOpenHigh: calc.isExactOpenHigh,
+                    isExactLowClose: calc.isExactLowClose,
+                    isExactHighClose: calc.isExactHighClose,
+                    openLowDiff: calc.openLowDiff,
+                    openHighDiff: calc.openHighDiff,
+                    lowCloseDiff: calc.lowCloseDiff,
+                    openLowDiffPct: calc.openLowDiffPct,
+                    openHighDiffPct: calc.openHighDiffPct,
+                    isFetched: true,
+                  };
+                })
+              );
+            }
           }
         }
       }
@@ -807,10 +884,10 @@ export default function App() {
             
             if (bulkMarketFeed[secId]) {
                const feed = bulkMarketFeed[secId];
-               if (feed.ohlc?.open > 0) openPrice = feed.ohlc.open;
-               if (feed.ohlc?.high > 0) highPrice = Math.max(highPrice, feed.ohlc.high);
-               if (feed.ohlc?.low > 0) lowPrice = Math.min(lowPrice, feed.ohlc.low);
-               if (feed.last_price > 0) closePrice = feed.last_price;
+               if (feed.ohlc?.open > 0) openPrice = Math.round(feed.ohlc.open * 100) / 100;
+               if (feed.ohlc?.high > 0) highPrice = Math.round(feed.ohlc.high * 100) / 100;
+               if (feed.ohlc?.low > 0) lowPrice = Math.round(feed.ohlc.low * 100) / 100;
+               if (feed.last_price > 0) closePrice = Math.round(feed.last_price * 100) / 100;
             }
 
             const rsi = data.rsi;
@@ -857,6 +934,13 @@ export default function App() {
                       gannScore: calc.gannScore,
                       isOpenEqualLow: calc.isOpenEqualLow,
                       isOpenEqualHigh: calc.isOpenEqualHigh,
+                      isExactOpenLow: calc.isExactOpenLow,
+                      isExactOpenHigh: calc.isExactOpenHigh,
+                      isExactLowClose: calc.isExactLowClose,
+                      isExactHighClose: calc.isExactHighClose,
+                      openLowDiff: calc.openLowDiff,
+                      openHighDiff: calc.openHighDiff,
+                      lowCloseDiff: calc.lowCloseDiff,
                       openLowDiffPct: calc.openLowDiffPct,
                       openHighDiffPct: calc.openHighDiffPct,
                       fib382Bull: calc.fib382Bull,
@@ -1312,8 +1396,13 @@ export default function App() {
           /* Dedicated Open = High/Low Strategy Hub */
           <OpenHighLowScanner
             stocks={stocks}
+            credentials={credentials}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+            onFetchSingleStock={handleFetchSingleDhan}
+            onFetchAll={handleFetchAllDhan}
+            isBulkLoading={isBulkLoading}
           />
         ) : activeDashboardTab === 'hundred_bullish' ? (
           /* Dedicated 100% Bullish Setup Scanner */

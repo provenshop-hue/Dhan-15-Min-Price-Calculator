@@ -666,7 +666,18 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
         let accuratePreviousClose = previousDayClose;
 
         // Fetch real-time live LTP and true Day High/Low from Dhan Marketfeed API
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = (() => {
+          try {
+            return new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'Asia/Kolkata',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            }).format(new Date());
+          } catch (e) {
+            return new Date().toISOString().split('T')[0];
+          }
+        })();
         const isCurrentSession = !date || date === todayStr || foundDate === todayStr;
 
         if (isCurrentSession && clientId && accessToken) {
@@ -693,19 +704,24 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
 
               if (instrumentFeed) {
                 // If last_price (LTP) is valid, it is the exact real-time live current price
-                if (instrumentFeed.last_price && instrumentFeed.last_price > 0) {
+                if (typeof instrumentFeed.last_price === 'number' && instrumentFeed.last_price > 0) {
                   accurateClose = instrumentFeed.last_price;
                 }
-                // Check if marketfeed has higher high or lower low
-                if (instrumentFeed.ohlc?.high && instrumentFeed.ohlc.high > 0) {
-                  accurateHigh = Math.max(accurateHigh, instrumentFeed.ohlc.high);
-                }
-                if (instrumentFeed.ohlc?.low && instrumentFeed.ohlc.low > 0) {
-                  accurateLow = Math.min(accurateLow, instrumentFeed.ohlc.low);
-                }
-                // Previous day close from Dhan marketfeed
-                if (instrumentFeed.ohlc?.close && instrumentFeed.ohlc.close > 0) {
-                  accuratePreviousClose = instrumentFeed.ohlc.close;
+                // Dhan Official Day OHLC directly from NSE marketfeed
+                if (instrumentFeed.ohlc) {
+                  if (typeof instrumentFeed.ohlc.open === 'number' && instrumentFeed.ohlc.open > 0) {
+                    accurateOpen = instrumentFeed.ohlc.open;
+                  }
+                  if (typeof instrumentFeed.ohlc.high === 'number' && instrumentFeed.ohlc.high > 0) {
+                    accurateHigh = instrumentFeed.ohlc.high;
+                  }
+                  if (typeof instrumentFeed.ohlc.low === 'number' && instrumentFeed.ohlc.low > 0) {
+                    accurateLow = instrumentFeed.ohlc.low;
+                  }
+                  // Previous day close from Dhan marketfeed
+                  if (typeof instrumentFeed.ohlc.close === 'number' && instrumentFeed.ohlc.close > 0) {
+                    accuratePreviousClose = instrumentFeed.ohlc.close;
+                  }
                 }
               }
             }
@@ -877,10 +893,14 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
           securityId: String(secId),
           candleTimestamp,
           fetchedDate: foundDate,
-          open: accurateOpen,
+          open: Math.round(accurateOpen * 100) / 100,
           close: Math.round(accurateClose * 100) / 100,
           high: Math.round(accurateHigh * 100) / 100,
           low: Math.round(accurateLow * 100) / 100,
+          dayOpen: Math.round(accurateOpen * 100) / 100,
+          dayHigh: Math.round(accurateHigh * 100) / 100,
+          dayLow: Math.round(accurateLow * 100) / 100,
+          dayClose: Math.round(accurateClose * 100) / 100,
           previousClose: accuratePreviousClose ? Math.round(accuratePreviousClose * 100) / 100 : null,
           first15mHigh: Math.round(first15MinHigh * 100) / 100,
           first15mLow: Math.round(first15MinLow * 100) / 100,
