@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp, Scale } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'low_close_equal';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'low_close_equal') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -385,6 +385,24 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="flex items-center gap-1.5">
                 <TrendingUp className={`w-3.5 h-3.5 ${activeDashboardTab === 'hundred_bullish' ? 'text-emerald-200' : 'text-emerald-600'}`} />
                 <span>🚀 100% Bullish</span>
+              </span>
+            </button>
+
+            {/* ⚖️ Low = Close (>1000) Tab */}
+            <button
+              onClick={() => onChangeDashboardTab('low_close_equal')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'low_close_equal'
+                  ? 'bg-gradient-to-r from-rose-600 via-amber-600 to-indigo-700 text-white shadow-md shadow-rose-500/30 ring-1 ring-white/30'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-rose-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Scale className={`w-3.5 h-3.5 ${activeDashboardTab === 'low_close_equal' ? 'text-amber-200' : 'text-rose-600'}`} />
+                <span>⚖️ Low = Close</span>
+                <span className="bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  &gt;1000
+                </span>
               </span>
             </button>
           </div>

@@ -259,6 +259,9 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
     }
   };
 
+  const handleRefreshAllTrackerPricesRef = useRef(handleRefreshAllTrackerPrices);
+  handleRefreshAllTrackerPricesRef.current = handleRefreshAllTrackerPrices;
+
   // 5-Minute Auto-Refresh Timer Hook
   useEffect(() => {
     if (!isAutoRefreshActive) return;
@@ -266,8 +269,10 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
     const timer = setInterval(() => {
       setCountdownSeconds((prev) => {
         if (prev <= 1) {
-          // Trigger auto-refresh
-          handleRefreshAllTrackerPrices();
+          // Trigger auto-refresh outside state updater
+          setTimeout(() => {
+            handleRefreshAllTrackerPricesRef.current();
+          }, 0);
           return refreshIntervalMins * 60;
         }
         return prev - 1;
@@ -275,7 +280,7 @@ export const UserTradeTracker: React.FC<UserTradeTrackerProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isAutoRefreshActive, refreshIntervalMins, trades, stockMap]);
+  }, [isAutoRefreshActive, refreshIntervalMins]);
 
   // Format countdown mm:ss
   const formatCountdown = (totalSeconds: number) => {

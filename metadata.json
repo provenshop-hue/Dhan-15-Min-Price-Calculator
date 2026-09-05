@@ -1,6 +1,6 @@
 {
   "name": "StockMarket ATM",
-  "description": "15-minute Parabolic Rally & Breakdown Probability Engine with 12-point confirmation scoring, Live Sector Strength Analyzer & Industry Flow Confluence Hub, User Trade Tracker & Trading Companion with 5-minute live Dhan sync, Total Capital Journey Blueprint roadmap, and 15-minute TradingView candlestick charts.",
+  "description": "15-minute Parabolic Rally & Breakdown Probability Engine with 12-point confirmation scoring, Low = Close (>1000) High-Value Stock Scanner, Live Sector Strength Analyzer & Industry Flow Confluence Hub, User Trade Tracker & Trading Companion with 5-minute live Dhan sync, Total Capital Journey Blueprint roadmap, and 15-minute TradingView candlestick charts.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -36,9 +36,9 @@ export const PositionSizingModal: React.FC<PositionSizingModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       if (selectedStock?.id) {
-        setCurrentStockId(selectedStock.id);
-      } else if (allStocks.length > 0 && !currentStockId) {
-        setCurrentStockId(allStocks[0].id);
+        setCurrentStockId((prev) => (prev !== selectedStock.id ? selectedStock.id : prev));
+      } else if (allStocks.length > 0) {
+        setCurrentStockId((prev) => (!prev ? allStocks[0].id : prev));
       }
     }
   }, [isOpen, selectedStock]);

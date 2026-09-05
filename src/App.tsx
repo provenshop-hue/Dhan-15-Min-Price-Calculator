@@ -23,9 +23,10 @@ import { UserTradeTracker } from './components/UserTradeTracker';
 import { SectorStrengthDashboard } from './components/SectorStrengthDashboard';
 import { OpenHighLowScanner } from './components/OpenHighLowScanner';
 import { HundredPercentBullishScanner } from './components/HundredPercentBullishScanner';
+import { LowCloseScanner } from './components/LowCloseScanner';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
-import { getDhanSecurityId } from './data/dhanSecurityMap';
+import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
 import { calculateGann15Min } from './utils/gann';
 import { is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishFadeReason, get100PercentBearishFadeReason, detectHistorical100Fades } from './utils/rsiPullback';
@@ -214,8 +215,8 @@ export default function App() {
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
 
-  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'parabolic_rally', 'user_tracker', or 'sector_strength')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish'>('gann');
+  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'parabolic_rally', 'user_tracker', 'sector_strength', 'open_high_low', 'hundred_bullish', or 'low_close_equal')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'low_close_equal'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -516,19 +517,23 @@ export default function App() {
       const data = result.data;
       const openPrice = data.open;
       const closePrice = data.close;
+      const highPrice = data.high;
+      const lowPrice = data.low;
       const rsi = data.rsi;
       const adx = data.adx;
-      const vwap = data.vwap !== undefined ? data.vwap : (data.high && data.low ? Math.round(((data.high + data.low + closePrice) / 3) * 100) / 100 : null);
-      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, data.high, data.low, 0.001, adx, data.first15mHigh, data.first15mLow, stock.symbol, data.candleTimestamp);
+      const vwap = data.vwap !== undefined ? data.vwap : (highPrice && lowPrice ? Math.round(((highPrice + lowPrice + closePrice) / 3) * 100) / 100 : null);
+      const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, highPrice, lowPrice, 0.001, adx, data.first15mHigh, data.first15mLow, stock.symbol, data.candleTimestamp);
 
       const updatedObj: StockCalculated = {
         ...stock,
         securityId: data.securityId || result.secId,
         openPrice,
         closePrice,
-        highPrice: data.high,
-        lowPrice: data.low,
+        highPrice,
+        lowPrice,
         previousClose: data.previousClose !== undefined ? data.previousClose : stock.previousClose,
+        first15mOpen: data.first15mOpen ?? stock.first15mOpen,
+        first15mClose: data.first15mClose ?? stock.first15mClose,
         first15mHigh: data.first15mHigh,
         first15mLow: data.first15mLow,
         first1mOpen: data.first1mOpen,
@@ -744,22 +749,30 @@ export default function App() {
       const isToday = !credentials.date || credentials.date === todayStr;
       
       if (isToday && stocks.length > 0) {
-        const secIds = stocks.map(s => s.securityId || getDhanSecurityId(s.symbol)).filter(Boolean);
-        if (secIds.length > 0) {
+        const instruments = stocks.map(s => {
+          const secId = s.securityId || getDhanSecurityId(s.symbol);
+          if (!secId) return null;
+          const isIdx = isIndexSymbol(s.symbol);
+          const seg = isIdx ? 'IDX_I' : (credentials.segment || 'NSE_EQ');
+          return { symbol: s.symbol, securityId: secId, exchangeSegment: seg };
+        }).filter(Boolean);
+
+        if (instruments.length > 0) {
           const res = await fetch('/api/dhan/bulk-marketfeed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
               clientId: credentials.clientId, 
               accessToken: credentials.accessToken, 
-              securityIds: secIds,
+              instruments,
               exchangeSegment: credentials.segment || 'NSE_EQ'
             })
           });
           const data = await res.json();
-          const seg = credentials.segment || 'NSE_EQ';
-          if (data?.status === 'success' && data?.data?.[seg]) {
-            bulkMarketFeed = data.data[seg];
+          if (data?.status === 'success' && data?.data) {
+            for (const segKey of Object.keys(data.data)) {
+              Object.assign(bulkMarketFeed, data.data[segKey]);
+            }
           }
         }
       }
@@ -813,9 +826,11 @@ export default function App() {
                       securityId: data.securityId || result.secId,
                       openPrice,
                       closePrice,
-                      highPrice: data.high,
-                      lowPrice: data.low,
+                      highPrice,
+                      lowPrice,
                       previousClose: data.previousClose !== undefined ? data.previousClose : s.previousClose,
+                      first15mOpen: data.first15mOpen ?? s.first15mOpen,
+                      first15mClose: data.first15mClose ?? s.first15mClose,
                       first15mHigh: data.first15mHigh,
                       first15mLow: data.first15mLow,
                       first1mOpen: data.first1mOpen,
@@ -924,13 +939,15 @@ export default function App() {
     const intervalId = setInterval(() => {
       setNextFetchSeconds((prev) => {
         if (prev <= 1) {
-          if (credentialsRef.current.isConfigured && !isBulkLoadingRef.current) {
-            handleFetchAllRef.current();
-            setNotification({
-              type: 'info',
-              message: `⏱️ Auto-Fetch triggered (${autoFetchIntervalMinutes}m interval)! Updating 15m candles...`
-            });
-          }
+          setTimeout(() => {
+            if (credentialsRef.current.isConfigured && !isBulkLoadingRef.current) {
+              handleFetchAllRef.current();
+              setNotification({
+                type: 'info',
+                message: `⏱️ Auto-Fetch triggered (${autoFetchIntervalMinutes}m interval)! Updating 15m candles...`
+              });
+            }
+          }, 0);
           return autoFetchIntervalMinutes * 60;
         }
         return prev - 1;
@@ -1305,6 +1322,18 @@ export default function App() {
             niftyStock={niftyStock}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
           />
+        ) : activeDashboardTab === 'low_close_equal' ? (
+          /* Dedicated Low = Close Strategy Hub (Price > 1000) */
+          <LowCloseScanner
+            stocks={stocks}
+            credentials={credentials}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
+            onFetchSingleStock={handleFetchSingleDhan}
+            onFetchAll={handleFetchAllDhan}
+            isBulkLoading={isBulkLoading}
+          />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */
           <BtstPredictionHub
@@ -1319,7 +1348,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-200 bg-white py-6 pb-16 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
             StockMarket ATM &bull; Powered by Dhan HQ Data API & Nifty F&O Master List

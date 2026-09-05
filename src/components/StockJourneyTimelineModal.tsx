@@ -91,7 +91,7 @@ export const StockJourneyTimelineModal: React.FC<StockJourneyTimelineModalProps>
       playbackTimerRef.current = setInterval(() => {
         setActiveStepIndex((prev) => {
           if (prev >= journeyData.steps.length - 1) {
-            setIsPlaying(false);
+            setTimeout(() => setIsPlaying(false), 0);
             return prev;
           }
           return prev + 1;

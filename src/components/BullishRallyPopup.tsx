@@ -26,7 +26,9 @@ import {
   Filter,
   Plus,
   RotateCcw,
-  EyeOff
+  EyeOff,
+  PanelBottom,
+  ChevronUp
 } from 'lucide-react';
 import { StockCalculated } from '../types';
 import { 
@@ -65,11 +67,51 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   // Expand / collapse quick filter tray
   const [isFilterBarExpanded, setIsFilterBarExpanded] = useState<boolean>(true);
 
-  const [rallySignals, setRallySignals] = useState<RallySignal[]>([]);
-  const [totalRawCount, setTotalRawCount] = useState<number>(0);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(true);
-  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  
+  // Minimize style: 'FULL_LENGTH_BAR' (docked along full length of screen bottom) or 'FLOATING_PILL'
+  const [minimizeStyle, setMinimizeStyle] = useState<'FULL_LENGTH_BAR' | 'FLOATING_PILL'>(() => {
+    try {
+      const saved = localStorage.getItem('rally_popunder_min_style');
+      if (saved === 'FLOATING_PILL') return 'FLOATING_PILL';
+      return 'FULL_LENGTH_BAR';
+    } catch {
+      return 'FULL_LENGTH_BAR';
+    }
+  });
+
+  const handleSetMinimizeStyle = (style: 'FULL_LENGTH_BAR' | 'FLOATING_PILL') => {
+    setMinimizeStyle(style);
+    try {
+      localStorage.setItem('rally_popunder_min_style', style);
+    } catch {
+      // ignore
+    }
+  };
+
+  const [isMinimized, setIsMinimized] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('rally_popunder_minimized');
+      if (stored !== null) {
+        return stored === 'true';
+      }
+      // Default to minimized (full length bar) so it never obscures or hides the user's screen
+      return true;
+    } catch {
+      return true;
+    }
+  });
+
+  const handleSetMinimized = (minimized: boolean) => {
+    setIsMinimized(minimized);
+    try {
+      localStorage.setItem('rally_popunder_minimized', String(minimized));
+    } catch {
+      // ignore
+    }
+  };
+
   const [isAutoRotating, setIsAutoRotating] = useState<boolean>(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
   const [showAllList, setShowAllList] = useState<boolean>(false);
@@ -156,10 +198,9 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     setSlideProgress(0);
   };
 
-  // Scan stocks whenever stocks or filters change
-  useEffect(() => {
-    // Get all raw detected signals
-    const allDetected = getAllRallySignals(
+  // 1. Memoized raw detected signals
+  const allDetected = useMemo(() => {
+    return getAllRallySignals(
       stocks, 
       'ALL', 
       'RECENCY_FIRST', 
@@ -170,11 +211,13 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
       false,
       false
     );
+  }, [stocks]);
 
-    setTotalRawCount(allDetected.length);
+  const totalRawCount = allDetected.length;
 
-    // Apply active filter selections
-    const filtered = allDetected.filter((signal) => {
+  // 2. Memoized filtered rally signals based on user filter selections
+  const rallySignals = useMemo(() => {
+    return allDetected.filter((signal) => {
       // 1. Exclude dismissed stocks
       if (dismissedSymbols.has(signal.symbol)) {
         return false;
@@ -226,24 +269,37 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
       return true;
     });
+  }, [
+    allDetected,
+    dismissedSymbols,
+    filterDirection,
+    recencyMode,
+    hideYesterday,
+    safeOnly,
+    goodVolumeOnly,
+    volumeIncreasingOnly,
+    rsiIncreasingOnly,
+    selectedTriggers
+  ]);
 
-    setRallySignals(filtered);
-
-    if (filtered.length > 0) {
-      const currentKeys = new Set(filtered.map((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}`));
+  // Audio alert and auto-show when brand new rallies are detected
+  useEffect(() => {
+    if (rallySignals.length > 0) {
+      const currentKeys = new Set(rallySignals.map((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}`));
       let hasNewRally = false;
       let newDirection: RallyDirection = 'BULLISH';
 
       for (const key of currentKeys) {
         if (!previousRallySymbolsRef.current.has(key)) {
           hasNewRally = true;
-          const found = filtered.find((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}` === key);
+          const found = rallySignals.find((d) => `${d.symbol}_${d.direction}_${d.triggerType}_${d.isSustainedHold ? 'sustained' : 'hit'}` === key);
           if (found) newDirection = found.direction;
           break;
         }
       }
 
-      if (hasNewRally) {
+      // Only chime/auto-open if previous symbols were already recorded (prevents nuisance pop on initial load)
+      if (hasNewRally && previousRallySymbolsRef.current.size > 0) {
         setIsOpen(true);
         if (soundEnabled) {
           if (newDirection === 'BULLISH') {
@@ -256,24 +312,7 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
 
       previousRallySymbolsRef.current = currentKeys;
     }
-
-    // Keep currentIndex in bounds
-    if (currentIndex >= filtered.length) {
-      setCurrentIndex(0);
-    }
-  }, [
-    stocks, 
-    filterDirection, 
-    selectedTriggers, 
-    recencyMode, 
-    safeOnly, 
-    hideYesterday, 
-    goodVolumeOnly,
-    volumeIncreasingOnly,
-    rsiIncreasingOnly,
-    dismissedSymbols, 
-    soundEnabled
-  ]);
+  }, [rallySignals, soundEnabled]);
 
   // List of active filter pills for the active filter bar
   const activeFilterList = useMemo(() => {
@@ -403,22 +442,24 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   // Auto-rotation slider timer with progress bar
   useEffect(() => {
     if (!isAutoRotating || isHovered || rallySignals.length <= 1 || !isOpen) {
+      setSlideProgress(0);
       return;
     }
 
-    const progressStep = (PROGRESS_TICK_MS / ROTATE_INTERVAL_MS) * 100;
     const interval = setInterval(() => {
-      setSlideProgress((prev) => {
-        if (prev >= 100) {
-          handleNextSlide();
-          return 0;
-        }
-        return prev + progressStep;
-      });
+      setCurrentIndex((prev) => (prev + 1) % rallySignals.length);
+      setSlideProgress(0);
+    }, ROTATE_INTERVAL_MS);
+
+    const progressInterval = setInterval(() => {
+      setSlideProgress((prev) => Math.min(100, prev + (PROGRESS_TICK_MS / ROTATE_INTERVAL_MS) * 100));
     }, PROGRESS_TICK_MS);
 
-    return () => clearInterval(interval);
-  }, [isAutoRotating, isHovered, rallySignals.length, isOpen, handleNextSlide]);
+    return () => {
+      clearInterval(interval);
+      clearInterval(progressInterval);
+    };
+  }, [isAutoRotating, isHovered, rallySignals.length, isOpen]);
 
   const toggleSound = () => {
     setSoundEnabled((prev) => {
@@ -441,9 +482,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
     return (
       <div className="fixed bottom-4 right-4 z-40">
         <button
+          id="popunder-reopen-btn"
           onClick={() => {
             setIsOpen(true);
-            setIsMinimized(false);
+            handleSetMinimized(false);
           }}
           className="flex items-center space-x-2 px-3 py-2 rounded-2xl shadow-xl bg-slate-900/95 hover:bg-slate-800 text-white border-2 border-emerald-500/70 backdrop-blur-md transition-all cursor-pointer hover:scale-105"
           title="Open Bullish Rally Alert & Confluence Popunder"
@@ -458,16 +500,257 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
   }
 
   const hasSignals = rallySignals.length > 0;
-  const currentRally = hasSignals ? (rallySignals[currentIndex] || rallySignals[0]) : null;
+  const safeCurrentIndex = hasSignals ? (currentIndex % rallySignals.length) : 0;
+  const currentRally = hasSignals ? (rallySignals[safeCurrentIndex] || rallySignals[0]) : null;
   const isBull = currentRally ? currentRally.direction === 'BULLISH' : true;
   const pct = currentRally?.pctChange ?? 0;
   const isGainPositive = pct >= 0;
   const plan = currentRally?.tradePlan;
 
-  // Render Minimized Popunder Pill
+  // Render Minimized Popunder: Full-Length Docked Bottom Bar OR Floating Corner Pill
   if (isMinimized) {
+    if (minimizeStyle === 'FULL_LENGTH_BAR') {
+      return (
+        <div 
+          id="popunder-full-length-dock"
+          className="fixed bottom-0 left-0 right-0 z-40 select-none shadow-[0_-8px_30px_rgba(0,0,0,0.5)] transition-all animate-slide-up"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          {/* Progress bar inside dock bar */}
+          {rallySignals.length > 1 && isAutoRotating && (
+            <div className="h-0.5 w-full bg-black/60 overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-75 ${isBull ? 'bg-emerald-400' : 'bg-rose-400'}`}
+                style={{ width: `${slideProgress}%` }}
+              />
+            </div>
+          )}
+
+          <div className={`px-2.5 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-2 border-t-2 text-white backdrop-blur-md ${
+            isBull 
+              ? 'bg-gradient-to-r from-slate-950 via-emerald-950/95 to-slate-950 border-emerald-500/80' 
+              : 'bg-gradient-to-r from-slate-950 via-rose-950/95 to-slate-950 border-rose-500/80'
+          }`}>
+            
+            {/* Left Section: Expand Button, Live Alert Icon, Symbol Badge & Quick Stats */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0 overflow-x-auto no-scrollbar">
+              {/* Expand to Full Card button */}
+              <button
+                id="dock-expand-btn"
+                onClick={() => handleSetMinimized(false)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-500/50 border border-emerald-400/60 text-emerald-200 font-bold text-xs cursor-pointer transition-all hover:scale-105 shrink-0 shadow-sm"
+                title="Expand Full 14-Confluence Popunder Window"
+              >
+                <ChevronUp className="w-4 h-4 text-emerald-300" />
+                <span className="font-mono text-[11px] uppercase tracking-wider font-extrabold hidden md:inline">Full Alert</span>
+              </button>
+
+              {/* Live Signal Indicator */}
+              <div 
+                onClick={() => handleSetMinimized(false)}
+                className="flex items-center gap-1.5 cursor-pointer shrink-0"
+                title="Double click to expand full card"
+              >
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isBull ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isBull ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                </span>
+                {isBull ? (
+                  <Flame className="w-4 h-4 text-yellow-300 fill-current shrink-0" />
+                ) : (
+                  <TrendingDown className="w-4 h-4 text-rose-300 shrink-0" />
+                )}
+              </div>
+
+              {/* Active Rally Stock Details */}
+              {currentRally ? (
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap">
+                  <button
+                    onClick={() => onSelectStockDetail && onSelectStockDetail(currentRally.stock)}
+                    className={`text-xs sm:text-sm font-black font-mono tracking-tight px-2 py-0.5 rounded-md border shrink-0 transition-transform hover:scale-105 cursor-pointer ${
+                      isBull 
+                        ? 'bg-emerald-950/90 text-yellow-300 border-yellow-400/70 shadow-sm' 
+                        : 'bg-rose-950/90 text-rose-300 border-rose-500/70 shadow-sm'
+                    }`}
+                    title={`Click to view ${currentRally.symbol} details`}
+                  >
+                    {currentRally.symbol}
+                  </button>
+
+                  <span className={`px-1.5 py-0.5 rounded font-mono text-[11px] font-bold shrink-0 ${isBull ? 'bg-emerald-500/30 text-emerald-200' : 'bg-rose-500/30 text-rose-200'}`}>
+                    {isGainPositive ? '+' : ''}{pct.toFixed(2)}%
+                  </span>
+
+                  <span className={`hidden sm:inline-block px-1.5 py-0.2 rounded text-[10px] font-mono font-black border shrink-0 ${currentRally.triggerColorClass}`}>
+                    {currentRally.triggerBadge}
+                  </span>
+
+                  {currentRally.isSustainedHold && (
+                    <span className="hidden lg:flex bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-black items-center gap-0.5 shrink-0">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      STOOD &gt;30M
+                    </span>
+                  )}
+
+                  <span className="px-1.5 py-0.5 rounded text-[10.5px] font-mono font-bold flex items-center gap-1 bg-amber-950/90 text-yellow-200 border border-amber-500/60 shrink-0">
+                    <Clock className="w-3 h-3 text-cyan-300" />
+                    <span>HIT: {currentRally.rulePassedTime}</span>
+                  </span>
+
+                  {currentRally.volumeRatio && (
+                    <span className="hidden md:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 shrink-0">
+                      📊 {currentRally.volumeRatio.toFixed(1)}x Vol{currentRally.isVolumeIncreasing ? ' ↗' : ''}
+                    </span>
+                  )}
+
+                  {currentRally.rsi && (
+                    <span className="hidden lg:inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/50 shrink-0">
+                      ⚡ RSI {currentRally.rsi.toFixed(0)}
+                    </span>
+                  )}
+
+                  {plan && (
+                    <span className="hidden xl:flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10.5px] font-mono shrink-0">
+                      <span className="text-emerald-400 font-bold">T1: ₹{plan.target1.toFixed(1)}</span>
+                      <span className="text-slate-500">•</span>
+                      <span className="text-rose-400 font-bold">SL: ₹{plan.stopLoss.toFixed(1)}</span>
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-xs text-slate-400 font-mono">0 active rally signals</span>
+              )}
+            </div>
+
+            {/* Center Section: Quick Hits Strip (Clickable symbols directly in docked bar) */}
+            {rallySignals.length > 1 && (
+              <div className="hidden lg:flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-[32vw] shrink px-2 border-x border-slate-800">
+                <span className="text-[10px] font-mono font-bold text-slate-400 shrink-0 uppercase tracking-wider">
+                  Hits ({rallySignals.length}):
+                </span>
+                {rallySignals.map((sig, idx) => {
+                  const isSelected = idx === safeCurrentIndex;
+                  const isSigBull = sig.direction === 'BULLISH';
+                  return (
+                    <button
+                      key={`dock-sig-${sig.symbol}-${idx}`}
+                      onClick={() => {
+                        setCurrentIndex(idx);
+                        setSlideProgress(0);
+                      }}
+                      className={`px-2 py-0.5 rounded text-xs font-mono font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                        isSelected
+                          ? isSigBull
+                            ? 'bg-emerald-500 text-black font-black ring-1 ring-white scale-105'
+                            : 'bg-rose-500 text-white font-black ring-1 ring-white scale-105'
+                          : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700 hover:text-white'
+                      }`}
+                      title={`${sig.symbol} (${sig.pctChange >= 0 ? '+' : ''}${sig.pctChange.toFixed(1)}%) - Click to select`}
+                    >
+                      <span>{sig.symbol}</span>
+                      <span className="text-[10px] opacity-85">
+                        {sig.pctChange >= 0 ? '+' : ''}{sig.pctChange.toFixed(1)}%
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Right Section: Prev/Next, Auto-Rotate, Sizer, Switch to Corner Pill, Expand, Dismiss */}
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+              {/* Prev / Next Slider Navigation */}
+              {rallySignals.length > 1 && (
+                <div className="flex items-center space-x-0.5 border-r border-slate-800 pr-1.5">
+                  <button 
+                    onClick={handlePrevSlide}
+                    className="p-1 text-slate-400 hover:text-white rounded transition-colors cursor-pointer"
+                    title="Previous Stock"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] font-mono text-slate-400 px-1">
+                    {safeCurrentIndex + 1}/{rallySignals.length}
+                  </span>
+                  <button 
+                    onClick={handleNextSlide}
+                    className="p-1 text-slate-400 hover:text-white rounded transition-colors cursor-pointer"
+                    title="Next Stock"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                  {/* Play/Pause */}
+                  <button
+                    onClick={toggleAutoRotate}
+                    className="p-1 text-slate-400 hover:text-white rounded transition-colors cursor-pointer ml-0.5"
+                    title={isAutoRotating ? 'Pause Auto-Rotation' : 'Resume Auto-Rotation'}
+                  >
+                    {isAutoRotating ? <Pause className="w-3 h-3 text-yellow-300" /> : <Play className="w-3 h-3 text-slate-400" />}
+                  </button>
+                </div>
+              )}
+
+              {/* Quick Action: Position Sizer */}
+              {currentRally && onOpenPositionSizer && (
+                <button
+                  onClick={() => onOpenPositionSizer(currentRally.stock)}
+                  className="hidden sm:flex items-center gap-1 px-2 py-1 rounded text-xs font-bold font-mono bg-blue-900/60 hover:bg-blue-800 text-blue-200 border border-blue-500/50 transition-all cursor-pointer"
+                  title="Open Position Sizer"
+                >
+                  <Calculator className="w-3.5 h-3.5" />
+                  <span className="hidden xl:inline">Sizer</span>
+                </button>
+              )}
+
+              {/* Sound Toggle */}
+              <button
+                onClick={toggleSound}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                title={soundEnabled ? 'Mute Alert Sound' : 'Enable Alert Sound'}
+              >
+                {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
+              </button>
+
+              {/* Switch to Floating Pill style */}
+              <button
+                id="dock-switch-to-pill-btn"
+                onClick={() => handleSetMinimizeStyle('FLOATING_PILL')}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                title="Switch to Floating Corner Pill mode"
+              >
+                <Minimize2 className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Expand Full Card */}
+              <button
+                id="popunder-maximize-btn"
+                onClick={() => handleSetMinimized(false)}
+                className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                title="Expand Full Rally Alert Window"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Close / Dismiss */}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                title="Dismiss Alert"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    // FLOATING_PILL style
     return (
       <div 
+        id="popunder-minimized-pill"
         className="fixed bottom-4 right-4 z-40"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -489,9 +772,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           )}
 
           <button
-            onClick={() => setIsMinimized(false)}
+            id="popunder-minimized-expand-btn"
+            onClick={() => handleSetMinimized(false)}
             className="flex items-center space-x-2 text-left cursor-pointer"
-            title="Click to expand full alert card"
+            title="Click to expand full alert card (workspace saved mode active)"
           >
             <span className="relative flex h-3 w-3 shrink-0">
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isBull ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
@@ -591,10 +875,21 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
             </div>
           )}
 
+          {/* Switch to Full-Length Bar */}
           <button
-            onClick={() => setIsMinimized(false)}
-            className="p-1 text-slate-400 hover:text-white rounded transition-colors ml-1"
-            title="Expand Card"
+            id="pill-switch-to-dock-btn"
+            onClick={() => handleSetMinimizeStyle('FULL_LENGTH_BAR')}
+            className="p-1.5 text-slate-400 hover:text-white rounded transition-colors ml-1 cursor-pointer"
+            title="Dock to Full-Length Bottom Bar (saves screen space)"
+          >
+            <PanelBottom className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            id="popunder-maximize-btn"
+            onClick={() => handleSetMinimized(false)}
+            className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors ml-1 cursor-pointer"
+            title="Expand Full Rally Alert Card (Double-click or click to restore full view)"
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
@@ -626,8 +921,11 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
           </div>
         )}
 
-        {/* Top Header Bar */}
-        <div className={`px-3.5 py-2.5 flex items-center justify-between shadow-md ${
+        {/* Top Header Bar (Double-click to minimize and save workspace) */}
+        <div 
+          onDoubleClick={() => handleSetMinimized(true)}
+          title="Double-click header to minimize and save workspace"
+          className={`px-3.5 py-2.5 flex items-center justify-between shadow-md cursor-pointer select-none ${
           isBull 
             ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700' 
             : 'bg-gradient-to-r from-rose-700 via-red-600 to-rose-800'
@@ -783,11 +1081,29 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
               {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-white/50" />}
             </button>
 
+            {/* Dock to Full-Length Bottom Bar (Workspace Saver) */}
+            <button
+              id="popunder-dock-full-length-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSetMinimizeStyle('FULL_LENGTH_BAR');
+                handleSetMinimized(true);
+              }}
+              className="p-1.5 text-white/90 hover:text-white rounded-lg hover:bg-white/20 transition-all cursor-pointer flex items-center gap-1"
+              title="Dock to Full-Length Bottom Bar (never hides screen or obscures workspace)"
+            >
+              <PanelBottom className="w-4 h-4 text-emerald-300" />
+            </button>
+
             {/* Minimize Popunder */}
             <button
-              onClick={() => setIsMinimized(true)}
-              className="p-1.5 text-white/80 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
-              title="Minimize to Popunder Pill"
+              id="popunder-minimize-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSetMinimized(true);
+              }}
+              className="p-1.5 text-white/90 hover:text-white rounded-lg hover:bg-white/20 transition-all cursor-pointer"
+              title="Minimize Popunder (saves screen workspace)"
             >
               <Minimize2 className="w-4 h-4" />
             </button>

@@ -219,12 +219,20 @@ export function createExpressApp() {
   // API Route: Fetch Intraday 15-min Candle Data from Dhan API
     apiRouter.post('/dhan/bulk-marketfeed', async (req, res) => {
     try {
-      const { clientId, accessToken, securityIds, exchangeSegment = 'NSE_EQ' } = req.body;
+      const { clientId, accessToken, securityIds, instruments, exchangeSegment = 'NSE_EQ' } = req.body;
       if (!clientId || !accessToken) return res.status(401).json({ error: 'Missing auth' });
       
-      const payload = {
-        [exchangeSegment]: securityIds.map(Number)
-      };
+      const payload: Record<string, number[]> = {};
+
+      if (instruments && Array.isArray(instruments)) {
+        for (const item of instruments) {
+          const seg = item.exchangeSegment || (isIndexSymbol(item.symbol || '') ? 'IDX_I' : exchangeSegment);
+          if (!payload[seg]) payload[seg] = [];
+          if (item.securityId) payload[seg].push(Number(item.securityId));
+        }
+      } else if (securityIds && Array.isArray(securityIds)) {
+        payload[exchangeSegment] = securityIds.map(Number);
+      }
       
       const feedRes = await fetch('https://api.dhan.co/v2/marketfeed/ohlc', {
         method: 'POST',
@@ -235,7 +243,7 @@ export function createExpressApp() {
           'access-token': accessToken,
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(8000)
       });
       
       const data = await feedRes.json();
@@ -657,6 +665,55 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
         let accurateVolume = sessionTotalVol;
         let accuratePreviousClose = previousDayClose;
 
+        // Fetch real-time live LTP and true Day High/Low from Dhan Marketfeed API
+        const todayStr = new Date().toISOString().split('T')[0];
+        const isCurrentSession = !date || date === todayStr || foundDate === todayStr;
+
+        if (isCurrentSession && clientId && accessToken) {
+          try {
+            const feedPayload = {
+              [exchangeSegment]: [Number(secId)]
+            };
+            const feedRes = await fetch('https://api.dhan.co/v2/marketfeed/ohlc', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'client-id': clientId,
+                'access-token': accessToken,
+              },
+              body: JSON.stringify(feedPayload),
+              signal: AbortSignal.timeout(3500)
+            });
+
+            if (feedRes.ok) {
+              const feedData = await feedRes.json().catch(() => null);
+              const segmentData = feedData?.data?.[exchangeSegment];
+              const instrumentFeed = segmentData?.[String(secId)] || segmentData?.[Number(secId)];
+
+              if (instrumentFeed) {
+                // If last_price (LTP) is valid, it is the exact real-time live current price
+                if (instrumentFeed.last_price && instrumentFeed.last_price > 0) {
+                  accurateClose = instrumentFeed.last_price;
+                }
+                // Check if marketfeed has higher high or lower low
+                if (instrumentFeed.ohlc?.high && instrumentFeed.ohlc.high > 0) {
+                  accurateHigh = Math.max(accurateHigh, instrumentFeed.ohlc.high);
+                }
+                if (instrumentFeed.ohlc?.low && instrumentFeed.ohlc.low > 0) {
+                  accurateLow = Math.min(accurateLow, instrumentFeed.ohlc.low);
+                }
+                // Previous day close from Dhan marketfeed
+                if (instrumentFeed.ohlc?.close && instrumentFeed.ohlc.close > 0) {
+                  accuratePreviousClose = instrumentFeed.ohlc.close;
+                }
+              }
+            }
+          } catch (feedErr) {
+            // Silently proceed with candle data if marketfeed timeout
+          }
+        }
+
 
 
         // Calculate 14-period RSI timeline for every candle from 09:15 AM to current time
@@ -820,13 +877,15 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
           securityId: String(secId),
           candleTimestamp,
           fetchedDate: foundDate,
-          open: first15MinOpen,
-          close: Math.round(effectiveClose * 100) / 100,
-          high: Math.round(sessionHigh * 100) / 100,
-          low: Math.round(sessionLow * 100) / 100,
-          previousClose: previousDayClose ? Math.round(previousDayClose * 100) / 100 : null,
+          open: accurateOpen,
+          close: Math.round(accurateClose * 100) / 100,
+          high: Math.round(accurateHigh * 100) / 100,
+          low: Math.round(accurateLow * 100) / 100,
+          previousClose: accuratePreviousClose ? Math.round(accuratePreviousClose * 100) / 100 : null,
           first15mHigh: Math.round(first15MinHigh * 100) / 100,
           first15mLow: Math.round(first15MinLow * 100) / 100,
+          first15mOpen: Math.round(first15MinOpen * 100) / 100,
+          first15mClose: Math.round(first15MinClose * 100) / 100,
           first1mOpen: first1mO !== null ? Math.round(first1mO * 100) / 100 : null,
           first1mHigh: first1mH !== null ? Math.round(first1mH * 100) / 100 : null,
           first1mLow: first1mL !== null ? Math.round(first1mL * 100) / 100 : null,

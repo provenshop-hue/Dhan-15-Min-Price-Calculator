@@ -390,7 +390,7 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
       });
       resizeObserver.observe(container);
 
-      setRenderError(false);
+      setRenderError((prev) => (prev ? false : prev));
 
       return () => {
         resizeObserver.disconnect();
@@ -401,7 +401,7 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
       };
     } catch (err) {
       console.warn('Lightweight charts init error, switching to SVG engine fallback:', err);
-      setRenderError(true);
+      setRenderError((prev) => (!prev ? true : prev));
     }
   }, [candleData, volumeData, showGannOverlays, showVolume, stock.buyAbove, stock.sellBelow, stock.vwap]);
 
