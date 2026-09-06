@@ -27,11 +27,6 @@ export interface StockCalculated {
   volumeSpike?: boolean | null;
   candleTimestamp?: string | null;
   previousClose?: number | null;
-  ltp?: number | null;
-  dayOpen?: number | null;
-  dayHigh?: number | null;
-  dayLow?: number | null;
-  dayClose?: number | null;
 
   // Gann Calculated Values
   openCalc?: number | null; // ((sqrt(open) * 15) - 15) % 15
@@ -56,13 +51,6 @@ export interface StockCalculated {
   isOpenEqualLow?: boolean;
   isOpenEqualHigh?: boolean;
   isHighEqualClose?: boolean;
-  isExactOpenLow?: boolean;
-  isExactOpenHigh?: boolean;
-  isExactLowClose?: boolean;
-  isExactHighClose?: boolean;
-  openLowDiff?: number | null;
-  openHighDiff?: number | null;
-  lowCloseDiff?: number | null;
   openLowDiffPct?: number | null;
   openHighDiffPct?: number | null;
 
@@ -138,13 +126,6 @@ export interface GannCalcResult {
   isOpenEqualLow?: boolean;
   isOpenEqualHigh?: boolean;
   isHighEqualClose?: boolean;
-  isExactOpenLow?: boolean;
-  isExactOpenHigh?: boolean;
-  isExactLowClose?: boolean;
-  isExactHighClose?: boolean;
-  openLowDiff?: number | null;
-  openHighDiff?: number | null;
-  lowCloseDiff?: number | null;
   openLowDiffPct?: number | null;
   openHighDiffPct?: number | null;
   fib382Bull?: number | null;

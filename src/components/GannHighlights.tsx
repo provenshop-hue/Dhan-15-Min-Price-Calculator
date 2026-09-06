@@ -64,14 +64,12 @@ export const GannHighlights: React.FC<GannHighlightsProps> = ({
 
   // Open = Low (Bullish) and Open = High (Bearish) stocks (Strict Exact Match)
   const openLowStocks = calculatedStocks.filter((s) => {
-    if (s.isExactOpenLow || s.isOpenEqualLow) return true;
     if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
       return isOpenLowPattern(s.openPrice, s.lowPrice, s.first15mLow);
     }
     return false;
   });
   const openHighStocks = calculatedStocks.filter((s) => {
-    if (s.isExactOpenHigh || s.isOpenEqualHigh) return true;
     if (s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0) {
       return isOpenHighPattern(s.openPrice, s.highPrice, s.first15mHigh);
     }

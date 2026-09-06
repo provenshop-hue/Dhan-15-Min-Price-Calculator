@@ -1089,11 +1089,10 @@ export const BullishRallyPopup: React.FC<BullishRallyPopupProps> = ({
                 handleSetMinimizeStyle('FULL_LENGTH_BAR');
                 handleSetMinimized(true);
               }}
-              className="px-2 py-1 text-xs font-bold text-emerald-200 bg-emerald-950/90 border border-emerald-500/60 hover:bg-emerald-900 rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-xs"
-              title="Minimize Popunder to Full-Length Bottom Bar (frees entire screen)"
+              className="p-1.5 text-white/90 hover:text-white rounded-lg hover:bg-white/20 transition-all cursor-pointer flex items-center gap-1"
+              title="Dock to Full-Length Bottom Bar (never hides screen or obscures workspace)"
             >
-              <PanelBottom className="w-3.5 h-3.5 text-emerald-300" />
-              <span className="font-mono text-[10px] uppercase font-bold hidden sm:inline">Minimize to Full Length</span>
+              <PanelBottom className="w-4 h-4 text-emerald-300" />
             </button>
 
             {/* Minimize Popunder */}

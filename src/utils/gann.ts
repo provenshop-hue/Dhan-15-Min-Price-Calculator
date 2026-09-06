@@ -127,24 +127,6 @@ export function calculateADX(
  * Accounts for 15-min candle low, session low, NSE tick size (₹0.05), and 0.05% tolerance.
  * Ensures the session low has not broken below the open price.
  */
-export function isExactOpenLowPattern(openPrice?: number | null, lowPrice?: number | null): boolean {
-  if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
-  if (lowPrice === undefined || lowPrice === null || lowPrice <= 0) return false;
-  return Math.abs(openPrice - lowPrice) <= 0.05 || Math.round(openPrice * 100) === Math.round(lowPrice * 100);
-}
-
-export function isExactOpenHighPattern(openPrice?: number | null, highPrice?: number | null): boolean {
-  if (openPrice === undefined || openPrice === null || openPrice <= 0) return false;
-  if (highPrice === undefined || highPrice === null || highPrice <= 0) return false;
-  return Math.abs(openPrice - highPrice) <= 0.05 || Math.round(openPrice * 100) === Math.round(highPrice * 100);
-}
-
-export function isExactLowClosePattern(lowPrice?: number | null, closePrice?: number | null): boolean {
-  if (lowPrice === undefined || lowPrice === null || lowPrice <= 0) return false;
-  if (closePrice === undefined || closePrice === null || closePrice <= 0) return false;
-  return Math.abs(closePrice - lowPrice) <= 0.05 || Math.round(closePrice * 100) === Math.round(lowPrice * 100);
-}
-
 export function isOpenLowPattern(
   openPrice?: number | null, 
   lowPrice?: number | null,
@@ -431,26 +413,10 @@ export function calculateGann15Min(
 
   const pctChange = openPrice > 0 ? ((closePrice - openPrice) / openPrice) * 100 : 0;
 
-  // Exact and Near Pattern detection: Open = Low, Open = High, High = Close
-  const openLowDiff = openPrice > 0 && lowPrice && lowPrice > 0
-    ? Math.round(Math.abs(openPrice - lowPrice) * 100) / 100
-    : null;
-  const openHighDiff = openPrice > 0 && highPrice && highPrice > 0
-    ? Math.round(Math.abs(openPrice - highPrice) * 100) / 100
-    : null;
-  const lowCloseDiff = closePrice > 0 && lowPrice && lowPrice > 0
-    ? Math.round(Math.abs(closePrice - lowPrice) * 100) / 100
-    : null;
-
-  // Strict exact matches (diff <= 0.05, 1 NSE tick)
-  const isExactOpenLow = isExactOpenLowPattern(openPrice, lowPrice);
-  const isExactOpenHigh = isExactOpenHighPattern(openPrice, highPrice);
-  const isExactLowClose = isExactLowClosePattern(lowPrice, closePrice);
-  const isExactHighClose = highPrice !== null && highPrice !== undefined && highPrice > 0 && Math.abs(closePrice - highPrice) <= 0.05;
-
-  const isOpenEqualLow = isExactOpenLow || isOpenLowPattern(openPrice, lowPrice, first15mLow);
-  const isOpenEqualHigh = isExactOpenHigh || isOpenHighPattern(openPrice, highPrice, first15mHigh);
-  const isHighEqualClose = isExactHighClose || isHighClosePattern(closePrice, highPrice, first15mHigh, openPrice);
+  // Pattern detection: Open = Low, Open = High, High = Close (Strict Exact Match)
+  const isOpenEqualLow = isOpenLowPattern(openPrice, lowPrice, first15mLow);
+  const isOpenEqualHigh = isOpenHighPattern(openPrice, highPrice, first15mHigh);
+  const isHighEqualClose = isHighClosePattern(closePrice, highPrice, first15mHigh, openPrice);
 
   const openLowDiffPct = openPrice > 0 && lowPrice && lowPrice > 0
     ? Math.abs(openPrice - lowPrice) / openPrice * 100
@@ -534,13 +500,6 @@ export function calculateGann15Min(
     isOpenEqualLow,
     isOpenEqualHigh,
     isHighEqualClose,
-    isExactOpenLow,
-    isExactOpenHigh,
-    isExactLowClose,
-    isExactHighClose,
-    openLowDiff,
-    openHighDiff,
-    lowCloseDiff,
     openLowDiffPct,
     openHighDiffPct,
     fib382Bull: fibData?.fib382Bull ?? null,

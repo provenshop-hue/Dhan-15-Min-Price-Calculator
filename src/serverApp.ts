@@ -651,40 +651,22 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
         if (sessionLow === Infinity || isNaN(sessionLow)) sessionLow = Math.min(first15MinLow, latestCandle?.low || 0);
 
         const sessionVWAP = sessionTotalVol > 0 ? Math.round((sessionTotalTPV / sessionTotalVol) * 100) / 100 : null;
+        const effectiveClose = latestCandle ? latestCandle.close : first15MinClose;
         const latestTimeStr = latestCandle ? latestCandle.timeStr : '09:15 AM';
 
         // Calculate Previous Day Close from candle stream prior to foundDate
         const prevSessionCandles = candlesList.filter((c) => c.dateStr && c.dateStr < foundDate);
         let previousDayClose = prevSessionCandles.length > 0 ? prevSessionCandles[prevSessionCandles.length - 1].close : null;
 
-        // Accurate 15-Minute Candle OHLC directly from Dhan Intraday Chart API
-        // For the target candle (e.g. 3:00 PM candle for ABB, matching Image 1: O 7445.50, H 7470.00, L 7392.50, C 7407.50)
-        const candleTarget = latestCandle || first15m || sessionCandles[0];
-        const candleOpen = candleTarget ? candleTarget.open : first15MinOpen;
-        const candleHigh = candleTarget ? candleTarget.high : first15MinHigh;
-        const candleLow = candleTarget ? candleTarget.low : first15MinLow;
-        const candleClose = candleTarget ? candleTarget.close : first15MinClose;
-        const candleVolume = candleTarget ? candleTarget.volume : first15MinVol;
-
-        let liveLtp: number | null = null;
-        let dayOpen = first15MinOpen;
-        let dayHigh = sessionHigh;
-        let dayLow = sessionLow;
-        let dayClose = previousDayClose;
+        let accurateOpen = first15MinOpen;
+        let accurateClose = effectiveClose;
+        let accurateHigh = sessionHigh;
+        let accurateLow = sessionLow;
+        let accurateVolume = sessionTotalVol;
+        let accuratePreviousClose = previousDayClose;
 
         // Fetch real-time live LTP and true Day High/Low from Dhan Marketfeed API
-        const todayStr = (() => {
-          try {
-            return new Intl.DateTimeFormat('en-CA', {
-              timeZone: 'Asia/Kolkata',
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit'
-            }).format(new Date());
-          } catch (e) {
-            return new Date().toISOString().split('T')[0];
-          }
-        })();
+        const todayStr = new Date().toISOString().split('T')[0];
         const isCurrentSession = !date || date === todayStr || foundDate === todayStr;
 
         if (isCurrentSession && clientId && accessToken) {
@@ -710,25 +692,20 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
               const instrumentFeed = segmentData?.[String(secId)] || segmentData?.[Number(secId)];
 
               if (instrumentFeed) {
-                // last_price is the LTP tick from the market (e.g. 7410.00 for ABB)
-                if (typeof instrumentFeed.last_price === 'number' && instrumentFeed.last_price > 0) {
-                  liveLtp = instrumentFeed.last_price;
+                // If last_price (LTP) is valid, it is the exact real-time live current price
+                if (instrumentFeed.last_price && instrumentFeed.last_price > 0) {
+                  accurateClose = instrumentFeed.last_price;
                 }
-                // Dhan Official Day OHLC directly from NSE marketfeed
-                if (instrumentFeed.ohlc) {
-                  if (typeof instrumentFeed.ohlc.open === 'number' && instrumentFeed.ohlc.open > 0) {
-                    dayOpen = instrumentFeed.ohlc.open;
-                  }
-                  if (typeof instrumentFeed.ohlc.high === 'number' && instrumentFeed.ohlc.high > 0) {
-                    dayHigh = instrumentFeed.ohlc.high;
-                  }
-                  if (typeof instrumentFeed.ohlc.low === 'number' && instrumentFeed.ohlc.low > 0) {
-                    dayLow = instrumentFeed.ohlc.low;
-                  }
-                  // Previous day close from Dhan marketfeed
-                  if (typeof instrumentFeed.ohlc.close === 'number' && instrumentFeed.ohlc.close > 0) {
-                    dayClose = instrumentFeed.ohlc.close;
-                  }
+                // Check if marketfeed has higher high or lower low
+                if (instrumentFeed.ohlc?.high && instrumentFeed.ohlc.high > 0) {
+                  accurateHigh = Math.max(accurateHigh, instrumentFeed.ohlc.high);
+                }
+                if (instrumentFeed.ohlc?.low && instrumentFeed.ohlc.low > 0) {
+                  accurateLow = Math.min(accurateLow, instrumentFeed.ohlc.low);
+                }
+                // Previous day close from Dhan marketfeed
+                if (instrumentFeed.ohlc?.close && instrumentFeed.ohlc.close > 0) {
+                  accuratePreviousClose = instrumentFeed.ohlc.close;
                 }
               }
             }
@@ -900,19 +877,11 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
           securityId: String(secId),
           candleTimestamp,
           fetchedDate: foundDate,
-          // Exact 15-minute candle OHLC directly from Dhan Intraday Chart API (matches chart perfectly)
-          open: Math.round(candleOpen * 100) / 100,
-          close: Math.round(candleClose * 100) / 100,
-          high: Math.round(candleHigh * 100) / 100,
-          low: Math.round(candleLow * 100) / 100,
-          // Real-time marketfeed tick & Day OHLC
-          ltp: liveLtp ? Math.round(liveLtp * 100) / 100 : Math.round(candleClose * 100) / 100,
-          dayOpen: Math.round(dayOpen * 100) / 100,
-          dayHigh: Math.round(dayHigh * 100) / 100,
-          dayLow: Math.round(dayLow * 100) / 100,
-          dayClose: dayClose ? Math.round(dayClose * 100) / 100 : null,
-          previousClose: dayClose ? Math.round(dayClose * 100) / 100 : (previousDayClose ? Math.round(previousDayClose * 100) / 100 : null),
-          // First 15m candle (09:15 AM)
+          open: accurateOpen,
+          close: Math.round(accurateClose * 100) / 100,
+          high: Math.round(accurateHigh * 100) / 100,
+          low: Math.round(accurateLow * 100) / 100,
+          previousClose: accuratePreviousClose ? Math.round(accuratePreviousClose * 100) / 100 : null,
           first15mHigh: Math.round(first15MinHigh * 100) / 100,
           first15mLow: Math.round(first15MinLow * 100) / 100,
           first15mOpen: Math.round(first15MinOpen * 100) / 100,
@@ -921,7 +890,7 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
           first1mHigh: first1mH !== null ? Math.round(first1mH * 100) / 100 : null,
           first1mLow: first1mL !== null ? Math.round(first1mL * 100) / 100 : null,
           first1mClose: first1mC !== null ? Math.round(first1mC * 100) / 100 : null,
-          volume: candleVolume > 0 ? candleVolume : (sessionTotalVol > 0 ? sessionTotalVol : first15MinVol),
+          volume: sessionTotalVol > 0 ? sessionTotalVol : first15MinVol,
           first15mVolume: first15MinVol,
           totalVolume: sessionTotalVol,
           rsi,

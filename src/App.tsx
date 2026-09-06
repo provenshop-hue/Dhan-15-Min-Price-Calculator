@@ -23,7 +23,6 @@ import { UserTradeTracker } from './components/UserTradeTracker';
 import { SectorStrengthDashboard } from './components/SectorStrengthDashboard';
 import { OpenHighLowScanner } from './components/OpenHighLowScanner';
 import { HundredPercentBullishScanner } from './components/HundredPercentBullishScanner';
-import { LowCloseScanner } from './components/LowCloseScanner';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
@@ -215,8 +214,8 @@ export default function App() {
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
 
-  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'parabolic_rally', 'user_tracker', 'sector_strength', 'open_high_low', 'hundred_bullish', or 'low_close_equal')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'low_close_equal'>('gann');
+  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'parabolic_rally', 'user_tracker', or 'sector_strength')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -531,11 +530,6 @@ export default function App() {
         closePrice,
         highPrice,
         lowPrice,
-        ltp: data.ltp ?? closePrice,
-        dayOpen: data.dayOpen ?? openPrice,
-        dayHigh: data.dayHigh ?? highPrice,
-        dayLow: data.dayLow ?? lowPrice,
-        dayClose: data.dayClose ?? closePrice,
         previousClose: data.previousClose !== undefined ? data.previousClose : stock.previousClose,
         first15mOpen: data.first15mOpen ?? stock.first15mOpen,
         first15mClose: data.first15mClose ?? stock.first15mClose,
@@ -565,13 +559,6 @@ export default function App() {
         gannScore: calc.gannScore,
         isOpenEqualLow: calc.isOpenEqualLow,
         isOpenEqualHigh: calc.isOpenEqualHigh,
-        isExactOpenLow: calc.isExactOpenLow,
-        isExactOpenHigh: calc.isExactOpenHigh,
-        isExactLowClose: calc.isExactLowClose,
-        isExactHighClose: calc.isExactHighClose,
-        openLowDiff: calc.openLowDiff,
-        openHighDiff: calc.openHighDiff,
-        lowCloseDiff: calc.lowCloseDiff,
         openLowDiffPct: calc.openLowDiffPct,
         openHighDiffPct: calc.openHighDiffPct,
         fib382Bull: calc.fib382Bull,
@@ -785,96 +772,6 @@ export default function App() {
             for (const segKey of Object.keys(data.data)) {
               Object.assign(bulkMarketFeed, data.data[segKey]);
             }
-            // Immediately apply verified Dhan OHLC directly from NSE marketfeed
-            if (Object.keys(bulkMarketFeed).length > 0) {
-              setStocks((prev) =>
-                prev.map((s) => {
-                  const secId = String(s.securityId || getDhanSecurityId(s.symbol));
-                  const feed = bulkMarketFeed[secId] || bulkMarketFeed[Number(secId)];
-                  if (!feed) return s;
-
-                  const ohlc = feed.ohlc;
-                  const liveLtp = feed.last_price > 0 ? Math.round(feed.last_price * 100) / 100 : (s.ltp ?? s.closePrice);
-                  const dayOpen = ohlc?.open > 0 ? Math.round(ohlc.open * 100) / 100 : (s.dayOpen ?? s.openPrice);
-                  const dayHigh = ohlc?.high > 0 ? Math.round(ohlc.high * 100) / 100 : (s.dayHigh ?? s.highPrice);
-                  const dayLow = ohlc?.low > 0 ? Math.round(ohlc.low * 100) / 100 : (s.dayLow ?? s.lowPrice);
-                  const dayClose = ohlc?.close > 0 ? Math.round(ohlc.close * 100) / 100 : (s.dayClose ?? s.closePrice);
-                  const exactPrevClose = ohlc?.close > 0 ? Math.round(ohlc.close * 100) / 100 : (s.previousClose ?? null);
-
-                  // Keep verified 15-minute candle OHLC if already fetched from Chart API
-                  const exactOpen = s.openPrice !== null && s.openPrice !== undefined
-                    ? s.openPrice
-                    : (ohlc?.open > 0 ? Math.round(ohlc.open * 100) / 100 : 0);
-                  const exactHigh = s.highPrice !== null && s.highPrice !== undefined
-                    ? s.highPrice
-                    : (ohlc?.high > 0 ? Math.round(ohlc.high * 100) / 100 : exactOpen);
-                  const exactLow = s.lowPrice !== null && s.lowPrice !== undefined
-                    ? s.lowPrice
-                    : (ohlc?.low > 0 ? Math.round(ohlc.low * 100) / 100 : exactOpen);
-                  const exactClose = s.closePrice !== null && s.closePrice !== undefined
-                    ? s.closePrice
-                    : (feed.last_price > 0 ? Math.round(feed.last_price * 100) / 100 : exactOpen);
-
-                  const calc = calculateGann15Min(
-                    exactOpen,
-                    exactClose,
-                    s.rsi,
-                    s.vwap,
-                    exactHigh,
-                    exactLow,
-                    0.001,
-                    s.adx,
-                    s.first15mHigh,
-                    s.first15mLow,
-                    s.symbol,
-                    s.candleTimestamp
-                  );
-
-                  return {
-                    ...s,
-                    ltp: liveLtp,
-                    dayOpen,
-                    dayHigh,
-                    dayLow,
-                    dayClose,
-                    openPrice: exactOpen,
-                    highPrice: exactHigh,
-                    lowPrice: exactLow,
-                    closePrice: exactClose,
-                    previousClose: exactPrevClose,
-                    first15mOpen: s.first15mOpen ?? exactOpen,
-                    first15mHigh: s.first15mHigh ?? exactHigh,
-                    first15mLow: s.first15mLow ?? exactLow,
-                    first1mOpen: s.first1mOpen ?? exactOpen,
-                    first1mHigh: s.first1mHigh ?? exactHigh,
-                    first1mLow: s.first1mLow ?? exactLow,
-                    first1mClose: s.first1mClose ?? exactClose,
-                    openCalc: calc.openCalc,
-                    closeCalc: calc.closeCalc,
-                    totalCalc: calc.totalCalc,
-                    buyAbove: calc.buyAbove,
-                    sellBelow: calc.sellBelow,
-                    targetsUp: calc.targetsUp,
-                    targetsDown: calc.targetsDown,
-                    trend: calc.trend,
-                    pctChange: calc.pctChange,
-                    gannScore: calc.gannScore,
-                    isOpenEqualLow: calc.isOpenEqualLow,
-                    isOpenEqualHigh: calc.isOpenEqualHigh,
-                    isExactOpenLow: calc.isExactOpenLow,
-                    isExactOpenHigh: calc.isExactOpenHigh,
-                    isExactLowClose: calc.isExactLowClose,
-                    isExactHighClose: calc.isExactHighClose,
-                    openLowDiff: calc.openLowDiff,
-                    openHighDiff: calc.openHighDiff,
-                    lowCloseDiff: calc.lowCloseDiff,
-                    openLowDiffPct: calc.openLowDiffPct,
-                    openHighDiffPct: calc.openHighDiffPct,
-                    isFetched: true,
-                  };
-                })
-              );
-            }
           }
         }
       }
@@ -902,24 +799,17 @@ export default function App() {
             const data = result.data;
             const secId = String(result.secId);
             
-            const openPrice = data.open;
-            const closePrice = data.close;
-            const highPrice = data.high;
-            const lowPrice = data.low;
-            
-            let liveLtp = data.ltp ?? closePrice;
-            let dayOpen = data.dayOpen ?? openPrice;
-            let dayHigh = data.dayHigh ?? highPrice;
-            let dayLow = data.dayLow ?? lowPrice;
-            let dayClose = data.dayClose ?? closePrice;
+            let openPrice = data.open;
+            let closePrice = data.close;
+            let highPrice = data.high;
+            let lowPrice = data.low;
             
             if (bulkMarketFeed[secId]) {
                const feed = bulkMarketFeed[secId];
-               if (feed.last_price > 0) liveLtp = Math.round(feed.last_price * 100) / 100;
-               if (feed.ohlc?.open > 0) dayOpen = Math.round(feed.ohlc.open * 100) / 100;
-               if (feed.ohlc?.high > 0) dayHigh = Math.round(feed.ohlc.high * 100) / 100;
-               if (feed.ohlc?.low > 0) dayLow = Math.round(feed.ohlc.low * 100) / 100;
-               if (feed.ohlc?.close > 0) dayClose = Math.round(feed.ohlc.close * 100) / 100;
+               if (feed.ohlc?.open > 0) openPrice = feed.ohlc.open;
+               if (feed.ohlc?.high > 0) highPrice = Math.max(highPrice, feed.ohlc.high);
+               if (feed.ohlc?.low > 0) lowPrice = Math.min(lowPrice, feed.ohlc.low);
+               if (feed.last_price > 0) closePrice = feed.last_price;
             }
 
             const rsi = data.rsi;
@@ -937,11 +827,6 @@ export default function App() {
                       closePrice,
                       highPrice,
                       lowPrice,
-                      ltp: liveLtp,
-                      dayOpen,
-                      dayHigh,
-                      dayLow,
-                      dayClose,
                       previousClose: data.previousClose !== undefined ? data.previousClose : s.previousClose,
                       first15mOpen: data.first15mOpen ?? s.first15mOpen,
                       first15mClose: data.first15mClose ?? s.first15mClose,
@@ -971,13 +856,6 @@ export default function App() {
                       gannScore: calc.gannScore,
                       isOpenEqualLow: calc.isOpenEqualLow,
                       isOpenEqualHigh: calc.isOpenEqualHigh,
-                      isExactOpenLow: calc.isExactOpenLow,
-                      isExactOpenHigh: calc.isExactOpenHigh,
-                      isExactLowClose: calc.isExactLowClose,
-                      isExactHighClose: calc.isExactHighClose,
-                      openLowDiff: calc.openLowDiff,
-                      openHighDiff: calc.openHighDiff,
-                      lowCloseDiff: calc.lowCloseDiff,
                       openLowDiffPct: calc.openLowDiffPct,
                       openHighDiffPct: calc.openHighDiffPct,
                       fib382Bull: calc.fib382Bull,
@@ -1433,13 +1311,8 @@ export default function App() {
           /* Dedicated Open = High/Low Strategy Hub */
           <OpenHighLowScanner
             stocks={stocks}
-            credentials={credentials}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
-            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
-            onFetchSingleStock={handleFetchSingleDhan}
-            onFetchAll={handleFetchAllDhan}
-            isBulkLoading={isBulkLoading}
           />
         ) : activeDashboardTab === 'hundred_bullish' ? (
           /* Dedicated 100% Bullish Setup Scanner */
@@ -1447,18 +1320,6 @@ export default function App() {
             stocks={stocks}
             niftyStock={niftyStock}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
-          />
-        ) : activeDashboardTab === 'low_close_equal' ? (
-          /* Dedicated Low = Close Strategy Hub (Price > 1000) */
-          <LowCloseScanner
-            stocks={stocks}
-            credentials={credentials}
-            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
-            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
-            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
-            onFetchSingleStock={handleFetchSingleDhan}
-            onFetchAll={handleFetchAllDhan}
-            isBulkLoading={isBulkLoading}
           />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */
