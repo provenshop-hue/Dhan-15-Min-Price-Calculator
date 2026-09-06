@@ -531,6 +531,11 @@ export default function App() {
         closePrice,
         highPrice,
         lowPrice,
+        ltp: data.ltp ?? closePrice,
+        dayOpen: data.dayOpen ?? openPrice,
+        dayHigh: data.dayHigh ?? highPrice,
+        dayLow: data.dayLow ?? lowPrice,
+        dayClose: data.dayClose ?? closePrice,
         previousClose: data.previousClose !== undefined ? data.previousClose : stock.previousClose,
         first15mOpen: data.first15mOpen ?? stock.first15mOpen,
         first15mClose: data.first15mClose ?? stock.first15mClose,
@@ -789,11 +794,26 @@ export default function App() {
                   if (!feed) return s;
 
                   const ohlc = feed.ohlc;
-                  const exactOpen = ohlc?.open > 0 ? Math.round(ohlc.open * 100) / 100 : (s.openPrice ?? 0);
-                  const exactHigh = ohlc?.high > 0 ? Math.round(ohlc.high * 100) / 100 : (s.highPrice ?? exactOpen);
-                  const exactLow = ohlc?.low > 0 ? Math.round(ohlc.low * 100) / 100 : (s.lowPrice ?? exactOpen);
-                  const exactClose = feed.last_price > 0 ? Math.round(feed.last_price * 100) / 100 : (s.closePrice ?? exactOpen);
+                  const liveLtp = feed.last_price > 0 ? Math.round(feed.last_price * 100) / 100 : (s.ltp ?? s.closePrice);
+                  const dayOpen = ohlc?.open > 0 ? Math.round(ohlc.open * 100) / 100 : (s.dayOpen ?? s.openPrice);
+                  const dayHigh = ohlc?.high > 0 ? Math.round(ohlc.high * 100) / 100 : (s.dayHigh ?? s.highPrice);
+                  const dayLow = ohlc?.low > 0 ? Math.round(ohlc.low * 100) / 100 : (s.dayLow ?? s.lowPrice);
+                  const dayClose = ohlc?.close > 0 ? Math.round(ohlc.close * 100) / 100 : (s.dayClose ?? s.closePrice);
                   const exactPrevClose = ohlc?.close > 0 ? Math.round(ohlc.close * 100) / 100 : (s.previousClose ?? null);
+
+                  // Keep verified 15-minute candle OHLC if already fetched from Chart API
+                  const exactOpen = s.openPrice !== null && s.openPrice !== undefined
+                    ? s.openPrice
+                    : (ohlc?.open > 0 ? Math.round(ohlc.open * 100) / 100 : 0);
+                  const exactHigh = s.highPrice !== null && s.highPrice !== undefined
+                    ? s.highPrice
+                    : (ohlc?.high > 0 ? Math.round(ohlc.high * 100) / 100 : exactOpen);
+                  const exactLow = s.lowPrice !== null && s.lowPrice !== undefined
+                    ? s.lowPrice
+                    : (ohlc?.low > 0 ? Math.round(ohlc.low * 100) / 100 : exactOpen);
+                  const exactClose = s.closePrice !== null && s.closePrice !== undefined
+                    ? s.closePrice
+                    : (feed.last_price > 0 ? Math.round(feed.last_price * 100) / 100 : exactOpen);
 
                   const calc = calculateGann15Min(
                     exactOpen,
@@ -812,6 +832,11 @@ export default function App() {
 
                   return {
                     ...s,
+                    ltp: liveLtp,
+                    dayOpen,
+                    dayHigh,
+                    dayLow,
+                    dayClose,
                     openPrice: exactOpen,
                     highPrice: exactHigh,
                     lowPrice: exactLow,
@@ -877,17 +902,24 @@ export default function App() {
             const data = result.data;
             const secId = String(result.secId);
             
-            let openPrice = data.open;
-            let closePrice = data.close;
-            let highPrice = data.high;
-            let lowPrice = data.low;
+            const openPrice = data.open;
+            const closePrice = data.close;
+            const highPrice = data.high;
+            const lowPrice = data.low;
+            
+            let liveLtp = data.ltp ?? closePrice;
+            let dayOpen = data.dayOpen ?? openPrice;
+            let dayHigh = data.dayHigh ?? highPrice;
+            let dayLow = data.dayLow ?? lowPrice;
+            let dayClose = data.dayClose ?? closePrice;
             
             if (bulkMarketFeed[secId]) {
                const feed = bulkMarketFeed[secId];
-               if (feed.ohlc?.open > 0) openPrice = Math.round(feed.ohlc.open * 100) / 100;
-               if (feed.ohlc?.high > 0) highPrice = Math.round(feed.ohlc.high * 100) / 100;
-               if (feed.ohlc?.low > 0) lowPrice = Math.round(feed.ohlc.low * 100) / 100;
-               if (feed.last_price > 0) closePrice = Math.round(feed.last_price * 100) / 100;
+               if (feed.last_price > 0) liveLtp = Math.round(feed.last_price * 100) / 100;
+               if (feed.ohlc?.open > 0) dayOpen = Math.round(feed.ohlc.open * 100) / 100;
+               if (feed.ohlc?.high > 0) dayHigh = Math.round(feed.ohlc.high * 100) / 100;
+               if (feed.ohlc?.low > 0) dayLow = Math.round(feed.ohlc.low * 100) / 100;
+               if (feed.ohlc?.close > 0) dayClose = Math.round(feed.ohlc.close * 100) / 100;
             }
 
             const rsi = data.rsi;
@@ -905,6 +937,11 @@ export default function App() {
                       closePrice,
                       highPrice,
                       lowPrice,
+                      ltp: liveLtp,
+                      dayOpen,
+                      dayHigh,
+                      dayLow,
+                      dayClose,
                       previousClose: data.previousClose !== undefined ? data.previousClose : s.previousClose,
                       first15mOpen: data.first15mOpen ?? s.first15mOpen,
                       first15mClose: data.first15mClose ?? s.first15mClose,

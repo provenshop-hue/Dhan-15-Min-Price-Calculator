@@ -79,10 +79,10 @@ export function OpenHighLowScanner({
 
       if (dataSource === 'DAY_OHLC') {
         // Official NSE Day Session from Dhan Live Marketfeed / Intraday API
-        open = s.openPrice;
-        high = s.highPrice;
-        low = s.lowPrice;
-        close = s.closePrice;
+        open = s.dayOpen ?? s.openPrice;
+        high = s.dayHigh ?? s.highPrice;
+        low = s.dayLow ?? s.lowPrice;
+        close = s.dayClose ?? s.ltp ?? s.closePrice;
       } else if (dataSource === 'FIRST_15M') {
         // 09:15 AM - 09:30 AM First 15m Candle
         open = s.first15mOpen ?? s.openPrice;
@@ -108,9 +108,13 @@ export function OpenHighLowScanner({
       const diffLow = Math.round(Math.abs(open - low) * 100) / 100;
       const diffHigh = Math.round(Math.abs(open - high) * 100) / 100;
 
+      // Pure exact: 0.00 difference (Open === Low or Open === High down to the exact paise)
+      const isPureExactLow = Math.round(open * 100) === Math.round(low * 100) || diffLow === 0;
+      const isPureExactHigh = Math.round(open * 100) === Math.round(high * 100) || diffHigh === 0;
+
       // Exact match on NSE: difference is within 1 tick (₹0.05) or rounds to identical paise
-      const isExactLow = diffLow <= 0.05 || Math.round(open * 100) === Math.round(low * 100);
-      const isExactHigh = diffHigh <= 0.05 || Math.round(open * 100) === Math.round(high * 100);
+      const isExactLow = isPureExactLow || diffLow <= 0.05;
+      const isExactHigh = isPureExactHigh || diffHigh <= 0.05;
 
       // Near match tolerance: <= 0.10% variance (or <= 0.20 pts for sub-₹200 penny stocks)
       const isNearLow = !isExactLow && ((diffLow / open) * 100 <= 0.10 || diffLow <= 0.20);

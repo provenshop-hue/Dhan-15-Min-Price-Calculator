@@ -69,10 +69,10 @@ export function LowCloseScanner({
 
     stocks.forEach((s) => {
       // Use official NSE Day Session data from Dhan API as primary
-      const open = s.openPrice ?? s.first15mOpen ?? s.first1mOpen;
-      const high = s.highPrice ?? s.first15mHigh ?? s.first1mHigh;
-      const low = s.lowPrice ?? s.first15mLow ?? s.first1mLow;
-      const close = s.closePrice ?? s.first15mClose ?? s.first1mClose;
+      const open = s.dayOpen ?? s.openPrice ?? s.first15mOpen ?? s.first1mOpen;
+      const high = s.dayHigh ?? s.highPrice ?? s.first15mHigh ?? s.first1mHigh;
+      const low = s.dayLow ?? s.lowPrice ?? s.first15mLow ?? s.first1mLow;
+      const close = s.dayClose ?? s.ltp ?? s.closePrice ?? s.first15mClose ?? s.first1mClose;
 
       if (open == null || high == null || low == null || close == null) {
         return;
@@ -88,11 +88,12 @@ export function LowCloseScanner({
         return;
       }
 
-      const diff = Math.abs(close - low);
+      const diff = Math.round(Math.abs(close - low) * 100) / 100;
       const diffPct = close > 0 ? (diff / close) * 100 : 0;
 
-      // Exact match: tick size on NSE is ₹0.05, so diff < 0.05 is exact match!
-      const isExactMatch = diff < 0.05;
+      // Exact match: 0.00 pure difference or within NSE tick (₹0.05)
+      const isPureExact = Math.round(close * 100) === Math.round(low * 100) || diff === 0;
+      const isExactMatch = isPureExact || diff <= 0.05;
       
       // Near match: within 0.15% or within 50 paise
       const isNearMatch = diffPct <= 0.15 || diff <= 0.50;

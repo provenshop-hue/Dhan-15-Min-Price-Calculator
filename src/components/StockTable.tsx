@@ -1325,6 +1325,11 @@ export const StockTable: React.FC<StockTableProps> = ({
                         }}
                         className="w-24 bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded px-2 py-1 text-right font-mono text-slate-900 text-xs outline-none shadow-2xs"
                       />
+                      {stock.highPrice !== undefined && stock.highPrice !== null && (
+                        <div className="text-[9.5px] font-mono text-slate-400 text-right mt-0.5" title={`15m Candle High: ₹${stock.highPrice} | Low: ₹${stock.lowPrice}`}>
+                          H:{stock.highPrice} L:{stock.lowPrice}
+                        </div>
+                      )}
                     </td>
 
                     {/* 15-Min Close Input */}
@@ -1340,6 +1345,11 @@ export const StockTable: React.FC<StockTableProps> = ({
                         }}
                         className="w-24 bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded px-2 py-1 text-right font-mono text-slate-900 text-xs outline-none shadow-2xs"
                       />
+                      {stock.ltp !== undefined && stock.ltp !== null && stock.ltp !== stock.closePrice && (
+                        <div className="text-[9.5px] font-mono font-medium text-slate-500 text-right mt-0.5" title="Live Traded Price (NSE Marketfeed)">
+                          LTP: <span className="font-bold text-slate-700">₹{stock.ltp}</span>
+                        </div>
+                      )}
                     </td>
 
                     {/* 15-Min Volume */}

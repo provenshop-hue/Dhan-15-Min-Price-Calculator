@@ -27,6 +27,11 @@ export interface StockCalculated {
   volumeSpike?: boolean | null;
   candleTimestamp?: string | null;
   previousClose?: number | null;
+  ltp?: number | null;
+  dayOpen?: number | null;
+  dayHigh?: number | null;
+  dayLow?: number | null;
+  dayClose?: number | null;
 
   // Gann Calculated Values
   openCalc?: number | null; // ((sqrt(open) * 15) - 15) % 15
