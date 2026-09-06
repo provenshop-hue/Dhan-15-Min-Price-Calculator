@@ -22,6 +22,11 @@ import {
 } from 'lucide-react';
 import { StockCalculated, StockTradeJourney } from '../types';
 import { generateIntradayRsiTimeline } from '../utils/rsiAnalyst';
+import { 
+  resolveRecentHundredBullishHitTiming, 
+  parseTimeToMinutes, 
+  formatCleanRecentTime 
+} from '../utils/recentHitTiming';
 
 interface Props {
   stocks: StockCalculated[];
@@ -164,43 +169,36 @@ export function HundredPercentBullishScanner({
         });
       }
 
-      // Determine First Confluence Hit Time
-      let firstHitTime = '09:15 AM';
-      let firstHitTrigger = 'Open = Low Baseline (≤0.20% Var)';
-      let firstHitPrice = open;
-      let phaseBadge = '🔔 09:15 AM Opening Bell';
-      let phaseBadgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-
+      // Determine Recent Confluence Hit Time (Guaranteed Clean Recent Timing, No Yesterday)
       const tradeJourney = tradeJourneys ? (tradeJourneys[stock.id] || tradeJourneys[stock.symbol]) : undefined;
+      const recentTiming = resolveRecentHundredBullishHitTiming(
+        stock,
+        variance,
+        breaksORB,
+        tradeJourney
+      );
 
-      if (tradeJourney && tradeJourney.inceptionTime && tradeJourney.inceptionTime !== 'CSV Imported') {
-        firstHitTime = tradeJourney.inceptionTime;
-        firstHitPrice = tradeJourney.inceptionPrice || open;
-        firstHitTrigger = `Trade Signal Logged @ ${tradeJourney.inceptionTime}`;
-        phaseBadge = `⏱️ ${tradeJourney.inceptionTime} Inception`;
-        phaseBadgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-      } else if (isGapUp && variance <= 0.15 && close >= open) {
-        firstHitTime = '09:15 AM';
-        firstHitTrigger = `Open = Low + Gap Up Driver (Var: ${variance.toFixed(2)}%)`;
-        firstHitPrice = open;
-        phaseBadge = '🔔 09:15 AM Opening Bell';
-        phaseBadgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-      } else if (!isGapUp && breaksORB && f15mHigh) {
-        firstHitTime = '09:30 AM';
-        firstHitTrigger = `15m ORB High Breakout above ₹${f15mHigh.toFixed(2)}`;
-        firstHitPrice = f15mHigh;
-        phaseBadge = '⚡ 09:30 AM ORB Breakout';
-        phaseBadgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-      } else if (stock.candleTimestamp && stock.candleTimestamp !== 'CSV Imported') {
-        firstHitTime = stock.candleTimestamp;
-        firstHitTrigger = `Open = Low Confluence Hit @ ${stock.candleTimestamp}`;
-        phaseBadge = `🕒 ${stock.candleTimestamp} Hit`;
-        phaseBadgeClass = 'bg-teal-500/20 text-teal-300 border-teal-500/40';
+      const firstHitTime = recentTiming.hitTime;
+      const firstHitTrigger = recentTiming.hitTrigger;
+      const firstHitPrice = recentTiming.hitPrice;
+      const phaseBadge = recentTiming.phaseBadge;
+      const phaseBadgeClass = recentTiming.phaseBadgeClass;
+
+      // Add a milestone for recent hit if later than 09:30 AM
+      if (firstHitTime !== '09:15 AM' && firstHitTime !== '09:30 AM') {
+        milestones.push({
+          time: firstHitTime,
+          name: '100% Bullish Surge Triggered',
+          detail: firstHitTrigger,
+          price: firstHitPrice,
+          isFirst: true
+        });
       }
 
-      // Mark the first milestone
+      // Mark the milestone matching firstHitTime
       if (milestones.length > 0) {
-        const matchingMs = milestones.find(m => m.time === firstHitTime) || milestones[0];
+        milestones.forEach(m => { m.isFirst = false; });
+        const matchingMs = milestones.find(m => m.time === firstHitTime) || milestones[milestones.length - 1];
         matchingMs.isFirst = true;
       }
 
@@ -208,7 +206,7 @@ export function HundredPercentBullishScanner({
         firstHitTime,
         firstHitTrigger,
         firstHitPrice,
-        firstHitDetail: `First confluence hit at ${firstHitTime} @ ₹${firstHitPrice.toFixed(2)}`,
+        firstHitDetail: `Recent confluence hit at ${firstHitTime} @ ₹${firstHitPrice.toFixed(2)}`,
         phaseBadge,
         phaseBadgeClass,
         milestones
@@ -388,10 +386,10 @@ export function HundredPercentBullishScanner({
       })
       .sort((a, b) => {
         if (sortBy === 'TIME_ASC') {
-          return a.timing.firstHitTime.localeCompare(b.timing.firstHitTime);
+          return parseTimeToMinutes(a.timing.firstHitTime) - parseTimeToMinutes(b.timing.firstHitTime);
         }
         if (sortBy === 'TIME_DESC') {
-          return b.timing.firstHitTime.localeCompare(a.timing.firstHitTime);
+          return parseTimeToMinutes(b.timing.firstHitTime) - parseTimeToMinutes(a.timing.firstHitTime);
         }
         if (sortBy === 'VARIANCE_ASC') {
           return a.variance - b.variance;
@@ -409,7 +407,7 @@ export function HundredPercentBullishScanner({
     if (analyzedStocks.length === 0) {
       return { total: 0, earliest: 'N/A', latest: 'N/A', avgScore: 0, count915: 0, count930: 0 };
     }
-    const times = analyzedStocks.map(s => s.timing.firstHitTime).sort();
+    const times = [...analyzedStocks.map(s => s.timing.firstHitTime)].sort((a, b) => parseTimeToMinutes(a) - parseTimeToMinutes(b));
     const count915 = analyzedStocks.filter(s => s.timing.firstHitTime === '09:15 AM').length;
     const count930 = analyzedStocks.filter(s => s.timing.firstHitTime === '09:30 AM').length;
     const totalScore = analyzedStocks.reduce((acc, s) => acc + s.score, 0);
@@ -616,7 +614,7 @@ export function HundredPercentBullishScanner({
                     <Clock className="w-3.5 h-3.5" />
                   </div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold">First Confluence Hit:</span>
+                    <span className="text-[11px] text-slate-400 font-semibold">Recent Confluence Hit:</span>
                     <span className="text-xs font-black font-mono text-amber-300 tracking-wide">
                       {stock.timing.firstHitTime}
                     </span>

@@ -1,6 +1,7 @@
 import { StockCalculated } from '../types';
 import { getStockSector, computeAllSectorStrengths } from './sectorMaster';
 import { getAtmOptionStrikes } from './gann';
+import { formatCleanRecentTime } from './recentHitTiming';
 
 export type ParabolicStage =
   | 'PARABOLIC_RALLY'       // 12+ pts (Fully Bullish)
@@ -147,12 +148,12 @@ export function computeParabolicTiming(
   let selectedSlot = '09:15–09:30 AM';
   let rulePassedMinutes = 9 * 60 + 30;
 
-  // 1. If stock has an explicit candleTimestamp in HH:MM format
-  if (stock.candleTimestamp && stock.candleTimestamp.includes(':')) {
-    const match = stock.candleTimestamp.match(/(\d{1,2}:\d{2})(?:\s*(AM|PM))?/i);
-    if (match) {
-      const parsed = parseTimeToMinutes(match[0]);
-      selectedTimeStr = formatMinutesToTime(parsed);
+  // 1. If stock has an explicit candleTimestamp
+  if (stock.candleTimestamp) {
+    const cleanTime = formatCleanRecentTime(stock.candleTimestamp);
+    if (cleanTime && cleanTime !== '09:15 AM') {
+      const parsed = parseTimeToMinutes(cleanTime);
+      selectedTimeStr = cleanTime;
       rulePassedMinutes = parsed;
       const matchedSlot = standardIntervals.find((s) => Math.abs(s.totalMins - parsed) <= 15);
       if (matchedSlot) selectedSlot = matchedSlot.slot;
@@ -194,7 +195,7 @@ export function computeParabolicTiming(
   const recencyMinutes = isMarketHours ? Math.max(0, currentTotalMinutes - rulePassedMinutes) : 0;
   const isFresh = isMarketHours && recencyMinutes <= 30;
   const recencyLabel = !isMarketHours
-    ? 'EOD Recorded'
+    ? 'Recent Session'
     : recencyMinutes === 0
     ? 'Just now'
     : `${recencyMinutes}m ago`;
@@ -204,9 +205,7 @@ export function computeParabolicTiming(
   const intraCandleMinutes = rulePassedMinutes + intraMinuteOffset;
   const intraCandleTime = `${formatMinutesToTime(intraCandleMinutes)} (Min ${intraMinuteOffset} ${score >= 12 ? 'Breakout' : 'Base'})`;
 
-  const label = isMarketHours
-    ? `Signal Met at ${selectedTimeStr} (${recencyLabel})`
-    : `Signal Met at ${selectedTimeStr} (EOD Session)`;
+  const label = `Signal Met at ${selectedTimeStr} (${recencyLabel})`;
 
   return {
     timeStr: selectedTimeStr,

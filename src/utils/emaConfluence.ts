@@ -1,5 +1,6 @@
 import { StockCalculated, StockTradeJourney, RsiIntradayPoint } from '../types';
 import { generateIntradayRsiTimeline } from './rsiAnalyst';
+import { resolveRecentEmaHitTiming, formatCleanRecentTime } from './recentHitTiming';
 
 export interface EmaConfluenceCondition {
   id: string;
@@ -77,11 +78,15 @@ export interface StockEmaAnalysis {
   dominantSide: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
   activeScore: number; // score of dominant side
 
-  // Hit Time & Milestones
+  // Hit Time & Milestones (Guaranteed Clean Recent Timing)
   hitTime: string;
   hitTrigger: string;
   hitPrice: number;
   milestones: EmaMilestone[];
+  recencyLabel?: string;
+  phaseBadge?: string;
+  phaseBadgeClass?: string;
+  isFresh?: boolean;
 
   // Lot Size & Contract Specs
   lotSize: number;
@@ -442,147 +447,132 @@ export function analyzeStockEmaConfluence(
   }
 
   // ==========================================
-  // ⏱️ HIT TIME & MILESTONES CALCULATION
+  // ⏱️ RECENT HIT TIME & MILESTONES CALCULATION (No Yesterday Timing)
   // ==========================================
-  const milestones: EmaMilestone[] = [];
-  let hitTime = '09:15 AM';
-  let hitTrigger = dominantSide === 'BULLISH' ? '9 EMA Breakout' : '9 EMA Breakdown';
-  let hitPrice = open;
-
-  // Check if trade journeys has an inception time
   const tradeJourney = tradeJourneys ? (tradeJourneys[stock.id] || tradeJourneys[stock.symbol]) : undefined;
-  if (tradeJourney && tradeJourney.inceptionTime && tradeJourney.inceptionTime !== 'CSV Imported') {
-    hitTime = tradeJourney.inceptionTime;
-    hitPrice = tradeJourney.inceptionPrice || open;
-    hitTrigger = `Trade Journey Logged @ ${hitTime}`;
+  const recentTiming = resolveRecentEmaHitTiming(
+    stock,
+    dominantSide === 'BEARISH' ? 'BEARISH' : 'BULLISH',
+    bullishScore,
+    bearishScore,
+    tradeJourney
+  );
+
+  const hitTime = recentTiming.hitTime;
+  const hitTrigger = recentTiming.hitTrigger;
+  const hitPrice = recentTiming.hitPrice;
+  const recencyLabel = recentTiming.recencyLabel;
+  const phaseBadge = recentTiming.phaseBadge;
+  const phaseBadgeClass = recentTiming.phaseBadgeClass;
+  const isFresh = recentTiming.isFresh;
+
+  const milestones: EmaMilestone[] = [];
+
+  // Build clean session milestone timeline
+  if (dominantSide === 'BULLISH') {
+    // 09:15 AM: Opening bell base
+    milestones.push({
+      time: '09:15 AM',
+      event: 'Opening Candle Base',
+      detail: `Open at ₹${open.toFixed(2)}${open > prevClose ? ' (Gap Up)' : ''}`,
+      price: open,
+      isFirst: false
+    });
+
+    // 09:30 AM: 9/20 EMA crossover / ORB
+    if (bullCond1 && bullCond2) {
+      milestones.push({
+        time: '09:30 AM',
+        event: '9/20 EMA Bullish Stack Emergence',
+        detail: `Price broke above 9 EMA (₹${ema9.toFixed(2)}) & 20 EMA (₹${ema20.toFixed(2)})`,
+        price: Math.max(open, ema9),
+        isFirst: false
+      });
+    }
+
+    // 09:45 AM: 50 EMA & Volume expansion
+    if (bullCond3 && bullCond4) {
+      milestones.push({
+        time: '09:45 AM',
+        event: '9>20>50 EMA Stack Confirmed',
+        detail: `Full cascade established with ${volRatio.toFixed(1)}x volume support`,
+        price: ema20,
+        isFirst: false
+      });
+    }
+
+    // Recent Hit milestone if after 09:45 AM
+    if (hitTime !== '09:15 AM' && hitTime !== '09:30 AM' && hitTime !== '09:45 AM') {
+      milestones.push({
+        time: hitTime,
+        event: 'Recent Confluence Confirmation',
+        detail: hitTrigger,
+        price: hitPrice,
+        isFirst: true
+      });
+    } else if (bullishScore >= 7) {
+      milestones.push({
+        time: '10:00 AM',
+        event: '7–8 Very Strong Bullish Confluence',
+        detail: `Higher High sustained at ₹${high.toFixed(2)} with positive slopes`,
+        price: close,
+        isFirst: false
+      });
+    }
   } else {
-    // Determine milestone timeline based on intraday progression
-    if (dominantSide === 'BULLISH') {
-      // 09:15 AM: Opening bell base
+    // BEARISH
+    milestones.push({
+      time: '09:15 AM',
+      event: 'Opening Candle Resistance',
+      detail: `Open at ₹${open.toFixed(2)}${open < prevClose ? ' (Gap Down)' : ''}`,
+      price: open,
+      isFirst: false
+    });
+
+    if (bearCond1 && bearCond2) {
       milestones.push({
-        time: '09:15 AM',
-        event: 'Opening Candle Base',
-        detail: `Open at ₹${open.toFixed(2)}${open > prevClose ? ' (Gap Up)' : ''}`,
-        price: open,
+        time: '09:30 AM',
+        event: '9/20 EMA Breakdown',
+        detail: `Price slipped below 9 EMA (₹${ema9.toFixed(2)}) & 20 EMA (₹${ema20.toFixed(2)})`,
+        price: Math.min(open, ema9),
         isFirst: false
       });
+    }
 
-      // 09:30 AM: 9/20 EMA crossover / ORB
-      if (bullCond1 && bullCond2) {
-        milestones.push({
-          time: '09:30 AM',
-          event: '9/20 EMA Bullish Stack Emergence',
-          detail: `Price broke above 9 EMA (₹${ema9.toFixed(2)}) & 20 EMA (₹${ema20.toFixed(2)})`,
-          price: Math.max(open, ema9),
-          isFirst: false
-        });
-      }
-
-      // 09:45 AM: 50 EMA & Volume expansion
-      if (bullCond3 && bullCond4) {
-        milestones.push({
-          time: '09:45 AM',
-          event: '9>20>50 EMA Stack Confirmed',
-          detail: `Full cascade established with ${volRatio.toFixed(1)}x volume support`,
-          price: ema20,
-          isFirst: false
-        });
-      }
-
-      // 10:00 AM: Pullback hold or Parabolic extension
-      if (bullishScore >= 7) {
-        milestones.push({
-          time: '10:00 AM',
-          event: '7–8 Very Strong Bullish Confluence',
-          detail: `Higher High sustained at ₹${high.toFixed(2)} with positive slopes`,
-          price: close,
-          isFirst: false
-        });
-      }
-
-      // Resolve first hit time
-      if (open > prevClose && close > open && bullCond1) {
-        hitTime = '09:15 AM';
-        hitTrigger = '09:15 AM Gap Up & Immediate 9 EMA Support';
-        hitPrice = open;
-      } else if (bullCond1 && bullCond3) {
-        hitTime = '09:30 AM';
-        hitTrigger = '09:30 AM 9/20 EMA Golden Cross Confirmation';
-        hitPrice = ema9;
-      } else if (bullCond4 && isVolumeConfirmed) {
-        hitTime = '09:45 AM';
-        hitTrigger = '09:45 AM 20>50 EMA Expansion Surge';
-        hitPrice = ema20;
-      } else {
-        hitTime = '10:00 AM';
-        hitTrigger = '10:00 AM Trend Structure Continuation';
-        hitPrice = close;
-      }
-
-    } else {
-      // BEARISH
+    if (bearCond3 && bearCond4) {
       milestones.push({
-        time: '09:15 AM',
-        event: 'Opening Candle Resistance',
-        detail: `Open at ₹${open.toFixed(2)}${open < prevClose ? ' (Gap Down)' : ''}`,
-        price: open,
+        time: '09:45 AM',
+        event: '9<20<50 EMA Death Stack',
+        detail: `Bearish cascade confirmed with selling volume ${volRatio.toFixed(1)}x`,
+        price: ema20,
         isFirst: false
       });
+    }
 
-      if (bearCond1 && bearCond2) {
-        milestones.push({
-          time: '09:30 AM',
-          event: '9/20 EMA Breakdown',
-          detail: `Price slipped below 9 EMA (₹${ema9.toFixed(2)}) & 20 EMA (₹${ema20.toFixed(2)})`,
-          price: Math.min(open, ema9),
-          isFirst: false
-        });
-      }
-
-      if (bearCond3 && bearCond4) {
-        milestones.push({
-          time: '09:45 AM',
-          event: '9<20<50 EMA Death Stack',
-          detail: `Bearish cascade confirmed with selling volume ${volRatio.toFixed(1)}x`,
-          price: ema20,
-          isFirst: false
-        });
-      }
-
-      if (bearishScore >= 7) {
-        milestones.push({
-          time: '10:00 AM',
-          event: '7–8 Very Strong Bearish Confluence',
-          detail: `Lower Low breached at ₹${low.toFixed(2)} with negative slopes`,
-          price: close,
-          isFirst: false
-        });
-      }
-
-      // Resolve first hit time
-      if (open < prevClose && close < open && bearCond1) {
-        hitTime = '09:15 AM';
-        hitTrigger = '09:15 AM Gap Down & 9 EMA Rejection';
-        hitPrice = open;
-      } else if (bearCond1 && bearCond3) {
-        hitTime = '09:30 AM';
-        hitTrigger = '09:30 AM 9/20 EMA Death Cross Breakdown';
-        hitPrice = ema9;
-      } else if (bearCond4 && isVolumeConfirmed) {
-        hitTime = '09:45 AM';
-        hitTrigger = '09:45 AM 20<50 EMA Selling Acceleration';
-        hitPrice = ema20;
-      } else {
-        hitTime = '10:00 AM';
-        hitTrigger = '10:00 AM Downward Momentum Continuation';
-        hitPrice = close;
-      }
+    // Recent Hit milestone if after 09:45 AM
+    if (hitTime !== '09:15 AM' && hitTime !== '09:30 AM' && hitTime !== '09:45 AM') {
+      milestones.push({
+        time: hitTime,
+        event: 'Recent Confluence Breakdown',
+        detail: hitTrigger,
+        price: hitPrice,
+        isFirst: true
+      });
+    } else if (bearishScore >= 7) {
+      milestones.push({
+        time: '10:00 AM',
+        event: '7–8 Very Strong Bearish Confluence',
+        detail: `Lower Low breached at ₹${low.toFixed(2)} with negative slopes`,
+        price: close,
+        isFirst: false
+      });
     }
   }
 
-  // Mark first milestone
+  // Mark the active milestone matching hitTime
   if (milestones.length > 0) {
-    const matched = milestones.find(m => m.time === hitTime) || milestones[0];
+    const matched = milestones.find(m => m.time === hitTime) || milestones[milestones.length - 1];
+    milestones.forEach(m => { m.isFirst = false; });
     matched.isFirst = true;
   }
 
@@ -634,6 +624,10 @@ export function analyzeStockEmaConfluence(
     hitTrigger,
     hitPrice,
     milestones,
+    recencyLabel,
+    phaseBadge,
+    phaseBadgeClass,
+    isFresh,
     lotSize,
     contractValue,
     estOptionCapital,

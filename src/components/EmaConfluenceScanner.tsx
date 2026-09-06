@@ -30,6 +30,7 @@ import {
   StockEmaAnalysis, 
   EmaScoreTier 
 } from '../utils/emaConfluence';
+import { parseTimeToMinutes } from '../utils/recentHitTiming';
 
 interface Props {
   stocks: StockCalculated[];
@@ -121,7 +122,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
     // Earliest hit time
     const activeHighConviction = analyzedStocks.filter(s => s.activeScore >= 5);
     const earliestTime = activeHighConviction.length > 0 
-      ? [...activeHighConviction].sort((a, b) => a.hitTime.localeCompare(b.hitTime))[0].hitTime 
+      ? [...activeHighConviction].sort((a, b) => parseTimeToMinutes(a.hitTime) - parseTimeToMinutes(b.hitTime))[0].hitTime 
       : '09:15 AM';
 
     const avgScore = total > 0 
@@ -179,10 +180,10 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
       .sort((a, b) => {
         // Sorting
         if (sortBy === 'TIME_ASC') {
-          return a.hitTime.localeCompare(b.hitTime);
+          return parseTimeToMinutes(a.hitTime) - parseTimeToMinutes(b.hitTime);
         }
         if (sortBy === 'TIME_DESC') {
-          return b.hitTime.localeCompare(a.hitTime);
+          return parseTimeToMinutes(b.hitTime) - parseTimeToMinutes(a.hitTime);
         }
         if (sortBy === 'LOT_DESC') {
           return b.lotSize - a.lotSize;
@@ -539,11 +540,19 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                     <div className="p-1 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30">
                       <Clock className="w-3.5 h-3.5" />
                     </div>
-                    <div className="flex items-baseline gap-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10.5px] text-slate-400 font-semibold">Hit Time:</span>
                       <span className="text-xs font-black font-mono text-amber-300 tracking-wide">
                         {analysis.hitTime}
                       </span>
+                      {analysis.isFresh && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      )}
+                      {analysis.phaseBadge && (
+                        <span className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border ${analysis.phaseBadgeClass || 'bg-amber-500/20 text-amber-300 border-amber-500/30'}`}>
+                          {analysis.phaseBadge}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -862,7 +871,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                   <th className="py-3 px-3">Symbol &amp; Company</th>
                   <th className="py-3 px-3">LTP &amp; Change</th>
                   <th className="py-3 px-3">F&amp;O Lot Size &amp; Value</th>
-                  <th className="py-3 px-3">First Hit Time</th>
+                  <th className="py-3 px-3">Recent Hit Time</th>
                   <th className="py-3 px-3">EMA Confluence Score</th>
                   <th className="py-3 px-3">9 / 20 / 50 / 200 EMAs</th>
                   <th className="py-3 px-3">Slopes &amp; Trajectory</th>
@@ -913,15 +922,25 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                         </div>
                       </td>
 
-                      {/* First Hit Time */}
+                      {/* Recent Hit Time */}
                       <td className="py-3 px-3">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           <Clock className="w-3 h-3 text-amber-400" />
                           <span className="font-black text-amber-300 text-xs">{analysis.hitTime}</span>
+                          {analysis.isFresh && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          )}
                         </div>
                         <div className="text-[9.5px] text-slate-400 truncate max-w-[150px]">
                           {analysis.hitTrigger}
                         </div>
+                        {analysis.phaseBadge && (
+                          <div className="mt-0.5">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border inline-block ${analysis.phaseBadgeClass || 'bg-amber-500/20 text-amber-300 border-amber-500/30'}`}>
+                              {analysis.phaseBadge}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Confluence Score */}

@@ -6,6 +6,7 @@ import { getExactNseStrikeStep, roundToExactNseStrike, formatStrikePrice } from 
 import { analyzeParabolicRally, ParabolicRallyAnalysis } from './parabolicRallyEngine';
 import { generateIntradayRsiTimeline } from './rsiAnalyst';
 import { evaluateHighConfidenceTrade, HighConfidenceTradeAnalysis } from './highConfidenceTrade';
+import { formatCleanRecentTime } from './recentHitTiming';
 
 export type RallyDirection = 'BULLISH' | 'BEARISH';
 
@@ -433,24 +434,8 @@ export function calculateExactRulePassedTiming(
 } {
   const isBull = direction === 'BULLISH';
   const ist = getISTNow();
-  const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
 
-  // If this stock data is from yesterday or a prior date, explicitly mark as yesterday
-  if (yesterdayCheck.isYesterday) {
-    const timeMatch = stock.candleTimestamp ? stock.candleTimestamp.match(/\d{1,2}:\d{2}(\s*(?:AM|PM))?/i) : null;
-    const timeStr = timeMatch ? `${timeMatch[0]} (Prior Day)` : 'Yesterday Close';
-    return {
-      timeStr,
-      rulePassedMinutes: 0,
-      recencyMinutes: 9999,
-      isFresh: false,
-      label: `Passed on ${yesterdayCheck.dateStr} (Yesterday)`,
-      isMarketHours: false,
-      intervalMinute: 0,
-      isYesterday: true
-    };
-  }
-
+  // User mandate: Always display recent intraday hit timing without "(Prior Day)" or "Yesterday" labels
   const hours = ist.hours;
   const minutes = ist.minutes;
   const currentTotalMinutes = ist.totalMinutes;
@@ -512,12 +497,11 @@ export function calculateExactRulePassedTiming(
     return buildResult(stock.fib382Time, 0);
   }
 
-  // 2. If stock has explicit candleTimestamp matching HH:MM format
-  if (stock.candleTimestamp && stock.candleTimestamp.includes(':')) {
-    const match = stock.candleTimestamp.match(/\d{1,2}:\d{2}(\s*(?:AM|PM))?/i);
-    if (match) {
-      const timeStr = match[0].toUpperCase().includes('M') ? match[0].toUpperCase() : `${match[0]} AM`;
-      return buildResult(timeStr, 0);
+  // 2. If stock has explicit candleTimestamp, extract clean recent time
+  if (stock.candleTimestamp) {
+    const cleanCandleTime = formatCleanRecentTime(stock.candleTimestamp);
+    if (cleanCandleTime && cleanCandleTime !== '09:15 AM') {
+      return buildResult(cleanCandleTime, 0);
     }
   }
 
