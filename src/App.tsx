@@ -1330,6 +1330,7 @@ export default function App() {
           <EmaConfluenceScanner
             stocks={stocks}
             tradeJourneys={tradeJourneys}
+            credentials={credentials}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}

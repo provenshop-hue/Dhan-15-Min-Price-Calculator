@@ -1,6 +1,7 @@
 import { StockCalculated, StockTradeJourney, RsiIntradayPoint } from '../types';
 import { generateIntradayRsiTimeline } from './rsiAnalyst';
 import { resolveRecentEmaHitTiming, formatCleanRecentTime } from './recentHitTiming';
+import { isStockFromYesterdayOrOlder, getISTNow } from './bullishRally';
 
 export interface EmaConfluenceCondition {
   id: string;
@@ -87,6 +88,9 @@ export interface StockEmaAnalysis {
   phaseBadge?: string;
   phaseBadgeClass?: string;
   isFresh?: boolean;
+  isHitToday: boolean;
+  isFromToday: boolean;
+  sessionDate: string;
 
   // Lot Size & Contract Specs
   lotSize: number;
@@ -141,11 +145,71 @@ function buildPriceSequence(stock: StockCalculated, timeline: RsiIntradayPoint[]
 }
 
 /**
+ * Checks whether a stock's data is strictly from today's live/active session.
+ * Excludes Friday, yesterday, weekends, and any older date records.
+ */
+export function isStockFromToday(stock: StockCalculated, targetDate?: string): boolean {
+  const ist = getISTNow();
+  const todayDateStr = targetDate || ist.dateStr; // e.g. "2026-09-07"
+
+  // 1. Check explicit fetchedDate
+  if (stock.fetchedDate) {
+    const clean = stock.fetchedDate.trim();
+    if (clean !== todayDateStr) {
+      return false;
+    }
+  }
+
+  // 2. Check candleTimestamp for explicit prior date or labels
+  if (stock.candleTimestamp) {
+    const ts = stock.candleTimestamp.trim();
+    if (/yesterday|prev|prior|friday/i.test(ts)) {
+      return false;
+    }
+    const matchYMD = ts.match(/(\d{4}-\d{2}-\d{2})/);
+    if (matchYMD && matchYMD[1]) {
+      if (matchYMD[1] !== todayDateStr) {
+        return false;
+      }
+    }
+    const matchDMY = ts.match(/(\d{1,2})[-/]([A-Za-z]{3}|\d{1,2})[-/](\d{4})/);
+    if (matchDMY) {
+      try {
+        const parsedD = new Date(ts);
+        if (!isNaN(parsedD.getTime())) {
+          const y = parsedD.getFullYear();
+          const m = String(parsedD.getMonth() + 1).padStart(2, '0');
+          const d = String(parsedD.getDate()).padStart(2, '0');
+          const fmt = `${y}-${m}-${d}`;
+          if (fmt !== todayDateStr) {
+            return false;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  // 3. Check yesterday/older evaluator
+  const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
+  if (yesterdayCheck.isYesterday) {
+    return false;
+  }
+
+  // 4. If neither fetchedDate nor candleTimestamp has any session record (unfetched default placeholder)
+  if (!stock.fetchedDate && (!stock.candleTimestamp || stock.candleTimestamp === 'CSV Imported')) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Main Analyzer function for a single stock
  */
 export function analyzeStockEmaConfluence(
   stock: StockCalculated,
-  tradeJourneys?: Record<string, StockTradeJourney>
+  tradeJourneys?: Record<string, StockTradeJourney>,
+  targetDate?: string
 ): StockEmaAnalysis {
   const timeline = generateIntradayRsiTimeline(stock);
   const priceSeq = buildPriceSequence(stock, timeline);
@@ -447,29 +511,35 @@ export function analyzeStockEmaConfluence(
   }
 
   // ==========================================
-  // ⏱️ RECENT HIT TIME & MILESTONES CALCULATION (No Yesterday Timing)
+  // ⏱️ RECENT HIT TIME & MILESTONES CALCULATION (Today's Hits Only)
   // ==========================================
+  const ist = getISTNow();
+  const todayDateStr = targetDate || ist.dateStr;
+  const isFromToday = isStockFromToday(stock, todayDateStr);
+  const isHitToday = isFromToday && activeScore >= 5;
+
   const tradeJourney = tradeJourneys ? (tradeJourneys[stock.id] || tradeJourneys[stock.symbol]) : undefined;
   const recentTiming = resolveRecentEmaHitTiming(
     stock,
     dominantSide === 'BEARISH' ? 'BEARISH' : 'BULLISH',
     bullishScore,
     bearishScore,
-    tradeJourney
+    tradeJourney,
+    todayDateStr
   );
 
-  const hitTime = recentTiming.hitTime;
-  const hitTrigger = recentTiming.hitTrigger;
-  const hitPrice = recentTiming.hitPrice;
-  const recencyLabel = recentTiming.recencyLabel;
-  const phaseBadge = recentTiming.phaseBadge;
-  const phaseBadgeClass = recentTiming.phaseBadgeClass;
-  const isFresh = recentTiming.isFresh;
+  const hitTime = isHitToday ? recentTiming.hitTime : (isFromToday ? 'Pending Signal' : 'Not Hit Today');
+  const hitTrigger = isHitToday ? recentTiming.hitTrigger : (isFromToday ? 'Waiting for today\'s confluence trigger' : 'Stock data is from prior session (Friday/prior) - Not hit today');
+  const hitPrice = isHitToday ? recentTiming.hitPrice : close;
+  const recencyLabel = isHitToday ? recentTiming.recencyLabel : (isFromToday ? 'Pending' : 'Prior Session');
+  const phaseBadge = isHitToday ? recentTiming.phaseBadge : '';
+  const phaseBadgeClass = isHitToday ? recentTiming.phaseBadgeClass : '';
+  const isFresh = isHitToday ? recentTiming.isFresh : false;
 
   const milestones: EmaMilestone[] = [];
 
-  // Build clean session milestone timeline
-  if (dominantSide === 'BULLISH') {
+  // Build clean session milestone timeline only if actually hit today
+  if (isHitToday && dominantSide === 'BULLISH') {
     // 09:15 AM: Opening bell base
     milestones.push({
       time: '09:15 AM',
@@ -519,7 +589,7 @@ export function analyzeStockEmaConfluence(
         isFirst: false
       });
     }
-  } else {
+  } else if (isHitToday) {
     // BEARISH
     milestones.push({
       time: '09:15 AM',
@@ -628,6 +698,9 @@ export function analyzeStockEmaConfluence(
     phaseBadge,
     phaseBadgeClass,
     isFresh,
+    isHitToday,
+    isFromToday,
+    sessionDate: todayDateStr,
     lotSize,
     contractValue,
     estOptionCapital,

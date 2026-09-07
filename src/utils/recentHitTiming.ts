@@ -1,4 +1,5 @@
 import { StockCalculated, StockTradeJourney, RsiIntradayPoint } from '../types';
+import { isStockFromYesterdayOrOlder, getISTNow } from './bullishRally';
 
 /**
  * Standard 15-minute intraday trading intervals (NSE / Indian Market: 09:15 AM to 03:30 PM)
@@ -122,7 +123,8 @@ export function resolveRecentEmaHitTiming(
   dominantSide: 'BULLISH' | 'BEARISH',
   bullishScore: number,
   bearishScore: number,
-  tradeJourney?: StockTradeJourney
+  tradeJourney?: StockTradeJourney,
+  targetDate?: string
 ): RecentHitTimingResult {
   const open = stock.openPrice || 100;
   const high = stock.highPrice || open * 1.01;
@@ -134,7 +136,45 @@ export function resolveRecentEmaHitTiming(
   const isBull = dominantSide === 'BULLISH';
   const score = isBull ? bullishScore : bearishScore;
 
-  // 1. If trade journey has a clean inception time from the session
+  const ist = getISTNow();
+  const todayDateStr = targetDate || ist.dateStr;
+
+  // 0. Check whether stock is from yesterday, Friday, or prior session
+  const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
+  const isFetchedOtherDate = stock.fetchedDate ? stock.fetchedDate.trim() !== todayDateStr : false;
+  const isCandleOtherDate = stock.candleTimestamp ? (
+    /yesterday|prev|prior|friday/i.test(stock.candleTimestamp) ||
+    Boolean(stock.candleTimestamp.match(/(\d{4}-\d{2}-\d{2})/) && stock.candleTimestamp.match(/(\d{4}-\d{2}-\d{2})/)![1] !== todayDateStr)
+  ) : false;
+
+  if (yesterdayCheck.isYesterday || isFetchedOtherDate || isCandleOtherDate) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: 'Stock data is from prior session (Friday/prior day) - Not hit today',
+      hitPrice: close,
+      recencyLabel: 'Prior Session',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  // 0b. If score is below 5, stock has not met confluence threshold
+  if (score < 5) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: `Score ${score}/8 - Below confluence threshold (≥5/8 required)`,
+      hitPrice: close,
+      recencyLabel: 'Pending Signal',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  // 1. If trade journey has a clean inception time from today's session
   if (tradeJourney && tradeJourney.inceptionTime && tradeJourney.inceptionTime !== 'CSV Imported') {
     const cleanTime = formatCleanRecentTime(tradeJourney.inceptionTime, '');
     if (cleanTime) {
@@ -207,7 +247,7 @@ export function resolveRecentEmaHitTiming(
   }
 
   // 3. Check candleTimestamp for recent candle timing
-  if (stock.candleTimestamp && stock.candleTimestamp !== 'CSV Imported') {
+  if (stock.candleTimestamp && stock.candleTimestamp !== 'CSV Imported' && !/yesterday|prev|prior|friday/i.test(stock.candleTimestamp)) {
     const cleanTime = formatCleanRecentTime(stock.candleTimestamp, '');
     if (cleanTime && cleanTime !== '09:15 AM') {
       const parsedMins = parseTimeToMinutes(cleanTime);

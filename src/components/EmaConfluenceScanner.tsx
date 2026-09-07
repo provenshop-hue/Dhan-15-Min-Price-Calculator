@@ -24,17 +24,20 @@ import {
   ShieldAlert,
   ArrowRight
 } from 'lucide-react';
-import { StockCalculated, StockTradeJourney } from '../types';
+import { StockCalculated, StockTradeJourney, DhanApiCredentials } from '../types';
 import { 
   analyzeStockEmaConfluence, 
   StockEmaAnalysis, 
-  EmaScoreTier 
+  EmaScoreTier,
+  isStockFromToday 
 } from '../utils/emaConfluence';
 import { parseTimeToMinutes } from '../utils/recentHitTiming';
+import { getISTNow } from '../utils/bullishRally';
 
 interface Props {
   stocks: StockCalculated[];
   tradeJourneys?: Record<string, StockTradeJourney>;
+  credentials?: DhanApiCredentials;
   onSelectStockDetail: (stock: StockCalculated) => void;
   onOpenPositionSizer?: (stock: StockCalculated) => void;
   onOpenRsiAnalyst?: (stock: StockCalculated) => void;
@@ -43,11 +46,13 @@ interface Props {
 export function EmaConfluenceScanner({
   stocks,
   tradeJourneys,
+  credentials,
   onSelectStockDetail,
   onOpenPositionSizer,
   onOpenRsiAnalyst
 }: Props) {
   // Navigation & Primary Filter State
+  const [todayOnly, setTodayOnly] = useState<boolean>(true);
   const [sideFilter, setSideFilter] = useState<'ALL' | 'BULLISH' | 'BEARISH' | 'STRONG_ONLY'>('BULLISH');
   const [tierFilter, setTierFilter] = useState<'ALL' | 'VERY_STRONG' | 'MODERATE' | 'WEAK_WAIT'>('ALL');
   const [timeFilter, setTimeFilter] = useState<'ALL' | '09:15' | '09:30' | '09:45' | '10:00_PLUS'>('ALL');
@@ -55,6 +60,9 @@ export function EmaConfluenceScanner({
   const [sortBy, setSortBy] = useState<'SCORE_DESC' | 'TIME_ASC' | 'TIME_DESC' | 'LOT_DESC' | 'PCT_DESC' | 'PRICE_DESC'>('SCORE_DESC');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'CARDS' | 'TABLE'>('CARDS');
+
+  const ist = getISTNow();
+  const sessionDate = credentials?.date || ist.dateStr;
 
   // Expanded Accordions State
   const [expandedTimelines, setExpandedTimelines] = useState<Set<string>>(new Set());
@@ -107,26 +115,32 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
   // Run EMA Analysis across all stocks
   const analyzedStocks = useMemo(() => {
     return stocks.map(stock => {
-      return analyzeStockEmaConfluence(stock, tradeJourneys);
+      return analyzeStockEmaConfluence(stock, tradeJourneys, sessionDate);
     });
-  }, [stocks, tradeJourneys]);
+  }, [stocks, tradeJourneys, sessionDate]);
+
+  // Stocks that have actively hit today (today's session + Score >= 5/8)
+  const todayHits = useMemo(() => {
+    return analyzedStocks.filter(s => s.isHitToday);
+  }, [analyzedStocks]);
 
   // Overall Statistics
   const overallStats = useMemo(() => {
-    const total = analyzedStocks.length;
-    const strongBullish = analyzedStocks.filter(s => s.bullishScore >= 7).length;
-    const strongBearish = analyzedStocks.filter(s => s.bearishScore >= 7).length;
-    const modBullish = analyzedStocks.filter(s => s.bullishScore >= 5 && s.bullishScore < 7).length;
-    const modBearish = analyzedStocks.filter(s => s.bearishScore >= 5 && s.bearishScore < 7).length;
+    const pool = todayOnly ? todayHits : analyzedStocks;
+    const total = pool.length;
+    const strongBullish = pool.filter(s => s.bullishScore >= 7).length;
+    const strongBearish = pool.filter(s => s.bearishScore >= 7).length;
+    const modBullish = pool.filter(s => s.bullishScore >= 5 && s.bullishScore < 7).length;
+    const modBearish = pool.filter(s => s.bearishScore >= 5 && s.bearishScore < 7).length;
     
-    // Earliest hit time
-    const activeHighConviction = analyzedStocks.filter(s => s.activeScore >= 5);
+    // Earliest hit time among active hits
+    const activeHighConviction = pool.filter(s => s.hitTime && s.hitTime !== 'Not Hit Today' && s.hitTime !== 'Pending Signal');
     const earliestTime = activeHighConviction.length > 0 
       ? [...activeHighConviction].sort((a, b) => parseTimeToMinutes(a.hitTime) - parseTimeToMinutes(b.hitTime))[0].hitTime 
-      : '09:15 AM';
+      : (todayHits.length === 0 ? 'None Today' : '09:15 AM');
 
     const avgScore = total > 0 
-      ? analyzedStocks.reduce((acc, s) => acc + s.activeScore, 0) / total 
+      ? pool.reduce((acc, s) => acc + s.activeScore, 0) / total 
       : 0;
 
     return {
@@ -138,11 +152,16 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
       earliestTime,
       avgScore
     };
-  }, [analyzedStocks]);
+  }, [todayOnly, todayHits, analyzedStocks]);
 
   // Filter and Sort
   const filteredStocks = useMemo(() => {
-    return analyzedStocks
+    // CRITICAL USER REQUIREMENT:
+    // When todayOnly is true (default), stocks not hit today are strictly excluded.
+    // If nothing has hit today, this array is empty and shows the blank state.
+    const baseList = todayOnly ? todayHits : analyzedStocks;
+
+    return baseList
       .filter(s => {
         // Search Term
         if (!searchTerm) return true;
@@ -151,8 +170,8 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
       })
       .filter(s => {
         // Side Filter
-        if (sideFilter === 'BULLISH') return s.dominantSide === 'BULLISH' || s.bullishScore >= 3;
-        if (sideFilter === 'BEARISH') return s.dominantSide === 'BEARISH' || s.bearishScore >= 3;
+        if (sideFilter === 'BULLISH') return s.dominantSide === 'BULLISH';
+        if (sideFilter === 'BEARISH') return s.dominantSide === 'BEARISH';
         if (sideFilter === 'STRONG_ONLY') return s.bullishScore >= 7 || s.bearishScore >= 7;
         return true;
       })
@@ -167,7 +186,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
         if (timeFilter === '09:15') return s.hitTime === '09:15 AM';
         if (timeFilter === '09:30') return s.hitTime === '09:30 AM';
         if (timeFilter === '09:45') return s.hitTime === '09:45 AM';
-        if (timeFilter === '10:00_PLUS') return s.hitTime !== '09:15 AM' && s.hitTime !== '09:30 AM' && s.hitTime !== '09:45 AM';
+        if (timeFilter === '10:00_PLUS') return s.hitTime !== '09:15 AM' && s.hitTime !== '09:30 AM' && s.hitTime !== '09:45 AM' && s.hitTime !== 'Not Hit Today' && s.hitTime !== 'Pending Signal';
         return true;
       })
       .filter(s => {
@@ -199,7 +218,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
         const scoreB = b.dominantSide === 'BULLISH' ? b.bullishScore : b.bearishScore;
         return scoreB - scoreA || b.pctChange - a.pctChange;
       });
-  }, [analyzedStocks, searchTerm, sideFilter, tierFilter, timeFilter, priceFilter, sortBy]);
+  }, [todayOnly, todayHits, analyzedStocks, searchTerm, sideFilter, tierFilter, timeFilter, priceFilter, sortBy]);
 
   return (
     <div className="space-y-6">
@@ -223,9 +242,16 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                   <Flame className="w-3.5 h-3.5 text-emerald-400" />
                   9 &gt; 20 &gt; 50 &gt; 200 EMA Cascade
                 </span>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  Session: {sessionDate}
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                  Prior Sessions Excluded
+                </span>
               </div>
               <p className="text-xs md:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Quantitative multi-EMA scoring system with <strong className="text-amber-300">Intraday Hit Time</strong>, <strong className="text-cyan-300">F&amp;O Lot Size</strong>, and slope trajectory tracking.
+                Quantitative multi-EMA scoring system with <strong className="text-amber-300">Today&apos;s Hit Time</strong>, <strong className="text-cyan-300">F&amp;O Lot Size</strong>, and real-time slope trajectory tracking.
               </p>
             </div>
           </div>
@@ -303,7 +329,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
               <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
               <span>🟢 Bullish Confluence</span>
               <span className="text-[10px] bg-emerald-950 px-1.5 py-0.2 rounded font-mono">
-                {analyzedStocks.filter(s => s.dominantSide === 'BULLISH').length}
+                {(todayOnly ? todayHits : analyzedStocks).filter(s => s.dominantSide === 'BULLISH').length}
               </span>
             </button>
 
@@ -318,7 +344,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
               <TrendingDown className="w-3.5 h-3.5 text-rose-300" />
               <span>🔴 Bearish Confluence</span>
               <span className="text-[10px] bg-rose-950 px-1.5 py-0.2 rounded font-mono">
-                {analyzedStocks.filter(s => s.dominantSide === 'BEARISH').length}
+                {(todayOnly ? todayHits : analyzedStocks).filter(s => s.dominantSide === 'BEARISH').length}
               </span>
             </button>
 
@@ -345,7 +371,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
-              <span>All ({analyzedStocks.length})</span>
+              <span>All ({(todayOnly ? todayHits : analyzedStocks).length})</span>
             </button>
           </div>
 
@@ -384,13 +410,26 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
           </div>
         </div>
 
-        {/* Secondary Filter Row: Hit Time, Tiers, Price & Sort */}
+        {/* Secondary Filter Row: Today Mode, Hit Time, Tiers, Price & Sort */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/70 text-xs">
-          {/* Hit Time Filter */}
-          <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1 pr-1">
-              <Clock className="w-3 h-3" />
-              Hit Time:
+          {/* Today Strict Mode & Hit Time Filter */}
+          <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar">
+            <button
+              onClick={() => setTodayOnly(!todayOnly)}
+              className={`px-3 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border ${
+                todayOnly
+                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+              title={todayOnly ? "Strict mode: showing only stocks that hit today" : "Showing all stocks including prior session"}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Today&apos;s Hits ({todayHits.length})</span>
+              {todayOnly && <span className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+            </button>
+
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1 pl-1.5 border-l border-slate-800">
+              Timing:
             </span>
             <button
               onClick={() => setTimeFilter('ALL')}
@@ -1012,17 +1051,59 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
 
       {/* Empty State */}
       {filteredStocks.length === 0 && (
-        <div className="bg-slate-900/60 rounded-3xl border border-slate-800 p-12 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-3">
-            <Filter className="w-6 h-6" />
+        todayHits.length === 0 && todayOnly ? (
+          <div className="bg-slate-900/80 rounded-3xl border border-slate-800 p-10 md:p-14 text-center relative overflow-hidden shadow-xl">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8" />
+            </div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-950 border border-slate-800 text-xs text-slate-300 mb-3 font-mono">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              Session: {sessionDate} • Scanner Active
+            </div>
+            <h3 className="text-xl font-black text-white font-mono">
+              No Stocks Have Hit EMA Confluence Today
+            </h3>
+            <p className="text-slate-400 text-xs md:text-sm max-w-lg mx-auto mt-2 leading-relaxed">
+              Friday 3:00 PM and prior-session records are strictly excluded. The scanner remains blank until stocks trigger live EMA confluence (Score ≥ 5/8) in today&apos;s session.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <div className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400 flex items-center gap-2 font-mono">
+                <span className="w-2 h-2 rounded-full bg-slate-600" />
+                <span>Today&apos;s Active Hits: <strong className="text-white">0</strong></span>
+              </div>
+              <button
+                onClick={() => setTodayOnly(false)}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition-colors cursor-pointer font-semibold"
+              >
+                View Historical / Prior Session ({analyzedStocks.length})
+              </button>
+            </div>
           </div>
-          <h3 className="text-lg font-bold text-white font-mono">No Stocks Match Filter</h3>
-          <p className="text-slate-400 text-xs max-w-md mx-auto mt-1">
-            {searchTerm 
-              ? `No stock matching "${searchTerm}" fulfills the selected EMA confluence criteria.`
-              : 'Try selecting "All Tiers" or adjusting the time window to view more active setups.'}
-          </p>
-        </div>
+        ) : (
+          <div className="bg-slate-900/60 rounded-3xl border border-slate-800 p-12 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-3">
+              <Filter className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-white font-mono">No Stocks Match Active Filter</h3>
+            <p className="text-slate-400 text-xs max-w-md mx-auto mt-1">
+              {searchTerm 
+                ? `No stock matching "${searchTerm}" fulfills the selected filter.`
+                : `No stock matches the selected criteria among today's ${todayHits.length} confluence hits.`}
+            </p>
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSideFilter('ALL');
+                setTimeFilter('ALL');
+                setTierFilter('ALL');
+                setPriceFilter('ALL');
+              }}
+              className="mt-4 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white border border-slate-700 cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          </div>
+        )
       )}
     </div>
   );
