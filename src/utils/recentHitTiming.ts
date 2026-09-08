@@ -137,20 +137,90 @@ export function resolveRecentEmaHitTiming(
   const score = isBull ? bullishScore : bearishScore;
 
   const ist = getISTNow();
-  const todayDateStr = targetDate || ist.dateStr;
+  const realTodayDate = ist.dateStr;
 
-  // 0. Check whether stock is from yesterday, Friday, or prior session
-  const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
-  const isFetchedOtherDate = stock.fetchedDate ? stock.fetchedDate.trim() !== todayDateStr : false;
-  const isCandleOtherDate = stock.candleTimestamp ? (
-    /yesterday|prev|prior|friday/i.test(stock.candleTimestamp) ||
-    Boolean(stock.candleTimestamp.match(/(\d{4}-\d{2}-\d{2})/) && stock.candleTimestamp.match(/(\d{4}-\d{2}-\d{2})/)![1] !== todayDateStr)
-  ) : false;
+  // 0. DATE & MARKET SESSION GUARDS:
+  // If market hasn't opened today (before 09:15 AM IST) or weekend, no stocks have hit today!
+  const isWeekend = ist.dayOfWeek === 0 || ist.dayOfWeek === 6;
+  const isBeforeOpen = ist.totalMinutes < 9 * 60 + 15;
 
-  if (yesterdayCheck.isYesterday || isFetchedOtherDate || isCandleOtherDate) {
+  if (isWeekend || isBeforeOpen) {
     return {
       hitTime: 'Not Hit Today',
-      hitTrigger: 'Stock data is from prior session (Friday/prior day) - Not hit today',
+      hitTrigger: isWeekend
+        ? 'Market closed (Weekend) - No live hits today'
+        : 'Market opens at 09:15 AM IST - No live hits today',
+      hitPrice: close,
+      recencyLabel: 'Not Hit Today',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  // Stock must be fetched live for today's session
+  if (!stock.isFetched) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: 'Stock not fetched live for today\'s session',
+      hitPrice: close,
+      recencyLabel: 'Unfetched',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  // If fetchedDate is not today's actual date, it is from yesterday / Friday
+  if (stock.fetchedDate && stock.fetchedDate.trim() !== realTodayDate) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: `Stock data is from prior session (${stock.fetchedDate}) - Not hit today`,
+      hitPrice: close,
+      recencyLabel: 'Prior Session',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  // Check candleTimestamp for explicit prior date or labels
+  if (stock.candleTimestamp) {
+    if (/yesterday|prev|prior|friday/i.test(stock.candleTimestamp)) {
+      return {
+        hitTime: 'Not Hit Today',
+        hitTrigger: 'Stock data is from prior session (Friday/prior day) - Not hit today',
+        hitPrice: close,
+        recencyLabel: 'Prior Session',
+        phaseBadge: '',
+        phaseBadgeClass: '',
+        rulePassedMinutes: 0,
+        isFresh: false
+      };
+    }
+    const matchYMD = stock.candleTimestamp.match(/(\d{4}-\d{2}-\d{2})/);
+    if (matchYMD && matchYMD[1] !== realTodayDate) {
+      return {
+        hitTime: 'Not Hit Today',
+        hitTrigger: `Candle from ${matchYMD[1]} - Not hit today`,
+        hitPrice: close,
+        recencyLabel: 'Prior Session',
+        phaseBadge: '',
+        phaseBadgeClass: '',
+        rulePassedMinutes: 0,
+        isFresh: false
+      };
+    }
+  }
+
+  const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
+  if (yesterdayCheck.isYesterday) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: 'Stock data is from prior session - Not hit today',
       hitPrice: close,
       recencyLabel: 'Prior Session',
       phaseBadge: '',
@@ -179,36 +249,41 @@ export function resolveRecentEmaHitTiming(
     const cleanTime = formatCleanRecentTime(tradeJourney.inceptionTime, '');
     if (cleanTime) {
       const parsedMins = parseTimeToMinutes(cleanTime);
-      return {
-        hitTime: cleanTime,
-        hitTrigger: `EMA Confluence Logged @ ${cleanTime}`,
-        hitPrice: tradeJourney.inceptionPrice || (isBull ? open : close),
-        recencyLabel: 'Logged Hit',
-        phaseBadge: `⏱️ ${cleanTime} Inception`,
-        phaseBadgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-        rulePassedMinutes: parsedMins,
-        isFresh: false
-      };
+      if (parsedMins <= ist.totalMinutes + 5) {
+        return {
+          hitTime: cleanTime,
+          hitTrigger: `EMA Confluence Logged @ ${cleanTime}`,
+          hitPrice: tradeJourney.inceptionPrice || (isBull ? open : close),
+          recencyLabel: 'Logged Hit',
+          phaseBadge: `⏱️ ${cleanTime} Inception`,
+          phaseBadgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+          rulePassedMinutes: parsedMins,
+          isFresh: false
+        };
+      }
     }
   }
 
   // 2. Scan intraday timeline for the exact recent trigger candle
   const timeline = stock.rsiTimeline || [];
   if (timeline.length >= 2) {
-    // Traverse from earliest to find where criteria met or most recent breakout hold
     for (let i = 0; i < timeline.length; i++) {
       const pt = timeline[i];
       const ptTime = formatCleanRecentTime(pt.timeStr, '');
       if (!ptTime) continue;
 
+      const parsedMins = parseTimeToMinutes(ptTime);
+      // Futurity guard: If candle time is beyond current IST time + 5 mins, skip it
+      if (parsedMins > ist.totalMinutes + 5) {
+        continue;
+      }
+
       if (isBull) {
-        // Bullish trigger: ORB break or RSI surge above 55 or new session high
         const isOrbBreak = pt.high ? pt.high >= f15mHigh : pt.close > f15mHigh * 0.998;
         const isRsiSurge = pt.rsi >= 55;
         const isAbovePrev = pt.close > prevClose;
 
         if (i >= 1 && (isOrbBreak || (isRsiSurge && isAbovePrev))) {
-          const parsedMins = parseTimeToMinutes(ptTime);
           return {
             hitTime: ptTime,
             hitTrigger: i === 1 
@@ -223,12 +298,10 @@ export function resolveRecentEmaHitTiming(
           };
         }
       } else {
-        // Bearish trigger: Breakdown below low or RSI drop below 45
         const isOrbDrop = pt.low ? pt.low <= f15mLow : pt.close < f15mLow * 1.002;
         const isRsiDrop = pt.rsi <= 45;
 
         if (i >= 1 && (isOrbDrop || isRsiDrop)) {
-          const parsedMins = parseTimeToMinutes(ptTime);
           return {
             hitTime: ptTime,
             hitTrigger: i === 1 
@@ -246,27 +319,30 @@ export function resolveRecentEmaHitTiming(
     }
   }
 
-  // 3. Check candleTimestamp for recent candle timing
+  // 3. Check candleTimestamp for recent candle timing (guard against future/past 3:00 PM candle)
   if (stock.candleTimestamp && stock.candleTimestamp !== 'CSV Imported' && !/yesterday|prev|prior|friday/i.test(stock.candleTimestamp)) {
     const cleanTime = formatCleanRecentTime(stock.candleTimestamp, '');
     if (cleanTime && cleanTime !== '09:15 AM') {
       const parsedMins = parseTimeToMinutes(cleanTime);
-      return {
-        hitTime: cleanTime,
-        hitTrigger: `${cleanTime} ${isBull ? 'Bullish' : 'Bearish'} EMA Confluence Bar`,
-        hitPrice: close,
-        recencyLabel: 'Recent Candle',
-        phaseBadge: `🕒 ${cleanTime} Hit`,
-        phaseBadgeClass: isBull 
-          ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' 
-          : 'bg-rose-500/20 text-rose-300 border-rose-500/40',
-        rulePassedMinutes: parsedMins,
-        isFresh: true
-      };
+      // ONLY allow if the time has actually occurred today! (e.g. 3:00 PM is NOT valid at 10:00 AM)
+      if (parsedMins <= ist.totalMinutes + 5) {
+        return {
+          hitTime: cleanTime,
+          hitTrigger: `${cleanTime} ${isBull ? 'Bullish' : 'Bearish'} EMA Confluence Bar`,
+          hitPrice: close,
+          recencyLabel: 'Recent Candle',
+          phaseBadge: `🕒 ${cleanTime} Hit`,
+          phaseBadgeClass: isBull 
+            ? 'bg-teal-500/20 text-teal-300 border-teal-500/40' 
+            : 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+          rulePassedMinutes: parsedMins,
+          isFresh: true
+        };
+      }
     }
   }
 
-  // 4. Session Pattern Triggers
+  // 4. Session Pattern Triggers (strictly bounded by current session progression)
   if (isBull) {
     if (open > prevClose && close > open && (stock.isOpenEqualLow || (low >= open * 0.998))) {
       return {
@@ -281,7 +357,7 @@ export function resolveRecentEmaHitTiming(
       };
     }
 
-    if (close > f15mHigh) {
+    if (close > f15mHigh && ist.totalMinutes >= 9 * 60 + 30) {
       return {
         hitTime: '09:30 AM',
         hitTrigger: '09:30 AM 15m ORB High Breakout & 9/20 EMA Cross',
@@ -294,7 +370,7 @@ export function resolveRecentEmaHitTiming(
       };
     }
 
-    if (score >= 7) {
+    if (score >= 7 && ist.totalMinutes >= 10 * 60) {
       return {
         hitTime: '10:00 AM',
         hitTrigger: '10:00 AM 7–8 Confluence Stack Expansion',
@@ -307,14 +383,27 @@ export function resolveRecentEmaHitTiming(
       };
     }
 
+    if (ist.totalMinutes >= 9 * 60 + 45) {
+      return {
+        hitTime: '09:45 AM',
+        hitTrigger: '09:45 AM 9>20>50 EMA Trend Momentum',
+        hitPrice: (open + close) / 2,
+        recencyLabel: 'Session Momentum',
+        phaseBadge: '🕒 09:45 AM Confluence',
+        phaseBadgeClass: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
+        rulePassedMinutes: 9 * 60 + 45,
+        isFresh: false
+      };
+    }
+
     return {
-      hitTime: '09:45 AM',
-      hitTrigger: '09:45 AM 9>20>50 EMA Trend Momentum',
-      hitPrice: (open + close) / 2,
-      recencyLabel: 'Session Momentum',
-      phaseBadge: '🕒 09:45 AM Confluence',
+      hitTime: '09:15 AM',
+      hitTrigger: '09:15 AM Opening Confluence Momentum',
+      hitPrice: open,
+      recencyLabel: 'Opening Bell',
+      phaseBadge: '🔔 09:15 AM Opening',
       phaseBadgeClass: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
-      rulePassedMinutes: 9 * 60 + 45,
+      rulePassedMinutes: 9 * 60 + 15,
       isFresh: false
     };
   } else {
@@ -332,7 +421,7 @@ export function resolveRecentEmaHitTiming(
       };
     }
 
-    if (close < f15mLow) {
+    if (close < f15mLow && ist.totalMinutes >= 9 * 60 + 30) {
       return {
         hitTime: '09:30 AM',
         hitTrigger: '09:30 AM 15m ORB Low Breakdown & 9/20 EMA Death Cross',
@@ -345,14 +434,27 @@ export function resolveRecentEmaHitTiming(
       };
     }
 
+    if (ist.totalMinutes >= 9 * 60 + 45) {
+      return {
+        hitTime: '09:45 AM',
+        hitTrigger: '09:45 AM 9<20<50 EMA Downward Momentum',
+        hitPrice: (open + close) / 2,
+        recencyLabel: 'Session Breakdown',
+        phaseBadge: '🕒 09:45 AM Confluence',
+        phaseBadgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+        rulePassedMinutes: 9 * 60 + 45,
+        isFresh: false
+      };
+    }
+
     return {
-      hitTime: '09:45 AM',
-      hitTrigger: '09:45 AM 9<20<50 EMA Downward Momentum',
-      hitPrice: (open + close) / 2,
-      recencyLabel: 'Session Breakdown',
-      phaseBadge: '🕒 09:45 AM Confluence',
+      hitTime: '09:15 AM',
+      hitTrigger: '09:15 AM Opening Breakdown',
+      hitPrice: open,
+      recencyLabel: 'Opening Bell',
+      phaseBadge: '🔔 09:15 AM Opening',
       phaseBadgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
-      rulePassedMinutes: 9 * 60 + 45,
+      rulePassedMinutes: 9 * 60 + 15,
       isFresh: false
     };
   }
@@ -375,21 +477,69 @@ export function resolveRecentHundredBullishHitTiming(
   const f15mHigh = stock.first15mHigh || high;
   const isGapUp = prevClose ? open > prevClose : false;
 
+  const ist = getISTNow();
+  const realTodayDate = ist.dateStr;
+
+  const isWeekend = ist.dayOfWeek === 0 || ist.dayOfWeek === 6;
+  const isBeforeOpen = ist.totalMinutes < 9 * 60 + 15;
+
+  if (isWeekend || isBeforeOpen || !stock.isFetched) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: isWeekend ? 'Market closed (Weekend) - No live hits today' : 'Market opens at 09:15 AM IST',
+      hitPrice: close,
+      recencyLabel: 'Not Hit Today',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  if (stock.fetchedDate && stock.fetchedDate.trim() !== realTodayDate) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: `Stock data is from prior session (${stock.fetchedDate})`,
+      hitPrice: close,
+      recencyLabel: 'Prior Session',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
+  if (yesterdayCheck.isYesterday) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: 'Stock data is from prior session - Not hit today',
+      hitPrice: close,
+      recencyLabel: 'Prior Session',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
   // 1. Trade Journey Inception
   if (tradeJourney && tradeJourney.inceptionTime && tradeJourney.inceptionTime !== 'CSV Imported') {
     const cleanTime = formatCleanRecentTime(tradeJourney.inceptionTime, '');
     if (cleanTime) {
       const parsedMins = parseTimeToMinutes(cleanTime);
-      return {
-        hitTime: cleanTime,
-        hitTrigger: `100% Bullish Trade Logged @ ${cleanTime}`,
-        hitPrice: tradeJourney.inceptionPrice || open,
-        recencyLabel: 'Logged Signal',
-        phaseBadge: `⏱️ ${cleanTime} Inception`,
-        phaseBadgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-        rulePassedMinutes: parsedMins,
-        isFresh: false
-      };
+      if (parsedMins <= ist.totalMinutes + 5) {
+        return {
+          hitTime: cleanTime,
+          hitTrigger: `100% Bullish Trade Logged @ ${cleanTime}`,
+          hitPrice: tradeJourney.inceptionPrice || open,
+          recencyLabel: 'Logged Signal',
+          phaseBadge: `⏱️ ${cleanTime} Inception`,
+          phaseBadgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+          rulePassedMinutes: parsedMins,
+          isFresh: false
+        };
+      }
     }
   }
 
@@ -401,11 +551,13 @@ export function resolveRecentHundredBullishHitTiming(
       const ptTime = formatCleanRecentTime(pt.timeStr, '');
       if (!ptTime) continue;
 
+      const parsedMins = parseTimeToMinutes(ptTime);
+      if (parsedMins > ist.totalMinutes + 5) continue;
+
       const isHighClose = pt.close >= (pt.high || high) * 0.995;
       const isRsiBull = pt.rsi >= 55;
 
       if (isHighClose && isRsiBull) {
-        const parsedMins = parseTimeToMinutes(ptTime);
         return {
           hitTime: ptTime,
           hitTrigger: `${ptTime} 100% Bullish Candle (CMP ₹${pt.close.toFixed(2)} | RSI ${pt.rsi.toFixed(0)})`,
@@ -421,25 +573,27 @@ export function resolveRecentHundredBullishHitTiming(
   }
 
   // 3. Check clean candle timestamp
-  if (stock.candleTimestamp && stock.candleTimestamp !== 'CSV Imported') {
+  if (stock.candleTimestamp && stock.candleTimestamp !== 'CSV Imported' && !/yesterday|prev|prior|friday/i.test(stock.candleTimestamp)) {
     const cleanTime = formatCleanRecentTime(stock.candleTimestamp, '');
     if (cleanTime && cleanTime !== '09:15 AM') {
       const parsedMins = parseTimeToMinutes(cleanTime);
-      return {
-        hitTime: cleanTime,
-        hitTrigger: `Open = Low 100% Confluence Hit @ ${cleanTime}`,
-        hitPrice: close,
-        recencyLabel: 'Recent Hit',
-        phaseBadge: `🕒 ${cleanTime} Hit`,
-        phaseBadgeClass: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
-        rulePassedMinutes: parsedMins,
-        isFresh: true
-      };
+      if (parsedMins <= ist.totalMinutes + 5) {
+        return {
+          hitTime: cleanTime,
+          hitTrigger: `Open = Low 100% Confluence Hit @ ${cleanTime}`,
+          hitPrice: close,
+          recencyLabel: 'Recent Hit',
+          phaseBadge: `🕒 ${cleanTime} Hit`,
+          phaseBadgeClass: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
+          rulePassedMinutes: parsedMins,
+          isFresh: true
+        };
+      }
     }
   }
 
   // 4. Pattern triggers
-  if (breaksORB && f15mHigh) {
+  if (breaksORB && f15mHigh && ist.totalMinutes >= 9 * 60 + 30) {
     return {
       hitTime: '09:30 AM',
       hitTrigger: `09:30 AM 15m ORB High Breakout above ₹${f15mHigh.toFixed(2)}`,
@@ -494,6 +648,52 @@ export function resolveRecentParabolicHitTiming(
   const f15mHigh = stock.first15mHigh || high;
   const f15mLow = stock.first15mLow || low;
 
+  const ist = getISTNow();
+  const realTodayDate = ist.dateStr;
+
+  const isWeekend = ist.dayOfWeek === 0 || ist.dayOfWeek === 6;
+  const isBeforeOpen = ist.totalMinutes < 9 * 60 + 15;
+
+  if (isWeekend || isBeforeOpen || !stock.isFetched) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: isWeekend ? 'Market closed (Weekend) - No live hits today' : 'Market opens at 09:15 AM IST',
+      hitPrice: close,
+      recencyLabel: 'Not Hit Today',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  if (stock.fetchedDate && stock.fetchedDate.trim() !== realTodayDate) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: `Stock data is from prior session (${stock.fetchedDate})`,
+      hitPrice: close,
+      recencyLabel: 'Prior Session',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
+  if (yesterdayCheck.isYesterday) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: 'Stock data is from prior session - Not hit today',
+      hitPrice: close,
+      recencyLabel: 'Prior Session',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
   // 1. Scan timeline
   const timeline = stock.rsiTimeline || [];
   if (timeline.length >= 2) {
@@ -502,8 +702,10 @@ export function resolveRecentParabolicHitTiming(
       const ptTime = formatCleanRecentTime(pt.timeStr, '');
       if (!ptTime) continue;
 
+      const parsedMins = parseTimeToMinutes(ptTime);
+      if (parsedMins > ist.totalMinutes + 5) continue;
+
       if (isBull && pt.rsi >= 58 && pt.close >= open) {
-        const parsedMins = parseTimeToMinutes(ptTime);
         return {
           hitTime: ptTime,
           hitTrigger: `${ptTime} Parabolic Bullish Rally (RSI ${pt.rsi.toFixed(0)})`,
@@ -515,7 +717,6 @@ export function resolveRecentParabolicHitTiming(
           isFresh: i >= timeline.length - 2
         };
       } else if (!isBull && pt.rsi <= 42 && pt.close <= open) {
-        const parsedMins = parseTimeToMinutes(ptTime);
         return {
           hitTime: ptTime,
           hitTrigger: `${ptTime} Parabolic Bearish Breakdown (RSI ${pt.rsi.toFixed(0)})`,
@@ -531,28 +732,30 @@ export function resolveRecentParabolicHitTiming(
   }
 
   // 2. Candle timestamp
-  if (stock.candleTimestamp && stock.candleTimestamp !== 'CSV Imported') {
+  if (stock.candleTimestamp && stock.candleTimestamp !== 'CSV Imported' && !/yesterday|prev|prior|friday/i.test(stock.candleTimestamp)) {
     const cleanTime = formatCleanRecentTime(stock.candleTimestamp, '');
     if (cleanTime) {
       const parsedMins = parseTimeToMinutes(cleanTime);
-      return {
-        hitTime: cleanTime,
-        hitTrigger: `${cleanTime} Parabolic Bar Met`,
-        hitPrice: close,
-        recencyLabel: 'Recent Hit',
-        phaseBadge: `🕒 ${cleanTime} Hit`,
-        phaseBadgeClass: isBull 
-          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
-          : 'bg-rose-500/20 text-rose-300 border-rose-500/40',
-        rulePassedMinutes: parsedMins,
-        isFresh: true
-      };
+      if (parsedMins <= ist.totalMinutes + 5) {
+        return {
+          hitTime: cleanTime,
+          hitTrigger: `${cleanTime} Parabolic Bar Met`,
+          hitPrice: close,
+          recencyLabel: 'Recent Hit',
+          phaseBadge: `🕒 ${cleanTime} Hit`,
+          phaseBadgeClass: isBull 
+            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+            : 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+          rulePassedMinutes: parsedMins,
+          isFresh: true
+        };
+      }
     }
   }
 
   // 3. Standard fallback based on session structure
   if (isBull) {
-    if (close > f15mHigh) {
+    if (close > f15mHigh && ist.totalMinutes >= 9 * 60 + 30) {
       return {
         hitTime: '09:30 AM',
         hitTrigger: '09:30 AM 15m ORB Breakout Surge',
@@ -575,7 +778,7 @@ export function resolveRecentParabolicHitTiming(
       isFresh: false
     };
   } else {
-    if (close < f15mLow) {
+    if (close < f15mLow && ist.totalMinutes >= 9 * 60 + 30) {
       return {
         hitTime: '09:30 AM',
         hitTrigger: '09:30 AM 15m ORB Breakdown',

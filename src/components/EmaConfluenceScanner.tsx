@@ -51,18 +51,19 @@ export function EmaConfluenceScanner({
   onOpenPositionSizer,
   onOpenRsiAnalyst
 }: Props) {
-  // Navigation & Primary Filter State
+  // Navigation & Primary Filter State: Default to ALL (overall hits) and TIME_DESC (prioritize recent hits)
   const [todayOnly, setTodayOnly] = useState<boolean>(true);
-  const [sideFilter, setSideFilter] = useState<'ALL' | 'BULLISH' | 'BEARISH' | 'STRONG_ONLY'>('BULLISH');
+  const [sideFilter, setSideFilter] = useState<'ALL' | 'BULLISH' | 'BEARISH' | 'STRONG_ONLY'>('ALL');
   const [tierFilter, setTierFilter] = useState<'ALL' | 'VERY_STRONG' | 'MODERATE' | 'WEAK_WAIT'>('ALL');
   const [timeFilter, setTimeFilter] = useState<'ALL' | '09:15' | '09:30' | '09:45' | '10:00_PLUS'>('ALL');
   const [priceFilter, setPriceFilter] = useState<'ALL' | 'UNDER_1000' | '1000_TO_2500' | 'ABOVE_2500'>('ALL');
-  const [sortBy, setSortBy] = useState<'SCORE_DESC' | 'TIME_ASC' | 'TIME_DESC' | 'LOT_DESC' | 'PCT_DESC' | 'PRICE_DESC'>('SCORE_DESC');
+  const [sortBy, setSortBy] = useState<'SCORE_DESC' | 'TIME_ASC' | 'TIME_DESC' | 'LOT_DESC' | 'PCT_DESC' | 'PRICE_DESC'>('TIME_DESC');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'CARDS' | 'TABLE'>('CARDS');
 
   const ist = getISTNow();
-  const sessionDate = credentials?.date || ist.dateStr;
+  // Today date is strictly today's current Indian Standard Time date
+  const sessionDate = ist.dateStr;
 
   // Expanded Accordions State
   const [expandedTimelines, setExpandedTimelines] = useState<Set<string>>(new Set());
@@ -133,11 +134,11 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
     const modBullish = pool.filter(s => s.bullishScore >= 5 && s.bullishScore < 7).length;
     const modBearish = pool.filter(s => s.bearishScore >= 5 && s.bearishScore < 7).length;
     
-    // Earliest hit time among active hits
+    // Active hits with valid timestamps
     const activeHighConviction = pool.filter(s => s.hitTime && s.hitTime !== 'Not Hit Today' && s.hitTime !== 'Pending Signal');
-    const earliestTime = activeHighConviction.length > 0 
-      ? [...activeHighConviction].sort((a, b) => parseTimeToMinutes(a.hitTime) - parseTimeToMinutes(b.hitTime))[0].hitTime 
-      : (todayHits.length === 0 ? 'None Today' : '09:15 AM');
+    const sortedByRecency = [...activeHighConviction].sort((a, b) => parseTimeToMinutes(b.hitTime) - parseTimeToMinutes(a.hitTime));
+    const mostRecentTime = sortedByRecency.length > 0 ? sortedByRecency[0].hitTime : (todayHits.length === 0 ? 'None Today' : '09:15 AM');
+    const earliestTime = sortedByRecency.length > 0 ? sortedByRecency[sortedByRecency.length - 1].hitTime : (todayHits.length === 0 ? 'None Today' : '09:15 AM');
 
     const avgScore = total > 0 
       ? pool.reduce((acc, s) => acc + s.activeScore, 0) / total 
@@ -150,6 +151,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
       modBullish,
       modBearish,
       earliestTime,
+      mostRecentTime,
       avgScore
     };
   }, [todayOnly, todayHits, analyzedStocks]);
@@ -197,12 +199,20 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
         return true;
       })
       .sort((a, b) => {
-        // Sorting
+        // Sorting: Prioritize recent hits with tie-breakers
         if (sortBy === 'TIME_ASC') {
-          return parseTimeToMinutes(a.hitTime) - parseTimeToMinutes(b.hitTime);
+          const diff = parseTimeToMinutes(a.hitTime) - parseTimeToMinutes(b.hitTime);
+          if (diff !== 0) return diff;
+          const scoreA = a.dominantSide === 'BULLISH' ? a.bullishScore : a.bearishScore;
+          const scoreB = b.dominantSide === 'BULLISH' ? b.bullishScore : b.bearishScore;
+          return scoreB - scoreA || b.pctChange - a.pctChange;
         }
         if (sortBy === 'TIME_DESC') {
-          return parseTimeToMinutes(b.hitTime) - parseTimeToMinutes(a.hitTime);
+          const diff = parseTimeToMinutes(b.hitTime) - parseTimeToMinutes(a.hitTime);
+          if (diff !== 0) return diff;
+          const scoreA = a.dominantSide === 'BULLISH' ? a.bullishScore : a.bearishScore;
+          const scoreB = b.dominantSide === 'BULLISH' ? b.bullishScore : b.bearishScore;
+          return scoreB - scoreA || b.pctChange - a.pctChange;
         }
         if (sortBy === 'LOT_DESC') {
           return b.lotSize - a.lotSize;
@@ -259,26 +269,34 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
           {/* Quick Stat Pill Widgets */}
           <div className="flex items-center gap-2.5 flex-wrap">
             <div className="px-3 py-2 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5">
+              <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Overall Hits</span>
+                <span className="font-mono font-black text-cyan-300 text-xs">{overallStats.total} Stocks</span>
+              </div>
+            </div>
+
+            <div className="px-3 py-2 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5">
               <Clock className="w-4 h-4 text-amber-400 shrink-0" />
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Earliest Hit Time</span>
-                <span className="font-mono font-black text-amber-300 text-xs">{overallStats.earliestTime}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Latest / Recent Hit</span>
+                <span className="font-mono font-black text-amber-300 text-xs">{overallStats.mostRecentTime}</span>
               </div>
             </div>
 
             <div className="px-3 py-2 rounded-2xl bg-emerald-950/40 border border-emerald-800/60 flex items-center gap-2.5">
               <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
               <div>
-                <span className="text-[10px] uppercase font-bold text-emerald-400/80 block">Strong Bullish (7-8)</span>
-                <span className="font-mono font-black text-emerald-300 text-xs">{overallStats.strongBullish} Stocks</span>
+                <span className="text-[10px] uppercase font-bold text-emerald-400/80 block">Bullish Hits</span>
+                <span className="font-mono font-black text-emerald-300 text-xs">{overallStats.modBullish + overallStats.strongBullish} Stocks</span>
               </div>
             </div>
 
             <div className="px-3 py-2 rounded-2xl bg-rose-950/40 border border-rose-800/60 flex items-center gap-2.5">
               <TrendingDown className="w-4 h-4 text-rose-400 shrink-0" />
               <div>
-                <span className="text-[10px] uppercase font-bold text-rose-400/80 block">Strong Bearish (7-8)</span>
-                <span className="font-mono font-black text-rose-300 text-xs">{overallStats.strongBearish} Stocks</span>
+                <span className="text-[10px] uppercase font-bold text-rose-400/80 block">Bearish Hits</span>
+                <span className="font-mono font-black text-rose-300 text-xs">{overallStats.modBearish + overallStats.strongBearish} Stocks</span>
               </div>
             </div>
           </div>
@@ -319,6 +337,18 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
           {/* Side Mode Selector Buttons */}
           <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar">
             <button
+              onClick={() => setSideFilter('ALL')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                sideFilter === 'ALL'
+                  ? 'bg-amber-500 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Overall Hits ({(todayOnly ? todayHits : analyzedStocks).length})</span>
+            </button>
+
+            <button
               onClick={() => setSideFilter('BULLISH')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                 sideFilter === 'BULLISH'
@@ -327,7 +357,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
               }`}
             >
               <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
-              <span>🟢 Bullish Confluence</span>
+              <span>🟢 Bullish</span>
               <span className="text-[10px] bg-emerald-950 px-1.5 py-0.2 rounded font-mono">
                 {(todayOnly ? todayHits : analyzedStocks).filter(s => s.dominantSide === 'BULLISH').length}
               </span>
@@ -342,7 +372,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
               }`}
             >
               <TrendingDown className="w-3.5 h-3.5 text-rose-300" />
-              <span>🔴 Bearish Confluence</span>
+              <span>🔴 Bearish</span>
               <span className="text-[10px] bg-rose-950 px-1.5 py-0.2 rounded font-mono">
                 {(todayOnly ? todayHits : analyzedStocks).filter(s => s.dominantSide === 'BEARISH').length}
               </span>
@@ -352,7 +382,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
               onClick={() => setSideFilter('STRONG_ONLY')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                 sideFilter === 'STRONG_ONLY'
-                  ? 'bg-amber-500 text-slate-950 shadow-md'
+                  ? 'bg-indigo-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
               }`}
             >
@@ -361,17 +391,6 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
               <span className="text-[10px] bg-slate-900 text-amber-300 px-1.5 py-0.2 rounded font-mono">
                 {overallStats.strongBullish + overallStats.strongBearish}
               </span>
-            </button>
-
-            <button
-              onClick={() => setSideFilter('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                sideFilter === 'ALL'
-                  ? 'bg-slate-700 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <span>All ({(todayOnly ? todayHits : analyzedStocks).length})</span>
             </button>
           </div>
 
@@ -524,9 +543,9 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="bg-slate-950 border border-slate-800 text-amber-300 font-mono text-xs rounded-xl px-2.5 py-1 focus:outline-none focus:border-amber-500 cursor-pointer"
               >
+                <option value="TIME_DESC">Hit Time (Most Recent / Latest ⬇)</option>
                 <option value="SCORE_DESC">Confluence Score (Highest First)</option>
                 <option value="TIME_ASC">Hit Time (Earliest 09:15 AM ⬆)</option>
-                <option value="TIME_DESC">Hit Time (Latest ⬇)</option>
                 <option value="LOT_DESC">Lot Size (Largest First)</option>
                 <option value="PCT_DESC">% Gain (Highest First)</option>
                 <option value="PRICE_DESC">Stock Price (Highest First)</option>
@@ -546,18 +565,24 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
             </span>
           )}
         </div>
+        {todayOnly && (
+          <span className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono">
+            ⚡ Today&apos;s Active Hits Only
+          </span>
+        )}
       </div>
 
       {/* VIEW MODE: CARDS GRID */}
       {viewMode === 'CARDS' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredStocks.map(analysis => {
+          {filteredStocks.map((analysis, idx) => {
             const isBull = analysis.dominantSide === 'BULLISH';
             const activeScore = isBull ? analysis.bullishScore : analysis.bearishScore;
             const activeConditions = isBull ? analysis.bullishConditions : analysis.bearishConditions;
             const isTimelineExpanded = expandedTimelines.has(analysis.stock.id);
             const isStackExpanded = expandedEmaStacks.has(analysis.stock.id);
             const isCopied = copiedId === analysis.stock.id;
+            const isTopRecent = idx === 0 && sortBy === 'TIME_DESC' && analysis.hitTime !== 'Not Hit Today' && analysis.hitTime !== 'Pending Signal';
 
             return (
               <div
@@ -584,6 +609,11 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                       <span className="text-xs font-black font-mono text-amber-300 tracking-wide">
                         {analysis.hitTime}
                       </span>
+                      {isTopRecent && (
+                        <span className="text-[9px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black tracking-wider uppercase">
+                          Latest Hit
+                        </span>
+                      )}
                       {analysis.isFresh && (
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                       )}

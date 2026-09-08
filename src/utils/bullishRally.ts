@@ -340,7 +340,7 @@ export function isStockFromYesterdayOrOlder(stock: StockCalculated): { isYesterd
   // 1. Check explicit fetchedDate
   if (stock.fetchedDate) {
     const clean = stock.fetchedDate.trim();
-    if (clean && clean < todayDateStr) {
+    if (clean && clean !== todayDateStr) {
       return { isYesterday: true, dateStr: clean };
     }
   }
@@ -349,8 +349,8 @@ export function isStockFromYesterdayOrOlder(stock: StockCalculated): { isYesterd
   if (stock.candleTimestamp) {
     const ts = stock.candleTimestamp.trim();
     
-    // Check for explicit "Yesterday" or "Previous" in label
-    if (/yesterday|prev|prior/i.test(ts)) {
+    // Check for explicit "Yesterday", "Previous", "Prior", or "Friday" in label
+    if (/yesterday|prev|prior|friday/i.test(ts)) {
       return { isYesterday: true, dateStr: 'Yesterday' };
     }
 
@@ -358,7 +358,7 @@ export function isStockFromYesterdayOrOlder(stock: StockCalculated): { isYesterd
     const matchYMD = ts.match(/(\d{4}-\d{2}-\d{2})/);
     if (matchYMD && matchYMD[1]) {
       const cDate = matchYMD[1];
-      if (cDate < todayDateStr) {
+      if (cDate !== todayDateStr) {
         return { isYesterday: true, dateStr: cDate };
       }
     }
@@ -373,7 +373,7 @@ export function isStockFromYesterdayOrOlder(stock: StockCalculated): { isYesterd
           const m = String(parsedD.getMonth() + 1).padStart(2, '0');
           const d = String(parsedD.getDate()).padStart(2, '0');
           const fmt = `${y}-${m}-${d}`;
-          if (fmt < todayDateStr) {
+          if (fmt !== todayDateStr) {
             return { isYesterday: true, dateStr: fmt };
           }
         }

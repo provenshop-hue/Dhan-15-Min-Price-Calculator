@@ -1,6 +1,6 @@
 import { StockCalculated, StockTradeJourney, RsiIntradayPoint } from '../types';
 import { generateIntradayRsiTimeline } from './rsiAnalyst';
-import { resolveRecentEmaHitTiming, formatCleanRecentTime } from './recentHitTiming';
+import { resolveRecentEmaHitTiming, formatCleanRecentTime, parseTimeToMinutes } from './recentHitTiming';
 import { isStockFromYesterdayOrOlder, getISTNow } from './bullishRally';
 
 export interface EmaConfluenceCondition {
@@ -150,17 +150,34 @@ function buildPriceSequence(stock: StockCalculated, timeline: RsiIntradayPoint[]
  */
 export function isStockFromToday(stock: StockCalculated, targetDate?: string): boolean {
   const ist = getISTNow();
-  const todayDateStr = targetDate || ist.dateStr; // e.g. "2026-09-07"
+  const realTodayDate = ist.dateStr; // REAL today in Indian Standard Time (Asia/Kolkata)
 
-  // 1. Check explicit fetchedDate
-  if (stock.fetchedDate) {
-    const clean = stock.fetchedDate.trim();
-    if (clean !== todayDateStr) {
-      return false;
-    }
+  // 1. If stock is not marked as fetched live from Dhan, it's just initial CSV placeholder
+  if (!stock.isFetched) {
+    return false;
   }
 
-  // 2. Check candleTimestamp for explicit prior date or labels
+  // 2. Market timing guard:
+  // If it's weekend (Sat/Sun) or before market open (< 09:15 AM IST),
+  // today's market has not started yet, so NO stock can have hit today!
+  const isWeekend = ist.dayOfWeek === 0 || ist.dayOfWeek === 6;
+  const isBeforeOpen = ist.totalMinutes < 9 * 60 + 15;
+  if (isWeekend || isBeforeOpen) {
+    return false;
+  }
+
+  // 3. Check explicit fetchedDate: must match real today's date
+  if (stock.fetchedDate) {
+    const clean = stock.fetchedDate.trim();
+    if (clean !== realTodayDate) {
+      return false;
+    }
+  } else {
+    // If no fetchedDate is present, we cannot verify it is today
+    return false;
+  }
+
+  // 4. Check candleTimestamp for explicit prior date or labels
   if (stock.candleTimestamp) {
     const ts = stock.candleTimestamp.trim();
     if (/yesterday|prev|prior|friday/i.test(ts)) {
@@ -168,7 +185,7 @@ export function isStockFromToday(stock: StockCalculated, targetDate?: string): b
     }
     const matchYMD = ts.match(/(\d{4}-\d{2}-\d{2})/);
     if (matchYMD && matchYMD[1]) {
-      if (matchYMD[1] !== todayDateStr) {
+      if (matchYMD[1] !== realTodayDate) {
         return false;
       }
     }
@@ -181,22 +198,25 @@ export function isStockFromToday(stock: StockCalculated, targetDate?: string): b
           const m = String(parsedD.getMonth() + 1).padStart(2, '0');
           const d = String(parsedD.getDate()).padStart(2, '0');
           const fmt = `${y}-${m}-${d}`;
-          if (fmt !== todayDateStr) {
+          if (fmt !== realTodayDate) {
             return false;
           }
         }
       } catch (e) {}
     }
+
+    // 5. Futurity / Stale Close check:
+    // If candle is 03:00 PM (900 min) and current IST time is only e.g. 10:00 AM (600 min),
+    // this 03:00 PM candle is physically impossible to be from today! It was from Friday's 3:00 PM close!
+    const parsedMins = parseTimeToMinutes(ts);
+    if (parsedMins > ist.totalMinutes + 5) {
+      return false;
+    }
   }
 
-  // 3. Check yesterday/older evaluator
+  // 6. Check yesterday/older evaluator
   const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
   if (yesterdayCheck.isYesterday) {
-    return false;
-  }
-
-  // 4. If neither fetchedDate nor candleTimestamp has any session record (unfetched default placeholder)
-  if (!stock.fetchedDate && (!stock.candleTimestamp || stock.candleTimestamp === 'CSV Imported')) {
     return false;
   }
 
@@ -514,9 +534,8 @@ export function analyzeStockEmaConfluence(
   // ⏱️ RECENT HIT TIME & MILESTONES CALCULATION (Today's Hits Only)
   // ==========================================
   const ist = getISTNow();
-  const todayDateStr = targetDate || ist.dateStr;
-  const isFromToday = isStockFromToday(stock, todayDateStr);
-  const isHitToday = isFromToday && activeScore >= 5;
+  const realTodayDate = ist.dateStr;
+  const isFromToday = isStockFromToday(stock, realTodayDate);
 
   const tradeJourney = tradeJourneys ? (tradeJourneys[stock.id] || tradeJourneys[stock.symbol]) : undefined;
   const recentTiming = resolveRecentEmaHitTiming(
@@ -525,8 +544,10 @@ export function analyzeStockEmaConfluence(
     bullishScore,
     bearishScore,
     tradeJourney,
-    todayDateStr
+    realTodayDate
   );
+
+  const isHitToday = isFromToday && activeScore >= 5 && recentTiming.hitTime !== 'Not Hit Today';
 
   const hitTime = isHitToday ? recentTiming.hitTime : (isFromToday ? 'Pending Signal' : 'Not Hit Today');
   const hitTrigger = isHitToday ? recentTiming.hitTrigger : (isFromToday ? 'Waiting for today\'s confluence trigger' : 'Stock data is from prior session (Friday/prior) - Not hit today');
@@ -700,7 +721,7 @@ export function analyzeStockEmaConfluence(
     isFresh,
     isHitToday,
     isFromToday,
-    sessionDate: todayDateStr,
+    sessionDate: realTodayDate,
     lotSize,
     contractValue,
     estOptionCapital,
