@@ -18,7 +18,8 @@ import {
   Calculator,
   SlidersHorizontal,
   Activity,
-  Calendar
+  Calendar,
+  Layers
 } from 'lucide-react';
 import { StockCalculated, StockTradeJourney } from '../types';
 import { generateIntradayRsiTimeline } from '../utils/rsiAnalyst';
@@ -27,6 +28,8 @@ import {
   parseTimeToMinutes, 
   formatCleanRecentTime 
 } from '../utils/recentHitTiming';
+import { isStockFromToday } from '../utils/emaConfluence';
+import { getISTNow } from '../utils/bullishRally';
 
 interface Props {
   stocks: StockCalculated[];
@@ -69,6 +72,8 @@ interface AnalyzedStock extends StockCalculated {
   checks: ConfluenceCheck[];
   score: number;
   timing: ConfluenceTimingInfo;
+  isHitToday: boolean;
+  isFromToday: boolean;
 }
 
 export function HundredPercentBullishScanner({ 
@@ -79,11 +84,15 @@ export function HundredPercentBullishScanner({
   onOpenPositionSizer,
   onOpenRsiAnalyst
 }: Props) {
+  // Default to todayOnly = true (only live today's hits, 0 if market closed / none hit today)
+  const [todayOnly, setTodayOnly] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [priceFilter, setPriceFilter] = useState<'ALL' | '1000_TO_2500' | 'ABOVE_2500'>('ALL');
   const [timeFilter, setTimeFilter] = useState<'ALL' | '09:15' | '09:30' | '09:45_PLUS'>('ALL');
-  const [sortBy, setSortBy] = useState<'SCORE_DESC' | 'TIME_ASC' | 'TIME_DESC' | 'VARIANCE_ASC' | 'PCT_DESC'>('SCORE_DESC');
+  const [sortBy, setSortBy] = useState<'SCORE_DESC' | 'TIME_DESC' | 'TIME_ASC' | 'VARIANCE_ASC' | 'PCT_DESC'>('SCORE_DESC');
   const [expandedTimelines, setExpandedTimelines] = useState<Set<string>>(new Set());
+
+  const ist = getISTNow();
 
   const toggleTimeline = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -350,20 +359,32 @@ export function HundredPercentBullishScanner({
 
       const metCount = checks.filter(c => c.met).length;
       
+      const isFromToday = isStockFromToday(stock);
+      const isHitToday = isFromToday && timing.firstHitTime !== 'Not Hit Today' && timing.firstHitTime !== 'Pending Signal';
+
       return {
         ...stock,
         variance,
         checks,
         score: metCount,
-        timing
+        timing,
+        isHitToday,
+        isFromToday
       } as AnalyzedStock;
 
     }).filter(Boolean) as AnalyzedStock[];
   }, [stocks, niftyStock, tradeJourneys]);
 
+  // Today's Hits list (filtered strictly to real-time session hits today)
+  const todayHits = useMemo(() => {
+    return analyzedStocks.filter(s => s.isHitToday);
+  }, [analyzedStocks]);
+
   // Filter and Sort
   const filteredStocks = useMemo(() => {
-    return analyzedStocks
+    const sourceList = todayOnly ? todayHits : analyzedStocks;
+
+    return sourceList
       .filter(s => {
         if (!searchTerm) return true;
         const q = searchTerm.toLowerCase();
@@ -385,42 +406,69 @@ export function HundredPercentBullishScanner({
         return true;
       })
       .sort((a, b) => {
-        if (sortBy === 'TIME_ASC') {
-          return parseTimeToMinutes(a.timing.firstHitTime) - parseTimeToMinutes(b.timing.firstHitTime);
+        if (sortBy === 'SCORE_DESC') {
+          // Highest score (13/13, 12/13) at the very top!
+          const scoreDiff = b.score - a.score;
+          if (scoreDiff !== 0) return scoreDiff;
+          // Ties broken by most recent hit time, then lowest variance
+          const timeDiff = parseTimeToMinutes(b.timing.firstHitTime) - parseTimeToMinutes(a.timing.firstHitTime);
+          if (timeDiff !== 0) return timeDiff;
+          return a.variance - b.variance;
         }
         if (sortBy === 'TIME_DESC') {
-          return parseTimeToMinutes(b.timing.firstHitTime) - parseTimeToMinutes(a.timing.firstHitTime);
+          const timeDiff = parseTimeToMinutes(b.timing.firstHitTime) - parseTimeToMinutes(a.timing.firstHitTime);
+          if (timeDiff !== 0) return timeDiff;
+          return b.score - a.score || a.variance - b.variance;
+        }
+        if (sortBy === 'TIME_ASC') {
+          const timeDiff = parseTimeToMinutes(a.timing.firstHitTime) - parseTimeToMinutes(b.timing.firstHitTime);
+          if (timeDiff !== 0) return timeDiff;
+          return b.score - a.score || a.variance - b.variance;
         }
         if (sortBy === 'VARIANCE_ASC') {
-          return a.variance - b.variance;
+          return a.variance - b.variance || b.score - a.score;
         }
         if (sortBy === 'PCT_DESC') {
           return (b.pctChange || 0) - (a.pctChange || 0);
         }
-        // Default: SCORE_DESC, then lowest variance
-        return b.score - a.score || a.variance - b.variance;
+        return b.score - a.score;
       });
-  }, [analyzedStocks, searchTerm, priceFilter, timeFilter, sortBy]);
+  }, [todayOnly, todayHits, analyzedStocks, searchTerm, priceFilter, timeFilter, sortBy]);
 
   // Overall timing stats
   const timingStats = useMemo(() => {
-    if (analyzedStocks.length === 0) {
-      return { total: 0, earliest: 'N/A', latest: 'N/A', avgScore: 0, count915: 0, count930: 0 };
+    const list = todayOnly ? todayHits : analyzedStocks;
+    if (list.length === 0) {
+      return { 
+        total: 0, 
+        earliest: 'None Today', 
+        latest: 'None Today', 
+        avgScore: 0, 
+        maxScore: 0,
+        count915: 0, 
+        count930: 0 
+      };
     }
-    const times = [...analyzedStocks.map(s => s.timing.firstHitTime)].sort((a, b) => parseTimeToMinutes(a) - parseTimeToMinutes(b));
-    const count915 = analyzedStocks.filter(s => s.timing.firstHitTime === '09:15 AM').length;
-    const count930 = analyzedStocks.filter(s => s.timing.firstHitTime === '09:30 AM').length;
-    const totalScore = analyzedStocks.reduce((acc, s) => acc + s.score, 0);
+    const validTimes = list
+      .map(s => s.timing.firstHitTime)
+      .filter(t => t && t !== 'Not Hit Today' && t !== 'Pending Signal')
+      .sort((a, b) => parseTimeToMinutes(a) - parseTimeToMinutes(b));
+
+    const count915 = list.filter(s => s.timing.firstHitTime === '09:15 AM').length;
+    const count930 = list.filter(s => s.timing.firstHitTime === '09:30 AM').length;
+    const totalScore = list.reduce((acc, s) => acc + s.score, 0);
+    const maxScore = Math.max(...list.map(s => s.score));
 
     return {
-      total: analyzedStocks.length,
-      earliest: times[0] || '09:15 AM',
-      latest: times[times.length - 1] || '09:15 AM',
-      avgScore: totalScore / analyzedStocks.length,
+      total: list.length,
+      earliest: validTimes[0] || 'None Today',
+      latest: validTimes[validTimes.length - 1] || 'None Today',
+      avgScore: totalScore / list.length,
+      maxScore,
       count915,
       count930
     };
-  }, [analyzedStocks]);
+  }, [todayOnly, todayHits, analyzedStocks]);
 
   return (
     <div className="space-y-6">
@@ -440,9 +488,14 @@ export function HundredPercentBullishScanner({
                   <Flame className="w-3.5 h-3.5 text-emerald-400" />
                   {filteredStocks.length} Active
                 </span>
+                {todayOnly && (
+                  <span className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono">
+                    ⚡ Today&apos;s Active Hits Only
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Open = Low (≤0.20% Variance) + 12 Confluences with <strong className="text-amber-300">First Confluence Hit Time</strong> tracking
+                Open = Low (≤0.20% Variance) + 12 Confluences with <strong className="text-amber-300">First Confluence Hit Time</strong> tracking &amp; Real-time Session Date Validation
               </p>
             </div>
           </div>
@@ -450,18 +503,26 @@ export function HundredPercentBullishScanner({
           {/* Quick Timing Summary Badges */}
           <div className="flex items-center gap-2 flex-wrap text-xs">
             <div className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-400" />
+              <Layers className="w-4 h-4 text-cyan-400" />
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Earliest Confluence Hit</span>
-                <span className="font-mono font-black text-amber-300">{timingStats.earliest}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Overall Hits</span>
+                <span className="font-mono font-black text-cyan-300">{timingStats.total} Stocks</span>
               </div>
             </div>
 
             <div className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-400" />
+              <Clock className="w-4 h-4 text-amber-400" />
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Avg Confluence Score</span>
-                <span className="font-mono font-black text-emerald-300">{timingStats.avgScore.toFixed(1)} / 13</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Latest / Recent Hit</span>
+                <span className="font-mono font-black text-amber-300">{timingStats.latest}</span>
+              </div>
+            </div>
+
+            <div className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2">
+              <Flame className="w-4 h-4 text-emerald-400" />
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">Top Score</span>
+                <span className="font-mono font-black text-emerald-300">{timingStats.maxScore > 0 ? `${timingStats.maxScore} / 13` : '0 / 13'}</span>
               </div>
             </div>
 
@@ -475,16 +536,45 @@ export function HundredPercentBullishScanner({
           </div>
         </div>
 
-        {/* Search & Sort Controls Toolbar */}
+        {/* Search, Mode Switch, & Sort Controls Toolbar */}
         <div className="mt-4 pt-4 border-t border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          <div className="relative w-full md:w-72">
-            <input
-              type="text"
-              placeholder="Search symbol or company..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-4 py-2 focus:outline-none focus:border-emerald-500 transition-colors"
-            />
+          <div className="flex items-center gap-3 flex-1 flex-wrap">
+            <div className="relative w-full sm:w-64">
+              <input
+                type="text"
+                placeholder="Search symbol or company..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-4 py-2 focus:outline-none focus:border-emerald-500 transition-colors"
+              />
+            </div>
+
+            {/* Mode Switch: Today's Hits vs All Tracked Setups */}
+            <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setTodayOnly(true)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  todayOnly
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>⚡ Today&apos;s Hits Only ({todayHits.length})</span>
+              </button>
+
+              <button
+                onClick={() => setTodayOnly(false)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  !todayOnly
+                    ? 'bg-slate-700 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>All Tracked Setups ({analyzedStocks.length})</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -497,9 +587,9 @@ export function HundredPercentBullishScanner({
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="bg-slate-950 border border-slate-800 text-amber-300 font-mono text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer"
               >
-                <option value="SCORE_DESC">Score (Highest First)</option>
-                <option value="TIME_ASC">First Hit Time (Earliest First 09:15 AM ⬆)</option>
-                <option value="TIME_DESC">First Hit Time (Latest First ⬇)</option>
+                <option value="SCORE_DESC">Confluence Score (Highest First 13/13 ⬇)</option>
+                <option value="TIME_DESC">Hit Time (Most Recent / Latest ⬇)</option>
+                <option value="TIME_ASC">Hit Time (Earliest 09:15 AM ⬆)</option>
                 <option value="VARIANCE_ASC">Open=Low Variance (Lowest First)</option>
                 <option value="PCT_DESC">% Gain (Highest First)</option>
               </select>
@@ -596,10 +686,29 @@ export function HundredPercentBullishScanner({
         </div>
       </div>
 
+      {/* Results Count Banner */}
+      <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+        <div className="flex items-center gap-2">
+          <span>Showing <strong className="text-white">{filteredStocks.length}</strong> matching stocks</span>
+          {filteredStocks.length > 0 && (
+            <span className="text-emerald-400">
+              &bull; Top Score: {Math.max(...filteredStocks.map(s => s.score))}/13
+            </span>
+          )}
+        </div>
+        {todayOnly && (
+          <span className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono">
+            ⚡ Today&apos;s Active Hits Only
+          </span>
+        )}
+      </div>
+
       {/* Results Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filteredStocks.map(stock => {
+        {filteredStocks.map((stock, idx) => {
           const isTimelineExpanded = expandedTimelines.has(stock.id);
+          const isTopScore = idx === 0 && sortBy === 'SCORE_DESC' && stock.score >= 9;
+          const isTopRecent = idx === 0 && sortBy === 'TIME_DESC' && stock.timing.firstHitTime !== 'Not Hit Today' && stock.timing.firstHitTime !== 'Pending Signal';
 
           return (
             <div 
@@ -613,11 +722,21 @@ export function HundredPercentBullishScanner({
                   <div className="p-1 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30">
                     <Clock className="w-3.5 h-3.5" />
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-[11px] text-slate-400 font-semibold">Recent Confluence Hit:</span>
+                  <div className="flex items-baseline gap-1.5 flex-wrap">
+                    <span className="text-[11px] text-slate-400 font-semibold">Hit Time:</span>
                     <span className="text-xs font-black font-mono text-amber-300 tracking-wide">
                       {stock.timing.firstHitTime}
                     </span>
+                    {isTopScore && (
+                      <span className="text-[9px] bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 px-1.5 py-0.2 rounded font-black tracking-wider uppercase shadow-xs">
+                        ⭐ Top Score ({stock.score}/13)
+                      </span>
+                    )}
+                    {isTopRecent && (
+                      <span className="text-[9px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black tracking-wider uppercase">
+                        Latest Hit
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -798,18 +917,40 @@ export function HundredPercentBullishScanner({
       </div>
 
       {filteredStocks.length === 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
-          <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-slate-500" />
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center shadow-lg">
+          <div className="w-16 h-16 bg-slate-800/80 border border-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-8 h-8 text-emerald-400/80" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">No Setups Found</h3>
-          <p className="text-slate-400 max-w-md mx-auto">
-            {searchTerm 
-              ? `No stocks matching "${searchTerm}" meet the 100% Bullish criteria.`
-              : timeFilter !== 'ALL'
-              ? `No stocks found with First Confluence Hit Time matching the "${timeFilter}" filter.`
-              : `No stocks currently meet the Open = Low (≤0.20% var) baseline requirement.`}
+          <h3 className="text-xl font-bold text-white mb-2">
+            {todayOnly ? '0 100% Bullish Hits Today' : 'No Setups Found'}
+          </h3>
+          <p className="text-slate-400 max-w-lg mx-auto text-sm leading-relaxed mb-6">
+            {todayOnly ? (
+              <>
+                No stocks currently qualify for the 100% Bullish Move formula in today&apos;s active session ({ist.dateStr}).
+                <br />
+                <span className="text-xs text-slate-500 mt-2 block">
+                  Market is closed (Weekend / Pre-market) or waiting for 09:15 AM live candle confirmation.
+                  Stale Friday 3:00 PM closing candles and prior-session records are strictly excluded.
+                </span>
+              </>
+            ) : searchTerm ? (
+              `No stocks matching "${searchTerm}" meet the 100% Bullish criteria.`
+            ) : timeFilter !== 'ALL' ? (
+              `No stocks found with First Confluence Hit Time matching the "${timeFilter}" filter.`
+            ) : (
+              `No stocks currently meet the Open = Low (≤0.20% var) baseline requirement.`
+            )}
           </p>
+          {todayOnly && analyzedStocks.length > 0 && (
+            <button
+              onClick={() => setTodayOnly(false)}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold transition-all border border-slate-700 inline-flex items-center gap-2 cursor-pointer shadow-sm"
+            >
+              <Layers className="w-4 h-4 text-amber-400" />
+              <span>Show All Tracked Setups ({analyzedStocks.length})</span>
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -57,7 +57,7 @@ export function EmaConfluenceScanner({
   const [tierFilter, setTierFilter] = useState<'ALL' | 'VERY_STRONG' | 'MODERATE' | 'WEAK_WAIT'>('ALL');
   const [timeFilter, setTimeFilter] = useState<'ALL' | '09:15' | '09:30' | '09:45' | '10:00_PLUS'>('ALL');
   const [priceFilter, setPriceFilter] = useState<'ALL' | 'UNDER_1000' | '1000_TO_2500' | 'ABOVE_2500'>('ALL');
-  const [sortBy, setSortBy] = useState<'SCORE_DESC' | 'TIME_ASC' | 'TIME_DESC' | 'LOT_DESC' | 'PCT_DESC' | 'PRICE_DESC'>('TIME_DESC');
+  const [sortBy, setSortBy] = useState<'SCORE_DESC' | 'TIME_ASC' | 'TIME_DESC' | 'LOT_DESC' | 'PCT_DESC' | 'PRICE_DESC'>('SCORE_DESC');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'CARDS' | 'TABLE'>('CARDS');
 
@@ -223,10 +223,15 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
         if (sortBy === 'PRICE_DESC') {
           return b.price - a.price;
         }
-        // Default: SCORE_DESC
+        // Default: SCORE_DESC - Highest Confluence Score (8/8, 7/8) at the very top!
         const scoreA = a.dominantSide === 'BULLISH' ? a.bullishScore : a.bearishScore;
         const scoreB = b.dominantSide === 'BULLISH' ? b.bullishScore : b.bearishScore;
-        return scoreB - scoreA || b.pctChange - a.pctChange;
+        const scoreDiff = scoreB - scoreA;
+        if (scoreDiff !== 0) return scoreDiff;
+        // Ties broken by most recent hit time, then % gain
+        const timeDiff = parseTimeToMinutes(b.hitTime) - parseTimeToMinutes(a.hitTime);
+        if (timeDiff !== 0) return timeDiff;
+        return b.pctChange - a.pctChange;
       });
   }, [todayOnly, todayHits, analyzedStocks, searchTerm, sideFilter, tierFilter, timeFilter, priceFilter, sortBy]);
 
@@ -543,8 +548,8 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                 onChange={(e) => setSortBy(e.target.value as any)}
                 className="bg-slate-950 border border-slate-800 text-amber-300 font-mono text-xs rounded-xl px-2.5 py-1 focus:outline-none focus:border-amber-500 cursor-pointer"
               >
+                <option value="SCORE_DESC">Confluence Score (Highest First 8/8 ⬇)</option>
                 <option value="TIME_DESC">Hit Time (Most Recent / Latest ⬇)</option>
-                <option value="SCORE_DESC">Confluence Score (Highest First)</option>
                 <option value="TIME_ASC">Hit Time (Earliest 09:15 AM ⬆)</option>
                 <option value="LOT_DESC">Lot Size (Largest First)</option>
                 <option value="PCT_DESC">% Gain (Highest First)</option>
@@ -583,6 +588,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
             const isStackExpanded = expandedEmaStacks.has(analysis.stock.id);
             const isCopied = copiedId === analysis.stock.id;
             const isTopRecent = idx === 0 && sortBy === 'TIME_DESC' && analysis.hitTime !== 'Not Hit Today' && analysis.hitTime !== 'Pending Signal';
+            const isTopScore = idx === 0 && sortBy === 'SCORE_DESC' && activeScore >= 6;
 
             return (
               <div
@@ -609,6 +615,11 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                       <span className="text-xs font-black font-mono text-amber-300 tracking-wide">
                         {analysis.hitTime}
                       </span>
+                      {isTopScore && (
+                        <span className="text-[9px] bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 px-1.5 py-0.2 rounded font-black tracking-wider uppercase shadow-xs">
+                          ⭐ Top Score ({activeScore}/8)
+                        </span>
+                      )}
                       {isTopRecent && (
                         <span className="text-[9px] bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-black tracking-wider uppercase">
                           Latest Hit

@@ -523,6 +523,50 @@ export function resolveRecentHundredBullishHitTiming(
     };
   }
 
+  // Check candleTimestamp for explicit prior session or futuristic/stale Friday 3:00 PM candle
+  if (stock.candleTimestamp) {
+    const ts = stock.candleTimestamp.trim();
+    if (/yesterday|prev|prior|friday/i.test(ts)) {
+      return {
+        hitTime: 'Not Hit Today',
+        hitTrigger: 'Stock data is from prior session (Friday/prior) - Not hit today',
+        hitPrice: close,
+        recencyLabel: 'Prior Session',
+        phaseBadge: '',
+        phaseBadgeClass: '',
+        rulePassedMinutes: 0,
+        isFresh: false
+      };
+    }
+    const parsedMins = parseTimeToMinutes(ts);
+    if (parsedMins > ist.totalMinutes + 5) {
+      return {
+        hitTime: 'Not Hit Today',
+        hitTrigger: 'Stale closing candle from prior session - Not hit today',
+        hitPrice: close,
+        recencyLabel: 'Prior Session',
+        phaseBadge: '',
+        phaseBadgeClass: '',
+        rulePassedMinutes: 0,
+        isFresh: false
+      };
+    }
+  }
+
+  // Bullish filter: red candle or exceeded variance is not a 100% Bullish hit today
+  if (variance > 0.20 || close < open) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: close < open ? 'Red candle (Close < Open) - Not bullish today' : `Variance (${variance.toFixed(2)}%) exceeds 0.20% threshold`,
+      hitPrice: close,
+      recencyLabel: 'Not Hit Today',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
   // 1. Trade Journey Inception
   if (tradeJourney && tradeJourney.inceptionTime && tradeJourney.inceptionTime !== 'CSV Imported') {
     const cleanTime = formatCleanRecentTime(tradeJourney.inceptionTime, '');
@@ -619,14 +663,27 @@ export function resolveRecentHundredBullishHitTiming(
     };
   }
 
+  if (variance <= 0.20 && close >= open && ist.totalMinutes >= 9 * 60 + 15) {
+    return {
+      hitTime: '09:15 AM',
+      hitTrigger: 'Open = Low Baseline (≤0.20% Var)',
+      hitPrice: open,
+      recencyLabel: 'Opening Bell',
+      phaseBadge: '🔔 09:15 AM Opening Bell',
+      phaseBadgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      rulePassedMinutes: 9 * 60 + 15,
+      isFresh: false
+    };
+  }
+
   return {
-    hitTime: '09:15 AM',
-    hitTrigger: 'Open = Low Baseline (≤0.20% Var)',
-    hitPrice: open,
-    recencyLabel: 'Opening Bell',
-    phaseBadge: '🔔 09:15 AM Opening Bell',
-    phaseBadgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-    rulePassedMinutes: 9 * 60 + 15,
+    hitTime: 'Not Hit Today',
+    hitTrigger: 'Waiting for today\'s 100% bullish confluence trigger',
+    hitPrice: close,
+    recencyLabel: 'Not Hit Today',
+    phaseBadge: '',
+    phaseBadgeClass: '',
+    rulePassedMinutes: 0,
     isFresh: false
   };
 }
