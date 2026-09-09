@@ -2,6 +2,7 @@ import { StockCalculated } from '../types';
 import { getStockSector, computeAllSectorStrengths } from './sectorMaster';
 import { getAtmOptionStrikes } from './gann';
 import { formatCleanRecentTime } from './recentHitTiming';
+import { validateBullishIntegrity, validateBearishIntegrity } from './signalIntegrityValidator';
 
 export type ParabolicStage =
   | 'PARABOLIC_RALLY'       // 12+ pts (Fully Bullish)
@@ -335,8 +336,19 @@ export function analyzeParabolicRally(
   const sectorBreadthPct = sectorBreadthOverride?.breadthPct ?? (pct >= 0 ? 75 : 25);
   const sectorAvgPct = sectorBreadthOverride?.avgPct ?? (pct * 0.6);
 
-  // Determine Primary Bias (Bullish vs Bearish)
-  const isBullishBias = pct >= 0 || close >= open;
+  const bullIntegrity = validateBullishIntegrity(stock);
+  const bearIntegrity = validateBearishIntegrity(stock);
+
+  // Determine Primary Bias (Bullish vs Bearish) strictly using directional integrity
+  let isBullishBias = false;
+  if (bullIntegrity.isValid && !bearIntegrity.isValid) {
+    isBullishBias = true;
+  } else if (bearIntegrity.isValid && !bullIntegrity.isValid) {
+    isBullishBias = false;
+  } else {
+    // Both neutral or conflicting: check candle color and VWAP strictly
+    isBullishBias = close >= open && (vwap ? close >= vwap * 0.998 : pct >= 0);
+  }
 
   if (isBullishBias) {
     // ----------------------------------------------------
@@ -500,7 +512,13 @@ export function analyzeParabolicRally(
     let stageBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
     let stageColor = '#64748b';
 
-    if (isExhausted) {
+    if (!bullIntegrity.isValid) {
+      // Hard veto by directional integrity validator
+      stage = 'NEUTRAL';
+      stageLabel = `⚠️ NOT BULLISH (${bullIntegrity.vetoReason || 'Integrity Check Failed'})`;
+      stageBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+      stageColor = '#64748b';
+    } else if (isExhausted) {
       stage = 'EXHAUSTION';
       stageLabel = '⚠️ EXHAUSTION / OVEREXTENDED';
       stageBadgeClass = 'bg-amber-950 text-amber-300 border-amber-500/50 animate-pulse';
@@ -522,6 +540,8 @@ export function analyzeParabolicRally(
       stageColor = '#3b82f6';
     }
 
+    const effectiveBullScore = bullIntegrity.isValid ? totalScore : Math.min(totalScore, 4);
+
     const targets = [
       Math.round((close * 1.008) * 10) / 10,
       Math.round((close * 1.016) * 10) / 10,
@@ -538,14 +558,14 @@ export function analyzeParabolicRally(
     return {
       stock,
       direction: 'BULLISH',
-      score: totalScore,
+      score: effectiveBullScore,
       maxScore: 16,
       stage,
       stageLabel,
       stageBadgeClass,
       stageColor,
-      confidencePercent: Math.min(100, Math.round((totalScore / 16) * 100)),
-      isFullyBullish: totalScore >= 12 && !isExhausted,
+      confidencePercent: Math.min(100, Math.round((effectiveBullScore / 16) * 100)),
+      isFullyBullish: bullIntegrity.isValid && totalScore >= 12 && !isExhausted,
       isFullyBearish: false,
       checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
@@ -737,7 +757,13 @@ export function analyzeParabolicRally(
     let stageBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
     let stageColor = '#64748b';
 
-    if (isExhausted) {
+    if (!bearIntegrity.isValid) {
+      // Hard veto by directional integrity validator
+      stage = 'NEUTRAL';
+      stageLabel = `⚠️ NOT BEARISH (${bearIntegrity.vetoReason || 'Integrity Check Failed'})`;
+      stageBadgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+      stageColor = '#64748b';
+    } else if (isExhausted) {
       stage = 'EXHAUSTION';
       stageLabel = '⚠️ OVERSOLD EXHAUSTION DUMP';
       stageBadgeClass = 'bg-amber-950 text-amber-300 border-amber-500/50 animate-pulse';
@@ -759,6 +785,8 @@ export function analyzeParabolicRally(
       stageColor = '#9333ea';
     }
 
+    const effectiveBearScore = bearIntegrity.isValid ? totalScore : Math.min(totalScore, 4);
+
     const targets = [
       Math.round((close * 0.992) * 10) / 10,
       Math.round((close * 0.984) * 10) / 10,
@@ -775,15 +803,15 @@ export function analyzeParabolicRally(
     return {
       stock,
       direction: 'BEARISH',
-      score: totalScore,
+      score: effectiveBearScore,
       maxScore: 16,
       stage,
       stageLabel,
       stageBadgeClass,
       stageColor,
-      confidencePercent: Math.min(100, Math.round((totalScore / 16) * 100)),
+      confidencePercent: Math.min(100, Math.round((effectiveBearScore / 16) * 100)),
       isFullyBullish: false,
-      isFullyBearish: totalScore >= 12 && !isExhausted,
+      isFullyBearish: bearIntegrity.isValid && totalScore >= 12 && !isExhausted,
       checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
       openingRangeStatus: isOrbLowBroken ? 'ORB Low Shattered 🔴' : 'Inside ORB Range',
@@ -880,9 +908,42 @@ export function analyzeHistoricalPeakParabolicRally(
     }
   }
   
-  // If we found a peak analysis, we override its 'stock' property to be the current real stock 
-  // so the UI shows the current live price and pctChange, but keeps the timing/score of the peak!
+  // If we found a peak analysis, we verify that current live stock hasn't invalidated/reversed it
   if (peakAnalysis) {
+    if (peakAnalysis.direction === 'BULLISH') {
+      const currentBullIntegrity = validateBullishIntegrity(stock);
+      if (!currentBullIntegrity.isValid) {
+        // Stock hit peak earlier, but has since reversed/broken down (e.g. turned into red candle or fell below VWAP)
+        return {
+          ...peakAnalysis,
+          stock,
+          score: Math.min(peakAnalysis.score, 5),
+          stage: 'EXHAUSTION',
+          stageLabel: `⚠️ RALLY FAILED / REVERSED (${currentBullIntegrity.vetoReason || 'Below Open/VWAP'})`,
+          stageBadgeClass: 'bg-rose-950 text-rose-300 border-rose-500/40',
+          stageColor: '#ef4444',
+          isFullyBullish: false,
+          summaryVerdict: `Prior bullish momentum has failed. Live status: ${currentBullIntegrity.vetoReason}. Do NOT enter longs.`
+        };
+      }
+    } else if (peakAnalysis.direction === 'BEARISH') {
+      const currentBearIntegrity = validateBearishIntegrity(stock);
+      if (!currentBearIntegrity.isValid) {
+        // Stock broke down earlier, but has since recovered (e.g. turned into green candle or reclaimed VWAP)
+        return {
+          ...peakAnalysis,
+          stock,
+          score: Math.min(peakAnalysis.score, 5),
+          stage: 'EXHAUSTION',
+          stageLabel: `⚠️ BREAKDOWN FAILED / RECOVERED (${currentBearIntegrity.vetoReason || 'Above Open/VWAP'})`,
+          stageBadgeClass: 'bg-emerald-950 text-emerald-300 border-emerald-500/40',
+          stageColor: '#10b981',
+          isFullyBearish: false,
+          summaryVerdict: `Prior bearish breakdown has failed. Live status: ${currentBearIntegrity.vetoReason}. Do NOT enter shorts.`
+        };
+      }
+    }
+
     return {
       ...peakAnalysis,
       stock: stock

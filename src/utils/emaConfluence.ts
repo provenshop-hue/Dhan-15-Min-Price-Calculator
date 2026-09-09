@@ -2,6 +2,11 @@ import { StockCalculated, StockTradeJourney, RsiIntradayPoint } from '../types';
 import { generateIntradayRsiTimeline } from './rsiAnalyst';
 import { resolveRecentEmaHitTiming, formatCleanRecentTime, parseTimeToMinutes } from './recentHitTiming';
 import { isStockFromYesterdayOrOlder, getISTNow } from './bullishRally';
+import {
+  resolveStrictEmaConfluenceDirection,
+  validateBullishIntegrity,
+  validateBearishIntegrity
+} from './signalIntegrityValidator';
 
 export interface EmaConfluenceCondition {
   id: string;
@@ -127,6 +132,25 @@ function buildPriceSequence(stock: StockCalculated, timeline: RsiIntradayPoint[]
   const close = stock.closePrice || open;
   const prevClose = stock.previousClose || open;
   const f15mClose = stock.first15mClose || (open + close) / 2;
+
+  const isRed = close < open;
+  if (isRed) {
+    // For a red candle, price rallied/gapped early then plunged downwards towards low and close
+    return [
+      prevClose * 1.002,
+      prevClose,
+      (prevClose + open) / 2,
+      open,
+      (open + high) / 2,
+      high,
+      (high + f15mClose) / 2,
+      f15mClose,
+      (open + low) / 2,
+      low,
+      (low + close) / 2,
+      close
+    ];
+  }
 
   return [
     prevClose * 0.998,
@@ -256,17 +280,17 @@ export function analyzeStockEmaConfluence(
   let rawEma20 = ema20Series.length > 0 ? ema20Series[ema20Series.length - 1] : close * 0.990;
   let rawEma50 = ema50Series.length > 0 ? ema50Series[ema50Series.length - 1] : close * 0.980;
 
-  // Refine EMAs based on price direction to match real-world market alignment
-  if (pctChange > 0.5) {
-    // Bullish alignment bias if trending up
-    rawEma9 = Math.min(close, Math.max(open * 0.997, close * 0.994));
-    rawEma20 = Math.min(rawEma9 * 0.997, close * 0.988);
-    rawEma50 = Math.min(rawEma20 * 0.995, close * 0.978);
-  } else if (pctChange < -0.5) {
-    // Bearish alignment bias if trending down
-    rawEma9 = Math.max(close, Math.min(open * 1.003, close * 1.006));
-    rawEma20 = Math.max(rawEma9 * 1.003, close * 1.012);
-    rawEma50 = Math.max(rawEma20 * 1.005, close * 1.022);
+  // Refine EMAs based on true intraday price direction and VWAP
+  if (close > open && (pctChange >= 0 || (stock.vwap && close >= stock.vwap))) {
+    // Bullish alignment: Price is above 9 EMA, 9 EMA > 20 EMA
+    rawEma9 = Math.min(close * 0.997, Math.max(open * 0.995, close * 0.993));
+    rawEma20 = Math.min(rawEma9 * 0.996, close * 0.988);
+    rawEma50 = Math.min(rawEma20 * 0.994, close * 0.978);
+  } else if (close < open && (pctChange <= 0 || (stock.vwap && close <= stock.vwap))) {
+    // Bearish alignment: Price is below 9 EMA, 9 EMA < 20 EMA
+    rawEma9 = Math.max(close * 1.003, Math.min(open * 1.005, close * 1.007));
+    rawEma20 = Math.max(rawEma9 * 1.004, close * 1.012);
+    rawEma50 = Math.max(rawEma20 * 1.006, close * 1.022);
   }
 
   // 200 EMA calculation
@@ -516,19 +540,16 @@ export function analyzeStockEmaConfluence(
     bearishTierLabel = '🟡 3–4: Weak / Wait';
   }
 
-  // Dominant Side
-  let dominantSide: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = 'NEUTRAL';
-  let activeScore = 0;
-  if (bullishScore >= bearishScore && bullishScore >= 3) {
-    dominantSide = 'BULLISH';
-    activeScore = bullishScore;
-  } else if (bearishScore > bullishScore && bearishScore >= 3) {
-    dominantSide = 'BEARISH';
-    activeScore = bearishScore;
-  } else {
-    dominantSide = pctChange >= 0 ? 'BULLISH' : 'BEARISH';
-    activeScore = Math.max(bullishScore, bearishScore);
-  }
+  // Strict Dominant Side Resolution with Cross-Engine & Directional Integrity
+  const dominantSide = resolveStrictEmaConfluenceDirection(stock, bullishScore, bearishScore);
+  const activeScore = dominantSide === 'BULLISH'
+    ? bullishScore
+    : dominantSide === 'BEARISH'
+    ? bearishScore
+    : Math.max(bullishScore, bearishScore);
+
+  const bullIntegrity = validateBullishIntegrity(stock);
+  const bearIntegrity = validateBearishIntegrity(stock);
 
   // ==========================================
   // ⏱️ RECENT HIT TIME & MILESTONES CALCULATION (Today's Hits Only)
@@ -538,19 +559,45 @@ export function analyzeStockEmaConfluence(
   const isFromToday = isStockFromToday(stock, realTodayDate);
 
   const tradeJourney = tradeJourneys ? (tradeJourneys[stock.id] || tradeJourneys[stock.symbol]) : undefined;
+  const sideForTiming: 'BULLISH' | 'BEARISH' = dominantSide === 'BEARISH' ? 'BEARISH' : 'BULLISH';
   const recentTiming = resolveRecentEmaHitTiming(
     stock,
-    dominantSide === 'BEARISH' ? 'BEARISH' : 'BULLISH',
+    sideForTiming,
     bullishScore,
     bearishScore,
     tradeJourney,
     realTodayDate
   );
 
-  const isHitToday = isFromToday && activeScore >= 5 && recentTiming.hitTime !== 'Not Hit Today';
+  // Directional Integrity Filter: A Bullish hit MUST pass Bullish Integrity; a Bearish hit MUST pass Bearish Integrity
+  const directionPassesIntegrity = dominantSide === 'BULLISH'
+    ? bullIntegrity.isValid
+    : dominantSide === 'BEARISH'
+    ? bearIntegrity.isValid
+    : false;
+
+  const isHitToday = isFromToday &&
+    dominantSide !== 'NEUTRAL' &&
+    directionPassesIntegrity &&
+    activeScore >= 5 &&
+    recentTiming.hitTime !== 'Not Hit Today';
+
+  let hitTrigger = 'Waiting for today\'s confluence trigger';
+  if (isHitToday) {
+    hitTrigger = recentTiming.hitTrigger;
+  } else if (!isFromToday) {
+    hitTrigger = 'Stock data is from prior session (Friday/prior) - Not hit today';
+  } else if (dominantSide === 'NEUTRAL') {
+    hitTrigger = 'Neutral / Mixed structure - No decisive confluence';
+  } else if (!directionPassesIntegrity) {
+    hitTrigger = dominantSide === 'BULLISH'
+      ? (bullIntegrity.vetoReason || 'Contradictory bearish price action')
+      : (bearIntegrity.vetoReason || 'Contradictory bullish price action');
+  } else if (activeScore < 5) {
+    hitTrigger = `Score ${activeScore}/8 - Below 5-point confluence threshold`;
+  }
 
   const hitTime = isHitToday ? recentTiming.hitTime : (isFromToday ? 'Pending Signal' : 'Not Hit Today');
-  const hitTrigger = isHitToday ? recentTiming.hitTrigger : (isFromToday ? 'Waiting for today\'s confluence trigger' : 'Stock data is from prior session (Friday/prior) - Not hit today');
   const hitPrice = isHitToday ? recentTiming.hitPrice : close;
   const recencyLabel = isHitToday ? recentTiming.recencyLabel : (isFromToday ? 'Pending' : 'Prior Session');
   const phaseBadge = isHitToday ? recentTiming.phaseBadge : '';

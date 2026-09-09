@@ -46,6 +46,15 @@ export function is100PercentBullishMove(stock: StockCalculated): boolean {
     if (stock.pctChange <= 0) return false;
   }
 
+  // 2b. Price must be above VWAP if VWAP is available
+  if (stock.vwap !== undefined && stock.vwap !== null && stock.vwap > 0) {
+    if (close < stock.vwap * 0.998) return false;
+  }
+
+  // 2c. Cannot be Open = High
+  if (stock.isOpenEqualHigh) return false;
+  if (stock.highPrice && Math.abs(open - stock.highPrice) / open < 0.0005 && close < open) return false;
+
   const range = high - low;
   if (range <= 0) return false;
 
@@ -89,6 +98,15 @@ export function is100PercentBearishMove(stock: StockCalculated): boolean {
   } else if (stock.pctChange !== undefined && stock.pctChange !== null) {
     if (stock.pctChange >= 0) return false;
   }
+
+  // 2b. Price must be below VWAP if VWAP is available
+  if (stock.vwap !== undefined && stock.vwap !== null && stock.vwap > 0) {
+    if (close > stock.vwap * 1.002) return false;
+  }
+
+  // 2c. Cannot be Open = Low
+  if (stock.isOpenEqualLow) return false;
+  if (stock.lowPrice && Math.abs(open - stock.lowPrice) / open < 0.0005 && close > open) return false;
 
   const range = high - low;
   if (range <= 0) return false;

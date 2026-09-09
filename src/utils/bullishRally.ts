@@ -7,6 +7,7 @@ import { analyzeParabolicRally, ParabolicRallyAnalysis } from './parabolicRallyE
 import { generateIntradayRsiTimeline } from './rsiAnalyst';
 import { evaluateHighConfidenceTrade, HighConfidenceTradeAnalysis } from './highConfidenceTrade';
 import { formatCleanRecentTime } from './recentHitTiming';
+import { validateBullishIntegrity, validateBearishIntegrity } from './signalIntegrityValidator';
 
 export type RallyDirection = 'BULLISH' | 'BEARISH';
 
@@ -700,13 +701,9 @@ export function detectBullishRally(stock: StockCalculated): RallySignal | null {
     ? stock.pctChange
     : ((cmp - open) / open) * 100;
 
-  // Basic directional check: Close must not be heavily negative
-  if (pct < 0 && cmp < open * 0.998) {
-    return null;
-  }
-
-  // If VWAP is known and price is significantly below VWAP, reject false rallies
-  if (vwap && cmp < vwap * 0.992) {
+  // Strict Directional & Cross-Engine Integrity Check
+  const bullIntegrity = validateBullishIntegrity(stock);
+  if (!bullIntegrity.isValid) {
     return null;
   }
 
@@ -993,13 +990,9 @@ export function detectBearishRally(stock: StockCalculated): RallySignal | null {
     ? stock.pctChange
     : ((cmp - open) / open) * 100;
 
-  // Basic directional check: Close must not be heavily positive
-  if (pct > 0 && cmp > open * 1.002) {
-    return null;
-  }
-
-  // If VWAP is known and price is significantly above VWAP, reject false breakdowns
-  if (vwap && cmp > vwap * 1.008) {
+  // Strict Directional & Cross-Engine Integrity Check
+  const bearIntegrity = validateBearishIntegrity(stock);
+  if (!bearIntegrity.isValid) {
     return null;
   }
 
