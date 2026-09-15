@@ -51,7 +51,8 @@ export function EmaConfluenceScanner({
   onOpenPositionSizer,
   onOpenRsiAnalyst
 }: Props) {
-  // Navigation & Primary Filter State: Default to ALL (overall hits) and TIME_DESC (prioritize recent hits)
+  // Navigation & Primary Filter State: Default to matchAllOnly = true (all 8/8 confluences), todayOnly = true, and SCORE_DESC
+  const [matchAllOnly, setMatchAllOnly] = useState<boolean>(true);
   const [todayOnly, setTodayOnly] = useState<boolean>(true);
   const [sideFilter, setSideFilter] = useState<'ALL' | 'BULLISH' | 'BEARISH' | 'STRONG_ONLY'>('ALL');
   const [tierFilter, setTierFilter] = useState<'ALL' | 'VERY_STRONG' | 'MODERATE' | 'WEAK_WAIT'>('ALL');
@@ -120,25 +121,54 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
     });
   }, [stocks, tradeJourneys, sessionDate]);
 
-  // Stocks that have actively hit today (today's session + Score >= 5/8)
-  const todayHits = useMemo(() => {
+  // Base list of stocks that actively triggered today (today's session + Score >= 5/8)
+  const todayHitsBase = useMemo(() => {
     return analyzedStocks.filter(s => s.isHitToday);
   }, [analyzedStocks]);
 
+  // Total count of stocks matching ALL 8 confluences (8/8)
+  const all8MatchesCount = useMemo(() => {
+    const list = todayOnly ? todayHitsBase : analyzedStocks;
+    return list.filter(s => {
+      if (sideFilter === 'BULLISH') return s.bullishScore === 8;
+      if (sideFilter === 'BEARISH') return s.bearishScore === 8;
+      return s.bullishScore === 8 || s.bearishScore === 8 || s.activeScore === 8;
+    }).length;
+  }, [todayOnly, todayHitsBase, analyzedStocks, sideFilter]);
+
+  // Active today's hits (filtered to 8/8 when matchAllOnly is active)
+  const todayHits = useMemo(() => {
+    if (!matchAllOnly) return todayHitsBase;
+    return todayHitsBase.filter(s => {
+      if (sideFilter === 'BULLISH') return s.bullishScore === 8;
+      if (sideFilter === 'BEARISH') return s.bearishScore === 8;
+      return s.bullishScore === 8 || s.bearishScore === 8 || s.activeScore === 8;
+    });
+  }, [todayHitsBase, matchAllOnly, sideFilter]);
+
   // Overall Statistics
   const overallStats = useMemo(() => {
-    const pool = todayOnly ? todayHits : analyzedStocks;
+    let pool = todayOnly ? todayHitsBase : analyzedStocks;
+    if (matchAllOnly) {
+      pool = pool.filter(s => {
+        if (sideFilter === 'BULLISH') return s.bullishScore === 8;
+        if (sideFilter === 'BEARISH') return s.bearishScore === 8;
+        return s.bullishScore === 8 || s.bearishScore === 8 || s.activeScore === 8;
+      });
+    }
     const total = pool.length;
     const strongBullish = pool.filter(s => s.bullishScore >= 7).length;
     const strongBearish = pool.filter(s => s.bearishScore >= 7).length;
+    const all8Bullish = pool.filter(s => s.bullishScore === 8).length;
+    const all8Bearish = pool.filter(s => s.bearishScore === 8).length;
     const modBullish = pool.filter(s => s.bullishScore >= 5 && s.bullishScore < 7).length;
     const modBearish = pool.filter(s => s.bearishScore >= 5 && s.bearishScore < 7).length;
     
     // Active hits with valid timestamps
     const activeHighConviction = pool.filter(s => s.hitTime && s.hitTime !== 'Not Hit Today' && s.hitTime !== 'Pending Signal');
     const sortedByRecency = [...activeHighConviction].sort((a, b) => parseTimeToMinutes(b.hitTime) - parseTimeToMinutes(a.hitTime));
-    const mostRecentTime = sortedByRecency.length > 0 ? sortedByRecency[0].hitTime : (todayHits.length === 0 ? 'None Today' : '09:15 AM');
-    const earliestTime = sortedByRecency.length > 0 ? sortedByRecency[sortedByRecency.length - 1].hitTime : (todayHits.length === 0 ? 'None Today' : '09:15 AM');
+    const mostRecentTime = sortedByRecency.length > 0 ? sortedByRecency[0].hitTime : (total === 0 ? 'None Today' : '09:15 AM');
+    const earliestTime = sortedByRecency.length > 0 ? sortedByRecency[sortedByRecency.length - 1].hitTime : (total === 0 ? 'None Today' : '09:15 AM');
 
     const avgScore = total > 0 
       ? pool.reduce((acc, s) => acc + s.activeScore, 0) / total 
@@ -148,20 +178,31 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
       total,
       strongBullish,
       strongBearish,
+      all8Bullish,
+      all8Bearish,
       modBullish,
       modBearish,
       earliestTime,
       mostRecentTime,
       avgScore
     };
-  }, [todayOnly, todayHits, analyzedStocks]);
+  }, [todayOnly, todayHitsBase, analyzedStocks, matchAllOnly, sideFilter]);
 
   // Filter and Sort
   const filteredStocks = useMemo(() => {
     // CRITICAL USER REQUIREMENT:
     // When todayOnly is true (default), stocks not hit today are strictly excluded.
     // If nothing has hit today, this array is empty and shows the blank state.
-    const baseList = todayOnly ? todayHits : analyzedStocks;
+    let baseList = todayOnly ? todayHitsBase : analyzedStocks;
+
+    // Show ONLY stocks that match all 8 confluences when matchAllOnly is active
+    if (matchAllOnly) {
+      baseList = baseList.filter(s => {
+        if (sideFilter === 'BULLISH') return s.bullishScore === 8;
+        if (sideFilter === 'BEARISH') return s.bearishScore === 8;
+        return s.bullishScore === 8 || s.bearishScore === 8 || s.activeScore === 8;
+      });
+    }
 
     return baseList
       .filter(s => {
@@ -233,7 +274,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
         if (timeDiff !== 0) return timeDiff;
         return b.pctChange - a.pctChange;
       });
-  }, [todayOnly, todayHits, analyzedStocks, searchTerm, sideFilter, tierFilter, timeFilter, priceFilter, sortBy]);
+  }, [todayOnly, todayHitsBase, analyzedStocks, matchAllOnly, searchTerm, sideFilter, tierFilter, timeFilter, priceFilter, sortBy]);
 
   return (
     <div className="space-y-6">
@@ -257,6 +298,16 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                   <Flame className="w-3.5 h-3.5 text-emerald-400" />
                   9 &gt; 20 &gt; 50 &gt; 200 EMA Cascade
                 </span>
+                {matchAllOnly ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    ⭐ Only 8/8 All-Confluence Matches
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                    All Confluence Tiers (5–8)
+                  </span>
+                )}
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-amber-400" />
                   Session: {sessionDate}
@@ -266,7 +317,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                 </span>
               </div>
               <p className="text-xs md:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Quantitative multi-EMA scoring system with <strong className="text-amber-300">Today&apos;s Hit Time</strong>, <strong className="text-cyan-300">F&amp;O Lot Size</strong>, and real-time slope trajectory tracking.
+                Quantitative multi-EMA scoring system showing <strong className="text-emerald-300">stocks matching all confluence rules</strong> with <strong className="text-amber-300">Today&apos;s Hit Time</strong>, <strong className="text-cyan-300">F&amp;O Lot Size</strong>, and slope tracking.
               </p>
             </div>
           </div>
@@ -276,7 +327,9 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
             <div className="px-3 py-2 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5">
               <Layers className="w-4 h-4 text-cyan-400 shrink-0" />
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Overall Hits</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                  {matchAllOnly ? "8/8 All Matches" : "Overall Hits"}
+                </span>
                 <span className="font-mono font-black text-cyan-300 text-xs">{overallStats.total} Stocks</span>
               </div>
             </div>
@@ -292,16 +345,24 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
             <div className="px-3 py-2 rounded-2xl bg-emerald-950/40 border border-emerald-800/60 flex items-center gap-2.5">
               <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
               <div>
-                <span className="text-[10px] uppercase font-bold text-emerald-400/80 block">Bullish Hits</span>
-                <span className="font-mono font-black text-emerald-300 text-xs">{overallStats.modBullish + overallStats.strongBullish} Stocks</span>
+                <span className="text-[10px] uppercase font-bold text-emerald-400/80 block">
+                  {matchAllOnly ? "8/8 Bullish" : "Bullish Hits"}
+                </span>
+                <span className="font-mono font-black text-emerald-300 text-xs">
+                  {matchAllOnly ? overallStats.all8Bullish : (overallStats.modBullish + overallStats.strongBullish)} Stocks
+                </span>
               </div>
             </div>
 
             <div className="px-3 py-2 rounded-2xl bg-rose-950/40 border border-rose-800/60 flex items-center gap-2.5">
               <TrendingDown className="w-4 h-4 text-rose-400 shrink-0" />
               <div>
-                <span className="text-[10px] uppercase font-bold text-rose-400/80 block">Bearish Hits</span>
-                <span className="font-mono font-black text-rose-300 text-xs">{overallStats.modBearish + overallStats.strongBearish} Stocks</span>
+                <span className="text-[10px] uppercase font-bold text-rose-400/80 block">
+                  {matchAllOnly ? "8/8 Bearish" : "Bearish Hits"}
+                </span>
+                <span className="font-mono font-black text-rose-300 text-xs">
+                  {matchAllOnly ? overallStats.all8Bearish : (overallStats.modBearish + overallStats.strongBearish)} Stocks
+                </span>
               </div>
             </div>
           </div>
@@ -337,66 +398,97 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
 
       {/* Main Controls & Filter Toolbar */}
       <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-4 space-y-3.5 shadow-sm">
-        {/* Top Control Line: Search, View Mode, Side Toggle */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Side Mode Selector Buttons */}
-          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => setSideFilter('ALL')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                sideFilter === 'ALL'
-                  ? 'bg-amber-500 text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Overall Hits ({(todayOnly ? todayHits : analyzedStocks).length})</span>
-            </button>
+        {/* Top Control Line: Confluence Mode, Side Toggle, Search & View Mode */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Strict Confluence Mode Selector: 8/8 Matches Only vs All Setups */}
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
+              <button
+                onClick={() => setMatchAllOnly(true)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  matchAllOnly
+                    ? 'bg-emerald-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+                title="Strict Confluence: Show ONLY stocks matching ALL 8/8 EMA rules"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>⭐ All 8/8 Matches Only ({all8MatchesCount})</span>
+              </button>
 
-            <button
-              onClick={() => setSideFilter('BULLISH')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                sideFilter === 'BULLISH'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
-              <span>🟢 Bullish</span>
-              <span className="text-[10px] bg-emerald-950 px-1.5 py-0.2 rounded font-mono">
-                {(todayOnly ? todayHits : analyzedStocks).filter(s => s.dominantSide === 'BULLISH').length}
-              </span>
-            </button>
+              <button
+                onClick={() => setMatchAllOnly(false)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  !matchAllOnly
+                    ? 'bg-slate-700 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+                title="Show all EMA setups across any confluence tier (5–8 score)"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>All Setups ({(todayOnly ? todayHitsBase : analyzedStocks).length})</span>
+              </button>
+            </div>
 
-            <button
-              onClick={() => setSideFilter('BEARISH')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                sideFilter === 'BEARISH'
-                  ? 'bg-rose-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <TrendingDown className="w-3.5 h-3.5 text-rose-300" />
-              <span>🔴 Bearish</span>
-              <span className="text-[10px] bg-rose-950 px-1.5 py-0.2 rounded font-mono">
-                {(todayOnly ? todayHits : analyzedStocks).filter(s => s.dominantSide === 'BEARISH').length}
-              </span>
-            </button>
+            {/* Side Mode Selector Buttons */}
+            <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setSideFilter('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  sideFilter === 'ALL'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>All ({(todayOnly ? todayHits : analyzedStocks).length})</span>
+              </button>
 
-            <button
-              onClick={() => setSideFilter('STRONG_ONLY')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                sideFilter === 'STRONG_ONLY'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-              <span>⚡ 7–8 Score Only</span>
-              <span className="text-[10px] bg-slate-900 text-amber-300 px-1.5 py-0.2 rounded font-mono">
-                {overallStats.strongBullish + overallStats.strongBearish}
-              </span>
-            </button>
+              <button
+                onClick={() => setSideFilter('BULLISH')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  sideFilter === 'BULLISH'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
+                <span>🟢 Bullish</span>
+                <span className="text-[10px] bg-emerald-950 px-1.5 py-0.2 rounded font-mono">
+                  {(todayOnly ? todayHits : analyzedStocks).filter(s => s.dominantSide === 'BULLISH').length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setSideFilter('BEARISH')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  sideFilter === 'BEARISH'
+                    ? 'bg-rose-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <TrendingDown className="w-3.5 h-3.5 text-rose-300" />
+                <span>🔴 Bearish</span>
+                <span className="text-[10px] bg-rose-950 px-1.5 py-0.2 rounded font-mono">
+                  {(todayOnly ? todayHits : analyzedStocks).filter(s => s.dominantSide === 'BEARISH').length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setSideFilter('STRONG_ONLY')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  sideFilter === 'STRONG_ONLY'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                <span>⚡ 7–8 Score</span>
+                <span className="text-[10px] bg-slate-900 text-amber-300 px-1.5 py-0.2 rounded font-mono">
+                  {overallStats.strongBullish + overallStats.strongBearish}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Search & Layout Toggle */}
@@ -1092,7 +1184,43 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
 
       {/* Empty State */}
       {filteredStocks.length === 0 && (
-        todayHits.length === 0 && todayOnly ? (
+        matchAllOnly && all8MatchesCount === 0 ? (
+          <div className="bg-slate-900/80 rounded-3xl border border-slate-800 p-10 md:p-14 text-center relative overflow-hidden shadow-xl">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-950 border border-slate-800 text-xs text-slate-300 mb-3 font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Strict Confluence Mode • All 8/8 Matches Only
+            </div>
+            <h3 className="text-xl font-black text-white font-mono">
+              0 Stocks Match All 8 Confluences {todayOnly ? "Today" : "in Database"}
+            </h3>
+            <p className="text-slate-400 text-xs md:text-sm max-w-lg mx-auto mt-2 leading-relaxed">
+              No stock currently satisfies all 8 EMA confluence rules (Price &gt; 9/20 EMA, 9 &gt; 20 &gt; 50 &gt; 200 EMA cascade, positive slope alignment, HH+HL structure, and volume expansion).
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={() => setMatchAllOnly(false)}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-black transition-colors cursor-pointer shadow-lg shadow-emerald-950/50 flex items-center gap-2"
+              >
+                <Layers className="w-4 h-4" />
+                <span>Show All Setups (Score 5–7) ({(todayOnly ? todayHitsBase : analyzedStocks).length})</span>
+              </button>
+              {todayOnly && (
+                <button
+                  onClick={() => {
+                    setTodayOnly(false);
+                    setMatchAllOnly(false);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 transition-colors cursor-pointer font-semibold"
+                >
+                  View Historical / Prior Session ({analyzedStocks.length})
+                </button>
+              )}
+            </div>
+          </div>
+        ) : todayHits.length === 0 && todayOnly ? (
           <div className="bg-slate-900/80 rounded-3xl border border-slate-800 p-10 md:p-14 text-center relative overflow-hidden shadow-xl">
             <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-4">
               <Clock className="w-8 h-8" />
@@ -1138,6 +1266,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                 setTimeFilter('ALL');
                 setTierFilter('ALL');
                 setPriceFilter('ALL');
+                setMatchAllOnly(false);
               }}
               className="mt-4 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white border border-slate-700 cursor-pointer"
             >

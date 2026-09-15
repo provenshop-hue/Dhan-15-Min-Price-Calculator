@@ -84,7 +84,8 @@ export function HundredPercentBullishScanner({
   onOpenPositionSizer,
   onOpenRsiAnalyst
 }: Props) {
-  // Default to todayOnly = true (only live today's hits, 0 if market closed / none hit today)
+  // Default to matchAllOnly = true (show ONLY stocks matching all 13 confluences) and todayOnly = true
+  const [matchAllOnly, setMatchAllOnly] = useState<boolean>(true);
   const [todayOnly, setTodayOnly] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [priceFilter, setPriceFilter] = useState<'ALL' | '1000_TO_2500' | 'ABOVE_2500'>('ALL');
@@ -375,14 +376,31 @@ export function HundredPercentBullishScanner({
     }).filter(Boolean) as AnalyzedStock[];
   }, [stocks, niftyStock, tradeJourneys]);
 
-  // Today's Hits list (filtered strictly to real-time session hits today)
-  const todayHits = useMemo(() => {
+  // Base Today's Hits list (filtered strictly to real-time session hits today)
+  const todayHitsBase = useMemo(() => {
     return analyzedStocks.filter(s => s.isHitToday);
   }, [analyzedStocks]);
 
+  // Total count of stocks matching ALL 13 confluences
+  const allConfluenceCount = useMemo(() => {
+    const list = todayOnly ? todayHitsBase : analyzedStocks;
+    return list.filter(s => s.score === s.checks.length).length;
+  }, [todayOnly, todayHitsBase, analyzedStocks]);
+
+  // Today's Hits list (filtered by matchAllOnly if active)
+  const todayHits = useMemo(() => {
+    if (!matchAllOnly) return todayHitsBase;
+    return todayHitsBase.filter(s => s.score === s.checks.length);
+  }, [todayHitsBase, matchAllOnly]);
+
   // Filter and Sort
   const filteredStocks = useMemo(() => {
-    const sourceList = todayOnly ? todayHits : analyzedStocks;
+    let sourceList = todayOnly ? todayHitsBase : analyzedStocks;
+
+    // Show ONLY stocks that match all 13 confluences when matchAllOnly is active
+    if (matchAllOnly) {
+      sourceList = sourceList.filter(s => s.score === s.checks.length);
+    }
 
     return sourceList
       .filter(s => {
@@ -433,11 +451,14 @@ export function HundredPercentBullishScanner({
         }
         return b.score - a.score;
       });
-  }, [todayOnly, todayHits, analyzedStocks, searchTerm, priceFilter, timeFilter, sortBy]);
+  }, [todayOnly, todayHitsBase, analyzedStocks, matchAllOnly, searchTerm, priceFilter, timeFilter, sortBy]);
 
   // Overall timing stats
   const timingStats = useMemo(() => {
-    const list = todayOnly ? todayHits : analyzedStocks;
+    let list = todayOnly ? todayHitsBase : analyzedStocks;
+    if (matchAllOnly) {
+      list = list.filter(s => s.score === s.checks.length);
+    }
     if (list.length === 0) {
       return { 
         total: 0, 
@@ -488,6 +509,15 @@ export function HundredPercentBullishScanner({
                   <Flame className="w-3.5 h-3.5 text-emerald-400" />
                   {filteredStocks.length} Active
                 </span>
+                {matchAllOnly ? (
+                  <span className="text-[11px] text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1 font-black">
+                    ⭐ 13/13 All Confluences Only
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-slate-300 bg-slate-800 border border-slate-700 px-2.5 py-0.5 rounded-full font-mono">
+                    All Confluence Levels
+                  </span>
+                )}
                 {todayOnly && (
                   <span className="text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full font-mono">
                     ⚡ Today&apos;s Active Hits Only
@@ -549,6 +579,35 @@ export function HundredPercentBullishScanner({
               />
             </div>
 
+            {/* Primary Filter Mode Switch: 13/13 All Confluences Only vs All Setups */}
+            <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setMatchAllOnly(true)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  matchAllOnly
+                    ? 'bg-emerald-500 text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+                title="Strictly isolate setups matching all 13 confluence rules"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>⭐ All 13/13 Matches Only ({allConfluenceCount})</span>
+              </button>
+
+              <button
+                onClick={() => setMatchAllOnly(false)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  !matchAllOnly
+                    ? 'bg-slate-700 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+                title="View all Open=Low setups across any confluence score"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>All Open=Low Setups ({(todayOnly ? todayHitsBase : analyzedStocks).length})</span>
+              </button>
+            </div>
+
             {/* Mode Switch: Today's Hits vs All Tracked Setups */}
             <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar">
               <button
@@ -560,7 +619,7 @@ export function HundredPercentBullishScanner({
                 }`}
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>⚡ Today&apos;s Hits Only ({todayHits.length})</span>
+                <span>⚡ Today&apos;s Hits ({todayHits.length})</span>
               </button>
 
               <button
@@ -922,10 +981,22 @@ export function HundredPercentBullishScanner({
             <CheckCircle2 className="w-8 h-8 text-emerald-400/80" />
           </div>
           <h3 className="text-xl font-bold text-white mb-2">
-            {todayOnly ? '0 100% Bullish Hits Today' : 'No Setups Found'}
+            {matchAllOnly
+              ? `0 Stocks Match All 13 Confluences ${todayOnly ? "Today" : "in Database"}`
+              : todayOnly
+                ? "0 100% Bullish Hits Today"
+                : "No Setups Found"}
           </h3>
           <p className="text-slate-400 max-w-lg mx-auto text-sm leading-relaxed mb-6">
-            {todayOnly ? (
+            {matchAllOnly ? (
+              <>
+                Currently no stocks satisfy all 13 Bullish Confluence conditions simultaneously (Open=Low ≤0.20%, Body ≥60%, RVOL &gt;1.5x, Above VWAP, Gap Up, ORB Breakout, RSI 55–75, Market &amp; Sector Outperformance, HH+HL Structure, PDH, and OI Surge).
+                <br />
+                <span className="text-xs text-slate-500 mt-2 block">
+                  Scanner is strictly set to show ONLY stocks that achieve 100% (13/13) confluence.
+                </span>
+              </>
+            ) : todayOnly ? (
               <>
                 No stocks currently qualify for the 100% Bullish Move formula in today&apos;s active session ({ist.dateStr}).
                 <br />
@@ -942,15 +1013,28 @@ export function HundredPercentBullishScanner({
               `No stocks currently meet the Open = Low (≤0.20% var) baseline requirement.`
             )}
           </p>
-          {todayOnly && analyzedStocks.length > 0 && (
-            <button
-              onClick={() => setTodayOnly(false)}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold transition-all border border-slate-700 inline-flex items-center gap-2 cursor-pointer shadow-sm"
-            >
-              <Layers className="w-4 h-4 text-amber-400" />
-              <span>Show All Tracked Setups ({analyzedStocks.length})</span>
-            </button>
-          )}
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {matchAllOnly && (todayOnly ? todayHitsBase : analyzedStocks).length > 0 && (
+              <button
+                onClick={() => setMatchAllOnly(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold transition-all border border-slate-700 inline-flex items-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Layers className="w-4 h-4 text-amber-400" />
+                <span>View All Open=Low Setups ({(todayOnly ? todayHitsBase : analyzedStocks).length})</span>
+              </button>
+            )}
+
+            {todayOnly && analyzedStocks.length > 0 && (
+              <button
+                onClick={() => setTodayOnly(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-all border border-slate-700 inline-flex items-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Layers className="w-4 h-4 text-slate-400" />
+                <span>Show All Tracked Setups ({analyzedStocks.length})</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
