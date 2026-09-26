@@ -819,6 +819,26 @@ export function HundredPercentBullishScanner({
                 </div>
               </div>
 
+              {/* OHLC Bar (Open, High, Low, Close/LTP) */}
+              <div className="px-4 py-2 bg-slate-950/90 border-b border-slate-800/80 grid grid-cols-4 gap-2 text-center font-mono">
+                <div className="p-1 rounded bg-slate-900/60 border border-slate-800/60">
+                  <div className="text-[9px] font-sans font-bold text-slate-400 uppercase">Open</div>
+                  <div className="text-xs font-black text-slate-100">₹{(stock.first1mOpen ?? stock.openPrice)?.toFixed(2)}</div>
+                </div>
+                <div className="p-1 rounded bg-rose-950/25 border border-rose-900/40">
+                  <div className="text-[9px] font-sans font-bold text-rose-400 uppercase">High</div>
+                  <div className="text-xs font-black text-rose-300">₹{(stock.dayHigh ?? stock.highPrice ?? stock.first15mHigh)?.toFixed(2)}</div>
+                </div>
+                <div className="p-1 rounded bg-emerald-950/25 border border-emerald-900/40">
+                  <div className="text-[9px] font-sans font-bold text-emerald-400 uppercase">Low</div>
+                  <div className="text-xs font-black text-emerald-300">₹{(stock.first1mLow ?? stock.dayLow ?? stock.lowPrice ?? stock.first15mLow)?.toFixed(2)}</div>
+                </div>
+                <div className="p-1 rounded bg-blue-950/25 border border-blue-900/40">
+                  <div className="text-[9px] font-sans font-bold text-blue-400 uppercase">Close/LTP</div>
+                  <div className="text-xs font-black text-blue-300">₹{(stock.ltp ?? stock.closePrice)?.toFixed(2)}</div>
+                </div>
+              </div>
+
               {/* First Confluence Specific Detail Pill */}
               <div className="px-4 py-2 bg-slate-950/80 border-b border-slate-800/80 flex items-center justify-between text-xs gap-2">
                 <div className="flex items-center gap-1.5 text-slate-300 min-w-0">

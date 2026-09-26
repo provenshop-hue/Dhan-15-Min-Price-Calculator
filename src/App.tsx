@@ -25,6 +25,7 @@ import { OpenHighLowScanner } from './components/OpenHighLowScanner';
 import { HundredPercentBullishScanner } from './components/HundredPercentBullishScanner';
 import { EmaConfluenceScanner } from './components/EmaConfluenceScanner';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
+import { DhanMarketfeedModal } from './components/DhanMarketfeedModal';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -230,6 +231,7 @@ export default function App() {
   const [isManualCalcOpen, setIsManualCalcOpen] = useState(false);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
   const [isPositionSizerOpen, setIsPositionSizerOpen] = useState(false);
+  const [isMarketfeedModalOpen, setIsMarketfeedModalOpen] = useState(false);
   const [positionSizerStock, setPositionSizerStock] = useState<StockCalculated | null>(null);
   const [selectedDetailStock, setSelectedDetailStock] = useState<StockCalculated | null>(null);
   const [editingStockManual, setEditingStockManual] = useState<StockCalculated | null>(null);
@@ -515,13 +517,14 @@ export default function App() {
 
     if (result.success && result.data) {
       const data = result.data;
-      const openPrice = data.open;
-      const closePrice = data.close;
-      const highPrice = data.high;
-      const lowPrice = data.low;
+      const openPrice = data.first15mOpen ?? data.open;
+      const closePrice = data.first15mClose ?? data.close;
+      const highPrice = data.dayHigh ?? data.high;
+      const lowPrice = data.dayLow ?? data.low;
+      const ltp = data.ltp ?? data.sessionClose ?? closePrice;
       const rsi = data.rsi;
       const adx = data.adx;
-      const vwap = data.vwap !== undefined ? data.vwap : (highPrice && lowPrice ? Math.round(((highPrice + lowPrice + closePrice) / 3) * 100) / 100 : null);
+      const vwap = data.vwap !== undefined ? data.vwap : (highPrice && lowPrice ? Math.round(((highPrice + lowPrice + ltp) / 3) * 100) / 100 : null);
       const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, highPrice, lowPrice, 0.001, adx, data.first15mHigh, data.first15mLow, stock.symbol, data.candleTimestamp);
 
       const updatedObj: StockCalculated = {
@@ -531,6 +534,9 @@ export default function App() {
         closePrice,
         highPrice,
         lowPrice,
+        dayHigh: highPrice,
+        dayLow: lowPrice,
+        ltp,
         previousClose: data.previousClose !== undefined ? data.previousClose : stock.previousClose,
         first15mOpen: data.first15mOpen ?? stock.first15mOpen,
         first15mClose: data.first15mClose ?? stock.first15mClose,
@@ -800,22 +806,23 @@ export default function App() {
             const data = result.data;
             const secId = String(result.secId);
             
-            let openPrice = data.open;
-            let closePrice = data.close;
-            let highPrice = data.high;
-            let lowPrice = data.low;
+            let openPrice = data.first15mOpen ?? data.open;
+            let closePrice = data.first15mClose ?? data.close;
+            let highPrice = data.dayHigh ?? data.high;
+            let lowPrice = data.dayLow ?? data.low;
+            let ltp = data.ltp ?? data.sessionClose ?? closePrice;
             
             if (bulkMarketFeed[secId]) {
                const feed = bulkMarketFeed[secId];
-               if (feed.ohlc?.open > 0) openPrice = feed.ohlc.open;
-               if (feed.ohlc?.high > 0) highPrice = Math.max(highPrice, feed.ohlc.high);
-               if (feed.ohlc?.low > 0) lowPrice = Math.min(lowPrice, feed.ohlc.low);
-               if (feed.last_price > 0) closePrice = feed.last_price;
+               if (feed.ohlc?.open > 0 && (!openPrice || openPrice <= 0)) openPrice = feed.ohlc.open;
+               if (feed.ohlc?.high > 0) highPrice = Math.max(highPrice || 0, feed.ohlc.high);
+               if (feed.ohlc?.low > 0) lowPrice = lowPrice && lowPrice > 0 ? Math.min(lowPrice, feed.ohlc.low) : feed.ohlc.low;
+               if (feed.last_price > 0) ltp = feed.last_price;
             }
 
             const rsi = data.rsi;
             const adx = data.adx;
-            const vwap = data.vwap !== undefined ? data.vwap : (highPrice && lowPrice ? Math.round(((highPrice + lowPrice + closePrice) / 3) * 100) / 100 : null);
+            const vwap = data.vwap !== undefined ? data.vwap : (highPrice && lowPrice ? Math.round(((highPrice + lowPrice + ltp) / 3) * 100) / 100 : null);
             const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, highPrice, lowPrice, 0.001, adx, data.first15mHigh, data.first15mLow, stock.symbol, data.candleTimestamp);
 
             setStocks((prev) =>
@@ -828,6 +835,9 @@ export default function App() {
                       closePrice,
                       highPrice,
                       lowPrice,
+                      dayHigh: highPrice,
+                      dayLow: lowPrice,
+                      ltp,
                       previousClose: data.previousClose !== undefined ? data.previousClose : s.previousClose,
                       first15mOpen: data.first15mOpen ?? s.first15mOpen,
                       first15mClose: data.first15mClose ?? s.first15mClose,
@@ -1097,6 +1107,7 @@ export default function App() {
         }}
         onOpenPositionSizer={() => handleOpenPositionSizer(null)}
         onOpenCsvImport={() => setIsCsvImportOpen(true)}
+        onOpenMarketfeedModal={() => setIsMarketfeedModalOpen(true)}
         onExportCsv={handleExportCsv}
         totalStocks={stocks.length}
         calculatedCount={calculatedCount}
@@ -1416,6 +1427,13 @@ export default function App() {
         onClose={() => setIsCsvImportOpen(false)}
         onImportStocks={handleImportStocks}
         onResetToDefault={handleResetToDefaultCSV}
+      />
+
+      <DhanMarketfeedModal
+        isOpen={isMarketfeedModalOpen}
+        onClose={() => setIsMarketfeedModalOpen(false)}
+        credentials={credentials}
+        stocks={stocks}
       />
 
       {/* Bullish Rally Popup / Popunder Alert */}

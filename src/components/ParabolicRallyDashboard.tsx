@@ -57,7 +57,7 @@ type ViewFilter =
   | 'EARLY_1_3_MIN'
   | 'EXHAUSTION';
 
-type SortOption = 'SCORE_DESC' | 'TIME_NEWEST' | 'GAIN_DESC' | 'SYMBOL_ASC';
+type SortOption = 'VOLUME_PRIORITY' | 'SCORE_DESC' | 'TIME_NEWEST' | 'GAIN_DESC' | 'SYMBOL_ASC';
 
 export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = ({
   stocks,
@@ -73,7 +73,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   const [activeFilter, setActiveFilter] = useState<ViewFilter>('FULLY_BULLISH');
   const [selectedSector, setSelectedSector] = useState<string>('ALL');
   const [minScoreFilter, setMinScoreFilter] = useState<number>(0);
-  const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
+  const [sortBy, setSortBy] = useState<SortOption>('VOLUME_PRIORITY');
   const [timeWindowFilter, setTimeWindowFilter] = useState<string>('ALL');
   const [inspectedStock, setInspectedStock] = useState<ParabolicRallyAnalysis | null>(null);
   const [chartStock, setChartStock] = useState<StockCalculated | null>(null);
@@ -201,6 +201,11 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
         }
       })
       .sort((a, b) => {
+        if (sortBy === 'VOLUME_PRIORITY') {
+          const priA = a.volumePriorityScore || (a.score * 10000 + (a.isVolumeIncreasing ? 8000 : 0) + (a.volumeRatio || 1) * 3000);
+          const priB = b.volumePriorityScore || (b.score * 10000 + (b.isVolumeIncreasing ? 8000 : 0) + (b.volumeRatio || 1) * 3000);
+          return (priB - priA) || (b.score - a.score) || ((b.stock.pctChange || 0) - (a.stock.pctChange || 0));
+        }
         if (sortBy === 'TIME_NEWEST') {
           return (b.timing.rulePassedMinutes - a.timing.rulePassedMinutes) || (b.score - a.score);
         }
@@ -597,7 +602,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               onChange={(e) => setSortBy(e.target.value as SortOption)}
               className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
             >
-              <option value="SCORE_DESC">⭐ Top Match & Recent Time</option>
+              <option value="VOLUME_PRIORITY">🔥 Volume &amp; Confluence Priority (Top Volume &amp; Increasing)</option>
+              <option value="SCORE_DESC">⭐ Top Match &amp; Recent Time</option>
               <option value="TIME_NEWEST">🕒 Newest Signal Time</option>
               <option value="GAIN_DESC">Highest % Change</option>
               <option value="SYMBOL_ASC">Alphabetical (A-Z)</option>

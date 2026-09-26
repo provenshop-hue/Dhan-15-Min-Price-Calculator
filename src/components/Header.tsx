@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp, Layers } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp, Layers, Database } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   onOpenPositionSizer: () => void;
   onOpenCsvImport: () => void;
   onExportCsv: () => void;
+  onOpenMarketfeedModal?: () => void;
   totalStocks: number;
   calculatedCount: number;
   onSimulateAll: () => void;
@@ -34,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPositionSizer,
   onOpenCsvImport,
   onExportCsv,
+  onOpenMarketfeedModal,
   totalStocks,
   calculatedCount,
   isBulkLoading,
@@ -123,6 +125,18 @@ export const Header: React.FC<HeaderProps> = ({
               <Upload className="w-3.5 h-3.5 text-indigo-600" />
               <span>Import CSV Data</span>
             </button>
+
+            {/* Dhan Marketfeed Live Inspector (LTP, OHLC, Quote/Depth) */}
+            {onOpenMarketfeedModal && (
+              <button
+                onClick={onOpenMarketfeedModal}
+                title="Dhan Marketfeed v2 Live Inspector (POST /marketfeed/ltp, /ohlc, /quote)"
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 rounded-lg text-xs font-mono font-bold shadow-2xs transition-colors"
+              >
+                <Database className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Marketfeed (LTP/Depth)</span>
+              </button>
+            )}
 
             {/* Primary Action: Fetch All 15m Candles from Dhan API */}
             <button

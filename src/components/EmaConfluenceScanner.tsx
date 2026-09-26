@@ -766,6 +766,26 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                   </div>
                 </div>
 
+                {/* OHLC Bar (Open, High, Low, Close/LTP) */}
+                <div className="px-4 py-2 bg-slate-950/80 border-b border-slate-800 grid grid-cols-4 gap-2 text-center font-mono">
+                  <div className="p-1 rounded bg-slate-900/60 border border-slate-800/60">
+                    <span className="text-[9px] block text-slate-400 font-sans font-bold uppercase">Open</span>
+                    <span className="font-bold text-slate-200 text-xs">₹{(analysis.stock.first1mOpen ?? analysis.stock.openPrice)?.toFixed(2)}</span>
+                  </div>
+                  <div className="p-1 rounded bg-rose-950/25 border border-rose-900/40">
+                    <span className="text-[9px] block text-rose-400 font-sans font-bold uppercase">High</span>
+                    <span className="font-bold text-rose-300 text-xs">₹{(analysis.stock.dayHigh ?? analysis.stock.highPrice ?? analysis.stock.first15mHigh)?.toFixed(2)}</span>
+                  </div>
+                  <div className="p-1 rounded bg-emerald-950/25 border border-emerald-900/40">
+                    <span className="text-[9px] block text-emerald-400 font-sans font-bold uppercase">Low</span>
+                    <span className="font-bold text-emerald-300 text-xs">₹{(analysis.stock.first1mLow ?? analysis.stock.dayLow ?? analysis.stock.lowPrice ?? analysis.stock.first15mLow)?.toFixed(2)}</span>
+                  </div>
+                  <div className="p-1 rounded bg-blue-950/25 border border-blue-900/40">
+                    <span className="text-[9px] block text-blue-400 font-sans font-bold uppercase">Close/LTP</span>
+                    <span className="font-bold text-blue-300 text-xs">₹{(analysis.stock.ltp ?? analysis.price)?.toFixed(2)}</span>
+                  </div>
+                </div>
+
                 {/* 3. F&O Lot Size & Contract Specs Strip (Highlighted per user request) */}
                 <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-cyan-950/20 to-slate-950 border-b border-slate-800 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
@@ -1042,6 +1062,7 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                 <tr>
                   <th className="py-3 px-3">Symbol &amp; Company</th>
                   <th className="py-3 px-3">LTP &amp; Change</th>
+                  <th className="py-3 px-3">OHLC (O / H / L / C)</th>
                   <th className="py-3 px-3">F&amp;O Lot Size &amp; Value</th>
                   <th className="py-3 px-3">Recent Hit Time</th>
                   <th className="py-3 px-3">EMA Confluence Score</th>
@@ -1081,6 +1102,28 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                         <div className="text-white font-bold text-xs">₹{analysis.price.toFixed(2)}</div>
                         <div className={`text-[10px] font-bold ${analysis.pctChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {analysis.pctChange > 0 ? '+' : ''}{analysis.pctChange.toFixed(2)}%
+                        </div>
+                      </td>
+
+                      {/* OHLC Column */}
+                      <td className="py-3 px-3">
+                        <div className="text-[11px] font-mono grid grid-cols-2 gap-x-2 gap-y-0.5 text-slate-300">
+                          <div>
+                            <span className="text-slate-500 font-sans text-[9px] uppercase font-bold mr-1">O:</span>
+                            <span className="text-slate-200">₹{(analysis.stock.first1mOpen ?? analysis.stock.openPrice)?.toFixed(1)}</span>
+                          </div>
+                          <div>
+                            <span className="text-rose-400 font-sans text-[9px] uppercase font-bold mr-1">H:</span>
+                            <span className="text-rose-300">₹{(analysis.stock.dayHigh ?? analysis.stock.highPrice ?? analysis.stock.first15mHigh)?.toFixed(1)}</span>
+                          </div>
+                          <div>
+                            <span className="text-emerald-400 font-sans text-[9px] uppercase font-bold mr-1">L:</span>
+                            <span className="text-emerald-300">₹{(analysis.stock.first1mLow ?? analysis.stock.dayLow ?? analysis.stock.lowPrice ?? analysis.stock.first15mLow)?.toFixed(1)}</span>
+                          </div>
+                          <div>
+                            <span className="text-blue-400 font-sans text-[9px] uppercase font-bold mr-1">C:</span>
+                            <span className="text-blue-300">₹{(analysis.stock.ltp ?? analysis.price)?.toFixed(1)}</span>
+                          </div>
                         </div>
                       </td>
 

@@ -230,7 +230,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   const itemsPerPage = 25;
 
   // Sorting
-  const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'totalCalc' | 'companyName' | 'volume' | 'pctChange'>('symbol');
+  const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'totalCalc' | 'companyName' | 'volume' | 'pctChange' | 'openPrice' | 'highPrice' | 'lowPrice' | 'closePrice'>('symbol');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Helper check for O=L / O=H with strict exact match
@@ -480,7 +480,19 @@ export const StockTable: React.FC<StockTableProps> = ({
     let aVal: any = a[sortField];
     let bVal: any = b[sortField];
 
-    if (sortField === 'totalCalc') {
+    if (sortField === 'highPrice') {
+      aVal = a.dayHigh ?? a.highPrice ?? a.first15mHigh;
+      bVal = b.dayHigh ?? b.highPrice ?? b.first15mHigh;
+    } else if (sortField === 'lowPrice') {
+      aVal = a.dayLow ?? a.lowPrice ?? a.first15mLow;
+      bVal = b.dayLow ?? b.lowPrice ?? b.first15mLow;
+    } else if (sortField === 'closePrice') {
+      aVal = a.ltp ?? a.closePrice;
+      bVal = b.ltp ?? b.closePrice;
+    } else if (sortField === 'openPrice') {
+      aVal = a.openPrice ?? a.first1mOpen;
+      bVal = b.openPrice ?? b.first1mOpen;
+    } else if (sortField === 'totalCalc') {
       aVal = (a.totalCalc !== undefined && a.totalCalc !== null)
         ? a.totalCalc
         : (a.openCalc !== undefined && a.openCalc !== null && a.closeCalc !== undefined && a.closeCalc !== null)
@@ -509,7 +521,7 @@ export const StockTable: React.FC<StockTableProps> = ({
     currentPage * itemsPerPage
   );
 
-  const toggleSort = (field: 'symbol' | 'openCalc' | 'closeCalc' | 'totalCalc' | 'companyName' | 'volume') => {
+  const toggleSort = (field: 'symbol' | 'openCalc' | 'closeCalc' | 'totalCalc' | 'companyName' | 'volume' | 'openPrice' | 'highPrice' | 'lowPrice' | 'closePrice') => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -1142,8 +1154,41 @@ export const StockTable: React.FC<StockTableProps> = ({
                 </button>
               </th>
               <th className="py-3 px-3 text-center">Lot Size ({lotMonth} '26)</th>
-              <th className="py-3 px-3 text-right">15-Min Open (₹)</th>
-              <th className="py-3 px-3 text-right">15-Min Close (₹)</th>
+              <th className="py-3 px-3 text-right">
+                <button
+                  onClick={() => toggleSort('openPrice')}
+                  className="flex items-center justify-end gap-1 hover:text-slate-900 transition-colors w-full"
+                >
+                  15-Min Open (₹) <ArrowUpDown className="w-3 h-3" />
+                </button>
+              </th>
+              <th className="py-3 px-3 text-right">
+                <button
+                  onClick={() => toggleSort('highPrice')}
+                  className="flex items-center justify-end gap-1 hover:text-rose-700 transition-colors text-rose-800 font-bold w-full"
+                  title="Session High / 15m Candle High"
+                >
+                  High (₹) <ArrowUpDown className="w-3 h-3" />
+                </button>
+              </th>
+              <th className="py-3 px-3 text-right">
+                <button
+                  onClick={() => toggleSort('lowPrice')}
+                  className="flex items-center justify-end gap-1 hover:text-emerald-700 transition-colors text-emerald-800 font-bold w-full"
+                  title="Session Low / 15m Candle Low"
+                >
+                  Low (₹) <ArrowUpDown className="w-3 h-3" />
+                </button>
+              </th>
+              <th className="py-3 px-3 text-right">
+                <button
+                  onClick={() => toggleSort('closePrice')}
+                  className="flex items-center justify-end gap-1 hover:text-blue-800 transition-colors text-blue-900 font-bold w-full"
+                  title="15-Min Close & Live LTP"
+                >
+                  15m Close / LTP (₹) <ArrowUpDown className="w-3 h-3" />
+                </button>
+              </th>
               <th className="py-3 px-3 text-right">
                 <button
                   onClick={() => toggleSort('volume')}
@@ -1187,7 +1232,7 @@ export const StockTable: React.FC<StockTableProps> = ({
           <tbody className="divide-y divide-slate-100 text-slate-800">
             {paginatedStocks.length === 0 ? (
               <tr>
-                <td colSpan={12} className="text-center py-12 text-slate-400">
+                <td colSpan={14} className="text-center py-12 text-slate-400">
                   No stocks match the selected search or filter criteria.
                 </td>
               </tr>
@@ -1321,10 +1366,55 @@ export const StockTable: React.FC<StockTableProps> = ({
                         value={stock.openPrice !== undefined && stock.openPrice !== null ? stock.openPrice : ''}
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
-                          onUpdateStockPrices(stock.id, val, stock.closePrice || 0);
+                          onUpdateStockPrices(stock.id, val, stock.closePrice || 0, stock.highPrice, stock.lowPrice);
                         }}
                         className="w-24 bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded px-2 py-1 text-right font-mono text-slate-900 text-xs outline-none shadow-2xs"
                       />
+                      {stock.first1mOpen !== undefined && stock.first1mOpen !== null && (
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5" title="1-minute opening price">
+                          1m O: ₹{stock.first1mOpen.toFixed(2)}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* 15-Min High Input */}
+                    <td className="py-2.5 px-3 text-right">
+                      <input
+                        type="number"
+                        step="0.05"
+                        placeholder="0.00"
+                        value={stock.highPrice !== undefined && stock.highPrice !== null ? stock.highPrice : ''}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          onUpdateStockPrices(stock.id, stock.openPrice || 0, stock.closePrice || 0, val, stock.lowPrice);
+                        }}
+                        className="w-24 bg-white border border-slate-300 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 rounded px-2 py-1 text-right font-mono text-rose-800 text-xs outline-none shadow-2xs"
+                      />
+                      {(stock.dayHigh !== undefined && stock.dayHigh !== null) || (stock.first15mHigh !== undefined && stock.first15mHigh !== null) ? (
+                        <div className="text-[10px] text-rose-600 font-mono font-bold mt-0.5" title="Day High / 15m High">
+                          Day H: ₹{(stock.dayHigh ?? stock.first15mHigh)?.toFixed(2)}
+                        </div>
+                      ) : null}
+                    </td>
+
+                    {/* 15-Min Low Input */}
+                    <td className="py-2.5 px-3 text-right">
+                      <input
+                        type="number"
+                        step="0.05"
+                        placeholder="0.00"
+                        value={stock.lowPrice !== undefined && stock.lowPrice !== null ? stock.lowPrice : ''}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          onUpdateStockPrices(stock.id, stock.openPrice || 0, stock.closePrice || 0, stock.highPrice, val);
+                        }}
+                        className="w-24 bg-white border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 rounded px-2 py-1 text-right font-mono text-emerald-800 text-xs outline-none shadow-2xs"
+                      />
+                      {(stock.dayLow !== undefined && stock.dayLow !== null) || (stock.first15mLow !== undefined && stock.first15mLow !== null) ? (
+                        <div className="text-[10px] text-emerald-600 font-mono font-bold mt-0.5" title="Day Low / 15m Low">
+                          Day L: ₹{(stock.dayLow ?? stock.first15mLow)?.toFixed(2)}
+                        </div>
+                      ) : null}
                     </td>
 
                     {/* 15-Min Close Input */}
@@ -1336,10 +1426,15 @@ export const StockTable: React.FC<StockTableProps> = ({
                         value={stock.closePrice !== undefined && stock.closePrice !== null ? stock.closePrice : ''}
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
-                          onUpdateStockPrices(stock.id, stock.openPrice || 0, val);
+                          onUpdateStockPrices(stock.id, stock.openPrice || 0, val, stock.highPrice, stock.lowPrice);
                         }}
                         className="w-24 bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded px-2 py-1 text-right font-mono text-slate-900 text-xs outline-none shadow-2xs"
                       />
+                      {(stock.ltp !== undefined && stock.ltp !== null) && (
+                        <div className="text-[10px] text-blue-700 font-mono font-black mt-0.5" title="Live LTP">
+                          LTP: ₹{stock.ltp.toFixed(2)}
+                        </div>
+                      )}
                     </td>
 
                     {/* 15-Min Volume */}
