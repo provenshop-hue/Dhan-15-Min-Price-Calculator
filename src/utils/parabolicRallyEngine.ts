@@ -50,12 +50,6 @@ export interface ParabolicRallyAnalysis {
   confidencePercent: number;
   isFullyBullish: boolean;   // Score >= 12 & Bullish
   isFullyBearish: boolean;   // Score >= 12 & Bearish
-  // High Priority .00 Decimal Execution
-  hasOpenDecimal00: boolean;
-  hasCloseDecimal00: boolean;
-  hasOpenCloseDoubleZero: boolean; // Both Open & Close decimal end at .00
-  isHighPriority: boolean;
-  priorityLabel?: string;
   checks: SignalCheckItem[];
   // Intra-candle progression tracking (1-3 min vs 15m)
   intraCandlePhase: 'FIRST_1_MIN' | 'FIRST_3_MIN' | 'MID_CANDLE' | 'CANDLE_CLOSE';
@@ -255,10 +249,6 @@ function assignCheckTimes(
         offsetMinutes = 0;
         phase = 'Step 2: Min 00:01 (Candle Open)';
         break;
-      case 'double_zero_confluence':
-        offsetMinutes = 0;
-        phase = 'Step 1: Round .00 Decimal Execution';
-        break;
       case 'above_open':
       case 'below_open':
         offsetMinutes = 1;
@@ -321,48 +311,6 @@ function assignCheckTimes(
 
 
 /**
- * Checks if a price value has its 2-decimal representation ending in ".00"
- * (e.g. 1450.00, 240.00, or any round number with zero paise decimals)
- */
-export function isPriceDecimalEnding00(price?: number | null): boolean {
-  if (price === undefined || price === null || isNaN(price) || price <= 0) return false;
-  return (Math.round(price * 100) % 100) === 0;
-}
-
-/**
- * Checks if a stock has both Open and Close prices with decimals ending in "00"
- */
-export function detectOpenCloseDecimal00(stock: StockCalculated): {
-  hasOpenDecimal00: boolean;
-  hasCloseDecimal00: boolean;
-  hasOpenCloseDoubleZero: boolean;
-  effectiveOpen: number;
-  effectiveClose: number;
-} {
-  const openCandidates = [stock.first1mOpen, stock.openPrice, stock.first15mOpen].filter(
-    (v): v is number => v !== undefined && v !== null && !isNaN(v) && v > 0
-  );
-  const closeCandidates = [stock.ltp, stock.closePrice, stock.first15mClose, stock.first1mClose].filter(
-    (v): v is number => v !== undefined && v !== null && !isNaN(v) && v > 0
-  );
-
-  const effectiveOpen = openCandidates.length > 0 ? openCandidates[0] : (stock.openPrice || 100);
-  const effectiveClose = closeCandidates.length > 0 ? closeCandidates[0] : (stock.closePrice || effectiveOpen);
-
-  const hasOpenDecimal00 = openCandidates.length > 0 ? openCandidates.some(isPriceDecimalEnding00) : isPriceDecimalEnding00(effectiveOpen);
-  const hasCloseDecimal00 = closeCandidates.length > 0 ? closeCandidates.some(isPriceDecimalEnding00) : isPriceDecimalEnding00(effectiveClose);
-  const hasOpenCloseDoubleZero = hasOpenDecimal00 && hasCloseDecimal00;
-
-  return {
-    hasOpenDecimal00,
-    hasCloseDecimal00,
-    hasOpenCloseDoubleZero,
-    effectiveOpen,
-    effectiveClose
-  };
-}
-
-/**
  * Calculates 15-Minute Parabolic Rally (Bullish) or Breakdown (Bearish) Probability Analysis
  */
 export function analyzeParabolicRally(
@@ -381,14 +329,6 @@ export function analyzeParabolicRally(
   const first15mLow = stock.first15mLow || low;
   const buyAbove = stock.buyAbove || (open * 1.004);
   const sellBelow = stock.sellBelow || (open * 0.996);
-
-  // High Priority: Open & Close Decimal Ending in .00 Confluence
-  const decimalInfo = detectOpenCloseDecimal00(stock);
-  const hasOpenDecimal00 = decimalInfo.hasOpenDecimal00;
-  const hasCloseDecimal00 = decimalInfo.hasCloseDecimal00;
-  const hasOpenCloseDoubleZero = decimalInfo.hasOpenCloseDoubleZero;
-  const isHighPriority = hasOpenCloseDoubleZero;
-  const priorityLabel = hasOpenCloseDoubleZero ? '⭐ HIGH PRIORITY (.00 DOUBLE ZERO)' : undefined;
 
   // Sector stats
   const sectorInfo = getStockSector(stock.symbol);
@@ -550,24 +490,7 @@ export function analyzeParabolicRally(
       detail: isBreadthPositive ? 'Industry sector tailwinds fully backing the stock move' : 'Sector breadth weak or mixed'
     });
 
-    // 13. Institutional .00 Decimal Execution Confluence (+2 pts)
-    checks.push({
-      id: 'double_zero_confluence',
-      name: 'Open & Close .00 Decimal (Institutional)',
-      points: hasOpenCloseDoubleZero ? 2 : 0,
-      maxPoints: 2,
-      passed: hasOpenCloseDoubleZero,
-      actualValue: `Open: ₹${decimalInfo.effectiveOpen.toFixed(2)} | Close: ₹${decimalInfo.effectiveClose.toFixed(2)}`,
-      detail: hasOpenCloseDoubleZero
-        ? '⭐ HIGH PRIORITY: Both Open and Close printed exact .00 decimals (pure institutional block limit order execution)'
-        : hasOpenDecimal00
-        ? `Open printed .00 (₹${decimalInfo.effectiveOpen.toFixed(2)}), Close has cents (₹${decimalInfo.effectiveClose.toFixed(2)})`
-        : hasCloseDecimal00
-        ? `Close printed .00 (₹${decimalInfo.effectiveClose.toFixed(2)}), Open has cents (₹${decimalInfo.effectiveOpen.toFixed(2)})`
-        : 'Prices contain non-zero decimal paise'
-    });
-
-    const totalScore = Math.min(16, checks.reduce((sum, c) => sum + c.points, 0));
+    const totalScore = checks.reduce((sum, c) => sum + c.points, 0);
 
     // Exhaustion check: RSI > 78 OR price stretched >3.8% above VWAP
     const isExhausted = (rsi >= 78) || (vwap > 0 && ((close - vwap) / vwap) * 100 > 3.8);
@@ -624,25 +547,19 @@ export function analyzeParabolicRally(
       confidencePercent: Math.min(100, Math.round((totalScore / 16) * 100)),
       isFullyBullish: totalScore >= 12 && !isExhausted,
       isFullyBearish: false,
-      hasOpenDecimal00,
-      hasCloseDecimal00,
-      hasOpenCloseDoubleZero,
-      isHighPriority,
-      priorityLabel,
       checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
       openingRangeStatus: isOrbHighBroken ? 'ORB High Broken 🟢' : 'Inside ORB Range',
       vwapStatus: isAboveVwap ? `Above VWAP by +${vwapDiffPct.toFixed(1)}%` : 'Below VWAP',
       emaStatus: isEmaGolden ? '9 EMA > 21 EMA Golden' : 'Neutral',
       volumeStatus: isVolExpanding ? 'Volume Expanding >20-bar avg 🔥' : 'Normal Volume',
-      summaryVerdict: (hasOpenCloseDoubleZero ? `⭐ [HIGH PRIORITY: .00 DOUBLE ZERO - Open: ₹${decimalInfo.effectiveOpen.toFixed(2)}, Close: ₹${decimalInfo.effectiveClose.toFixed(2)}] ` : '') +
-        (totalScore >= 12 
+      summaryVerdict: totalScore >= 12 
         ? `High-confluence 15-minute parabolic breakout confirmed at ${timing.timeStr}. All institutional criteria (Open=Low, Above VWAP, ORB break, Volume explosion) are 100% active.`
         : totalScore >= 9
         ? `Strong bullish confirmation at ${timing.timeStr} with institutional alignment. Ideal for continuation entry.`
         : totalScore >= 6
         ? `Early bullish probability forming in the first 1-3 minutes (${timing.intraCandleTime}). Wait for ORB breakout.`
-        : 'Setup weak / incomplete. Avoid taking early entries without volume or VWAP confirmation.'),
+        : 'Setup weak / incomplete. Avoid taking early entries without volume or VWAP confirmation.',
       tacticalAction: totalScore >= 12 
         ? `BUY CALL OPTION: ${suggestedStrike} or Long Futures above ₹${close.toFixed(1)} with SL @ ₹${stopLoss.toFixed(1)} (Signal Met @ ${timing.timeStr}).`
         : totalScore >= 9
@@ -810,24 +727,7 @@ export function analyzeParabolicRally(
       detail: isBreadthNegative ? 'Industry sector headwind dragging down the entire peer basket' : 'Sector breadth mixed'
     });
 
-    // 13. Institutional .00 Decimal Execution Confluence (+2 pts)
-    checks.push({
-      id: 'double_zero_confluence',
-      name: 'Open & Close .00 Decimal (Institutional)',
-      points: hasOpenCloseDoubleZero ? 2 : 0,
-      maxPoints: 2,
-      passed: hasOpenCloseDoubleZero,
-      actualValue: `Open: ₹${decimalInfo.effectiveOpen.toFixed(2)} | Close: ₹${decimalInfo.effectiveClose.toFixed(2)}`,
-      detail: hasOpenCloseDoubleZero
-        ? '⭐ HIGH PRIORITY: Both Open and Close printed exact .00 decimals (pure institutional block limit order execution)'
-        : hasOpenDecimal00
-        ? `Open printed .00 (₹${decimalInfo.effectiveOpen.toFixed(2)}), Close has cents (₹${decimalInfo.effectiveClose.toFixed(2)})`
-        : hasCloseDecimal00
-        ? `Close printed .00 (₹${decimalInfo.effectiveClose.toFixed(2)}), Open has cents (₹${decimalInfo.effectiveOpen.toFixed(2)})`
-        : 'Prices contain non-zero decimal paise'
-    });
-
-    const totalScore = Math.min(16, checks.reduce((sum, c) => sum + c.points, 0));
+    const totalScore = checks.reduce((sum, c) => sum + c.points, 0);
 
     // Exhaustion check: RSI < 22 OR price stretched >3.8% below VWAP
     const isExhausted = (rsi <= 22) || (vwap > 0 && ((vwap - close) / vwap) * 100 > 3.8);
@@ -884,25 +784,19 @@ export function analyzeParabolicRally(
       confidencePercent: Math.min(100, Math.round((totalScore / 16) * 100)),
       isFullyBullish: false,
       isFullyBearish: totalScore >= 12 && !isExhausted,
-      hasOpenDecimal00,
-      hasCloseDecimal00,
-      hasOpenCloseDoubleZero,
-      isHighPriority,
-      priorityLabel,
       checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
       openingRangeStatus: isOrbLowBroken ? 'ORB Low Shattered 🔴' : 'Inside ORB Range',
       vwapStatus: isBelowVwap ? `Below VWAP by -${vwapDiffPct.toFixed(1)}%` : 'Above VWAP',
       emaStatus: isEmaDeath ? '9 EMA < 21 EMA Death' : 'Neutral',
       volumeStatus: isVolExpanding ? 'Selling Volume Expanding >20-bar avg 🔥' : 'Normal Volume',
-      summaryVerdict: (hasOpenCloseDoubleZero ? `⭐ [HIGH PRIORITY: .00 DOUBLE ZERO - Open: ₹${decimalInfo.effectiveOpen.toFixed(2)}, Close: ₹${decimalInfo.effectiveClose.toFixed(2)}] ` : '') +
-        (totalScore >= 12 
+      summaryVerdict: totalScore >= 12 
         ? `High-confluence 15-minute parabolic breakdown confirmed at ${timing.timeStr}. All institutional criteria (Open=High, Below VWAP, ORB breakdown, Volume dump) are 100% active.`
         : totalScore >= 9
         ? `Strong bearish confirmation at ${timing.timeStr} with institutional distribution. Ideal for short / PE entry.`
         : totalScore >= 6
         ? `Early bearish breakdown probability forming in the first 1-3 minutes (${timing.intraCandleTime}). Watch ORB low.`
-        : 'Setup weak / incomplete. Avoid chasing until confirmation is established.'),
+        : 'Setup weak / incomplete. Avoid chasing until confirmation is established.',
       tacticalAction: totalScore >= 12 
         ? `BUY PUT OPTION: ${suggestedStrike} or Short Futures below ₹${close.toFixed(1)} with SL @ ₹${stopLoss.toFixed(1)} (Signal Met @ ${timing.timeStr}).`
         : totalScore >= 9
@@ -989,18 +883,9 @@ export function analyzeHistoricalPeakParabolicRally(
   // If we found a peak analysis, we override its 'stock' property to be the current real stock 
   // so the UI shows the current live price and pctChange, but keeps the timing/score of the peak!
   if (peakAnalysis) {
-    const liveDecimals = detectOpenCloseDecimal00(stock);
-    const hasOpenCloseDoubleZero = liveDecimals.hasOpenCloseDoubleZero || peakAnalysis.hasOpenCloseDoubleZero;
-    const hasOpenDecimal00 = liveDecimals.hasOpenDecimal00 || peakAnalysis.hasOpenDecimal00;
-    const hasCloseDecimal00 = liveDecimals.hasCloseDecimal00 || peakAnalysis.hasCloseDecimal00;
     return {
       ...peakAnalysis,
-      stock: stock,
-      hasOpenDecimal00,
-      hasCloseDecimal00,
-      hasOpenCloseDoubleZero,
-      isHighPriority: hasOpenCloseDoubleZero,
-      priorityLabel: hasOpenCloseDoubleZero ? '⭐ HIGH PRIORITY (.00 DOUBLE ZERO)' : undefined
+      stock: stock
     };
   }
   

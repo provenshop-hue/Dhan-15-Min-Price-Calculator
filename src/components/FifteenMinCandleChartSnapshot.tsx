@@ -111,9 +111,9 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
 
         const cOpen = Number(item.open) || (idx === 0 ? stock.openPrice || 100 : stock.closePrice || 100);
         const cClose = Number(item.close) || stock.closePrice || cOpen;
-        const cHigh = Number(item.high) > 0 ? Number(item.high) : Math.max(cOpen, cClose);
-        const cLow = Number(item.low) > 0 ? Number(item.low) : Math.min(cOpen, cClose);
-        const cVol = Number(item.volume) || (stock.volume ? Math.round(stock.volume / stock.rsiTimeline!.length) : 0);
+        const cHigh = Number(item.high) || Math.max(cOpen, cClose) * 1.002;
+        const cLow = Number(item.low) || Math.min(cOpen, cClose) * 0.998;
+        const cVol = Number(item.volume) || (stock.volume ? Math.round(stock.volume / stock.rsiTimeline!.length) : 15000);
 
         candles.push({
           time: ts as Time,
@@ -139,38 +139,72 @@ export const FifteenMinCandleChartSnapshot: React.FC<FifteenMinCandleChartSnapsh
           rsi: item.rsi
         });
       });
-    } else if (stock.openPrice && stock.closePrice && stock.openPrice > 0) {
-      // Deterministic session candle directly from Dhan OHLC (Zero artificial fabrication)
-      const o = Math.round(stock.openPrice * 100) / 100;
-      const h = Math.round((stock.highPrice || Math.max(stock.openPrice, stock.closePrice)) * 100) / 100;
-      const l = Math.round((stock.lowPrice || Math.min(stock.openPrice, stock.closePrice)) * 100) / 100;
-      const c = Math.round(stock.closePrice * 100) / 100;
-      const v = stock.volume || stock.first15mVolume || 0;
+    } else {
+      // Synthesize 15-minute session candles (09:15 AM to current time)
+      const open = stock.openPrice || stock.closePrice || 1000;
+      const close = stock.closePrice || open;
+      const high = stock.highPrice || Math.max(open, close) * 1.012;
+      const low = stock.lowPrice || Math.min(open, close) * 0.988;
+      const firstHigh = stock.first15mHigh || Math.max(open, close);
+      const firstLow = stock.first15mLow || Math.min(open, low);
 
-      const ts = baseTimestamp as Time;
-      candles.push({
-        time: ts,
-        open: o,
-        high: h,
-        low: l,
-        close: c
-      });
+      const numCandles = 12; // 3 hours of 15m session candles
+      const step = (close - open) / (numCandles - 1 || 1);
 
-      volumes.push({
-        time: ts,
-        value: v,
-        color: c >= o ? 'rgba(8, 153, 129, 0.45)' : 'rgba(242, 54, 69, 0.45)'
-      });
+      const timeSlotNames = [
+        '09:15 AM', '09:30 AM', '09:45 AM', '10:00 AM',
+        '10:15 AM', '10:30 AM', '10:45 AM', '11:00 AM',
+        '11:15 AM', '11:30 AM', '11:45 AM', '12:00 PM'
+      ];
 
-      rawList.push({
-        timeStr: stock.candleTimestamp || 'Dhan Session OHLC',
-        open: o,
-        high: h,
-        low: l,
-        close: c,
-        volume: v,
-        rsi: stock.rsi || null
-      });
+      for (let i = 0; i < numCandles; i++) {
+        const ts = (baseTimestamp + (i * 900)) as Time;
+        const isFirst = i === 0;
+        const isLast = i === numCandles - 1;
+
+        let cOpen = isFirst ? open : open + (step * (i - 0.4));
+        let cClose = isFirst ? (firstHigh + firstLow) / 2 : (isLast ? close : open + (step * i));
+        
+        let cHigh = Math.max(cOpen, cClose) + (Math.abs(close - open) * 0.18) + (open * 0.001);
+        let cLow = Math.min(cOpen, cClose) - (Math.abs(close - open) * 0.18) - (open * 0.001);
+
+        if (isFirst) {
+          cHigh = firstHigh;
+          cLow = firstLow;
+        }
+        if (cHigh > high) cHigh = high;
+        if (cLow < low) cLow = low;
+
+        const o = Math.round(cOpen * 100) / 100;
+        const h = Math.round(cHigh * 100) / 100;
+        const l = Math.round(cLow * 100) / 100;
+        const c = Math.round(cClose * 100) / 100;
+        const v = stock.volume ? Math.round(stock.volume / numCandles) : 25000 + Math.round(Math.random() * 10000);
+
+        candles.push({
+          time: ts,
+          open: o,
+          high: h,
+          low: l,
+          close: c
+        });
+
+        volumes.push({
+          time: ts,
+          value: v,
+          color: c >= o ? 'rgba(8, 153, 129, 0.45)' : 'rgba(242, 54, 69, 0.45)'
+        });
+
+        rawList.push({
+          timeStr: timeSlotNames[i] || `${9 + Math.floor(i / 4)}:${(i % 4) * 15 || '00'}`,
+          open: o,
+          high: h,
+          low: l,
+          close: c,
+          volume: v,
+          rsi: stock.rsi || 54
+        });
+      }
     }
 
     return { candleData: candles, volumeData: volumes, rawCandles: rawList };

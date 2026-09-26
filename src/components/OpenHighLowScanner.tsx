@@ -134,15 +134,6 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                <div className="text-emerald-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-1"><Zap className="w-3 h-3"/> AI Algorithmic Top Pick</div>
                <h2 className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">{topRecommendation.symbol}</h2>
                <p className="text-slate-300 mt-1">Exceptional Open=Low candidate with <strong className="text-emerald-300">₹{topRecommendation.difference.toFixed(2)}</strong> variance.</p>
-               <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-mono text-slate-300 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-emerald-500/20">
-                 <span>Open: <strong className="text-white">₹{(topRecommendation.first1mOpen ?? topRecommendation.openPrice)?.toFixed(2)}</strong></span>
-                 <span className="text-slate-600">•</span>
-                 <span>High: <strong className="text-rose-400">₹{(topRecommendation.dayHigh ?? topRecommendation.highPrice ?? topRecommendation.first1mHigh)?.toFixed(2)}</strong></span>
-                 <span className="text-slate-600">•</span>
-                 <span>Low: <strong className="text-emerald-400">₹{(topRecommendation.first1mLow ?? topRecommendation.dayLow ?? topRecommendation.lowPrice)?.toFixed(2)}</strong></span>
-                 <span className="text-slate-600">•</span>
-                 <span>Close/LTP: <strong className="text-blue-400">₹{(topRecommendation.ltp ?? topRecommendation.closePrice)?.toFixed(2)}</strong></span>
-               </div>
              </div>
            </div>
         </div>
@@ -255,29 +246,14 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                     <h4 className={`text-sm font-black uppercase tracking-wider ${isBull ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {isBull ? 'OPEN = LOW' : 'OPEN = HIGH'}
                     </h4>
+                    <p className="text-xs font-mono mt-0.5 text-slate-300">
+                      Open: ₹{stock.first1mOpen?.toFixed(2)}
+                      <span className="mx-1 text-slate-500">|</span>
+                      {isBull ? 'Low' : 'High'}: ₹{isBull ? stock.first1mLow?.toFixed(2) : stock.first1mHigh?.toFixed(2)}
+                    </p>
                     <p className={`text-[11px] font-mono mt-0.5 ${isBull ? 'text-emerald-500' : 'text-rose-500'}`}>
                       Difference: ₹{(stock as any).difference.toFixed(2)}
                     </p>
-                  </div>
-                </div>
-
-                {/* Open, High, Low, Close (OHLC) Metrics Bar */}
-                <div className="grid grid-cols-4 gap-1.5 p-2 bg-slate-950/80 rounded-xl border border-slate-800 text-center font-mono">
-                  <div className="p-1 rounded bg-slate-900/60 border border-slate-800/60">
-                    <div className="text-[9px] uppercase text-slate-400 font-sans font-bold">Open</div>
-                    <div className="text-xs font-black text-white">₹{(stock.first1mOpen ?? stock.openPrice)?.toFixed(2)}</div>
-                  </div>
-                  <div className="p-1 rounded bg-rose-950/30 border border-rose-900/40">
-                    <div className="text-[9px] uppercase text-rose-400 font-sans font-bold">High</div>
-                    <div className="text-xs font-black text-rose-300">₹{(stock.dayHigh ?? stock.highPrice ?? stock.first15mHigh ?? stock.first1mHigh)?.toFixed(2)}</div>
-                  </div>
-                  <div className="p-1 rounded bg-emerald-950/30 border border-emerald-900/40">
-                    <div className="text-[9px] uppercase text-emerald-400 font-sans font-bold">Low</div>
-                    <div className="text-xs font-black text-emerald-300">₹{(stock.first1mLow ?? stock.dayLow ?? stock.lowPrice ?? stock.first15mLow)?.toFixed(2)}</div>
-                  </div>
-                  <div className="p-1 rounded bg-blue-950/30 border border-blue-900/40">
-                    <div className="text-[9px] uppercase text-blue-400 font-sans font-bold">Close/LTP</div>
-                    <div className="text-xs font-black text-blue-300">₹{(stock.ltp ?? stock.closePrice)?.toFixed(2)}</div>
                   </div>
                 </div>
 

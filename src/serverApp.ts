@@ -216,116 +216,25 @@ export function createExpressApp() {
     }
   });
 
-  /**
-   * Helper: Resolve Dhan credentials and normalize payload for Marketfeed v2 endpoints.
-   * Deterministic Zero AI Hallucination: strictly forward genuine Dhan parameters without artificial manipulation.
-   */
-  function resolveDhanMarketfeedParams(req: any) {
-    const reqClientId = req.headers['client-id'] || req.headers['client_id'] || req.body?.clientId;
-    const reqAccessToken = req.headers['access-token'] || req.headers['access_token'] || req.body?.accessToken;
-
-    const globalSettings = loadGlobalSettings();
-    const clientId = reqClientId || globalSettings.dhanCredentials?.clientId || process.env.DHAN_CLIENT_ID;
-    const accessToken = reqAccessToken || globalSettings.dhanCredentials?.accessToken || process.env.DHAN_ACCESS_TOKEN;
-
-    if (!clientId || !accessToken) {
-      return {
-        authenticated: false,
-        error: 'Missing Dhan credentials. Provide client-id and access-token headers or configure in Dhan Settings.',
-        clientId: null,
-        accessToken: null,
-        payload: null
-      };
-    }
-
-    const body = req.body || {};
-    const payload: Record<string, number[]> = {};
-
-    // Standard Dhan exchange segments
-    const dhanSegments = ['NSE_EQ', 'NSE_FNO', 'IDX_I', 'BSE_EQ', 'MCX_COMM', 'BSE_FNO'];
-    let hasDirectSegmentKeys = false;
-    for (const seg of dhanSegments) {
-      if (Array.isArray(body[seg]) && body[seg].length > 0) {
-        payload[seg] = body[seg].map(Number).filter((n: number) => !isNaN(n) && n > 0);
-        hasDirectSegmentKeys = true;
-      }
-    }
-
-    if (!hasDirectSegmentKeys) {
-      const defaultSegment = body.exchangeSegment || 'NSE_EQ';
-
-      if (Array.isArray(body.instruments) && body.instruments.length > 0) {
-        for (const item of body.instruments) {
-          const seg = item.exchangeSegment || (isIndexSymbol(item.symbol || '') ? 'IDX_I' : defaultSegment);
-          let secId = Number(item.securityId);
-          if ((!secId || isNaN(secId)) && item.symbol) {
-            secId = Number(getDhanSecurityId(item.symbol));
-          }
-          if (secId && !isNaN(secId)) {
-            if (!payload[seg]) payload[seg] = [];
-            payload[seg].push(secId);
-          }
-        }
-      } else if (Array.isArray(body.securityIds) && body.securityIds.length > 0) {
-        const seg = defaultSegment;
-        payload[seg] = body.securityIds.map(Number).filter((n: number) => !isNaN(n) && n > 0);
-      } else if (Array.isArray(body.symbols) && body.symbols.length > 0) {
-        for (const sym of body.symbols) {
-          const isIdx = isIndexSymbol(sym);
-          const seg = isIdx ? 'IDX_I' : defaultSegment;
-          const secId = Number(getDhanSecurityId(sym));
-          if (secId && !isNaN(secId)) {
-            if (!payload[seg]) payload[seg] = [];
-            payload[seg].push(secId);
-          }
-        }
-      } else if (body.securityId || body.symbol) {
-        const isIdx = isIndexSymbol(body.symbol || '');
-        const seg = body.exchangeSegment || (isIdx ? 'IDX_I' : 'NSE_EQ');
-        const secId = Number(body.securityId || getDhanSecurityId(body.symbol || ''));
-        if (secId && !isNaN(secId)) {
-          payload[seg] = [secId];
-        }
-      }
-    }
-
-    return {
-      authenticated: true,
-      clientId: String(clientId).trim(),
-      accessToken: String(accessToken).trim(),
-      payload
-    };
-  }
-
-  /**
-   * Deterministic Proxy Handler for Dhan Marketfeed Endpoints:
-   * - ltp: /marketfeed/ltp -> Get ticker data (LTP) of instruments
-   * - ohlc: /marketfeed/ohlc -> Get OHLC data + LTP of instruments
-   * - quote: /marketfeed/quote -> Get full market depth, volume, OHLC, 52W high/low, circuit limits
-   */
-  async function handleDhanMarketfeedProxy(endpoint: 'ltp' | 'ohlc' | 'quote', req: any, res: any) {
-    const { authenticated, clientId, accessToken, payload, error } = resolveDhanMarketfeedParams(req);
-
-    if (!authenticated || !clientId || !accessToken) {
-      return res.status(401).json({
-        status: 'failure',
-        remarks: 'AUTHENTICATION_REQUIRED',
-        error: error || 'Authentication required. Missing Dhan Client ID or Access Token.',
-        code: 'DHAN_AUTH_REQUIRED'
-      });
-    }
-
-    if (!payload || Object.keys(payload).length === 0) {
-      return res.status(400).json({
-        status: 'failure',
-        remarks: 'INVALID_REQUEST',
-        error: 'Empty instruments payload. Please specify instruments, securityIds, or exchange segment arrays (e.g. {"NSE_EQ": [1333]}).'
-      });
-    }
-
+  // API Route: Fetch Intraday 15-min Candle Data from Dhan API
+    apiRouter.post('/dhan/bulk-marketfeed', async (req, res) => {
     try {
-      const dhanUrl = `https://api.dhan.co/v2/marketfeed/${endpoint}`;
-      const dhanResponse = await fetch(dhanUrl, {
+      const { clientId, accessToken, securityIds, instruments, exchangeSegment = 'NSE_EQ' } = req.body;
+      if (!clientId || !accessToken) return res.status(401).json({ error: 'Missing auth' });
+      
+      const payload: Record<string, number[]> = {};
+
+      if (instruments && Array.isArray(instruments)) {
+        for (const item of instruments) {
+          const seg = item.exchangeSegment || (isIndexSymbol(item.symbol || '') ? 'IDX_I' : exchangeSegment);
+          if (!payload[seg]) payload[seg] = [];
+          if (item.securityId) payload[seg].push(Number(item.securityId));
+        }
+      } else if (securityIds && Array.isArray(securityIds)) {
+        payload[exchangeSegment] = securityIds.map(Number);
+      }
+      
+      const feedRes = await fetch('https://api.dhan.co/v2/marketfeed/ohlc', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -334,44 +243,15 @@ export function createExpressApp() {
           'access-token': accessToken,
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(10000)
+        signal: AbortSignal.timeout(8000)
       });
-
-      const data = await dhanResponse.json().catch(() => null);
-
-      // Return exact deterministic values from Dhan API with zero artificial manipulation
-      if (dhanResponse.ok && data) {
-        return res.status(200).json(data);
-      } else {
-        return res.status(dhanResponse.status || 500).json(data || {
-          status: 'failure',
-          error: `Dhan ${endpoint.toUpperCase()} API returned status ${dhanResponse.status}`,
-          dhanStatus: dhanResponse.status
-        });
-      }
-    } catch (err: any) {
-      return res.status(500).json({
-        status: 'failure',
-        error: err.message || `Failed to communicate with Dhan ${endpoint.toUpperCase()} API`
-      });
+      
+      const data = await feedRes.json();
+      return res.json(data);
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
     }
-  }
-
-  // 1. POST /marketfeed/ltp - Get ticker data of instruments (LTP)
-  apiRouter.post('/marketfeed/ltp', (req, res) => handleDhanMarketfeedProxy('ltp', req, res));
-  apiRouter.post('/dhan/marketfeed/ltp', (req, res) => handleDhanMarketfeedProxy('ltp', req, res));
-  apiRouter.post('/dhan/ltp', (req, res) => handleDhanMarketfeedProxy('ltp', req, res));
-
-  // 2. POST /marketfeed/ohlc - Get OHLC data of instruments
-  apiRouter.post('/marketfeed/ohlc', (req, res) => handleDhanMarketfeedProxy('ohlc', req, res));
-  apiRouter.post('/dhan/marketfeed/ohlc', (req, res) => handleDhanMarketfeedProxy('ohlc', req, res));
-  apiRouter.post('/dhan/ohlc', (req, res) => handleDhanMarketfeedProxy('ohlc', req, res));
-  apiRouter.post('/dhan/bulk-marketfeed', (req, res) => handleDhanMarketfeedProxy('ohlc', req, res));
-
-  // 3. POST /marketfeed/quote - Get market depth data of instruments
-  apiRouter.post('/marketfeed/quote', (req, res) => handleDhanMarketfeedProxy('quote', req, res));
-  apiRouter.post('/dhan/marketfeed/quote', (req, res) => handleDhanMarketfeedProxy('quote', req, res));
-  apiRouter.post('/dhan/quote', (req, res) => handleDhanMarketfeedProxy('quote', req, res));
+  });
 
 apiRouter.post('/dhan/intraday-15m', async (req, res) => {
     try {
@@ -564,23 +444,43 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
         const timestamps = data.start_time || data.timestamp || data.t || data.time;
         let candleIdx = 0;
 
-        // Helper to parse IST Date (YYYY-MM-DD) and hours & minutes from Epoch / Unix timestamp or formatted string using Asia/Kolkata (+05:30) offset
+        // Helper to parse IST Date (YYYY-MM-DD) and hours & minutes from Epoch / Unix timestamp or formatted string using Asia/Kolkata timezone
         const getISTDateTime = (tsVal: any): { dateStr: string; hours: number; minutes: number } | null => {
           if (tsVal === undefined || tsVal === null) return null;
 
           const num = Number(tsVal);
           if (!isNaN(num) && num > 0) {
             const sec = num > 1e11 ? Math.floor(num / 1000) : num;
-            // IST is strictly UTC + 5h 30m (+19800 seconds). India has no DST.
-            const istDate = new Date((sec + 19800) * 1000);
-            const y = istDate.getUTCFullYear();
-            const m = String(istDate.getUTCMonth() + 1).padStart(2, '0');
-            const d = String(istDate.getUTCDate()).padStart(2, '0');
-            return {
-              dateStr: `${y}-${m}-${d}`,
-              hours: istDate.getUTCHours(),
-              minutes: istDate.getUTCMinutes()
-            };
+            const dateObj = new Date(sec * 1000);
+            try {
+              const formatter = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Kolkata',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: 'numeric',
+                minute: 'numeric',
+                hour12: false
+              });
+              const formatted = formatter.format(dateObj); // e.g. "2026-07-31, 09:15"
+              const parts = formatted.split(', ');
+              if (parts.length >= 2) {
+                const [dPart, tPart] = parts;
+                const [h, m] = tPart.split(':').map((n) => parseInt(n, 10));
+                return { dateStr: dPart.trim(), hours: h, minutes: m };
+              }
+            } catch (e) {
+              const utcDate = new Date(sec * 1000);
+              const istDate = new Date(utcDate.getTime() + 19800 * 1000);
+              const y = istDate.getUTCFullYear();
+              const m = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+              const d = String(istDate.getUTCDate()).padStart(2, '0');
+              return {
+                dateStr: `${y}-${m}-${d}`,
+                hours: istDate.getUTCHours(),
+                minutes: istDate.getUTCMinutes()
+              };
+            }
           }
 
           if (typeof tsVal === 'string') {
@@ -709,30 +609,9 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
           }
         }
 
-        // All valid dates present in candles list
-        const validDates = Array.from(
-          new Set(
-            candlesList
-              .map((c) => c.dateStr)
-              .filter((d) => Boolean(d) && /^\d{4}-\d{2}-\d{2}$/.test(d))
-          )
-        ).sort();
-
-        let sessionDate = targetDate;
-        if (validDates.includes(targetDate)) {
-          sessionDate = targetDate;
-        } else if (validDates.length > 0) {
-          // If requested date has no data (e.g. weekend, holiday, pre-market), pick the latest date that actually has candles
-          sessionDate = validDates[validDates.length - 1];
-        }
-        foundDate = sessionDate;
-
-        // Target session candles strictly for sessionDate
-        let sessionCandles = candlesList.filter((c) => c.dateStr === sessionDate);
-        if (sessionCandles.length === 0) {
-          // Fallback: at most the last 25 15m candles (one standard 6.25 hour NSE trading session)
-          sessionCandles = candlesList.slice(-25);
-        }
+        // Target session candles for foundDate
+        const targetSessionCandles = candlesList.filter((c) => !c.dateStr || c.dateStr === foundDate);
+        const sessionCandles = targetSessionCandles.length > 0 ? targetSessionCandles : candlesList;
 
         // First 15-minute candle (09:15 AM IST) for Gann base open calculation
         let first15m = sessionCandles.find((c) => c.hours === 9 && c.minutes === 15);
@@ -752,7 +631,7 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
         // Latest candle in current session (e.g., 11:00 AM candle when refreshed at 11 AM)
         const latestCandle = sessionCandles[sessionCandles.length - 1] || candlesList[candlesList.length - 1];
 
-        // Session high, low, VWAP accumulated strictly up to latestCandle within the session
+        // Session high, low, VWAP accumulated up to latestCandle
         let sessionHigh = -Infinity;
         let sessionLow = Infinity;
         let sessionTotalTPV = 0;
@@ -775,21 +654,20 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
         const effectiveClose = latestCandle ? latestCandle.close : first15MinClose;
         const latestTimeStr = latestCandle ? latestCandle.timeStr : '09:15 AM';
 
-        // Calculate Previous Day Close from candle stream prior to sessionDate
-        const prevSessionCandles = candlesList.filter((c) => c.dateStr && c.dateStr < sessionDate);
+        // Calculate Previous Day Close from candle stream prior to foundDate
+        const prevSessionCandles = candlesList.filter((c) => c.dateStr && c.dateStr < foundDate);
         let previousDayClose = prevSessionCandles.length > 0 ? prevSessionCandles[prevSessionCandles.length - 1].close : null;
 
         let accurateOpen = first15MinOpen;
-        let accurateClose = first15MinClose; // 15-min candle close is the base close for Gann
-        let accurateLtp = effectiveClose;    // Latest candle close is initial LTP
-        let accurateHigh = sessionHigh;       // True Day High
-        let accurateLow = sessionLow;         // True Day Low
+        let accurateClose = effectiveClose;
+        let accurateHigh = sessionHigh;
+        let accurateLow = sessionLow;
         let accurateVolume = sessionTotalVol;
         let accuratePreviousClose = previousDayClose;
 
         // Fetch real-time live LTP and true Day High/Low from Dhan Marketfeed API
         const todayStr = new Date().toISOString().split('T')[0];
-        const isCurrentSession = !date || date === todayStr || sessionDate === todayStr;
+        const isCurrentSession = !date || date === todayStr || foundDate === todayStr;
 
         if (isCurrentSession && clientId && accessToken) {
           try {
@@ -816,14 +694,14 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
               if (instrumentFeed) {
                 // If last_price (LTP) is valid, it is the exact real-time live current price
                 if (instrumentFeed.last_price && instrumentFeed.last_price > 0) {
-                  accurateLtp = instrumentFeed.last_price;
+                  accurateClose = instrumentFeed.last_price;
                 }
-                // Check if marketfeed has higher high or lower low for current day
+                // Check if marketfeed has higher high or lower low
                 if (instrumentFeed.ohlc?.high && instrumentFeed.ohlc.high > 0) {
                   accurateHigh = Math.max(accurateHigh, instrumentFeed.ohlc.high);
                 }
                 if (instrumentFeed.ohlc?.low && instrumentFeed.ohlc.low > 0) {
-                  accurateLow = accurateLow > 0 ? Math.min(accurateLow, instrumentFeed.ohlc.low) : instrumentFeed.ohlc.low;
+                  accurateLow = Math.min(accurateLow, instrumentFeed.ohlc.low);
                 }
                 // Previous day close from Dhan marketfeed
                 if (instrumentFeed.ohlc?.close && instrumentFeed.ohlc.close > 0) {
@@ -1000,13 +878,9 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
           candleTimestamp,
           fetchedDate: foundDate,
           open: accurateOpen,
-          close: Math.round(accurateClose * 100) / 100, // 15-Min Candle Close
-          sessionClose: Math.round(effectiveClose * 100) / 100, // Latest Session Candle Close
-          ltp: Math.round(accurateLtp * 100) / 100, // Real-time Live Price
-          high: Math.round(accurateHigh * 100) / 100, // True Session Day High
-          low: Math.round(accurateLow * 100) / 100, // True Session Day Low
-          dayHigh: Math.round(accurateHigh * 100) / 100,
-          dayLow: Math.round(accurateLow * 100) / 100,
+          close: Math.round(accurateClose * 100) / 100,
+          high: Math.round(accurateHigh * 100) / 100,
+          low: Math.round(accurateLow * 100) / 100,
           previousClose: accuratePreviousClose ? Math.round(accuratePreviousClose * 100) / 100 : null,
           first15mHigh: Math.round(first15MinHigh * 100) / 100,
           first15mLow: Math.round(first15MinLow * 100) / 100,
@@ -1023,7 +897,7 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
           adx,
           vwap: sessionVWAP,
           rsiTimeline,
-          totalCandles: sessionCandles.length
+          totalCandles: openCandles.length
         });
       } else {
         return res.status(404).json({

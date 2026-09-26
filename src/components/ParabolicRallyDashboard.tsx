@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Flame,
   TrendingUp,
@@ -25,11 +25,7 @@ import {
   ArrowDownRight,
   PieChart,
   ArrowUpDown,
-  Calendar,
-  Camera,
-  FileText,
-  Download,
-  CheckCircle
+  Calendar
 } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials } from '../types';
 import {
@@ -40,7 +36,6 @@ import {
 } from '../utils/parabolicRallyEngine';
 import { FifteenMinCandleChartSnapshot } from './FifteenMinCandleChartSnapshot';
 import { saveDailyHits, getHistoricalHits } from '../utils/historyDb';
-import { downloadElementAsJpg, downloadElementAsPdf } from '../utils/snapshotExporter';
 
 interface ParabolicRallyDashboardProps {
   stocks: StockCalculated[];
@@ -55,7 +50,6 @@ interface ParabolicRallyDashboardProps {
 
 type ViewFilter =
   | 'ALL'
-  | 'HIGH_PRIORITY_00'
   | 'FULLY_BULLISH'
   | 'FULLY_BEARISH'
   | 'CONFIRMED_BULLISH'
@@ -76,7 +70,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   isLoading = false
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<ViewFilter>('ALL');
+  const [activeFilter, setActiveFilter] = useState<ViewFilter>('FULLY_BULLISH');
   const [selectedSector, setSelectedSector] = useState<string>('ALL');
   const [minScoreFilter, setMinScoreFilter] = useState<number>(0);
   const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
@@ -89,15 +83,6 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   
   const [viewMode, setViewMode] = useState<'LIVE' | 'HISTORY'>('LIVE');
   const [historyRecords, setHistoryRecords] = useState<any[]>([]);
-
-  // 📸 Snapshot / Screenshot State & Container Ref (Specifically Top 10 Cards)
-  const [isCapturingSnapshot, setIsCapturingSnapshot] = useState(false);
-  const [snapshotType, setSnapshotType] = useState<'jpg' | 'pdf' | null>(null);
-  const [snapshotNotification, setSnapshotNotification] = useState<string | null>(null);
-  const [isSnapshotDropdownOpen, setIsSnapshotDropdownOpen] = useState(false);
-  const [showTop10Only, setShowTop10Only] = useState<boolean>(true); // Default to Top 10 focus
-  const [snapshotLimit, setSnapshotLimit] = useState<number>(10);
-  const stockCardsContainerRef = useRef<HTMLDivElement>(null);
 
 
 
@@ -138,10 +123,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
     let confirmedBearishCount = 0;
     let earlyCount = 0;
     let exhaustionCount = 0;
-    let highPriorityCount = 0;
 
     analyses.forEach((a) => {
-      if (a.hasOpenCloseDoubleZero) highPriorityCount++;
       if (a.isFullyBullish) fullyBullishCount++;
       if (a.isFullyBearish) fullyBearishCount++;
       if (a.stage === 'BULLISH_CONFIRMED') confirmedBullishCount++;
@@ -152,7 +135,6 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
     return {
       total: analyses.length,
-      highPriorityCount,
       fullyBullishCount,
       fullyBearishCount,
       confirmedBullishCount,
@@ -201,8 +183,6 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
         // View Filter
         switch (activeFilter) {
-          case 'HIGH_PRIORITY_00':
-            return a.hasOpenCloseDoubleZero;
           case 'FULLY_BULLISH':
             return a.isFullyBullish;
           case 'FULLY_BEARISH':
@@ -221,10 +201,6 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
         }
       })
       .sort((a, b) => {
-        // High Priority (.00 Double Zero Confluence) gets top precedence
-        if (a.hasOpenCloseDoubleZero !== b.hasOpenCloseDoubleZero) {
-          return a.hasOpenCloseDoubleZero ? -1 : 1;
-        }
         if (sortBy === 'TIME_NEWEST') {
           return (b.timing.rulePassedMinutes - a.timing.rulePassedMinutes) || (b.score - a.score);
         }
@@ -239,77 +215,12 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
       });
   }, [analyses, searchQuery, selectedSector, minScoreFilter, timeWindowFilter, activeFilter, sortBy]);
 
-  // Current cards to render in view/snapshot:
-  // When capturing snapshot or when showTop10Only is true, limit to snapshotLimit (default 10)
-  const cardsToRender = useMemo(() => {
-    if (isCapturingSnapshot || showTop10Only) {
-      return filteredAnalyses.slice(0, snapshotLimit);
-    }
-    return filteredAnalyses;
-  }, [filteredAnalyses, isCapturingSnapshot, showTop10Only, snapshotLimit]);
-
   const handleRefreshAll = async () => {
     setIsRefreshingAll(true);
     try {
       await onFetchAllStocks();
     } finally {
       setIsRefreshingAll(false);
-    }
-  };
-
-  // 📸 Handle Snapshot & Screenshot Export (JPG or PDF) strictly for current Top 10 Cards
-  const handleTakeSnapshot = async (
-    format: 'jpg' | 'pdf',
-    pdfMode: 'continuous' | 'paginated_a4' = 'continuous',
-    customLimit: number = 10
-  ) => {
-    setIsSnapshotDropdownOpen(false);
-    const prevMode = displayMode;
-    if (displayMode !== 'cards') {
-      setDisplayMode('cards');
-      await new Promise((r) => setTimeout(r, 200));
-    }
-
-    if (!stockCardsContainerRef.current) return;
-    setIsCapturingSnapshot(true);
-    setSnapshotType(format);
-    const countToExport = Math.min(customLimit, filteredAnalyses.length);
-    setSnapshotNotification(`📸 Generating ${format.toUpperCase()} snapshot of Top ${countToExport} stock cards...`);
-
-    try {
-      // Allow DOM to re-render with exactly the Top 10 cards
-      await new Promise((r) => setTimeout(r, 250));
-      const element = stockCardsContainerRef.current;
-      const metadata = {
-        title: `Parabolic Rally Top ${countToExport} Stock Cards`,
-        subtitle: `Top ${countToExport} Highest-Confluence Signals`,
-        filterLabel: activeFilter.replace(/_/g, ' '),
-        totalCards: countToExport,
-        highPriorityCount: stats.highPriorityCount,
-        dateStr: credentials?.date || new Date().toISOString().split('T')[0]
-      };
-
-      const filePrefix = `Parabolic_Rally_Top${countToExport}_Cards`;
-
-      if (format === 'jpg') {
-        await downloadElementAsJpg(element, filePrefix, metadata);
-        setSnapshotNotification(`✅ Successfully saved Top ${countToExport} cards JPG snapshot!`);
-      } else {
-        await downloadElementAsPdf(element, filePrefix, metadata, pdfMode);
-        setSnapshotNotification(`✅ Successfully saved Top ${countToExport} cards PDF snapshot document!`);
-      }
-    } catch (err: any) {
-      console.error('Snapshot capture failed:', err);
-      setSnapshotNotification(`❌ Snapshot error: ${err?.message || 'Failed to capture snapshot'}`);
-    } finally {
-      setIsCapturingSnapshot(false);
-      setSnapshotType(null);
-      if (prevMode !== 'cards') {
-        setDisplayMode(prevMode);
-      }
-      setTimeout(() => {
-        setSnapshotNotification(null);
-      }, 4500);
     }
   };
 
@@ -346,69 +257,6 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               <Calendar className="w-3.5 h-3.5" />
               <span>{viewMode === 'LIVE' ? 'View History' : 'Live Dashboard'}</span>
             </button>
-
-            {/* 📸 Snapshot / Screenshot Button Group */}
-            <div className="relative">
-              <button
-                onClick={() => setIsSnapshotDropdownOpen(!isSnapshotDropdownOpen)}
-                disabled={isCapturingSnapshot || filteredAnalyses.length === 0}
-                className="flex items-center space-x-1.5 px-3.5 py-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-500/25 transition-all cursor-pointer disabled:opacity-50"
-                title="Take snapshot screenshot of current Top 10 stock cards (PDF or JPG)"
-              >
-                {isCapturingSnapshot ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Camera className="w-3.5 h-3.5" />
-                )}
-                <span>📸 Snapshot Top 10</span>
-                <span className="text-[10px] opacity-75">▾</span>
-              </button>
-
-              {isSnapshotDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-indigo-500/40 rounded-xl shadow-2xl z-50 p-2 space-y-1.5 animate-fade-in no-snapshot">
-                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 flex items-center justify-between">
-                    <span>Export Top 10 Cards</span>
-                    <span className="text-amber-400 font-mono font-black">Top 10 Only</span>
-                  </div>
-                  <button
-                    onClick={() => handleTakeSnapshot('jpg', 'continuous', 10)}
-                    className="w-full flex items-center space-x-2 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white rounded-lg transition-colors text-left cursor-pointer"
-                  >
-                    <Camera className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <div>
-                      <div>Download Top 10 JPG</div>
-                      <div className="text-[10px] text-slate-400 font-normal">High-Resolution Retina .jpg image</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleTakeSnapshot('pdf', 'continuous', 10)}
-                    className="w-full flex items-center space-x-2 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white rounded-lg transition-colors text-left cursor-pointer"
-                  >
-                    <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
-                    <div>
-                      <div>Download Top 10 PDF</div>
-                      <div className="text-[10px] text-slate-400 font-normal">Continuous Canvas Sheet .pdf</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => handleTakeSnapshot('pdf', 'paginated_a4', 10)}
-                    className="w-full flex items-center space-x-2 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white rounded-lg transition-colors text-left cursor-pointer"
-                  >
-                    <Download className="w-4 h-4 text-purple-400 shrink-0" />
-                    <div>
-                      <div>Paginated Top 10 A4 PDF</div>
-                      <div className="text-[10px] text-slate-400 font-normal">Formatted Multi-page A4 print</div>
-                    </div>
-                  </button>
-
-                  <div className="pt-1.5 border-t border-slate-800/80 px-2 flex items-center justify-between text-[10px] text-slate-400">
-                    <span>Snapshot Target:</span>
-                    <span className="text-emerald-400 font-black">Top 10 Ranked Cards</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
             <button
               onClick={handleRefreshAll}
               disabled={isLoading || isRefreshingAll}
@@ -526,46 +374,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
         </div>
       ) : (
         <>
-      {/* 📸 Snapshot Notification Toast */}
-      {snapshotNotification && (
-        <div className="p-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-emerald-400/50 rounded-xl text-white text-xs font-bold flex items-center justify-between shadow-xl animate-fade-in no-snapshot">
-          <div className="flex items-center gap-2">
-            <Camera className="w-4 h-4 text-emerald-400 animate-pulse" />
-            <span>{snapshotNotification}</span>
-          </div>
-          <button
-            onClick={() => setSnapshotNotification(null)}
-            className="text-slate-400 hover:text-white text-xs cursor-pointer ml-4 font-normal"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       {/* 📊 Summary Stats Chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
-        {/* ⭐ HIGH PRIORITY: .00 DOUBLE ZERO */}
-        <button
-          onClick={() => setActiveFilter(activeFilter === 'HIGH_PRIORITY_00' ? 'ALL' : 'HIGH_PRIORITY_00')}
-          className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-            activeFilter === 'HIGH_PRIORITY_00'
-              ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 border-amber-300 shadow-lg shadow-amber-400/30 ring-2 ring-amber-300'
-              : 'bg-gradient-to-br from-amber-50/70 to-yellow-50/50 hover:bg-amber-100/50 border-amber-300/80 text-slate-900 shadow-2xs'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider flex items-center gap-1 text-amber-800">
-              <Sparkles className="w-3 h-3 fill-amber-500 text-amber-600" /> High Priority
-            </span>
-            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-200/90 text-amber-950 font-mono">
-              .00
-            </span>
-          </div>
-          <div className="text-2xl font-black mt-1 text-slate-950">
-            {stats.highPriorityCount}
-          </div>
-          <div className="text-[9px] text-amber-900 font-bold mt-0.5">Open &amp; Close .00</div>
-        </button>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Fully Bullish 12+ */}
         <button
           onClick={() => setActiveFilter('FULLY_BULLISH')}
@@ -803,37 +613,11 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               setSelectedSector('ALL');
               setMinScoreFilter(0);
               setTimeWindowFilter('ALL');
-              setShowTop10Only(true);
             }}
             className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 transition-all cursor-pointer"
           >
             Reset
           </button>
-          
-          {/* Top 10 / All Switcher */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-            <button
-              onClick={() => setShowTop10Only(true)}
-              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                showTop10Only ? 'bg-amber-400 text-slate-950 shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Show only top 10 ranked cards"
-            >
-              <Sparkles className="w-3 h-3 fill-current" />
-              <span>Top 10</span>
-            </button>
-            <button
-              onClick={() => setShowTop10Only(false)}
-              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                !showTop10Only ? 'bg-white text-slate-900 shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Show all matching cards"
-            >
-              All ({filteredAnalyses.length})
-            </button>
-          </div>
-
-          {/* Cards / Table View Switcher */}
           <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
             <button
               onClick={() => setDisplayMode('cards')}
@@ -855,16 +639,12 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
         </div>
       </div>
 
-      {/* 📋 Filter Info Pill & Quick Snapshot Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-600 px-1 gap-2">
+      {/* 📋 Filter Info Pill */}
+      <div className="flex items-center justify-between text-xs text-slate-600 px-1">
         <div>
-          Showing <strong>{cardsToRender.length}</strong> {showTop10Only ? 'Top 10 cards' : 'stocks'}{' '}
-          {showTop10Only && <span className="text-amber-700 font-bold">(Top 10 of {filteredAnalyses.length} ranked)</span>}{' '}
-          for{' '}
+          Showing <strong>{filteredAnalyses.length}</strong> matching stocks for{' '}
           <span className="font-bold text-slate-900">
-            {activeFilter === 'HIGH_PRIORITY_00'
-              ? '⭐ High Priority: Open & Close .00 Decimal Confluence'
-              : activeFilter === 'FULLY_BULLISH'
+            {activeFilter === 'FULLY_BULLISH'
               ? '🔥 Fully Bullish Parabolic Rallies (12+ pts)'
               : activeFilter === 'FULLY_BEARISH'
               ? '🔥 Fully Bearish Parabolic Breakdowns (12+ pts)'
@@ -879,73 +659,17 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               : 'All Universe Stocks'}
           </span>
         </div>
-
-        {/* Quick Snapshot Action Buttons for Top 10 */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <span className="text-[11px] text-slate-500 font-bold hidden sm:inline">Snapshot:</span>
-          <button
-            onClick={() => handleTakeSnapshot('jpg', 'continuous', 10)}
-            disabled={isCapturingSnapshot || filteredAnalyses.length === 0}
-            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-40"
-            title="Download JPG Snapshot of current Top 10 stock cards"
-          >
-            <Camera className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Top 10 JPG</span>
-          </button>
-          <button
-            onClick={() => handleTakeSnapshot('pdf', 'continuous', 10)}
-            disabled={isCapturingSnapshot || filteredAnalyses.length === 0}
-            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-40"
-            title="Download PDF Snapshot of current Top 10 stock cards"
-          >
-            <FileText className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Top 10 PDF</span>
-          </button>
-        </div>
+        {filteredAnalyses.length === 0 && (
+          <div className="text-amber-600 font-semibold">
+            No stocks meet the current strict filter. Try lowering the score threshold or switching filters.
+          </div>
+        )}
       </div>
 
-      {filteredAnalyses.length === 0 && (
-        <div className="text-amber-600 font-semibold px-1">
-          No stocks meet the current strict filter. Try lowering the score threshold or switching filters.
-        </div>
-      )}
-
-      {/* 📦 CARD VIEW (Wrapped in stockCardsContainerRef for clean high-res export of Top 10 cards) */}
+      {/* 📦 CARD VIEW */}
       {displayMode === 'cards' ? (
-        <div ref={stockCardsContainerRef} className="space-y-4 p-3 sm:p-5 rounded-2xl bg-slate-900 border border-indigo-500/20 shadow-xl">
-          {/* Snapshot Branding & Info Strip (Rendered cleanly at top of snapshot) */}
-          <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 p-4 rounded-xl border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider flex items-center gap-1 shadow-xs">
-                  <Zap className="w-3 h-3 fill-slate-950" /> TOP {cardsToRender.length} CARDS SNAPSHOT
-                </span>
-                <span className="text-[11px] font-bold text-indigo-300">
-                  Date: {credentials?.date || new Date().toISOString().split('T')[0]}
-                </span>
-                {stats.highPriorityCount > 0 && (
-                  <span className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 fill-slate-950" /> {stats.highPriorityCount} High Priority (.00)
-                  </span>
-                )}
-              </div>
-              <h3 className="text-lg font-black text-white flex items-center gap-2">
-                <span>⚡ Parabolic Rally &amp; Breakdown Engine — TOP {cardsToRender.length} LEADERBOARD</span>
-              </h3>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Active Filter: <strong className="text-amber-300">{activeFilter === 'HIGH_PRIORITY_00' ? 'High Priority (.00 Decimals)' : activeFilter.replace(/_/g, ' ')}</strong> | Current Top Cards: <strong className="text-emerald-400">{cardsToRender.length}</strong> (of {filteredAnalyses.length} ranked stocks)
-              </p>
-            </div>
-            <div className="text-left sm:text-right">
-              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Top 10 Snapshot Time</div>
-              <div className="text-xs font-mono font-black text-indigo-200 mt-0.5">
-                {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cardsToRender.map((item, index) => {
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAnalyses.map((item) => {
             const isBull = item.direction === 'BULLISH';
             const close = item.stock.closePrice || 0;
             const pct = item.stock.pctChange || 0;
@@ -954,9 +678,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               <div
                 key={item.stock.id}
                 className={`bg-white rounded-2xl border transition-all hover:shadow-lg flex flex-col justify-between relative overflow-hidden ${
-                  item.hasOpenCloseDoubleZero
-                    ? 'border-amber-400 shadow-lg shadow-amber-500/15 ring-2 ring-amber-400/50'
-                    : item.isFullyBullish
+                  item.isFullyBullish
                     ? 'border-emerald-300 shadow-md shadow-emerald-500/10 ring-1 ring-emerald-400/30'
                     : item.isFullyBearish
                     ? 'border-rose-300 shadow-md shadow-rose-500/10 ring-1 ring-rose-400/30'
@@ -968,9 +690,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                 {/* Top Accent Strip */}
                 <div
                   className={`h-1.5 w-full ${
-                    item.hasOpenCloseDoubleZero
-                      ? 'bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500'
-                      : item.isFullyBullish
+                    item.isFullyBullish
                       ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600'
                       : item.isFullyBearish
                       ? 'bg-gradient-to-r from-rose-500 via-red-400 to-rose-600'
@@ -980,33 +700,11 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                   }`}
                 />
 
-                {/* ⭐ HIGH PRIORITY: .00 DOUBLE ZERO CONFLUENCE BANNER */}
-                {item.hasOpenCloseDoubleZero && (
-                  <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 px-3 py-1 font-black text-[10px] uppercase tracking-wider flex items-center justify-between shadow-2xs">
-                    <span className="flex items-center gap-1.5 font-black">
-                      <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
-                      ⭐ HIGH PRIORITY: .00 DOUBLE ZERO
-                    </span>
-                    <span className="bg-slate-950 text-amber-300 text-[9px] px-1.5 py-0.5 rounded font-mono font-bold">
-                      Open .00 &amp; Close .00
-                    </span>
-                  </div>
-                )}
-
                 <div className="p-4 space-y-3.5 flex-1">
                   {/* Stock Header */}
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded border shadow-2xs ${
-                          index === 0
-                            ? 'bg-amber-400 text-slate-950 border-amber-300'
-                            : index < 3
-                            ? 'bg-indigo-600 text-white border-indigo-500'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}>
-                          #{index + 1}
-                        </span>
                         <span className="text-base font-black text-slate-900 tracking-tight">
                           {item.stock.symbol}
                         </span>
@@ -1109,38 +807,6 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                     </div>
                   </div>
 
-                  {/* OHLC Bar (Open, High, Low, Close/LTP) */}
-                  <div className={`grid grid-cols-4 gap-1.5 p-2 rounded-xl border text-center font-mono ${
-                    item.hasOpenCloseDoubleZero 
-                      ? 'bg-amber-500/10 border-amber-300/80 shadow-2xs' 
-                      : 'bg-slate-100/90 border-slate-200/80'
-                  }`}>
-                    <div className={`p-1 rounded bg-white shadow-2xs border ${item.hasOpenDecimal00 ? 'border-amber-400 ring-1 ring-amber-400/50' : 'border-slate-200/60'}`}>
-                      <span className="text-[9px] block text-slate-500 font-sans font-bold uppercase flex items-center justify-center gap-0.5">
-                        Open {item.hasOpenDecimal00 && <span className="text-[8px] text-amber-600 font-black">(.00)</span>}
-                      </span>
-                      <span className={`font-bold text-xs ${item.hasOpenDecimal00 ? 'text-amber-800 font-black' : 'text-slate-800'}`}>
-                        ₹{(item.stock.first1mOpen ?? item.stock.openPrice)?.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="p-1 rounded bg-rose-50/70 border border-rose-200/60">
-                      <span className="text-[9px] block text-rose-600 font-sans font-bold uppercase">High</span>
-                      <span className="font-bold text-rose-700 text-xs">₹{(item.stock.dayHigh ?? item.stock.highPrice ?? item.stock.first15mHigh)?.toFixed(2)}</span>
-                    </div>
-                    <div className="p-1 rounded bg-emerald-50/70 border border-emerald-200/60">
-                      <span className="text-[9px] block text-emerald-600 font-sans font-bold uppercase">Low</span>
-                      <span className="font-bold text-emerald-700 text-xs">₹{(item.stock.first1mLow ?? item.stock.dayLow ?? item.stock.lowPrice ?? item.stock.first15mLow)?.toFixed(2)}</span>
-                    </div>
-                    <div className={`p-1 rounded bg-blue-50/70 border ${item.hasCloseDecimal00 ? 'border-amber-400 ring-1 ring-amber-400/50' : 'border-blue-200/60'}`}>
-                      <span className="text-[9px] block text-blue-600 font-sans font-bold uppercase flex items-center justify-center gap-0.5">
-                        Close {item.hasCloseDecimal00 && <span className="text-[8px] text-amber-600 font-black">(.00)</span>}
-                      </span>
-                      <span className={`font-bold text-xs ${item.hasCloseDecimal00 ? 'text-amber-800 font-black' : 'text-blue-800'}`}>
-                        ₹{(item.stock.ltp ?? close)?.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-
                   {/* Progress Bar */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
@@ -1229,7 +895,6 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               </div>
             );
           })}
-          </div>
         </div>
       ) : (
         /* 📊 TABLE VIEW */
@@ -1251,7 +916,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {cardsToRender.map((item, index) => {
+                {filteredAnalyses.map((item) => {
                   const close = item.stock.closePrice || 0;
                   const pct = item.stock.pctChange || 0;
                   const isBull = item.direction === 'BULLISH';
@@ -1268,23 +933,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                       }`}
                     >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded border ${
-                            index === 0
-                              ? 'bg-amber-400 text-slate-950 border-amber-300'
-                              : index < 3
-                              ? 'bg-indigo-600 text-white border-indigo-500'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}>
-                            #{index + 1}
-                          </span>
-                          <span className="font-black text-slate-900">{item.stock.symbol}</span>
-                          {item.hasOpenCloseDoubleZero && (
-                            <span className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 text-[9px] px-1.5 py-0.5 rounded font-black tracking-wider shadow-2xs flex items-center gap-0.5">
-                              <Sparkles className="w-2.5 h-2.5 fill-slate-950" /> .00
-                            </span>
-                          )}
-                        </div>
+                        <div className="font-black text-slate-900">{item.stock.symbol}</div>
                         <div className="text-[10px] text-slate-500 truncate max-w-[150px]">
                           {item.stock.companyName}
                         </div>
@@ -1306,19 +955,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                           <span className="text-[9px] text-slate-400">({item.timing.candleTimeSlot})</span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 font-mono">
-                        <div className="font-bold text-slate-900 flex items-center gap-1">
-                          <span>₹{close.toFixed(2)}</span>
-                          {item.hasCloseDecimal00 && (
-                            <span className="text-[8px] bg-amber-100 text-amber-900 font-black px-1 rounded">.00</span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          Open: ₹{(item.stock.first1mOpen ?? item.stock.openPrice)?.toFixed(2)}
-                          {item.hasOpenDecimal00 && (
-                            <span className="text-[8px] text-amber-700 font-black ml-0.5">(.00)</span>
-                          )}
-                        </div>
+                      <td className="px-3 py-3">
+                        <div className="font-bold text-slate-900">₹{close.toFixed(2)}</div>
                         <div
                           className={`text-[10px] font-bold ${
                             pct >= 0 ? 'text-emerald-600' : 'text-rose-600'
@@ -1464,26 +1102,6 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                 </div>
               </div>
 
-              {/* ⭐ High Priority .00 Banner in Modal */}
-              {inspectedStock.hasOpenCloseDoubleZero && (
-                <div className="p-3 bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 border border-amber-400 rounded-xl flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500" />
-                    <div>
-                      <div className="font-black text-amber-950 flex items-center gap-1.5">
-                        <span>⭐ HIGH PRIORITY: Round .00 Decimal Confluence</span>
-                      </div>
-                      <div className="text-[11px] text-amber-900 font-medium">
-                        Open: ₹{(inspectedStock.stock.first1mOpen ?? inspectedStock.stock.openPrice)?.toFixed(2)} (.00) &bull; Close: ₹{(inspectedStock.stock.ltp ?? inspectedStock.stock.closePrice)?.toFixed(2)} (.00)
-                      </div>
-                    </div>
-                  </div>
-                  <span className="bg-amber-400 text-slate-950 font-mono font-black text-[10px] px-2 py-0.5 rounded shadow-2xs">
-                    HIGH PRIORITY
-                  </span>
-                </div>
-              )}
-
               {/* Score Header */}
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
                 <div>
@@ -1513,7 +1131,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                 <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between">
                   <span>12-Point Probability Verification with Trigger Timestamps</span>
                   <span className="text-[11px] text-slate-500 font-normal">
-                    {inspectedStock.checks.filter((c) => c.passed).length} of {inspectedStock.checks.length} Passed
+                    {inspectedStock.checks.filter((c) => c.passed).length} of 12 Passed
                   </span>
                 </div>
 

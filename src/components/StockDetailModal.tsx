@@ -448,32 +448,6 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, allSt
             </span>
           </div>
 
-          {/* Session Day High / Low / LTP Indicator */}
-          {(stock.dayHigh || stock.highPrice || stock.dayLow || stock.lowPrice || stock.ltp) && (
-            <div className="mb-3 p-2 bg-white rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-              <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-                <span>
-                  <span className="text-slate-400 text-[10px] uppercase font-sans mr-1">Day Low:</span>
-                  <strong className="text-emerald-700">₹{(stock.dayLow ?? stock.lowPrice)?.toFixed(2)}</strong>
-                </span>
-                <span>
-                  <span className="text-slate-400 text-[10px] uppercase font-sans mr-1">Day High:</span>
-                  <strong className="text-rose-700">₹{(stock.dayHigh ?? stock.highPrice)?.toFixed(2)}</strong>
-                </span>
-                {stock.previousClose && (
-                  <span>
-                    <span className="text-slate-400 text-[10px] uppercase font-sans mr-1">Prev Close:</span>
-                    <strong className="text-slate-700">₹{stock.previousClose.toFixed(2)}</strong>
-                  </span>
-                )}
-              </div>
-              <div>
-                <span className="text-slate-400 text-[10px] uppercase font-sans mr-1">Live LTP:</span>
-                <strong className="text-blue-700 text-sm font-black">₹{(stock.ltp ?? stock.closePrice)?.toFixed(2)}</strong>
-              </div>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center mb-4">
             <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-2xs">
               <div className="text-[10px] text-slate-500 uppercase font-semibold">15-Min Open</div>

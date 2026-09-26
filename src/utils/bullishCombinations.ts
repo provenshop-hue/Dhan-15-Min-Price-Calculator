@@ -86,21 +86,32 @@ export function calculateMACD(prices: number[]): { macd: number[]; signal: numbe
 
 /**
  * Derives a price sequence for indicator calculations
- * Deterministic Zero AI Hallucination: strictly uses real candle points from Dhan API
  */
 function getPriceSequence(stock: StockCalculated, timeline: RsiIntradayPoint[]): number[] {
-  if (timeline && timeline.length >= 2) {
-    return timeline.map((pt) => pt.close).filter((c) => c > 0);
+  if (timeline && timeline.length >= 5) {
+    return timeline.map((pt) => pt.close);
   }
   
-  // Real prices only from Dhan feed
-  const prices: number[] = [];
-  if (stock.previousClose && stock.previousClose > 0) prices.push(stock.previousClose);
-  if (stock.openPrice && stock.openPrice > 0) prices.push(stock.openPrice);
-  if (stock.first15mClose && stock.first15mClose > 0) prices.push(stock.first15mClose);
-  if (stock.closePrice && stock.closePrice > 0) prices.push(stock.closePrice);
-  
-  return prices.length > 0 ? prices : [stock.closePrice || 100];
+  const open = stock.openPrice || 100;
+  const high = stock.highPrice || open * 1.01;
+  const low = stock.lowPrice || open * 0.99;
+  const close = stock.closePrice || open;
+  const prevClose = stock.previousClose || open;
+
+  // Construct synthetic price steps
+  const prices: number[] = [
+    prevClose,
+    (prevClose + open) / 2,
+    open,
+    (open + low) / 2,
+    low,
+    (low + high) / 2,
+    (open + close) / 2,
+    high,
+    (high + close) / 2,
+    close
+  ];
+  return prices;
 }
 
 /**

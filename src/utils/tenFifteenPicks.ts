@@ -314,14 +314,14 @@ export function analyzeTenFifteenPicks(stocks: StockCalculated[]): TenFifteenAna
   const sectorMetricsMap = computeAllSectorStrengths(stocks);
   const sectorMetricsList = Array.from(sectorMetricsMap.values()).sort((a, b) => b.avgPctChange - a.avgPctChange);
 
-  // Only consider stocks with loaded price data from Dhan API
+  // Only consider stocks with loaded price data
   const validStocks = stocks.filter(
     (s) => s.openPrice !== undefined && s.openPrice !== null && s.openPrice > 0 &&
            s.closePrice !== undefined && s.closePrice !== null && s.closePrice > 0
   );
 
-  // Deterministic Zero AI Hallucination: strictly evaluate only stocks with authentic Dhan price feeds
-  const candidatePool = validStocks;
+  // If no data is fetched yet, use initial stocks as placeholders with simulated base pricing
+  const candidatePool = validStocks.length > 0 ? validStocks : stocks.slice(0, 30);
 
   // 1. Evaluate Bullish candidates
   const scoredBullish = candidatePool
