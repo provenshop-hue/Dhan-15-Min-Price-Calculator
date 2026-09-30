@@ -1316,10 +1316,10 @@ export const StockTable: React.FC<StockTableProps> = ({
                         {detect15mHighPullbackBounce(stock).isPullbackBounce && (
                           <span
                             title={detect15mHighPullbackBounce(stock).detail}
-                            className="text-[10px] font-black text-purple-900 bg-purple-100 border border-purple-300 px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-2xs"
+                            className="text-xs font-black text-purple-950 bg-purple-100 border-2 border-purple-300 px-2 py-1 rounded-md flex items-center gap-1 shadow-xs"
                           >
-                            <Target className="w-3 h-3 text-purple-600 shrink-0" />
-                            15M BOUNCE ({detect15mHighPullbackBounce(stock).bounceTime})
+                            <Target className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+                            <span className="font-mono text-xs sm:text-sm font-black">15M BOUNCE ({detect15mHighPullbackBounce(stock).bounceTime})</span>
                           </span>
                         )}
                         {stock.error && (
