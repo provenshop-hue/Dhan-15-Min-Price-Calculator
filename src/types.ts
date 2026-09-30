@@ -14,6 +14,9 @@ export interface StockCalculated {
   closePrice?: number | null;
   highPrice?: number | null;
   lowPrice?: number | null;
+  dayHigh?: number | null;
+  dayLow?: number | null;
+  ltp?: number | null;
   first15mOpen?: number | null;
   first15mClose?: number | null;
   first15mHigh?: number | null;

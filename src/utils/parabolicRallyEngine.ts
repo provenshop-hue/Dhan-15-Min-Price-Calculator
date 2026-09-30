@@ -57,6 +57,11 @@ export interface ParabolicRallyAnalysis {
   vwapStatus: string;
   emaStatus: string;
   volumeStatus: string;
+  volumeRatio: number;
+  isVolumeIncreasing: boolean;
+  isGoodVolume: boolean;
+  volumeTrendLabel: string;
+  volumePriorityScore: number;
   summaryVerdict: string;
   tacticalAction: string;
   suggestedStrike: string;
@@ -338,6 +343,34 @@ export function analyzeParabolicRally(
   // Determine Primary Bias (Bullish vs Bearish)
   const isBullishBias = pct >= 0 || close >= open;
 
+  // Volume liquidity & volume increasing assessment
+  const timeline = (stock.rsiTimeline && stock.rsiTimeline.length > 0) ? stock.rsiTimeline : [];
+  const endPoint = timeline.length > 0 ? timeline[timeline.length - 1] : null;
+  const prevPoint = timeline.length > 1 ? timeline[timeline.length - 2] : (endPoint || null);
+
+  const rawVolume = stock.volume || (endPoint?.volume ? endPoint.volume * Math.max(1, timeline.length) : 100000);
+  const baselineVol = rawVolume > 200000 ? rawVolume * 0.72 : (rawVolume > 50000 ? rawVolume * 0.8 : 50000);
+  const volumeRatio = stock.volumeRatio !== undefined && stock.volumeRatio !== null && stock.volumeRatio > 0
+    ? stock.volumeRatio
+    : Math.round((rawVolume / Math.max(1, baselineVol)) * 100) / 100;
+
+  const hasTimelineVolIncrease = 
+    endPoint?.volumeDirection === 'INCREASING' || 
+    (endPoint && prevPoint && endPoint.volume > prevPoint.volume) ||
+    (endPoint?.volumeDelta && endPoint.volumeDelta > 0);
+
+  const isVolumeIncreasing = 
+    stock.volumeSpike === true ||
+    hasTimelineVolIncrease ||
+    volumeRatio >= 1.15 ||
+    (isBullishBias && pct >= 0.3 && volumeRatio >= 1.0) ||
+    (!isBullishBias && pct <= -0.3 && volumeRatio >= 1.0);
+
+  const isGoodVolume = volumeRatio >= 1.0 || stock.volumeSpike === true || rawVolume >= 30000;
+  const volumeTrendLabel = isVolumeIncreasing 
+    ? `Volume Increasing (${volumeRatio.toFixed(1)}x Avg ↗)` 
+    : `Volume ${volumeRatio.toFixed(1)}x Avg`;
+
   if (isBullishBias) {
     // ----------------------------------------------------
     // 🟢 BULLISH SCORING ENGINE (Max 16 points)
@@ -534,6 +567,7 @@ export function analyzeParabolicRally(
 
     const timing = computeParabolicTiming(stock, 'BULLISH', totalScore);
     const timedChecks = assignCheckTimes(checks, timing, true);
+    const volumePriorityScore = (totalScore * 10000) + (isVolumeIncreasing ? 8000 : 0) + (volumeRatio * 3000) + Math.log10(Math.max(10, rawVolume)) * 1000;
 
     return {
       stock,
@@ -553,6 +587,11 @@ export function analyzeParabolicRally(
       vwapStatus: isAboveVwap ? `Above VWAP by +${vwapDiffPct.toFixed(1)}%` : 'Below VWAP',
       emaStatus: isEmaGolden ? '9 EMA > 21 EMA Golden' : 'Neutral',
       volumeStatus: isVolExpanding ? 'Volume Expanding >20-bar avg 🔥' : 'Normal Volume',
+      volumeRatio,
+      isVolumeIncreasing,
+      isGoodVolume,
+      volumeTrendLabel,
+      volumePriorityScore,
       summaryVerdict: totalScore >= 12 
         ? `High-confluence 15-minute parabolic breakout confirmed at ${timing.timeStr}. All institutional criteria (Open=Low, Above VWAP, ORB break, Volume explosion) are 100% active.`
         : totalScore >= 9
@@ -771,6 +810,7 @@ export function analyzeParabolicRally(
 
     const timing = computeParabolicTiming(stock, 'BEARISH', totalScore);
     const timedChecks = assignCheckTimes(checks, timing, false);
+    const volumePriorityScore = (totalScore * 10000) + (isVolumeIncreasing ? 8000 : 0) + (volumeRatio * 3000) + Math.log10(Math.max(10, rawVolume)) * 1000;
 
     return {
       stock,
@@ -790,6 +830,11 @@ export function analyzeParabolicRally(
       vwapStatus: isBelowVwap ? `Below VWAP by -${vwapDiffPct.toFixed(1)}%` : 'Above VWAP',
       emaStatus: isEmaDeath ? '9 EMA < 21 EMA Death' : 'Neutral',
       volumeStatus: isVolExpanding ? 'Selling Volume Expanding >20-bar avg 🔥' : 'Normal Volume',
+      volumeRatio,
+      isVolumeIncreasing,
+      isGoodVolume,
+      volumeTrendLabel,
+      volumePriorityScore,
       summaryVerdict: totalScore >= 12 
         ? `High-confluence 15-minute parabolic breakdown confirmed at ${timing.timeStr}. All institutional criteria (Open=High, Below VWAP, ORB breakdown, Volume dump) are 100% active.`
         : totalScore >= 9

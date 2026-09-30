@@ -38,6 +38,7 @@ interface Props {
   onSelectStockDetail: (stock: StockCalculated) => void;
   onOpenPositionSizer?: (stock: StockCalculated) => void;
   onOpenRsiAnalyst?: (stock: StockCalculated) => void;
+  activeTimingFilter?: { active: boolean; date: string; timeSlot: string; qualifyingSymbols: string[] };
 }
 
 interface ConfluenceCheck {
@@ -82,7 +83,8 @@ export function HundredPercentBullishScanner({
   tradeJourneys,
   onSelectStockDetail,
   onOpenPositionSizer,
-  onOpenRsiAnalyst
+  onOpenRsiAnalyst,
+  activeTimingFilter
 }: Props) {
   // Default to matchAllOnly = true (show ONLY stocks matching all 13 confluences) and todayOnly = true
   const [matchAllOnly, setMatchAllOnly] = useState<boolean>(true);
@@ -361,7 +363,12 @@ export function HundredPercentBullishScanner({
       const metCount = checks.filter(c => c.met).length;
       
       const isFromToday = isStockFromToday(stock);
-      const isHitToday = isFromToday && timing.firstHitTime !== 'Not Hit Today' && timing.firstHitTime !== 'Pending Signal';
+      let isHitToday = isFromToday && timing.firstHitTime !== 'Not Hit Today' && timing.firstHitTime !== 'Pending Signal';
+
+      if (activeTimingFilter?.active && activeTimingFilter.timeSlot) {
+        timing.firstHitTime = activeTimingFilter.timeSlot;
+        isHitToday = true;
+      }
 
       return {
         ...stock,
@@ -374,7 +381,7 @@ export function HundredPercentBullishScanner({
       } as AnalyzedStock;
 
     }).filter(Boolean) as AnalyzedStock[];
-  }, [stocks, niftyStock, tradeJourneys]);
+  }, [stocks, niftyStock, tradeJourneys, activeTimingFilter]);
 
   // Base Today's Hits list (filtered strictly to real-time session hits today)
   const todayHitsBase = useMemo(() => {

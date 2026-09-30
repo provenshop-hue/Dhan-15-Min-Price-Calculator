@@ -41,6 +41,7 @@ interface Props {
   onSelectStockDetail: (stock: StockCalculated) => void;
   onOpenPositionSizer?: (stock: StockCalculated) => void;
   onOpenRsiAnalyst?: (stock: StockCalculated) => void;
+  activeTimingFilter?: { active: boolean; date: string; timeSlot: string; qualifyingSymbols: string[] };
 }
 
 export function EmaConfluenceScanner({
@@ -49,7 +50,8 @@ export function EmaConfluenceScanner({
   credentials,
   onSelectStockDetail,
   onOpenPositionSizer,
-  onOpenRsiAnalyst
+  onOpenRsiAnalyst,
+  activeTimingFilter
 }: Props) {
   // Navigation & Primary Filter State: Default to matchAllOnly = true (all 8/8 confluences), todayOnly = true, and SCORE_DESC
   const [matchAllOnly, setMatchAllOnly] = useState<boolean>(true);
@@ -117,9 +119,18 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
   // Run EMA Analysis across all stocks
   const analyzedStocks = useMemo(() => {
     return stocks.map(stock => {
-      return analyzeStockEmaConfluence(stock, tradeJourneys, sessionDate);
+      const res = analyzeStockEmaConfluence(stock, tradeJourneys, sessionDate);
+      if (activeTimingFilter?.active && activeTimingFilter.timeSlot) {
+        return {
+          ...res,
+          hitTime: activeTimingFilter.timeSlot,
+          hitTrigger: 'Precision Timing Filter',
+          isHitToday: true
+        };
+      }
+      return res;
     });
-  }, [stocks, tradeJourneys, sessionDate]);
+  }, [stocks, tradeJourneys, sessionDate, activeTimingFilter]);
 
   // Base list of stocks that actively triggered today (today's session + Score >= 5/8)
   const todayHitsBase = useMemo(() => {

@@ -46,6 +46,7 @@ interface ParabolicRallyDashboardProps {
   onOpenPositionSizer?: (stock: StockCalculated) => void;
   onOpenSettings?: () => void;
   isLoading?: boolean;
+  activeTimingFilter?: { active: boolean; date: string; timeSlot: string; qualifyingSymbols: string[] };
 }
 
 type ViewFilter =
@@ -67,7 +68,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   onSelectStockDetail,
   onOpenPositionSizer,
   onOpenSettings,
-  isLoading = false
+  isLoading = false,
+  activeTimingFilter
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<ViewFilter>('FULLY_BULLISH');
@@ -89,8 +91,19 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
   // Compute all parabolic analyses
   const analyses = useMemo(() => {
-    return computeAllParabolicRallies(stocks);
-  }, [stocks]);
+    const list = computeAllParabolicRallies(stocks);
+    if (activeTimingFilter?.active && activeTimingFilter.timeSlot) {
+      return list.map((a) => ({
+        ...a,
+        timing: {
+          ...a.timing,
+          timeStr: activeTimingFilter.timeSlot,
+          timeFormatted: `${activeTimingFilter.timeSlot} (Precision Timing)`
+        }
+      }));
+    }
+    return list;
+  }, [stocks, activeTimingFilter]);
 
   // Automatically save high-scoring hits for today
   useEffect(() => {

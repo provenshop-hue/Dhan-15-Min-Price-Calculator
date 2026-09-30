@@ -613,6 +613,21 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
         const targetSessionCandles = candlesList.filter((c) => !c.dateStr || c.dateStr === foundDate);
         const sessionCandles = targetSessionCandles.length > 0 ? targetSessionCandles : candlesList;
 
+        let effectiveSessionCandles = sessionCandles;
+        if (req.body.timeSlot) {
+          const tSlot = String(req.body.timeSlot).trim();
+          const match = tSlot.match(/(\d{1,2}):(\d{2})/);
+          if (match) {
+            const targetH = parseInt(match[1], 10);
+            const targetM = parseInt(match[2], 10);
+            const targetTotalMins = targetH * 60 + targetM;
+            const filtered = sessionCandles.filter((c) => (c.hours * 60 + c.minutes) <= targetTotalMins);
+            if (filtered.length > 0) {
+              effectiveSessionCandles = filtered;
+            }
+          }
+        }
+
         // First 15-minute candle (09:15 AM IST) for Gann base open calculation
         let first15m = sessionCandles.find((c) => c.hours === 9 && c.minutes === 15);
         if (!first15m) {
@@ -628,8 +643,8 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
         const first15MinLow = first15m ? first15m.low : (sessionCandles[0]?.low || 0);
         const first15MinVol = first15m ? first15m.volume : (sessionCandles[0]?.volume || 0);
 
-        // Latest candle in current session (e.g., 11:00 AM candle when refreshed at 11 AM)
-        const latestCandle = sessionCandles[sessionCandles.length - 1] || candlesList[candlesList.length - 1];
+        // Latest candle in current session (or up to requested timeSlot)
+        const latestCandle = effectiveSessionCandles[effectiveSessionCandles.length - 1] || sessionCandles[sessionCandles.length - 1] || candlesList[candlesList.length - 1];
 
         // Session high, low, VWAP accumulated up to latestCandle
         let sessionHigh = -Infinity;
@@ -637,7 +652,7 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
         let sessionTotalTPV = 0;
         let sessionTotalVol = 0;
 
-        for (const c of sessionCandles) {
+        for (const c of effectiveSessionCandles) {
           if (c.high > sessionHigh) sessionHigh = c.high;
           if (c.low > 0 && c.low < sessionLow) sessionLow = c.low;
 

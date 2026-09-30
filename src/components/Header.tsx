@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence' | 'timing_quality';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence' | 'timing_quality') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -402,6 +402,24 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>⚡ EMA Confluence</span>
                 <span className="bg-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   Score &amp; Time
+                </span>
+              </span>
+            </button>
+
+            {/* ⏱️ Precision Timing Scanner Tab */}
+            <button
+              onClick={() => onChangeDashboardTab('timing_quality')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'timing_quality'
+                  ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white shadow-md shadow-blue-500/30 ring-1 ring-white/30'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-blue-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Clock className={`w-3.5 h-3.5 ${activeDashboardTab === 'timing_quality' ? 'text-yellow-300 animate-pulse' : 'text-blue-600'}`} />
+                <span>⏱️ Precision Timing</span>
+                <span className="bg-gradient-to-r from-blue-400 to-indigo-400 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  9:15 - 3:30
                 </span>
               </span>
             </button>

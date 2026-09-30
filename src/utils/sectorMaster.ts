@@ -560,9 +560,8 @@ export function computeAllSectorStrengths(stocks: StockCalculated[]): Map<string
           if (s.openPrice && s.closePrice && s.openPrice > 0) {
             pct = ((s.closePrice - s.openPrice) / s.openPrice) * 100;
           } else {
-            // Pseudo-random deterministic fallback based on symbol characters
-            const hash = s.symbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-            pct = ((hash % 40) - 15) / 10; // -1.5% to +2.5%
+            // Zero artificial inclusion: Real values only from Dhan
+            pct = 0;
           }
         }
 
