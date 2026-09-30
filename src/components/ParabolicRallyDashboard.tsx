@@ -46,7 +46,6 @@ interface ParabolicRallyDashboardProps {
   onOpenPositionSizer?: (stock: StockCalculated) => void;
   onOpenSettings?: () => void;
   isLoading?: boolean;
-  activeTimingFilter?: { active: boolean; date: string; timeSlot: string; qualifyingSymbols: string[] };
 }
 
 type ViewFilter =
@@ -58,7 +57,7 @@ type ViewFilter =
   | 'EARLY_1_3_MIN'
   | 'EXHAUSTION';
 
-type SortOption = 'SCORE_DESC' | 'TIME_NEWEST' | 'GAIN_DESC' | 'SYMBOL_ASC';
+type SortOption = 'VOLUME_PRIORITY' | 'SCORE_DESC' | 'TIME_NEWEST' | 'GAIN_DESC' | 'SYMBOL_ASC';
 
 export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = ({
   stocks,
@@ -68,14 +67,13 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   onSelectStockDetail,
   onOpenPositionSizer,
   onOpenSettings,
-  isLoading = false,
-  activeTimingFilter
+  isLoading = false
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<ViewFilter>('FULLY_BULLISH');
   const [selectedSector, setSelectedSector] = useState<string>('ALL');
   const [minScoreFilter, setMinScoreFilter] = useState<number>(0);
-  const [sortBy, setSortBy] = useState<SortOption>('SCORE_DESC');
+  const [sortBy, setSortBy] = useState<SortOption>('VOLUME_PRIORITY');
   const [timeWindowFilter, setTimeWindowFilter] = useState<string>('ALL');
   const [inspectedStock, setInspectedStock] = useState<ParabolicRallyAnalysis | null>(null);
   const [chartStock, setChartStock] = useState<StockCalculated | null>(null);
@@ -91,19 +89,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
   // Compute all parabolic analyses
   const analyses = useMemo(() => {
-    const list = computeAllParabolicRallies(stocks);
-    if (activeTimingFilter?.active && activeTimingFilter.timeSlot) {
-      return list.map((a) => ({
-        ...a,
-        timing: {
-          ...a.timing,
-          timeStr: activeTimingFilter.timeSlot,
-          timeFormatted: `${activeTimingFilter.timeSlot} (Precision Timing)`
-        }
-      }));
-    }
-    return list;
-  }, [stocks, activeTimingFilter]);
+    return computeAllParabolicRallies(stocks);
+  }, [stocks]);
 
   // Automatically save high-scoring hits for today
   useEffect(() => {
@@ -214,6 +201,11 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
         }
       })
       .sort((a, b) => {
+        if (sortBy === 'VOLUME_PRIORITY') {
+          const priA = a.volumePriorityScore || (a.score * 10000 + (a.isVolumeIncreasing ? 8000 : 0) + (a.volumeRatio || 1) * 3000);
+          const priB = b.volumePriorityScore || (b.score * 10000 + (b.isVolumeIncreasing ? 8000 : 0) + (b.volumeRatio || 1) * 3000);
+          return (priB - priA) || (b.score - a.score) || ((b.stock.pctChange || 0) - (a.stock.pctChange || 0));
+        }
         if (sortBy === 'TIME_NEWEST') {
           return (b.timing.rulePassedMinutes - a.timing.rulePassedMinutes) || (b.score - a.score);
         }
@@ -528,6 +520,19 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
         </button>
       </div>
 
+      {/* 🕒 Time Range Clarification Banner */}
+      <div className="bg-blue-50 border border-blue-200 text-blue-900 px-4 py-2.5 rounded-xl text-xs flex items-center justify-between shadow-2xs">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-blue-600 shrink-0" />
+          <span>
+            <strong>15m Candle Range Note:</strong> When a signal hits at <strong>09:45 AM</strong>, the correct 15-minute candle trading range is <strong>09:45 AM – 10:00 AM</strong> (3rd 15m bar). (Note: 09:30 AM refers to 09:30 – 09:45 AM).
+          </span>
+        </div>
+        <span className="bg-blue-200 text-blue-950 font-black px-2 py-0.5 rounded text-[10px] shrink-0 font-mono">
+          09:45 = 09:45–10:00 AM
+        </span>
+      </div>
+
       {/* 🔍 Controls & Filter Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 flex-1">
@@ -610,7 +615,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
               onChange={(e) => setSortBy(e.target.value as SortOption)}
               className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
             >
-              <option value="SCORE_DESC">⭐ Top Match & Recent Time</option>
+              <option value="VOLUME_PRIORITY">🔥 Volume &amp; Confluence Priority (Top Volume &amp; Increasing)</option>
+              <option value="SCORE_DESC">⭐ Top Match &amp; Recent Time</option>
               <option value="TIME_NEWEST">🕒 Newest Signal Time</option>
               <option value="GAIN_DESC">Highest % Change</option>
               <option value="SYMBOL_ASC">Alphabetical (A-Z)</option>
