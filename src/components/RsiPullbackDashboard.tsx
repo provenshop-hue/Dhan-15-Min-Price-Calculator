@@ -1014,19 +1014,19 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
                 {/* 15m High Retest & Bounce Special Highlight Banner */}
                 {niftyIndex.analysis.pullback15mBounce?.isPullbackBounce && (
-                  <div className="bg-gradient-to-r from-purple-950 via-purple-900 to-indigo-950 text-white p-3 rounded-xl border-2 border-purple-400/90 shadow-lg space-y-1.5 animate-pulse">
+                  <div className="bg-gradient-to-r from-teal-950/95 via-slate-900 to-indigo-950/95 text-teal-100 p-3.5 rounded-xl border-2 border-teal-500/60 shadow-md space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-black text-xs text-purple-200 uppercase tracking-wider flex items-center gap-1.5">
-                        <Target className="w-4 h-4 text-purple-300 shrink-0" />
+                      <span className="font-black text-xs text-teal-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Target className="w-4 h-4 text-teal-400 shrink-0" />
                         🎯 NIFTY 50: 15m High Retested &amp; Bounced!
                       </span>
-                      <span className="bg-purple-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded shadow-xs font-mono">
-                        BOUNCE @ {niftyIndex.analysis.pullback15mBounce.bounceTime}
+                      <span className="text-sm sm:text-base font-black font-mono text-amber-300 bg-amber-500/20 px-3 py-1 rounded-lg border border-amber-400/50 shadow-sm flex items-center gap-1">
+                        ⏰ {niftyIndex.analysis.pullback15mBounce.bounceTime}
                       </span>
                     </div>
-                    <div className="text-[11px] font-mono text-purple-100 flex items-center justify-between pt-1 border-t border-purple-800/80">
+                    <div className="text-[11.5px] font-mono text-teal-100 flex items-center justify-between pt-1.5 border-t border-teal-800/60">
                       <span>15m High: <strong>₹{niftyIndex.analysis.pullback15mBounce.first15mHigh.toFixed(2)}</strong></span>
-                      <span>Retest Low: <strong>₹{niftyIndex.analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong></span>
+                      <span>Retest Low: <strong className="text-amber-300">₹{niftyIndex.analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong></span>
                       <span className="text-emerald-300 font-extrabold">Gain: +{niftyIndex.analysis.pullback15mBounce.bouncePct.toFixed(2)}%</span>
                     </div>
                   </div>
@@ -1201,19 +1201,19 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
                 {/* 15m High Retest & Bounce Special Highlight Banner */}
                 {bankNiftyIndex.analysis.pullback15mBounce?.isPullbackBounce && (
-                  <div className="bg-gradient-to-r from-purple-950 via-purple-900 to-indigo-950 text-white p-3 rounded-xl border-2 border-purple-400/90 shadow-lg space-y-1.5 animate-pulse">
+                  <div className="bg-gradient-to-r from-teal-950/95 via-slate-900 to-indigo-950/95 text-teal-100 p-3.5 rounded-xl border-2 border-teal-500/60 shadow-md space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-black text-xs text-purple-200 uppercase tracking-wider flex items-center gap-1.5">
-                        <Target className="w-4 h-4 text-purple-300 shrink-0" />
+                      <span className="font-black text-xs text-teal-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Target className="w-4 h-4 text-teal-400 shrink-0" />
                         🎯 BANK NIFTY: 15m High Retested &amp; Bounced!
                       </span>
-                      <span className="bg-purple-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded shadow-xs font-mono">
-                        BOUNCE @ {bankNiftyIndex.analysis.pullback15mBounce.bounceTime}
+                      <span className="text-sm sm:text-base font-black font-mono text-amber-300 bg-amber-500/20 px-3 py-1 rounded-lg border border-amber-400/50 shadow-sm flex items-center gap-1">
+                        ⏰ {bankNiftyIndex.analysis.pullback15mBounce.bounceTime}
                       </span>
                     </div>
-                    <div className="text-[11px] font-mono text-purple-100 flex items-center justify-between pt-1 border-t border-purple-800/80">
+                    <div className="text-[11.5px] font-mono text-teal-100 flex items-center justify-between pt-1.5 border-t border-teal-800/60">
                       <span>15m High: <strong>₹{bankNiftyIndex.analysis.pullback15mBounce.first15mHigh.toFixed(2)}</strong></span>
-                      <span>Retest Low: <strong>₹{bankNiftyIndex.analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong></span>
+                      <span>Retest Low: <strong className="text-amber-300">₹{bankNiftyIndex.analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong></span>
                       <span className="text-emerald-300 font-extrabold">Gain: +{bankNiftyIndex.analysis.pullback15mBounce.bouncePct.toFixed(2)}%</span>
                     </div>
                   </div>
@@ -1388,19 +1388,19 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
                 {/* 15m High Retest & Bounce Special Highlight Banner */}
                 {sensexIndex.analysis.pullback15mBounce?.isPullbackBounce && (
-                  <div className="bg-gradient-to-r from-purple-950 via-purple-900 to-indigo-950 text-white p-3 rounded-xl border-2 border-purple-400/90 shadow-lg space-y-1.5 animate-pulse">
+                  <div className="bg-gradient-to-r from-teal-950/95 via-slate-900 to-indigo-950/95 text-teal-100 p-3.5 rounded-xl border-2 border-teal-500/60 shadow-md space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-black text-xs text-purple-200 uppercase tracking-wider flex items-center gap-1.5">
-                        <Target className="w-4 h-4 text-purple-300 shrink-0" />
+                      <span className="font-black text-xs text-teal-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Target className="w-4 h-4 text-teal-400 shrink-0" />
                         🎯 BSE SENSEX: 15m High Retested &amp; Bounced!
                       </span>
-                      <span className="bg-purple-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded shadow-xs font-mono">
-                        BOUNCE @ {sensexIndex.analysis.pullback15mBounce.bounceTime}
+                      <span className="text-sm sm:text-base font-black font-mono text-amber-300 bg-amber-500/20 px-3 py-1 rounded-lg border border-amber-400/50 shadow-sm flex items-center gap-1">
+                        ⏰ {sensexIndex.analysis.pullback15mBounce.bounceTime}
                       </span>
                     </div>
-                    <div className="text-[11px] font-mono text-purple-100 flex items-center justify-between pt-1 border-t border-purple-800/80">
+                    <div className="text-[11.5px] font-mono text-teal-100 flex items-center justify-between pt-1.5 border-t border-teal-800/60">
                       <span>15m High: <strong>₹{sensexIndex.analysis.pullback15mBounce.first15mHigh.toFixed(2)}</strong></span>
-                      <span>Retest Low: <strong>₹{sensexIndex.analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong></span>
+                      <span>Retest Low: <strong className="text-amber-300">₹{sensexIndex.analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong></span>
                       <span className="text-emerald-300 font-extrabold">Gain: +{sensexIndex.analysis.pullback15mBounce.bouncePct.toFixed(2)}%</span>
                     </div>
                   </div>
@@ -2890,33 +2890,33 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
                 {/* 15M HIGH RETEST & BULLISH BOUNCE STRATEGY CARD BANNER */}
                 {analysis.pullback15mBounce && analysis.pullback15mBounce.isPullbackBounce && (
-                  <div className="bg-purple-950/95 text-purple-100 p-3 rounded-xl border border-purple-500/70 shadow-2xs space-y-2">
-                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wide border-b border-purple-800/80 pb-1.5 text-purple-200">
+                  <div className="bg-gradient-to-br from-slate-900 via-teal-950/90 to-slate-900 text-teal-100 p-3.5 rounded-xl border-2 border-teal-500/60 shadow-md space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wide border-b border-teal-800/80 pb-2 text-teal-200">
                       <div className="flex items-center space-x-1.5">
-                        <Target className="w-4 h-4 text-purple-400 shrink-0 animate-pulse" />
+                        <Target className="w-4 h-4 text-teal-400 shrink-0" />
                         <span>🎯 15m High Retest &amp; Bullish Bounce</span>
                       </div>
-                      <span className="bg-purple-500 text-slate-950 px-2 py-0.5 rounded text-[10px] font-black shadow-xs">
-                        BOUNCE TIME: {analysis.pullback15mBounce.bounceTime}
+                      <span className="text-sm sm:text-base font-black font-mono text-amber-300 bg-amber-500/20 px-3 py-1 rounded-lg border border-amber-400/50 shadow-sm flex items-center gap-1">
+                        ⏰ {analysis.pullback15mBounce.bounceTime}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono pt-0.5">
-                      <div className="bg-purple-900/50 p-1.5 rounded border border-purple-800/60">
-                        <span className="text-purple-300 text-[9.5px] block">15m High:</span>
+                    <div className="grid grid-cols-3 gap-2 text-[11px] font-mono pt-0.5">
+                      <div className="bg-teal-950/60 p-2 rounded-lg border border-teal-800/60">
+                        <span className="text-teal-300 text-[9.5px] block">15m High:</span>
                         <strong className="text-white text-xs">₹{analysis.pullback15mBounce.first15mHigh.toFixed(2)}</strong>
                       </div>
-                      <div className="bg-purple-900/50 p-1.5 rounded border border-purple-800/60">
-                        <span className="text-purple-300 text-[9.5px] block">Retest Price:</span>
+                      <div className="bg-teal-950/60 p-2 rounded-lg border border-teal-800/60">
+                        <span className="text-teal-300 text-[9.5px] block">Retest Price:</span>
                         <strong className="text-amber-300 text-xs">₹{analysis.pullback15mBounce.retestPrice.toFixed(2)}</strong>
                       </div>
-                      <div className="bg-purple-900/50 p-1.5 rounded border border-purple-800/60">
-                        <span className="text-purple-300 text-[9.5px] block">Bounce Gain:</span>
+                      <div className="bg-teal-950/60 p-2 rounded-lg border border-teal-800/60">
+                        <span className="text-teal-300 text-[9.5px] block">Bounce Gain:</span>
                         <strong className="text-emerald-300 text-xs">+{analysis.pullback15mBounce.bouncePct.toFixed(2)}%</strong>
                       </div>
                     </div>
 
-                    <p className="text-[10px] text-purple-200/90 leading-snug font-sans">
+                    <p className="text-[10.5px] text-teal-200/90 leading-snug font-sans">
                       {analysis.pullback15mBounce.detail}
                     </p>
                   </div>

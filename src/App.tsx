@@ -23,9 +23,10 @@ import { UserTradeTracker } from './components/UserTradeTracker';
 import { SectorStrengthDashboard } from './components/SectorStrengthDashboard';
 import { OpenHighLowScanner } from './components/OpenHighLowScanner';
 import { HundredPercentBullishScanner } from './components/HundredPercentBullishScanner';
+import { HundredPercentBearishScanner } from './components/HundredPercentBearishScanner';
 import { EmaConfluenceScanner } from './components/EmaConfluenceScanner';
-import { DhanTimingQualityScanner } from './components/DhanTimingQualityScanner';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
+import { DhanMarketfeedModal } from './components/DhanMarketfeedModal';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -35,7 +36,7 @@ import { getStoredTradeJourneys, updateAllTradeJourneys, clearTradeJourneys } fr
 import { analyzeIdealOptionsAndStocks } from './utils/idealTradeAnalyzer';
 import { getStockSector } from './utils/sectorMaster';
 
-import { Download, RefreshCw, Sparkles, CheckCircle, Clock } from 'lucide-react';
+import { Download, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
 
 export default function App() {
   // Dhan API Credentials State
@@ -216,39 +217,8 @@ export default function App() {
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
 
-  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'parabolic_rally', 'user_tracker', 'sector_strength', 'open_high_low', 'hundred_bullish', 'ema_confluence', or 'timing_quality')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence' | 'timing_quality'>('gann');
-
-  // Timing Filter State (Synchronizes selected date and 15-min timing slot across Parabolic, RSI Pullback, 100% Bullish, and EMA Confluence sections)
-  const [timingFilterState, setTimingFilterState] = useState<{
-    active: boolean;
-    date: string;
-    timeSlot: string;
-    qualifyingSymbols: string[];
-  }>({
-    active: false,
-    date: credentials.date || new Date().toISOString().split('T')[0],
-    timeSlot: '09:30',
-    qualifyingSymbols: []
-  });
-
-  const filteredStocksForTiming = useMemo(() => {
-    if (!timingFilterState.active || timingFilterState.qualifyingSymbols.length === 0) {
-      return stocks;
-    }
-    const tSlot = timingFilterState.timeSlot; // e.g. "09:45"
-    const h = parseInt(tSlot.split(':')[0], 10);
-    const formattedTime = !tSlot.includes('AM') && !tSlot.includes('PM')
-      ? `${tSlot} ${h >= 12 ? 'PM' : 'AM'}`
-      : tSlot;
-
-    return stocks
-      .filter((s) => timingFilterState.qualifyingSymbols.includes(s.symbol))
-      .map((s) => ({
-        ...s,
-        candleTimestamp: formattedTime
-      }));
-  }, [stocks, timingFilterState]);
+  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'parabolic_rally', 'user_tracker', 'sector_strength', 'open_high_low', 'hundred_bullish', 'hundred_bearish', or 'ema_confluence')
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'ema_confluence'>('gann');
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -262,6 +232,7 @@ export default function App() {
   const [isManualCalcOpen, setIsManualCalcOpen] = useState(false);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
   const [isPositionSizerOpen, setIsPositionSizerOpen] = useState(false);
+  const [isMarketfeedModalOpen, setIsMarketfeedModalOpen] = useState(false);
   const [positionSizerStock, setPositionSizerStock] = useState<StockCalculated | null>(null);
   const [selectedDetailStock, setSelectedDetailStock] = useState<StockCalculated | null>(null);
   const [editingStockManual, setEditingStockManual] = useState<StockCalculated | null>(null);
@@ -506,8 +477,7 @@ export default function App() {
             securityId: secId,
             exchangeSegment: stock.exchangeSegment || credentials.segment || 'NSE_EQ',
             symbol: stock.symbol,
-            date: credentials.date,
-            timeSlot: timingFilterState.active ? timingFilterState.timeSlot : undefined
+            date: credentials.date
           })
         });
 
@@ -1130,6 +1100,7 @@ export default function App() {
         }}
         onOpenPositionSizer={() => handleOpenPositionSizer(null)}
         onOpenCsvImport={() => setIsCsvImportOpen(true)}
+        onOpenMarketfeedModal={() => setIsMarketfeedModalOpen(true)}
         onExportCsv={handleExportCsv}
         totalStocks={stocks.length}
         calculatedCount={calculatedCount}
@@ -1217,34 +1188,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Active Timing Filter Synchronized Banner */}
-        {timingFilterState.active && (
-          <div className="mb-6 bg-gradient-to-r from-blue-900 via-indigo-900 to-purple-900 text-white p-4 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3 border border-blue-500/40">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-yellow-500/20 rounded-xl border border-yellow-400/30 text-yellow-300">
-                <Clock className="w-5 h-5 animate-pulse" />
-              </div>
-              <div>
-                <div className="font-black text-sm">
-                  🕒 Active Timing Filter: <span className="text-yellow-300">{timingFilterState.timeSlot}</span> on <span className="font-mono">{timingFilterState.date}</span>
-                </div>
-                <div className="text-xs text-blue-200">
-                  Showing <span className="font-bold text-white">{timingFilterState.qualifyingSymbols.length}</span> qualifying stocks across Parabolic Rally, RSI Pullback, 100% Bullish, and EMA Confluence sections.
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                setTimingFilterState({ active: false, date: credentials.date, timeSlot: '09:30', qualifyingSymbols: [] });
-                setNotification({ type: 'info', message: 'Timing filter cleared. Showing all watchlist stocks.' });
-              }}
-              className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 transition-all cursor-pointer"
-            >
-              Clear Timing Filter
-            </button>
-          </div>
-        )}
-
         {/* Dashboard View Switcher */}
         {activeDashboardTab === 'gann' ? (
           <>
@@ -1320,7 +1263,7 @@ export default function App() {
         ) : activeDashboardTab === 'rsi_pullback' ? (
           /* Dedicated RSI Pullback Dashboard */
           <RsiPullbackDashboard
-            stocks={filteredStocksForTiming}
+            stocks={stocks}
             faded100Log={faded100Log}
             onClearFadedLog={handleClearFadedLog}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
@@ -1331,12 +1274,11 @@ export default function App() {
             onDateChange={handleDateChange}
             onFetchAll={handleFetchAllDhan}
             isBulkLoading={isBulkLoading}
-            activeTimingFilter={timingFilterState}
           />
         ) : activeDashboardTab === 'parabolic_rally' ? (
           /* Dedicated 15-Minute Parabolic Rally & Breakdown Probability Engine */
           <ParabolicRallyDashboard
-            stocks={filteredStocksForTiming}
+            stocks={stocks}
             credentials={credentials}
             onFetchSingleStock={handleFetchSingleDhan}
             onFetchAllStocks={handleFetchAllDhan}
@@ -1344,12 +1286,11 @@ export default function App() {
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenSettings={() => setIsDhanGateOpen(true)}
             isLoading={isBulkLoading}
-            activeTimingFilter={timingFilterState}
           />
         ) : activeDashboardTab === 'user_tracker' ? (
           /* Dedicated User Trade & Option Tracker with 5-Min Dhan Refresh */
           <UserTradeTracker
-            stocks={filteredStocksForTiming}
+            stocks={stocks}
             credentials={credentials}
             onFetchSingleStock={handleFetchSingleDhan}
             onFetchAllStocks={handleFetchAllDhan}
@@ -1360,7 +1301,7 @@ export default function App() {
         ) : activeDashboardTab === 'sector_strength' ? (
           /* Dedicated Sector Strength & Real-Time Stock Confluence Hub */
           <SectorStrengthDashboard
-            stocks={filteredStocksForTiming}
+            stocks={stocks}
             credentials={credentials}
             onFetchSingleStock={handleFetchSingleDhan}
             onFetchSectorStocks={handleFetchSectorStocks}
@@ -1374,52 +1315,39 @@ export default function App() {
         ) : activeDashboardTab === 'open_high_low' ? (
           /* Dedicated Open = High/Low Strategy Hub */
           <OpenHighLowScanner
-            stocks={filteredStocksForTiming}
+            stocks={stocks}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
           />
         ) : activeDashboardTab === 'hundred_bullish' ? (
           /* Dedicated 100% Bullish Setup Scanner */
           <HundredPercentBullishScanner
-            stocks={filteredStocksForTiming}
+            stocks={stocks}
             niftyStock={niftyStock}
             tradeJourneys={tradeJourneys}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
-            activeTimingFilter={timingFilterState}
+          />
+        ) : activeDashboardTab === 'hundred_bearish' ? (
+          /* Dedicated 100% Bearish Retest & Breakdown Scanner */
+          <HundredPercentBearishScanner
+            stocks={stocks}
+            niftyStock={niftyStock}
+            tradeJourneys={tradeJourneys}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
           />
         ) : activeDashboardTab === 'ema_confluence' ? (
           /* Dedicated EMA Confluence Scanner */
           <EmaConfluenceScanner
-            stocks={filteredStocksForTiming}
+            stocks={stocks}
             tradeJourneys={tradeJourneys}
             credentials={credentials}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
-            activeTimingFilter={timingFilterState}
-          />
-        ) : activeDashboardTab === 'timing_quality' ? (
-          /* Dedicated 15-Min Timing Quality Scanner */
-          <DhanTimingQualityScanner
-            stocks={stocks}
-            credentials={credentials}
-            onUpdateCredentials={(c) => {
-              setCredentials(c);
-              localStorage.setItem('dhan_gann_creds', JSON.stringify(c));
-            }}
-            onFetchSingle={handleFetchSingleDhan}
-            onRefreshAll={handleFetchAllDhan}
-            isBulkLoading={isBulkLoading}
-            activeTimingFilter={timingFilterState}
-            onApplyTimingFilter={(date, timeSlot, symbols) => {
-              setTimingFilterState({ active: true, date, timeSlot, qualifyingSymbols: symbols });
-              setActiveDashboardTab('parabolic_rally');
-              setNotification({ type: 'success', message: `Timing filter applied for ${timeSlot} on ${date}! Showing qualifying stocks across Parabolic, RSI Pullback, 100% Bullish, and EMA Confluence sections.` });
-            }}
-            onClearTimingFilter={() => setTimingFilterState({ active: false, date: credentials.date, timeSlot: '09:30', qualifyingSymbols: [] })}
-            onChangeDashboardTab={(tab) => setActiveDashboardTab(tab)}
           />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */
@@ -1502,6 +1430,13 @@ export default function App() {
         onClose={() => setIsCsvImportOpen(false)}
         onImportStocks={handleImportStocks}
         onResetToDefault={handleResetToDefaultCSV}
+      />
+
+      <DhanMarketfeedModal
+        isOpen={isMarketfeedModalOpen}
+        onClose={() => setIsMarketfeedModalOpen(false)}
+        credentials={credentials}
+        stocks={stocks}
       />
 
       {/* Bullish Rally Popup / Popunder Alert */}

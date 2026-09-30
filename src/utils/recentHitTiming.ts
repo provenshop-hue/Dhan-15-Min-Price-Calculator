@@ -689,6 +689,229 @@ export function resolveRecentHundredBullishHitTiming(
 }
 
 /**
+ * Derives the RECENT HIT TIMING for the 100% Bearish Setup Scanner.
+ * Guarantees clean recent timing without yesterday dates or labels.
+ */
+export function resolveRecentHundredBearishHitTiming(
+  stock: StockCalculated,
+  variance: number,
+  breaksORB: boolean,
+  tradeJourney?: StockTradeJourney
+): RecentHitTimingResult {
+  const open = stock.openPrice || 100;
+  const high = stock.highPrice || open * 1.01;
+  const low = stock.lowPrice || open * 0.99;
+  const close = stock.closePrice || open;
+  const prevClose = stock.previousClose || open;
+  const f15mLow = stock.first15mLow || low;
+  const isGapDown = prevClose ? open < prevClose : false;
+
+  const ist = getISTNow();
+  const realTodayDate = ist.dateStr;
+
+  const isWeekend = ist.dayOfWeek === 0 || ist.dayOfWeek === 6;
+  const isBeforeOpen = ist.totalMinutes < 9 * 60 + 15;
+
+  if (isWeekend || isBeforeOpen || !stock.isFetched) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: isWeekend ? 'Market closed (Weekend) - No live hits today' : 'Market opens at 09:15 AM IST',
+      hitPrice: close,
+      recencyLabel: 'Not Hit Today',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  if (stock.fetchedDate && stock.fetchedDate.trim() !== realTodayDate) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: `Stock data is from prior session (${stock.fetchedDate})`,
+      hitPrice: close,
+      recencyLabel: 'Prior Session',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  const yesterdayCheck = isStockFromYesterdayOrOlder(stock);
+  if (yesterdayCheck.isYesterday) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: 'Stock data is from prior session - Not hit today',
+      hitPrice: close,
+      recencyLabel: 'Prior Session',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  if (stock.candleTimestamp) {
+    const ts = stock.candleTimestamp.trim();
+    if (/yesterday|prev|prior|friday/i.test(ts)) {
+      return {
+        hitTime: 'Not Hit Today',
+        hitTrigger: 'Stock data is from prior session (Friday/prior) - Not hit today',
+        hitPrice: close,
+        recencyLabel: 'Prior Session',
+        phaseBadge: '',
+        phaseBadgeClass: '',
+        rulePassedMinutes: 0,
+        isFresh: false
+      };
+    }
+    const parsedMins = parseTimeToMinutes(ts);
+    if (parsedMins > ist.totalMinutes + 5) {
+      return {
+        hitTime: 'Not Hit Today',
+        hitTrigger: 'Stale closing candle from prior session - Not hit today',
+        hitPrice: close,
+        recencyLabel: 'Prior Session',
+        phaseBadge: '',
+        phaseBadgeClass: '',
+        rulePassedMinutes: 0,
+        isFresh: false
+      };
+    }
+  }
+
+  if (variance > 0.20 || close > open) {
+    return {
+      hitTime: 'Not Hit Today',
+      hitTrigger: close > open ? 'Green candle (Close > Open) - Not bearish today' : `Variance (${variance.toFixed(2)}%) exceeds 0.20% threshold`,
+      hitPrice: close,
+      recencyLabel: 'Not Hit Today',
+      phaseBadge: '',
+      phaseBadgeClass: '',
+      rulePassedMinutes: 0,
+      isFresh: false
+    };
+  }
+
+  if (tradeJourney && tradeJourney.inceptionTime && tradeJourney.inceptionTime !== 'CSV Imported') {
+    const cleanTime = formatCleanRecentTime(tradeJourney.inceptionTime, '');
+    if (cleanTime) {
+      const parsedMins = parseTimeToMinutes(cleanTime);
+      if (parsedMins <= ist.totalMinutes + 5) {
+        return {
+          hitTime: cleanTime,
+          hitTrigger: `100% Bearish Trade Logged @ ${cleanTime}`,
+          hitPrice: tradeJourney.inceptionPrice || open,
+          recencyLabel: 'Logged Signal',
+          phaseBadge: `⏱️ ${cleanTime} Inception`,
+          phaseBadgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+          rulePassedMinutes: parsedMins,
+          isFresh: false
+        };
+      }
+    }
+  }
+
+  const timeline = stock.rsiTimeline || [];
+  if (timeline.length >= 2) {
+    for (let i = 1; i < timeline.length; i++) {
+      const pt = timeline[i];
+      const ptTime = formatCleanRecentTime(pt.timeStr, '');
+      if (!ptTime) continue;
+
+      const parsedMins = parseTimeToMinutes(ptTime);
+      if (parsedMins > ist.totalMinutes + 5) continue;
+
+      const isLowClose = pt.close <= (pt.low || low) * 1.005;
+      const isRsiBear = pt.rsi <= 45;
+
+      if (isLowClose && isRsiBear) {
+        return {
+          hitTime: ptTime,
+          hitTrigger: `${ptTime} 100% Bearish Candle (CMP ₹${pt.close.toFixed(2)} | RSI ${pt.rsi.toFixed(0)})`,
+          hitPrice: pt.close,
+          recencyLabel: i >= timeline.length - 2 ? 'Recent Hit' : 'Session Breakdown',
+          phaseBadge: `💥 ${ptTime} 100% Breakdown`,
+          phaseBadgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+          rulePassedMinutes: parsedMins,
+          isFresh: i >= timeline.length - 2
+        };
+      }
+    }
+  }
+
+  if (stock.candleTimestamp && stock.candleTimestamp !== 'CSV Imported' && !/yesterday|prev|prior|friday/i.test(stock.candleTimestamp)) {
+    const cleanTime = formatCleanRecentTime(stock.candleTimestamp, '');
+    if (cleanTime && cleanTime !== '09:15 AM') {
+      const parsedMins = parseTimeToMinutes(cleanTime);
+      if (parsedMins <= ist.totalMinutes + 5) {
+        return {
+          hitTime: cleanTime,
+          hitTrigger: `Open = High 100% Confluence Hit @ ${cleanTime}`,
+          hitPrice: close,
+          recencyLabel: 'Recent Hit',
+          phaseBadge: `🕒 ${cleanTime} Hit`,
+          phaseBadgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+          rulePassedMinutes: parsedMins,
+          isFresh: true
+        };
+      }
+    }
+  }
+
+  if (breaksORB && f15mLow && ist.totalMinutes >= 9 * 60 + 30) {
+    return {
+      hitTime: '09:30 AM',
+      hitTrigger: `09:30 AM 15m ORB Low Breakdown below ₹${f15mLow.toFixed(2)}`,
+      hitPrice: f15mLow,
+      recencyLabel: 'ORB Breakdown',
+      phaseBadge: '⚡ 09:30 AM ORB Breakdown',
+      phaseBadgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+      rulePassedMinutes: 9 * 60 + 30,
+      isFresh: false
+    };
+  }
+
+  if (isGapDown && variance <= 0.15 && close <= open) {
+    return {
+      hitTime: '09:15 AM',
+      hitTrigger: `Open = High + Gap Down Driver (Var: ${variance.toFixed(2)}%)`,
+      hitPrice: open,
+      recencyLabel: 'Opening Bell',
+      phaseBadge: '🔔 09:15 AM Opening Bell',
+      phaseBadgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+      rulePassedMinutes: 9 * 60 + 15,
+      isFresh: false
+    };
+  }
+
+  if (variance <= 0.20 && close <= open && ist.totalMinutes >= 9 * 60 + 15) {
+    return {
+      hitTime: '09:15 AM',
+      hitTrigger: 'Open = High Baseline (≤0.20% Var)',
+      hitPrice: open,
+      recencyLabel: 'Opening Bell',
+      phaseBadge: '🔔 09:15 AM Opening Bell',
+      phaseBadgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+      rulePassedMinutes: 9 * 60 + 15,
+      isFresh: false
+    };
+  }
+
+  return {
+    hitTime: 'Not Hit Today',
+    hitTrigger: 'Waiting for today\'s 100% bearish confluence trigger',
+    hitPrice: close,
+    recencyLabel: 'Not Hit Today',
+    phaseBadge: '',
+    phaseBadgeClass: '',
+    rulePassedMinutes: 0,
+    isFresh: false
+  };
+}
+
+/**
  * Derives the RECENT HIT TIMING for the Parabolic Rally & Breakdown Engine.
  * Strips all yesterday strings, returning clean session trigger time.
  */
