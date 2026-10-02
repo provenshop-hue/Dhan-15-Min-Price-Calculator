@@ -30,6 +30,7 @@ import {
 } from '../utils/recentHitTiming';
 import { isStockFromToday } from '../utils/emaConfluence';
 import { getISTNow } from '../utils/bullishRally';
+import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
 
 interface Props {
   stocks: StockCalculated[];
@@ -788,9 +789,9 @@ export function HundredPercentBullishScanner({
                   <div className="p-1 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30">
                     <Clock className="w-3.5 h-3.5" />
                   </div>
-                  <div className="flex items-baseline gap-1.5 flex-wrap">
-                    <span className="text-[11px] text-slate-400 font-semibold">Hit Time:</span>
-                    <span className="text-xs font-black font-mono text-amber-300 tracking-wide">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-xs text-slate-300 font-bold">Signal Met / Hit Time:</span>
+                    <span className="text-sm sm:text-base font-black font-mono text-amber-300 tracking-wider bg-amber-500/15 px-2.5 py-0.5 rounded border border-amber-500/40 shadow-2xs">
                       {stock.timing.firstHitTime}
                     </span>
                     {isTopScore && (
@@ -858,6 +859,35 @@ export function HundredPercentBullishScanner({
                   />
                 </div>
               </div>
+
+              {/* 15M High Retest & Bounce Badge / Banner */}
+              {detect15mHighPullbackBounce(stock).isPullbackBounce && (
+                <div className="mx-4 mt-3 bg-purple-100 text-purple-950 p-3 rounded-xl border-2 border-purple-300 shadow-sm space-y-2">
+                  <div className="flex items-center justify-between text-xs font-black uppercase tracking-wide border-b border-purple-200 pb-1.5 text-purple-950">
+                    <div className="flex items-center space-x-1.5">
+                      <Target className="w-4 h-4 text-purple-700 shrink-0" />
+                      <span>🎯 15m High Retest &amp; Bounce</span>
+                    </div>
+                    <span className="bg-purple-200 text-purple-950 px-2 py-0.5 rounded text-xs font-black shadow-2xs font-mono border border-purple-400">
+                      {detect15mHighPullbackBounce(stock).bounceTime}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono pt-0.5">
+                    <div className="bg-purple-50 p-1.5 rounded border border-purple-200">
+                      <span className="text-purple-700 text-[9px] block font-semibold">15m High:</span>
+                      <strong className="text-purple-950 text-xs font-black">₹{detect15mHighPullbackBounce(stock).first15mHigh.toFixed(2)}</strong>
+                    </div>
+                    <div className="bg-purple-50 p-1.5 rounded border border-purple-200">
+                      <span className="text-purple-700 text-[9px] block font-semibold">Retest:</span>
+                      <strong className="text-amber-800 text-xs font-black">₹{detect15mHighPullbackBounce(stock).retestPrice.toFixed(2)}</strong>
+                    </div>
+                    <div className="bg-purple-50 p-1.5 rounded border border-purple-200">
+                      <span className="text-purple-700 text-[9px] block font-semibold">Gain:</span>
+                      <strong className="text-emerald-700 text-xs font-black">+{detect15mHighPullbackBounce(stock).bouncePct.toFixed(2)}%</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Checklists */}
               <div className="p-4 flex-1">

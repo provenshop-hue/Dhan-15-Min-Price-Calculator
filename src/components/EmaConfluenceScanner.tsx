@@ -713,9 +713,9 @@ ${analysis.pullbackDetail !== 'No active pullback retest' ? `🔄 Pullback Actio
                     <div className="p-1 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30">
                       <Clock className="w-3.5 h-3.5" />
                     </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10.5px] text-slate-400 font-semibold">Hit Time:</span>
-                      <span className="text-xs font-black font-mono text-amber-300 tracking-wide">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-slate-300 font-bold">Signal Met / Hit Time:</span>
+                      <span className="text-sm sm:text-base font-black font-mono text-amber-300 tracking-wider bg-amber-500/15 px-2.5 py-0.5 rounded border border-amber-500/40 shadow-2xs">
                         {analysis.hitTime}
                       </span>
                       {isTopScore && (

@@ -760,9 +760,9 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                         <Clock className="w-3.5 h-3.5" />
                       </div>
                       <div>
-                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                          <span>Signal Met:</span>
-                          <span className="text-indigo-700 font-black text-xs">{item.timing.timeStr}</span>
+                        <div className="font-bold text-slate-900 flex items-center gap-2">
+                          <span className="text-xs text-slate-600 font-bold">Signal Met:</span>
+                          <span className="text-sm sm:text-base font-black font-mono text-indigo-700 bg-indigo-100/80 px-2 py-0.5 rounded border border-indigo-200">{item.timing.timeStr}</span>
                           {item.timing.isFresh && (
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
                           )}
