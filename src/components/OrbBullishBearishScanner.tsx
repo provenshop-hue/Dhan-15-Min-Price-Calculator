@@ -55,17 +55,21 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       // ORB Height Percentage = ((ORB High - ORB Low) / ORB Low) * 100
       const orbHeightPct = orbLow > 0 ? Math.abs(((orbHigh - orbLow) / orbLow) * 100) : 0;
 
-      // Bullish ORB Breakout criteria
-      const breaksOrbHigh = high > orbHigh * 1.001 || close > orbHigh;
-      const rsiBullish = rsi >= 48;
-      const aboveVwap = close >= vwap * 0.998;
-      const isBullishQualified = breaksOrbHigh && rsiBullish && aboveVwap;
+      // Strict Bullish ORB Breakout criteria (Must be currently sustaining above ORB High, positive day, green candle, RSI >= 52, above VWAP)
+      const isCurrentlyAboveOrb = close >= orbHigh;
+      const positiveDay = (stock.pctChange !== undefined ? stock.pctChange : (close - open)) >= 0;
+      const greenCandle = close >= open * 0.998;
+      const rsiBullish = rsi >= 52;
+      const aboveVwap = close > vwap;
+      const isBullishQualified = isCurrentlyAboveOrb && positiveDay && greenCandle && rsiBullish && aboveVwap;
 
-      // Bearish ORB Breakdown criteria
-      const breaksOrbLow = low < orbLow * 0.999 || close < orbLow;
-      const rsiBearish = rsi <= 52;
-      const belowVwap = close <= vwap * 1.002;
-      const isBearishQualified = breaksOrbLow && rsiBearish && belowVwap;
+      // Strict Bearish ORB Breakdown criteria (Must be currently sustaining below ORB Low, negative day, red candle, RSI <= 48, below VWAP)
+      const isCurrentlyBelowOrb = close <= orbLow;
+      const negativeDay = (stock.pctChange !== undefined ? stock.pctChange : (close - open)) <= 0;
+      const redCandle = close <= open * 1.002;
+      const rsiBearish = rsi <= 48;
+      const belowVwap = close < vwap;
+      const isBearishQualified = isCurrentlyBelowOrb && negativeDay && redCandle && rsiBearish && belowVwap;
 
       // Break percentages
       const breakPctAbove = orbHigh > 0 ? ((close - orbHigh) / orbHigh) * 100 : 0;
