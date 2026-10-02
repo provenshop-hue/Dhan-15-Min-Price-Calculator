@@ -417,29 +417,12 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
       let foundDate = targetDate;
       let openCandles = result.data?.open;
 
-      // If no candle data found on targetDate, automatically attempt previous trading days (up to 5 days back)
       if (!openCandles || !Array.isArray(openCandles) || openCandles.length === 0) {
-        const dt = new Date(targetDate);
-
-        for (let attempt = 1; attempt <= 5; attempt++) {
-          dt.setDate(dt.getDate() - 1);
-          // Skip weekends automatically
-          if (dt.getDay() === 0) dt.setDate(dt.getDate() - 2); // Sunday -> Friday
-          else if (dt.getDay() === 6) dt.setDate(dt.getDate() - 1); // Saturday -> Friday
-
-          const prevDateStr = dt.toISOString().split('T')[0];
-          const prevResult = await fetchDhanCandles(prevDateStr);
-
-          if (prevResult.data?.open && Array.isArray(prevResult.data.open) && prevResult.data.open.length > 0) {
-            result = prevResult;
-            openCandles = prevResult.data.open;
-            foundDate = prevDateStr;
-            break;
-          }
-        }
+        return res.status(400).json({
+          success: false,
+          error: `No 15m candle data found for exact date "${targetDate}" from Dhan API. Please select a valid trading date.`
+        });
       }
-
-      if (openCandles && Array.isArray(openCandles) && openCandles.length > 0) {
         const data = result.data;
         const timestamps = data.start_time || data.timestamp || data.t || data.time;
         let candleIdx = 0;
@@ -609,9 +592,16 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
           }
         }
 
-        // Target session candles for foundDate
+        // Target session candles for foundDate (EXACT DATE ONLY)
         const targetSessionCandles = candlesList.filter((c) => !c.dateStr || c.dateStr === foundDate);
-        const sessionCandles = targetSessionCandles.length > 0 ? targetSessionCandles : candlesList;
+        const sessionCandles = targetSessionCandles;
+
+        if (sessionCandles.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: `No 15m candle data found for exact date "${targetDate}" from Dhan API. Please select a valid trading date.`
+          });
+        }
 
         let effectiveSessionCandles = sessionCandles;
         if (req.body.timeSlot) {
@@ -914,12 +904,6 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
           rsiTimeline,
           totalCandles: openCandles.length
         });
-      } else {
-        return res.status(404).json({
-          error: `No 15-minute candle data returned from Dhan for ${symbol} (Security ID: ${secId}) on ${targetDate} or recent trading days.`,
-          dhanResponse: result.data
-        });
-      }
     } catch (err: any) {
       console.error('Error proxying Dhan API:', err);
       res.status(500).json({

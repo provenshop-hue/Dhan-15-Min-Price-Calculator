@@ -227,7 +227,7 @@ export const StockTable: React.FC<StockTableProps> = ({
   };
 
   // Pagination settings
-  const itemsPerPage = 25;
+  const [itemsPerPage, setItemsPerPage] = useState<number>(100);
 
   // Sorting
   const [sortField, setSortField] = useState<'symbol' | 'openCalc' | 'closeCalc' | 'totalCalc' | 'companyName' | 'volume' | 'pctChange' | 'openPrice' | 'highPrice' | 'lowPrice' | 'closePrice'>('symbol');
@@ -1846,9 +1846,27 @@ export const StockTable: React.FC<StockTableProps> = ({
 
       {/* Pagination Bar */}
       <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-3">
-        <div>
-          Showing {sortedStocks.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to{' '}
-          {Math.min(currentPage * itemsPerPage, sortedStocks.length)} of {sortedStocks.length} F&O Stocks
+        <div className="flex items-center space-x-3">
+          <span>
+            Showing {sortedStocks.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to{' '}
+            {Math.min(currentPage * itemsPerPage, sortedStocks.length)} of {sortedStocks.length} F&O Stocks
+          </span>
+          <div className="flex items-center space-x-1.5 pl-3 border-l border-slate-300">
+            <span className="font-semibold text-slate-600">Per page:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none cursor-pointer"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+            </select>
+          </div>
         </div>
 
         <div className="flex items-center space-x-2">

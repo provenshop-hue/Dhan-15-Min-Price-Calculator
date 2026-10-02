@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence' | 'timing_quality';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence' | 'timing_quality') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence' | 'timing_quality' | 'orb_breakout';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence' | 'timing_quality' | 'orb_breakout') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -406,7 +406,23 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </button>
 
-            {/* ⏱️ Precision Timing Scanner Tab */}
+            {/* 🎯 ORB Bullish & Bearish Hub Tab */}
+            <button
+              onClick={() => onChangeDashboardTab('orb_breakout')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'orb_breakout'
+                  ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-md shadow-indigo-500/30 ring-1 ring-white/30'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-purple-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Target className={`w-3.5 h-3.5 ${activeDashboardTab === 'orb_breakout' ? 'text-yellow-300' : 'text-purple-600'}`} />
+                <span>🎯 ORB Bull/Bear Hub</span>
+                <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  Breakout/Down
+                </span>
+              </span>
+            </button>
             <button
               onClick={() => onChangeDashboardTab('timing_quality')}
               className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
