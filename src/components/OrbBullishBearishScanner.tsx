@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StockCalculated } from '../types';
 import { 
   Target, 
@@ -20,7 +20,10 @@ import {
   ShieldCheck as ShieldSafe,
   Package,
   X,
-  RefreshCw
+  RefreshCw,
+  Bell,
+  Star,
+  CheckCircle
 } from 'lucide-react';
 
 interface OrbBullishBearishScannerProps {
@@ -40,9 +43,43 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
+
+  // Followed stocks state (persisted in localStorage)
+  const [followedSymbols, setFollowedSymbols] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('orb_followed_symbols');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // 2.65% Break Alert Popunder State (Only for followed stocks)
+  const [alertStock, setAlertStock] = useState<{ symbol: string; breakPct: number; type: 'BULLISH' | 'BEARISH' } | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('orb_followed_symbols', JSON.stringify(followedSymbols));
+    } catch {}
+  }, [followedSymbols]);
+
+  const toggleFollow = (stock: StockCalculated, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const symbol = stock.symbol;
+    const isCurrentlyFollowed = followedSymbols.includes(symbol);
+    
+    setFollowedSymbols(prev => 
+      isCurrentlyFollowed ? prev.filter(s => s !== symbol) : [...prev, symbol]
+    );
+
+    // Immediately fetch from Dhan API when followed
+    if (!isCurrentlyFollowed && onFetchSingleStock) {
+      onFetchSingleStock(stock);
+    }
+  };
 
   const processedOrbStocks = useMemo(() => {
     return stocks.map((stock) => {
@@ -87,7 +124,24 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       const breakPctAbove = orbHigh > 0 ? ((close - orbHigh) / orbHigh) * 100 : 0;
       const breakPctBelow = orbLow > 0 ? ((orbLow - close) / orbLow) * 100 : 0;
 
-      // Timing of ORB broken calculation & exact minute duration calculation
+      // Super Break conditions: Break % is 50% more than ORB Height %
+      const isSuperBreakBullish = isBullishQualified && breakPctAbove >= orbHeightPct * 1.5;
+      const isSuperBreakBearish = isBearishQualified && breakPctBelow >= orbHeightPct * 1.5;
+
+      // Check 3.0% crossing for alert popup (ONLY for followed stocks) when fetch happens
+      const isFollowed = followedSymbols.includes(stock.symbol);
+      if (isFollowed && ((breakPctAbove >= 3.0 && isBullishQualified) || (breakPctBelow >= 3.0 && isBearishQualified))) {
+        const alertKey = `alerted_${stock.symbol}_3.00`;
+        if (!sessionStorage.getItem(alertKey)) {
+          sessionStorage.setItem(alertKey, 'true');
+          setAlertStock({
+            symbol: stock.symbol,
+            breakPct: breakPctAbove >= 3.0 ? breakPctAbove : breakPctBelow,
+            type: breakPctAbove >= 3.0 ? 'BULLISH' : 'BEARISH'
+          });
+        }
+      }
+
       let orbBreakTime = '09:30 AM';
       let breakMinutesFromOpen = 15;
       
@@ -116,16 +170,11 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         breakMinutesFromOpen = 15 + ((hash % 4) * 15);
       }
 
-      // Calculate exact duration held since break
       const currentMarketMinutes = 375;
       const heldMinutes = Math.max(15, currentMarketMinutes - breakMinutesFromOpen);
       const hoursHeld = Math.floor(heldMinutes / 60);
       const minsHeld = heldMinutes % 60;
       const durationDisplay = hoursHeld > 0 ? `${hoursHeld}h ${minsHeld}m Hold` : `${minsHeld}m Hold`;
-
-      // Safety Sustained check
-      const isSafeSustained = (isBullishQualified && breakPctAbove >= 0.3) || (isBearishQualified && breakPctBelow >= 0.3);
-      const safetyNote = isSafeSustained ? `Sustaining breakout successfully (${durationDisplay})` : `Monitoring breakout momentum`;
 
       return {
         ...stock,
@@ -134,24 +183,42 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         orbHeightPct: Math.round(orbHeightPct * 100) / 100,
         isBullishQualified,
         isBearishQualified,
+        isSuperBreakBullish,
+        isSuperBreakBearish,
         breakPctAbove: Math.round(breakPctAbove * 100) / 100,
         breakPctBelow: Math.round(breakPctBelow * 100) / 100,
         orbBreakTime,
         breakMinutesFromOpen,
         durationDisplay,
-        isSafeSustained,
-        safetyNote,
         lotSize,
         rsi: Math.round(rsi * 10) / 10,
         vwap: Math.round(vwap * 100) / 100
       };
     });
-  }, [stocks]);
+  }, [stocks, followedSymbols]);
+
+  // Auto-fetch for followed stocks every 2 minutes (120,000 ms) from Dhan API
+  useEffect(() => {
+    if (!onFetchSingleStock || followedSymbols.length === 0) return;
+
+    const intervalId = setInterval(() => {
+      followedSymbols.forEach(sym => {
+        const found = stocks.find(s => s.symbol.toUpperCase() === sym.toUpperCase());
+        if (found && onFetchSingleStock) {
+          onFetchSingleStock(found);
+        }
+      });
+    }, 120000);
+
+    return () => clearInterval(intervalId);
+  }, [followedSymbols, stocks, onFetchSingleStock]);
 
   const filteredStocks = useMemo(() => {
     return processedOrbStocks.filter((s) => {
       if (activeTab === 'bullish' && !s.isBullishQualified) return false;
       if (activeTab === 'bearish' && !s.isBearishQualified) return false;
+      if (activeTab === 'super_break_bull' && !s.isSuperBreakBullish) return false;
+      if (activeTab === 'super_break_bear' && !s.isSuperBreakBearish) return false;
 
       if (activeTimingFilter?.active && activeTimingFilter.qualifyingSymbols && activeTimingFilter.qualifyingSymbols.length > 0) {
         if (!activeTimingFilter.qualifyingSymbols.includes(s.symbol)) return false;
@@ -163,15 +230,13 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
       return true;
     }).sort((a, b) => {
-      const valA = activeTab === 'bullish' ? a.breakPctAbove : a.breakPctBelow;
-      const valB = activeTab === 'bullish' ? b.breakPctAbove : b.breakPctBelow;
+      const valA = activeTab === 'bearish' || activeTab === 'super_break_bear' ? a.breakPctBelow : a.breakPctAbove;
+      const valB = activeTab === 'bearish' || activeTab === 'super_break_bear' ? b.breakPctBelow : b.breakPctAbove;
 
-      if (sortBy === 'BREAK_PX' || sortBy === 'BREAK_PCT') {
-        // STRICT #1 PRIORITY: Highest Break % Above High (descending)
+      if (sortBy === 'BREAK_PCT') {
         if (Math.abs(valB - valA) > 0.0001) {
           return valB - valA;
         }
-        // Secondary tie-breaker: Just hit ORB (earliest break time)
         return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
       }
       if (sortBy === 'JUST_HIT') {
@@ -189,9 +254,56 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
   const bullishCount = processedOrbStocks.filter(s => s.isBullishQualified).length;
   const bearishCount = processedOrbStocks.filter(s => s.isBearishQualified).length;
+  const superBreakBullCount = processedOrbStocks.filter(s => s.isSuperBreakBullish).length;
+  const superBreakBearCount = processedOrbStocks.filter(s => s.isSuperBreakBearish).length;
 
   return (
-    <div className="space-y-6 animate-fade-in pb-20">
+    <div className="space-y-6 animate-fade-in pb-20 relative">
+      {/* 3.0% BUY ALERT POPUNDER MODAL (ONLY FOR FOLLOWED STOCKS) */}
+      {alertStock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 border-2 border-amber-400 rounded-3xl p-8 max-w-md w-full shadow-2xl text-white text-center space-y-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/20 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div className="w-16 h-16 bg-amber-500/20 border-2 border-amber-400 rounded-2xl flex items-center justify-center mx-auto animate-bounce">
+              <Bell className="w-8 h-8 text-amber-300" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="bg-amber-400 text-slate-950 text-xs px-3 py-1 rounded-full font-black uppercase tracking-wider">
+                🚨 Followed Stock {alertStock.breakPct >= 3.0 ? '3.0%' : 'Breakout'} {alertStock.type === 'BULLISH' ? 'Breakout' : 'Breakdown'} Alert
+              </span>
+              <h3 className="text-3xl font-black font-mono tracking-tight text-white">
+                {alertStock.symbol}
+              </h3>
+              <p className="text-sm text-slate-300">
+                Your followed stock crossed <strong className="text-amber-300 font-mono text-base">{alertStock.breakPct >= 0 ? '+' : ''}{alertStock.breakPct.toFixed(2)}%</strong> {alertStock.type === 'BULLISH' ? 'breakout' : 'breakdown'} threshold (&gt;= 3.0%)!
+              </p>
+            </div>
+
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 grid grid-cols-2 gap-3 text-left font-mono text-xs">
+              <div>
+                <span className="text-slate-400 block text-[10px]">Action Signal</span>
+                <strong className="text-emerald-400 text-sm font-black">STRONG BUY</strong>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Follow Status</span>
+                <strong className="text-cyan-300 text-sm font-black">ACTIVE FOLLOW</strong>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setAlertStock(null)}
+                className="flex-1 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black py-3 px-6 rounded-xl shadow-lg transition-all cursor-pointer text-sm"
+              >
+                Acknowledge &amp; Trade
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Active Timing Filter Banner */}
       {activeTimingFilter?.active && (
         <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 rounded-2xl p-4 text-white shadow-lg flex items-center justify-between">
@@ -224,27 +336,20 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 <Target className="w-6 h-6 text-indigo-400 animate-pulse" />
               </div>
               <h1 className="text-2xl font-black tracking-tight">
-                ORB Bullish Breakout &amp; Bearish Breakdown Hub (Highest Break % #1 Priority)
+                ORB Bullish &amp; Bearish Conviction Hub (Follow &amp; Auto-Fetch Engine)
               </h1>
             </div>
             <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">
-              Strictly prioritizes <span className="text-emerald-400 font-semibold">Highest Break % Above High</span> as the #1 stock on the top row, followed by fresh ORB breakouts.
+              Clicking <span className="text-amber-300 font-semibold">Follow</span> on any stock immediately fetches its data from the Dhan API and continues auto-fetching every 2 minutes.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="bg-emerald-950/80 border border-emerald-500/40 px-4 py-3 rounded-xl flex items-center space-x-3">
-              <TrendingUp className="w-5 h-5 text-emerald-400" />
+            <div className="bg-amber-950/80 border border-amber-500/40 px-4 py-3 rounded-xl flex items-center space-x-3">
+              <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
               <div>
-                <div className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">ORB Bullish</div>
-                <div className="text-lg font-black text-white">{bullishCount} Stocks</div>
-              </div>
-            </div>
-            <div className="bg-rose-950/80 border border-rose-500/40 px-4 py-3 rounded-xl flex items-center space-x-3">
-              <TrendingDown className="w-5 h-5 text-rose-400" />
-              <div>
-                <div className="text-[10px] uppercase font-bold text-rose-400 tracking-wider">ORB Bearish</div>
-                <div className="text-lg font-black text-white">{bearishCount} Stocks</div>
+                <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Followed Stocks</div>
+                <div className="text-lg font-black text-white">{followedSymbols.length} Active</div>
               </div>
             </div>
           </div>
@@ -254,39 +359,63 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       {/* Navigation Tabs & Controls Bar */}
       <div className="flex flex-col lg:flex-row justify-between items-center gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-lg">
         {/* Tab Switcher */}
-        <div className="flex items-center space-x-2 w-full lg:w-auto">
+        <div className="flex items-center space-x-2 w-full lg:w-auto overflow-x-auto pb-1 lg:pb-0">
           <button
             onClick={() => setActiveTab('bullish')}
-            className={`flex-1 lg:flex-none px-5 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
               activeTab === 'bullish'
                 ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 border border-emerald-500'
                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
             }`}
           >
             <ArrowUpRight className="w-4 h-4 text-emerald-300" />
-            <span>🟢 ORB Bullish Breakout ({bullishCount})</span>
+            <span>🟢 Bullish ({bullishCount})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('bearish')}
-            className={`flex-1 lg:flex-none px-5 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center justify-center space-x-2 cursor-pointer ${
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
               activeTab === 'bearish'
                 ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30 border border-rose-500'
                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
             }`}
           >
             <ArrowDownRight className="w-4 h-4 text-rose-300" />
-            <span>🔴 ORB Bearish Breakdown ({bearishCount})</span>
+            <span>🔴 Bearish ({bearishCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('super_break_bull')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'super_break_bull'
+                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30 border border-amber-500'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+            <span>🚀 Super Break (Bullish 50%+) ({superBreakBullCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('super_break_bear')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'super_break_bear'
+                ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/30 border border-orange-500'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-orange-300 fill-orange-300" />
+            <span>💥 Super Breakdown (Bearish 50%+) ({superBreakBearCount})</span>
           </button>
         </div>
 
         {/* Search & Sort */}
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-56">
             <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search symbol or company..."
+              placeholder="Search symbol..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 text-sm text-white rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600"
@@ -303,7 +432,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
               }`}
             >
-              🚀 Highest Break % (#1 Top Row)
+              🚀 Highest Break % (#1 Top)
             </button>
             <button
               onClick={() => setSortBy('JUST_HIT')}
@@ -313,7 +442,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
               }`}
             >
-              ⏰ Just Hit ORB (Recency)
+              ⏰ Just Hit ORB
             </button>
           </div>
         </div>
@@ -323,48 +452,63 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       {filteredStocks.length === 0 ? (
         <div className="bg-slate-900 rounded-2xl p-12 text-center border border-slate-800 text-slate-400 space-y-3">
           <AlertCircle className="w-10 h-10 text-slate-600 mx-auto" />
-          <h3 className="text-lg font-bold text-white">No Stocks Found in {activeTab === 'bullish' ? 'ORB Bullish Breakout' : 'ORB Bearish Breakdown'}</h3>
+          <h3 className="text-lg font-bold text-white">No Stocks Found in {activeTab}</h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
-            No F&amp;O stocks currently meet strict directional ORB sustainability criteria with RSI &amp; VWAP validation.
+            No F&amp;O stocks currently meet this specific filter criteria.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredStocks.map((stock, idx) => {
-            const isBull = activeTab === 'bullish';
+            const isBull = activeTab === 'bullish' || activeTab === 'super_break_bull';
             const breakPct = isBull ? stock.breakPctAbove : stock.breakPctBelow;
+            const isSuper = (isBull && stock.isSuperBreakBullish) || (!isBull && stock.isSuperBreakBearish);
+            const isFollowed = followedSymbols.includes(stock.symbol);
 
             return (
               <div 
                 key={stock.symbol}
                 onClick={() => onSelectStockDetail(stock)}
                 className={`bg-slate-900 rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-xl ${
-                  idx === 0 
+                  isSuper 
+                    ? 'border-amber-400 ring-2 ring-amber-500/30 shadow-amber-500/20'
+                    : idx === 0 
                     ? (isBull ? 'border-emerald-400 ring-2 ring-emerald-500/30 shadow-emerald-500/20' : 'border-rose-400 ring-2 ring-rose-500/30 shadow-rose-500/20')
-                    : (isBull ? 'border-emerald-500/50 hover:border-emerald-500 shadow-emerald-500/10' : 'border-rose-500/50 hover:border-rose-500 shadow-rose-500/10')
+                    : 'border-slate-800 hover:border-slate-700'
                 }`}
               >
-                {/* Card Header Top: #1 Badge if Top Row, Status Badge & Per-Stock Refresh */}
-                <div className={`px-4 py-2.5 flex items-center justify-between border-b ${
-                  isBull ? 'bg-emerald-950/70 border-emerald-900 text-emerald-300' : 'bg-rose-950/70 border-rose-900 text-rose-300'
-                }`}>
+                {/* Card Header Top: #1 Crown / Super Break Badge, Per-Stock Refresh & Follow Toggle */}
+                <div className="px-4 py-2.5 flex items-center justify-between border-b bg-slate-950 border-slate-800 text-slate-300">
                   <div className="flex items-center space-x-2">
-                    {idx === 0 ? (
-                      <span className="bg-amber-400 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase shadow-sm">
-                        👑 #1 Top Break
+                    {isSuper ? (
+                      <span className="bg-amber-400 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
+                        <Zap className="w-3 h-3 fill-slate-950" /> Super {isBull ? 'Break (50%+)' : 'Breakdown (50%+)'}
+                      </span>
+                    ) : idx === 0 ? (
+                      <span className={`${isBull ? 'bg-emerald-500' : 'bg-rose-500'} text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider`}>
+                        👑 #1 Top {isBull ? 'Break' : 'Breakdown'}
                       </span>
                     ) : (
                       <ShieldSafe className="w-4 h-4 shrink-0 text-emerald-400" />
                     )}
-                    <span className="text-xs font-black font-sans uppercase tracking-wide">
-                      {isBull ? '🟢 ORB Bullish Breakout' : '🔴 ORB Bearish Breakdown'}
-                    </span>
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-950/80 border border-slate-800 text-slate-300">
-                      {stock.durationDisplay}
-                    </span>
+                    {/* Follow Toggle Button */}
+                    <button
+                      onClick={(e) => toggleFollow(stock, e)}
+                      title={isFollowed ? 'Following (Auto-fetching every 2 mins from Dhan API)' : 'Click to Follow stock (Fetches data immediately & every 2 mins)'}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center space-x-1 cursor-pointer min-h-[36px] ${
+                        isFollowed 
+                          ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30' 
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                      }`}
+                    >
+                      <Star className={`w-3.5 h-3.5 ${isFollowed ? 'fill-slate-950' : ''}`} />
+                      <span>{isFollowed ? 'Following ON (2m)' : 'Follow'}</span>
+                    </button>
+
+                    {/* Per-Stock Refresh */}
                     {onFetchSingleStock && (
                       <button
                         onClick={(e) => {
@@ -373,9 +517,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                         }}
                         disabled={stock.isLoading}
                         title="Immediately fetch live data from Dhan API for this stock"
-                        className="p-1 text-blue-300 hover:text-white hover:bg-blue-600/40 bg-blue-950/80 border border-blue-800/60 rounded transition-colors cursor-pointer"
+                        className="p-2 text-blue-300 hover:text-white hover:bg-blue-600/40 bg-blue-950/80 border border-blue-800/60 rounded-lg transition-colors cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center"
                       >
-                        <RefreshCw className={`w-3 h-3 ${stock.isLoading ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-4 h-4 ${stock.isLoading ? 'animate-spin' : ''}`} />
                       </button>
                     )}
                   </div>
@@ -435,8 +579,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                     <div className={`p-2.5 rounded-xl border ${isBull ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-rose-950/40 border-rose-800/60'}`}>
                       <span className="text-slate-400 text-[10px] block font-sans">{isBull ? 'Break % Above High' : 'Break % Below Low'}</span>
-                      <strong className={`text-sm font-black ${isBull ? 'text-emerald-300' : 'text-rose-300'}`}>
-                        {breakPct > 0 ? '+' : ''}{breakPct.toFixed(2)}%
+                      <strong className={`text-sm font-black ${breakPct >= 3.0 ? 'text-amber-300 animate-pulse' : isBull ? 'text-emerald-300' : 'text-rose-300'}`}>
+                        {breakPct > 0 ? '+' : ''}{breakPct.toFixed(2)}% {breakPct >= 3.0 ? '🔥' : ''}
                       </strong>
                     </div>
                     <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">

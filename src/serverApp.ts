@@ -1444,6 +1444,129 @@ Return ONLY a JSON array of objects with this schema:
     }
   });
 
+  apiRouter.post('/dhan/precision-timing-scan', async (req, res) => {
+    try {
+      let { clientId, accessToken, date, startTime, endTime } = req.body;
+      const globalSettings = loadGlobalSettings();
+      if (!clientId && globalSettings.dhanCredentials?.clientId) clientId = globalSettings.dhanCredentials.clientId;
+      if (!accessToken && globalSettings.dhanCredentials?.accessToken) accessToken = globalSettings.dhanCredentials.accessToken;
+      if (!clientId && process.env.DHAN_CLIENT_ID) clientId = process.env.DHAN_CLIENT_ID;
+      if (!accessToken && process.env.DHAN_ACCESS_TOKEN) accessToken = process.env.DHAN_ACCESS_TOKEN;
+
+      if (!clientId || !accessToken) {
+        return res.status(400).json({ error: 'Missing Dhan credentials. Please check settings.' });
+      }
+
+      const targetDate = date || new Date().toISOString().split('T')[0];
+      const parseMins = (slot: string) => {
+        if (!slot) return 0;
+        const [h, m] = slot.split(':').map(n => parseInt(n, 10));
+        return (h || 0) * 60 + (m || 0);
+      };
+      const startMins = parseMins(startTime || '09:30');
+      const endMins = parseMins(endTime || '10:00');
+
+      const defaultSymbols = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'ITC', 'BHARTIARTL', 'KOTAKBANK', 'LT', 'AXISBANK', 'MARUTI', 'SUNPHARMA', 'TITAN', 'TATAMOTORS', 'NTPC', 'BAJFINANCE', 'ASIANPAINT', 'HCLTECH', 'ADANIENT', 'WIPRO', 'ONGC', 'POWERGRID', 'M&M', 'TATASTEEL', 'COALINDIA', 'GRASIM', 'BAJAJFINSV', 'ADANIPORTS', 'BPCL'];
+      
+      const results = [];
+
+      for (const symbol of defaultSymbols) {
+        const secId = getDhanSecurityId(symbol);
+        if (!secId) continue;
+
+        try {
+          const payload = {
+            securityId: String(secId),
+            exchangeSegment: 'NSE_EQ',
+            instrument: 'EQUITY',
+            instrumentType: 'EQUITY',
+            fromDate: targetDate,
+            toDate: targetDate,
+            interval: '15'
+          };
+
+          const resp = await fetch('https://api.dhan.co/v2/charts/intraday', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'client-id': clientId,
+              'access-token': accessToken
+            },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(6000)
+          });
+
+          if (!resp.ok) continue;
+          const data = await resp.json().catch(() => null);
+          if (!data || !data.open || !Array.isArray(data.open) || data.open.length === 0) continue;
+
+          const timestamps = data.start_time || data.timestamp || data.t || data.time;
+          const candles = [];
+          for (let i = 0; i < data.open.length; i++) {
+            const parsed = getISTDateTime(timestamps?.[i]);
+            if (!parsed) continue;
+            if (parsed.dateStr && parsed.dateStr !== targetDate) continue;
+            
+            const totalM = parsed.hours * 60 + parsed.minutes;
+            const ampm = parsed.hours >= 12 ? 'PM' : 'AM';
+            const dh = parsed.hours % 12 === 0 ? 12 : parsed.hours % 12;
+            const dm = parsed.minutes < 10 ? `0${parsed.minutes}` : parsed.minutes;
+            
+            candles.push({
+              open: Number(data.open[i]) || 0,
+              high: Number(data.high[i]) || 0,
+              low: Number(data.low[i]) || 0,
+              close: Number(data.close[i]) || 0,
+              volume: Number(data.volume?.[i] || 10000),
+              totalMins: totalM,
+              timeStr: `${dh}:${dm} ${ampm}`
+            });
+          }
+
+          if (candles.length === 0) continue;
+
+          // STRICT HISTORICAL WINDOW FILTER:
+          // Keep only candles strictly within [startMins, endMins]
+          const candlesInWindow = candles.filter(c => c.totalMins >= startMins && c.totalMins <= endMins);
+          if (candlesInWindow.length === 0) continue;
+
+          const snapshotCandle = candlesInWindow[candlesInWindow.length - 1];
+          const openPrice = candles[0].open;
+          const closePrice = snapshotCandle.close;
+          const changePct = ((closePrice - openPrice) / openPrice) * 100;
+          const highInWindow = Math.max(...candlesInWindow.map(c => c.high));
+          const lowInWindow = Math.min(...candlesInWindow.map(c => c.low));
+
+          results.push({
+            symbol,
+            companyName: symbol,
+            lastPrice: closePrice,
+            dayChangePct: changePct,
+            openPrice,
+            highPrice: highInWindow,
+            lowPrice: lowInWindow,
+            volume: candlesInWindow.reduce((acc, c) => acc + c.volume, 0),
+            snapshotTimeStr: snapshotCandle.timeStr,
+            qualityScore: 75 + Math.round(Math.abs(changePct) * 5),
+            notes: [
+              `Historical Intraday Data (${targetDate}) from Dhan API`,
+              `Exact Window: ${startTime} - ${endTime}`,
+              `Matched Signal @ ${snapshotCandle.timeStr} (Change: ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`
+            ]
+          });
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      results.sort((a, b) => b.qualityScore - a.qualityScore);
+      return res.json({ success: true, results, scannedAt: new Date().toISOString() });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'Precision timing scan failed' });
+    }
+  });
+
 
   // Mount API router on both /api and / (for serverless compatibility)
   app.use('/api', apiRouter);

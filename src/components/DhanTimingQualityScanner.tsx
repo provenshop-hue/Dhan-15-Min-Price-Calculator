@@ -79,83 +79,60 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
         onUpdateCredentials({ ...credentials, date: selectedDate });
       }
 
-      // Fetch historical 15m candles from Dhan API
-      await onRefreshAll();
+      const response = await fetch('/api/dhan/precision-timing-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: credentials.clientId,
+          accessToken: credentials.accessToken,
+          date: selectedDate,
+          startTime,
+          endTime
+        })
+      });
 
-      const startMins = parseMins(startTime);
-      const endMins = parseMins(endTime);
-
-      const results: Array<{
-        stock: StockCalculated;
-        snapshotTimeStr: string;
-        snapshotPrice: number;
-        snapshotHigh: number;
-        snapshotLow: number;
-        snapshotVolume: number;
-        qualityScore: number;
-        notes: string[];
-      }> = [];
-
-      for (let i = 0; i < stocks.length; i++) {
-        const stock = stocks[i];
-        if (!stock.openPrice) continue;
-
-        const timeline = stock.rsiTimeline || [];
-        
-        // STRICT HISTORICAL WINDOW FILTER:
-        // Only keep candles whose timestamp falls strictly within [startMins, endMins]
-        const historicalCandlesInWindow = timeline.filter(pt => {
-          const totalMins = parseTimeStringToMinutes(pt.timeStr);
-          return totalMins >= startMins && totalMins <= endMins;
-        });
-
-        // If no candles fell within the exact [startTime, endTime] window, exclude this stock completely!
-        if (historicalCandlesInWindow.length === 0) {
-          continue;
-        }
-
-        const snapshotCandle = historicalCandlesInWindow[historicalCandlesInWindow.length - 1];
-        const snapshotPrice = snapshotCandle.close;
-        const snapshotHigh = Math.max(...historicalCandlesInWindow.map(c => c.high));
-        const snapshotLow = Math.min(...historicalCandlesInWindow.map(c => c.low));
-        const snapshotVolume = historicalCandlesInWindow.reduce((acc, c) => acc + (c.volume || 10000), 0);
-
-        const openPrice = historicalCandlesInWindow[0].open;
-        const changeInWindow = ((snapshotPrice - openPrice) / openPrice) * 100;
-        const isGreen = changeInWindow >= 0;
-
-        let qualityScore = 60;
-        const notes = [
-          `Strict Historical Window @ ${snapshotCandle.timeStr} (Range: ${startTime} - ${endTime})`,
-          `Window Price Change: ${changeInWindow >= 0 ? '+' : ''}${changeInWindow.toFixed(2)}%`,
-          `Window High: ₹${snapshotHigh.toFixed(2)} | Low: ₹${snapshotLow.toFixed(2)}`
-        ];
-
-        if (isGreen && changeInWindow > 0.2) {
-          qualityScore += 20;
-          notes.push('Bullish momentum confirmed inside time range');
-        } else if (!isGreen && changeInWindow < -0.2) {
-          qualityScore -= 10;
-          notes.push('Bearish pressure confirmed inside time range');
-        }
-
-        results.push({
-          stock,
-          snapshotTimeStr: snapshotCandle.timeStr,
-          snapshotPrice,
-          snapshotHigh,
-          snapshotLow,
-          snapshotVolume,
-          qualityScore,
-          notes
-        });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to fetch precision timing scan from Dhan API');
       }
 
-      results.sort((a, b) => b.qualityScore - a.qualityScore);
-      setScannedResults(results);
+      const serverResults = data.results || [];
+      const formattedResults = serverResults.map((item: any) => {
+        // Construct a StockCalculated object matching item
+        const stockObj: StockCalculated = {
+          symbol: item.symbol,
+          companyName: item.companyName,
+          lastPrice: item.lastPrice,
+          dayChangePct: item.dayChangePct,
+          openPrice: item.openPrice,
+          highPrice: item.highPrice,
+          lowPrice: item.lowPrice,
+          volume: item.volume,
+          rsi: 55,
+          adx: 25,
+          vwap: item.lastPrice,
+          isBullish: item.dayChangePct >= 0,
+          lotSize: 250,
+          notes: item.notes
+        };
+
+        return {
+          stock: stockObj,
+          snapshotTimeStr: item.snapshotTimeStr,
+          snapshotPrice: item.lastPrice,
+          snapshotHigh: item.highPrice,
+          snapshotLow: item.lowPrice,
+          snapshotVolume: item.volume,
+          qualityScore: item.qualityScore,
+          notes: item.notes
+        };
+      });
+
+      setScannedResults(formattedResults);
       setHasScanned(true);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Scan error:', e);
+      alert(e.message || 'Precision timing scan error');
     } finally {
       setIsScanning(false);
     }

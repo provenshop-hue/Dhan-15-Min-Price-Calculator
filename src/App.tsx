@@ -38,7 +38,7 @@ import { getStoredTradeJourneys, updateAllTradeJourneys, clearTradeJourneys } fr
 import { analyzeIdealOptionsAndStocks } from './utils/idealTradeAnalyzer';
 import { getStockSector } from './utils/sectorMaster';
 
-import { Download, RefreshCw, Sparkles, CheckCircle } from 'lucide-react';
+import { Download, RefreshCw, Sparkles, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function App() {
   // Dhan API Credentials State
@@ -229,6 +229,9 @@ export default function App() {
     timeSlot: '',
     qualifyingSymbols: [] as string[]
   });
+
+  // Failed fetches tracking during bulk fetch
+  const [failedFetches, setFailedFetches] = useState<Array<{ symbol: string; error: string }>>([]);
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -750,6 +753,7 @@ export default function App() {
   const handleFetchAllDhan = async () => {
     setIsBulkLoading(true);
     setBulkProgress({ current: 0, total: stocks.length });
+    setFailedFetches([]);
 
     // Reset errors
     setStocks((prev) =>
@@ -793,7 +797,7 @@ export default function App() {
       console.error("Failed to fetch bulk marketfeed", err);
     }
 
-    const CONCURRENCY = 8;
+    const CONCURRENCY = 3;
     let completed = 0;
     let authErrorOccurred = false;
 
@@ -889,6 +893,7 @@ export default function App() {
             if (result.error && (result.error.toLowerCase().includes('missing dhan credentials') || result.error.toLowerCase().includes('client id and access token'))) {
               authErrorOccurred = true;
             }
+            setFailedFetches(prev => [...prev, { symbol: stock.symbol, error: result.error || 'Fetch failed' }]);
             setStocks((prev) =>
               prev.map((s) =>
                 s.id === stock.id
@@ -913,7 +918,7 @@ export default function App() {
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
     setIsBulkLoading(false);
@@ -1101,6 +1106,26 @@ export default function App() {
       )}
 
       {/* Main Header */}
+      {failedFetches.length > 0 && (
+        <div className="bg-rose-950/90 border-b border-rose-800 px-4 py-2.5 text-rose-200 text-xs flex items-center justify-between z-40 relative">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>
+              <strong>⚠️ {failedFetches.length} stock(s) failed</strong> to fetch data from Dhan API during bulk fetch: <span className="font-mono">{failedFetches.map(f => f.symbol).join(', ')}</span>
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setFailedFetches([]);
+              handleFetchAllDhan();
+            }}
+            className="bg-rose-900 hover:bg-rose-800 text-white px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          >
+            Retry Failed Fetches
+          </button>
+        </div>
+      )}
+
       <Header
         credentials={credentials}
         onOpenSettings={() => setIsDhanGateOpen(true)}
