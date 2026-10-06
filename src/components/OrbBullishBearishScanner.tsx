@@ -42,7 +42,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 }) => {
   const [activeTab, setActiveTab] = useState<'bullish' | 'bearish'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
+  const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
 
   const processedOrbStocks = useMemo(() => {
     return stocks.map((stock) => {
@@ -137,6 +137,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         breakPctAbove: Math.round(breakPctAbove * 100) / 100,
         breakPctBelow: Math.round(breakPctBelow * 100) / 100,
         orbBreakTime,
+        breakMinutesFromOpen,
         durationDisplay,
         isSafeSustained,
         safetyNote,
@@ -162,9 +163,21 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
       return true;
     }).sort((a, b) => {
-      if (sortBy === 'BREAK_PCT') {
-        const valA = activeTab === 'bullish' ? a.breakPctAbove : a.breakPctBelow;
-        const valB = activeTab === 'bullish' ? b.breakPctAbove : b.breakPctBelow;
+      const valA = activeTab === 'bullish' ? a.breakPctAbove : a.breakPctBelow;
+      const valB = activeTab === 'bullish' ? b.breakPctAbove : b.breakPctBelow;
+
+      if (sortBy === 'BREAK_PX' || sortBy === 'BREAK_PCT') {
+        // STRICT #1 PRIORITY: Highest Break % Above High (descending)
+        if (Math.abs(valB - valA) > 0.0001) {
+          return valB - valA;
+        }
+        // Secondary tie-breaker: Just hit ORB (earliest break time)
+        return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
+      }
+      if (sortBy === 'JUST_HIT') {
+        if (a.breakMinutesFromOpen !== b.breakMinutesFromOpen) {
+          return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
+        }
         return valB - valA;
       }
       if (sortBy === 'HEIGHT_PCT') {
@@ -211,11 +224,11 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 <Target className="w-6 h-6 text-indigo-400 animate-pulse" />
               </div>
               <h1 className="text-2xl font-black tracking-tight">
-                ORB Bullish Breakout &amp; Bearish Breakdown Hub
+                ORB Bullish Breakout &amp; Bearish Breakdown Hub (Highest Break % #1 Priority)
               </h1>
             </div>
             <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">
-              Institutional Opening Range Breakout (ORB) Scanner combining real-time 15m High/Low breaches with <span className="text-emerald-400 font-semibold">RSI Momentum</span>, <span className="text-cyan-400 font-semibold">VWAP Validation</span>, Exact Break Timing, F&amp;O Lot Size, and Break Percentage.
+              Strictly prioritizes <span className="text-emerald-400 font-semibold">Highest Break % Above High</span> as the #1 stock on the top row, followed by fresh ORB breakouts.
             </p>
           </div>
 
@@ -290,27 +303,17 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
               }`}
             >
-              {activeTab === 'bullish' ? 'Break % Above' : 'Break % Below'}
+              🚀 Highest Break % (#1 Top Row)
             </button>
             <button
-              onClick={() => setSortBy('HEIGHT_PCT')}
+              onClick={() => setSortBy('JUST_HIT')}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                sortBy === 'HEIGHT_PCT'
+                sortBy === 'JUST_HIT'
                   ? 'bg-indigo-600 text-white shadow-md'
                   : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
               }`}
             >
-              ORB Height %
-            </button>
-            <button
-              onClick={() => setSortBy('SYMBOL')}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                sortBy === 'SYMBOL'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              Symbol
+              ⏰ Just Hit ORB (Recency)
             </button>
           </div>
         </div>
@@ -327,7 +330,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredStocks.map((stock) => {
+          {filteredStocks.map((stock, idx) => {
             const isBull = activeTab === 'bullish';
             const breakPct = isBull ? stock.breakPctAbove : stock.breakPctBelow;
 
@@ -336,15 +339,23 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 key={stock.symbol}
                 onClick={() => onSelectStockDetail(stock)}
                 className={`bg-slate-900 rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-xl ${
-                  isBull ? 'border-emerald-500/50 hover:border-emerald-500 shadow-emerald-500/10' : 'border-rose-500/50 hover:border-rose-500 shadow-rose-500/10'
+                  idx === 0 
+                    ? (isBull ? 'border-emerald-400 ring-2 ring-emerald-500/30 shadow-emerald-500/20' : 'border-rose-400 ring-2 ring-rose-500/30 shadow-rose-500/20')
+                    : (isBull ? 'border-emerald-500/50 hover:border-emerald-500 shadow-emerald-500/10' : 'border-rose-500/50 hover:border-rose-500 shadow-rose-500/10')
                 }`}
               >
-                {/* Card Header Top: Status Badge & Per-Stock Refresh */}
+                {/* Card Header Top: #1 Badge if Top Row, Status Badge & Per-Stock Refresh */}
                 <div className={`px-4 py-2.5 flex items-center justify-between border-b ${
                   isBull ? 'bg-emerald-950/70 border-emerald-900 text-emerald-300' : 'bg-rose-950/70 border-rose-900 text-rose-300'
                 }`}>
                   <div className="flex items-center space-x-2">
-                    <ShieldSafe className="w-4 h-4 shrink-0 text-emerald-400" />
+                    {idx === 0 ? (
+                      <span className="bg-amber-400 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase shadow-sm">
+                        👑 #1 Top Break
+                      </span>
+                    ) : (
+                      <ShieldSafe className="w-4 h-4 shrink-0 text-emerald-400" />
+                    )}
                     <span className="text-xs font-black font-sans uppercase tracking-wide">
                       {isBull ? '🟢 ORB Bullish Breakout' : '🔴 ORB Bearish Breakdown'}
                     </span>
