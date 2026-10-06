@@ -1774,16 +1774,17 @@ export const StockTable: React.FC<StockTableProps> = ({
                       <div className="flex items-center justify-center space-x-1">
                         
                         {/* Dhan Fetch Single */}
-                        {credentials.isConfigured && (
-                          <button
-                            onClick={() => onFetchSingleStock(stock)}
-                            disabled={stock.isLoading}
-                            title="Fetch live 15-min candle from Dhan API"
-                            className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
-                          >
-                            <RefreshCw className={`w-3.5 h-3.5 ${stock.isLoading ? 'animate-spin text-blue-600' : ''}`} />
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onFetchSingleStock(stock);
+                          }}
+                          disabled={stock.isLoading}
+                          title="Immediately fetch live data from Dhan API for this stock"
+                          className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 bg-blue-50/50 rounded transition-colors border border-blue-200 cursor-pointer"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${stock.isLoading ? 'animate-spin text-blue-600' : ''}`} />
+                        </button>
 
                         {/* AI RSI Trend Analyst */}
                         {onOpenRsiAnalyst && (

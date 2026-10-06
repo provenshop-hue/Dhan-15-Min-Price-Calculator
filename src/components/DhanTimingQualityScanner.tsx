@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { StockCalculated, DhanApiCredentials } from '../types';
-import { Clock, Calendar, Search, ShieldCheck, Sparkles, TrendingUp, TrendingDown, ArrowRight, Download, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
-import { getDhanSecurityId } from '../data/dhanSecurityMap';
+import { Clock, Calendar, Search, ShieldCheck, Sparkles, TrendingUp, TrendingDown, ArrowRight, AlertCircle, CheckCircle, RefreshCw, Zap, Flame } from 'lucide-react';
 
 interface DhanTimingQualityScannerProps {
   stocks: StockCalculated[];
@@ -36,132 +35,122 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
   onChangeDashboardTab
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(credentials.date || new Date().toISOString().split('T')[0]);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('09:30');
-  const [qualityFilter, setQualityFilter] = useState<'ALL' | 'BULLISH' | 'BEARISH' | 'HIGH_SCORE'>('ALL');
-  const [minQualityScore, setMinQualityScore] = useState<number>(50);
+  const [startTime, setStartTime] = useState<string>('09:30');
+  const [endTime, setEndTime] = useState<string>('10:00');
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [scannedResults, setScannedResults] = useState<Array<{
     stock: StockCalculated;
-    candle: { open: number; high: number; low: number; close: number; volume: number; timeStr: string };
+    snapshotTimeStr: string;
+    snapshotPrice: number;
+    snapshotHigh: number;
+    snapshotLow: number;
+    snapshotVolume: number;
     qualityScore: number;
-    qualityType: 'BULLISH_QUALITY' | 'BEARISH_QUALITY' | 'NEUTRAL';
-    reasons: string[];
+    notes: string[];
   }>>([]);
   const [hasScanned, setHasScanned] = useState<boolean>(false);
 
-  // Helper to parse time slot string into hours and minutes
-  const parseTimeSlot = (slot: string) => {
-    const [h, m] = slot.split(':').map((n) => parseInt(n, 10));
-    return { hours: h, minutes: m };
+  const parseMins = (slot: string) => {
+    const [h, m] = slot.split(':').map(n => parseInt(n, 10));
+    return h * 60 + m;
   };
 
-  // Run Scan for Selected Date & Timing Slot across stocks
+  const parseTimeStringToMinutes = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (!match) {
+      const parts = timeStr.split(':').map(n => parseInt(n, 10));
+      return (parts[0] || 0) * 60 + (parts[1] || 0);
+    }
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const ampm = (match[3] || '').toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
+  };
+
   const handleRunTimingScan = async () => {
     setIsScanning(true);
+    setScannedResults([]); // Fresh clear
+
     try {
-      // 1. First ensure we fetch latest candles for all stocks if not already fetched for this date
       if (credentials.date !== selectedDate) {
-        const updatedCreds = { ...credentials, date: selectedDate };
-        onUpdateCredentials(updatedCreds);
+        onUpdateCredentials({ ...credentials, date: selectedDate });
       }
 
-      // Trigger bulk fetch if needed
+      // Fetch historical 15m candles from Dhan API
       await onRefreshAll();
 
-      const { hours: targetH, minutes: targetM } = parseTimeSlot(selectedTimeSlot);
+      const startMins = parseMins(startTime);
+      const endMins = parseMins(endTime);
+
       const results: Array<{
         stock: StockCalculated;
-        candle: { open: number; high: number; low: number; close: number; volume: number; timeStr: string };
+        snapshotTimeStr: string;
+        snapshotPrice: number;
+        snapshotHigh: number;
+        snapshotLow: number;
+        snapshotVolume: number;
         qualityScore: number;
-        qualityType: 'BULLISH_QUALITY' | 'BEARISH_QUALITY' | 'NEUTRAL';
-        reasons: string[];
+        notes: string[];
       }> = [];
 
-      for (const stock of stocks) {
-        if (!stock.openPrice || !stock.closePrice) continue;
+      for (let i = 0; i < stocks.length; i++) {
+        const stock = stocks[i];
+        if (!stock.openPrice) continue;
 
-        const o = stock.openPrice || 0;
-        const c = stock.closePrice || 0;
-        const h = stock.highPrice || o;
-        const l = stock.lowPrice || c;
-        const v = stock.volume || 100000;
-        const rsi = stock.rsi || 50;
+        const timeline = stock.rsiTimeline || [];
+        
+        // STRICT HISTORICAL WINDOW FILTER:
+        // Only keep candles whose timestamp falls strictly within [startMins, endMins]
+        const historicalCandlesInWindow = timeline.filter(pt => {
+          const totalMins = parseTimeStringToMinutes(pt.timeStr);
+          return totalMins >= startMins && totalMins <= endMins;
+        });
 
-        let qualityScore = 50;
-        const reasons: string[] = [];
-        let qualityType: 'BULLISH_QUALITY' | 'BEARISH_QUALITY' | 'NEUTRAL' = 'NEUTRAL';
-
-        // Check Open = Low (Bullish quality)
-        const isOpenEqualLow = l > 0 && Math.abs(o - l) / l <= 0.0015;
-        const isOpenEqualHigh = h > 0 && Math.abs(o - h) / h <= 0.0015;
-        const isGreen = c >= o;
-        const bodyPct = o > 0 ? ((c - o) / o) * 100 : 0;
-
-        if (isOpenEqualLow) {
-          qualityScore += 25;
-          reasons.push('Open equals Low (Strong bullish institutional footprint)');
+        // If no candles fell within the exact [startTime, endTime] window, exclude this stock completely!
+        if (historicalCandlesInWindow.length === 0) {
+          continue;
         }
-        if (isGreen && bodyPct > 0.3) {
+
+        const snapshotCandle = historicalCandlesInWindow[historicalCandlesInWindow.length - 1];
+        const snapshotPrice = snapshotCandle.close;
+        const snapshotHigh = Math.max(...historicalCandlesInWindow.map(c => c.high));
+        const snapshotLow = Math.min(...historicalCandlesInWindow.map(c => c.low));
+        const snapshotVolume = historicalCandlesInWindow.reduce((acc, c) => acc + (c.volume || 10000), 0);
+
+        const openPrice = historicalCandlesInWindow[0].open;
+        const changeInWindow = ((snapshotPrice - openPrice) / openPrice) * 100;
+        const isGreen = changeInWindow >= 0;
+
+        let qualityScore = 60;
+        const notes = [
+          `Strict Historical Window @ ${snapshotCandle.timeStr} (Range: ${startTime} - ${endTime})`,
+          `Window Price Change: ${changeInWindow >= 0 ? '+' : ''}${changeInWindow.toFixed(2)}%`,
+          `Window High: ₹${snapshotHigh.toFixed(2)} | Low: ₹${snapshotLow.toFixed(2)}`
+        ];
+
+        if (isGreen && changeInWindow > 0.2) {
           qualityScore += 20;
-          reasons.push(`Strong bullish green candle (+${bodyPct.toFixed(2)}%)`);
-        }
-        if (rsi > 55 && rsi < 80) {
-          qualityScore += 20;
-          reasons.push(`Healthy bullish momentum RSI (${rsi})`);
-        } else if (rsi >= 80) {
-          qualityScore += 10;
-          reasons.push(`High momentum RSI (${rsi})`);
-        }
-        if (stock.vwap && c > stock.vwap) {
-          qualityScore += 15;
-          reasons.push('Trading above VWAP');
+          notes.push('Bullish momentum confirmed inside time range');
+        } else if (!isGreen && changeInWindow < -0.2) {
+          qualityScore -= 10;
+          notes.push('Bearish pressure confirmed inside time range');
         }
 
-        if (isOpenEqualHigh) {
-          qualityScore -= 20;
-          reasons.push('Open equals High (Bearish distribution)');
-        }
-        if (!isGreen && bodyPct < -0.3) {
-          qualityScore -= 15;
-          reasons.push(`Strong bearish red candle (${bodyPct.toFixed(2)}%)`);
-        }
-        if (rsi < 45) {
-          qualityScore -= 15;
-          reasons.push(`Weak momentum RSI (${rsi})`);
-        }
-
-        // Clamp score between 0 and 100
-        qualityScore = Math.max(0, Math.min(100, qualityScore));
-
-        if (qualityScore >= 60 && isGreen) {
-          qualityType = 'BULLISH_QUALITY';
-        } else if (qualityScore <= 40 && !isGreen) {
-          qualityType = 'BEARISH_QUALITY';
-        } else if (qualityScore >= 55) {
-          qualityType = 'BULLISH_QUALITY';
-        } else {
-          qualityType = 'NEUTRAL';
-        }
-
-        if (qualityScore >= minQualityScore || qualityType !== 'NEUTRAL') {
-          results.push({
-            stock,
-            candle: {
-              open: o,
-              high: h,
-              low: l,
-              close: c,
-              volume: v,
-              timeStr: selectedTimeSlot
-            },
-            qualityScore,
-            qualityType,
-            reasons
-          });
-        }
+        results.push({
+          stock,
+          snapshotTimeStr: snapshotCandle.timeStr,
+          snapshotPrice,
+          snapshotHigh,
+          snapshotLow,
+          snapshotVolume,
+          qualityScore,
+          notes
+        });
       }
 
-      // Sort by quality score descending
       results.sort((a, b) => b.qualityScore - a.qualityScore);
       setScannedResults(results);
       setHasScanned(true);
@@ -172,305 +161,191 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
     }
   };
 
-  const filteredResults = scannedResults.filter((item) => {
-    if (qualityFilter === 'BULLISH') return item.qualityType === 'BULLISH_QUALITY';
-    if (qualityFilter === 'BEARISH') return item.qualityType === 'BEARISH_QUALITY';
-    if (qualityFilter === 'HIGH_SCORE') return item.qualityScore >= 75;
-    return true;
-  });
-
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6 animate-fade-in pb-20">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 rounded-2xl p-6 text-white shadow-xl border border-indigo-800/50">
+      <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-blue-950 rounded-2xl p-6 text-white shadow-xl border border-indigo-500/30">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center space-x-2.5 mb-1.5">
-              <div className="p-2 bg-blue-600/30 rounded-xl border border-blue-400/30">
+            <div className="flex items-center space-x-2.5 mb-2">
+              <div className="p-2.5 bg-blue-600/30 rounded-xl border border-blue-400/40">
                 <Clock className="w-6 h-6 text-blue-400 animate-pulse" />
               </div>
               <h2 className="text-2xl font-black tracking-tight">
-                Dhan 15-Min Precision Timing &amp; Signal Scanner
+                Precision Timing Historical Snapshot (Strict Time Range)
               </h2>
             </div>
-            <p className="text-indigo-200 text-sm max-w-2xl">
-              Select any trading date and exact 15-minute timing slot (from market open 09:15 AM to close 03:30 PM). 
-              The scanner queries Dhan API precisely for that timing slot and lists all qualifying stocks meeting your trade signal criteria at that exact time.
+            <p className="text-indigo-200 text-sm max-w-3xl leading-relaxed">
+              Strictly queries historical 15m candles and excludes any stock that triggered after your End Time (<span className="text-amber-300 font-bold">{endTime}</span>). No out-of-range stocks are shown.
             </p>
           </div>
           <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-md px-4 py-3 rounded-xl border border-white/20">
             <ShieldCheck className="w-5 h-5 text-emerald-400" />
             <div className="text-xs">
-              <div className="font-bold text-white">Dhan API Synchronized</div>
-              <div className="text-indigo-200">Segment: {credentials.segment || 'NSE_EQ'}</div>
+              <div className="font-bold text-white">Strict Cutoff Active</div>
+              <div className="text-indigo-200">{selectedDate} ({startTime} - {endTime})</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Control Panel: Date, Time Slot, and Filters */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      {/* Control Panel */}
+      <div className="bg-slate-900 rounded-2xl p-5 shadow-xl border border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
         {/* Date Selector */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center space-x-1">
-            <Calendar className="w-3.5 h-3.5 text-blue-600" />
-            <span>Select Trading Date</span>
+          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1">
+            <Calendar className="w-3.5 h-3.5 text-blue-400" />
+            <span>Trading Date</span>
           </label>
           <input
             type="date"
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(e) => {
+              setSelectedDate(e.target.value);
+              setScannedResults([]);
+              setHasScanned(false);
+            }}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-white focus:outline-none focus:border-blue-500"
           />
         </div>
 
-        {/* 15-Min Timing Slot Selector */}
+        {/* Start Time */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center space-x-1">
-            <Clock className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Select 15-Min Timing Slot (9:15 - 3:30)</span>
+          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1">
+            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Start Time (From)</span>
           </label>
           <select
-            value={selectedTimeSlot}
-            onChange={(e) => setSelectedTimeSlot(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            value={startTime}
+            onChange={(e) => {
+              setStartTime(e.target.value);
+              setScannedResults([]);
+              setHasScanned(false);
+            }}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-bold text-indigo-300 focus:outline-none focus:border-blue-500 cursor-pointer"
           >
             {TIME_SLOTS.map((slot) => (
-              <option key={slot} value={slot}>
-                {slot} AM/PM ({slot === '09:15' ? 'Market Open' : slot === '15:30' ? 'Market Close' : '15-min Candle'})
-              </option>
+              <option key={slot} value={slot}>{slot}</option>
             ))}
           </select>
         </div>
 
-        {/* Minimum Quality Score Filter */}
+        {/* End Time */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center space-x-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Min Quality Score ({minQualityScore}/100)</span>
+          <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1">
+            <Clock className="w-3.5 h-3.5 text-blue-400" />
+            <span>End Time (STRICT HISTORICAL CUTOFF)</span>
           </label>
-          <input
-            type="range"
-            min="30"
-            max="90"
-            step="5"
-            value={minQualityScore}
-            onChange={(e) => setMinQualityScore(Number(e.target.value))}
-            className="w-full accent-blue-600 cursor-pointer"
-          />
+          <select
+            value={endTime}
+            onChange={(e) => {
+              setEndTime(e.target.value);
+              setScannedResults([]);
+              setHasScanned(false);
+            }}
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm font-bold text-amber-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+          >
+            {TIME_SLOTS.map((slot) => (
+              <option key={slot} value={slot}>{slot}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Run Scan Button */}
+        {/* Scan Button */}
         <div>
           <button
             onClick={handleRunTimingScan}
             disabled={isBulkLoading || isScanning}
-            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all disabled:opacity-50 text-sm"
+            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg transition-all disabled:opacity-50 text-sm cursor-pointer"
           >
             {isScanning || isBulkLoading ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Fetching Dhan API...</span>
+                <span>Filtering Historical...</span>
               </>
             ) : (
               <>
                 <Search className="w-4 h-4" />
-                <span>Scan Quality at {selectedTimeSlot}</span>
+                <span>Fetch Historical Snapshot</span>
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* Quick Time Milestones Presets */}
-      <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-2">Quick Timing Presets:</span>
-        {[
-          { label: '09:15 (Open)', slot: '09:15' },
-          { label: '09:30 (Opening Range)', slot: '09:30' },
-          { label: '10:15 (Morning Trend)', slot: '10:15' },
-          { label: '11:30 (Mid-Morning)', slot: '11:30' },
-          { label: '13:15 (Afternoon Move)', slot: '13:15' },
-          { label: '14:30 (Pre-Close Setup)', slot: '14:30' },
-          { label: '15:15 (Closing Range)', slot: '15:15' },
-        ].map((preset) => (
-          <button
-            key={preset.slot}
-            onClick={() => {
-              setSelectedTimeSlot(preset.slot);
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              selectedTimeSlot === preset.slot
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-300'
-            }`}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
-
       {/* Results Section */}
       {hasScanned && (
         <div className="space-y-4">
-          {/* Apply to All Sections Banner */}
-          {filteredResults.length > 0 && (
-            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-2xl p-5 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center space-x-2 font-black text-base mb-1">
-                  <Sparkles className="w-5 h-5 text-yellow-300 animate-spin" />
-                  <span>List These {filteredResults.length} Quality Stocks Across ALL Sections (Parabolic, RSI Pullback, 100% Bullish, EMA Confluence)?</span>
-                </div>
-                <p className="text-emerald-100 text-xs">
-                  Clicking this will synchronize <span className="font-mono font-bold">{selectedTimeSlot}</span> on <span className="font-mono font-bold">{selectedDate}</span> across all scanning sections.
-                </p>
-              </div>
-              <div className="flex items-center space-x-3 shrink-0">
-                <button
-                  onClick={() => {
-                    const symbols = filteredResults.map(r => r.stock.symbol);
-                    onApplyTimingFilter(selectedDate, selectedTimeSlot, symbols);
-                  }}
-                  className="bg-white text-emerald-900 hover:bg-emerald-50 px-4 py-2.5 rounded-xl font-black text-xs shadow-md transition-all flex items-center space-x-2 cursor-pointer"
-                >
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
-                  <span>Apply Timing Filter to All Sections</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-            <div className="flex items-center space-x-3">
-              <span className="text-sm font-bold text-slate-800">
-                Found <span className="text-blue-600 font-black">{filteredResults.length}</span> Quality Stocks for <span className="font-mono text-indigo-700">{selectedDate} @ {selectedTimeSlot}</span>
-              </span>
-            </div>
-
-            {/* Quality Filters */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setQualityFilter('ALL')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${qualityFilter === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-              >
-                All ({scannedResults.length})
-              </button>
-              <button
-                onClick={() => setQualityFilter('BULLISH')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${qualityFilter === 'BULLISH' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
-              >
-                Bullish Quality ({scannedResults.filter(r => r.qualityType === 'BULLISH_QUALITY').length})
-              </button>
-              <button
-                onClick={() => setQualityFilter('BEARISH')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${qualityFilter === 'BEARISH' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}
-              >
-                Bearish Quality ({scannedResults.filter(r => r.qualityType === 'BEARISH_QUALITY').length})
-              </button>
-              <button
-                onClick={() => setQualityFilter('HIGH_SCORE')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${qualityFilter === 'HIGH_SCORE' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}
-              >
-                Score 75+ ({scannedResults.filter(r => r.qualityScore >= 75).length})
-              </button>
-            </div>
+          <div className="flex items-center justify-between bg-slate-900 p-4 rounded-xl border border-slate-800">
+            <span className="text-sm font-bold text-white">
+              Strict Time Range Result: <span className="text-blue-400 font-black">{scannedResults.length}</span> Stocks strictly between <span className="font-mono text-amber-300">{startTime} and {endTime}</span> (No post-{endTime} stocks included)
+            </span>
+            <button
+              onClick={() => {
+                const symbols = scannedResults.map(r => r.stock.symbol);
+                onApplyTimingFilter(selectedDate, `${startTime}-${endTime}`, symbols);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-black shadow-md transition-all flex items-center space-x-1.5 cursor-pointer"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Apply to All Sections</span>
+            </button>
           </div>
 
-          {/* Table of Results */}
-          {filteredResults.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-sm">
-              <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-slate-800">No Quality Stocks Found for This Timing Slot</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                Try lowering the minimum quality score threshold or selecting a different 15-minute time slot.
-              </p>
+          {scannedResults.length === 0 ? (
+            <div className="bg-slate-900 rounded-2xl p-12 text-center border border-slate-800 text-slate-400">
+              <AlertCircle className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-white">No Stocks Found in Strict Range {startTime} - {endTime}</h3>
+              <p className="text-xs text-slate-500 mt-1">Try expanding the time range or selecting a different trading date.</p>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-600 uppercase text-[11px] font-black tracking-wider border-b border-slate-200">
-                      <th className="py-3 px-4">Rank &amp; Symbol</th>
-                      <th className="py-3 px-4">Timing Slot</th>
-                      <th className="py-3 px-4">LTP (₹)</th>
-                      <th className="py-3 px-4">15m Candle (O / H / L / C)</th>
-                      <th className="py-3 px-4">RSI &amp; VWAP</th>
-                      <th className="py-3 px-4">Quality Score</th>
-                      <th className="py-3 px-4">Quality Footprints &amp; Reasons</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-sm">
-                    {filteredResults.map((item, idx) => (
-                      <tr key={item.stock.symbol} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4 font-bold text-slate-900">
-                          <div className="flex items-center space-x-2">
-                            <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-xs font-black">
-                              {idx + 1}
-                            </span>
-                            <div>
-                              <div className="font-black text-slate-900">{item.stock.symbol}</div>
-                              <div className="text-[11px] font-normal text-slate-500 truncate max-w-[140px]">{item.stock.companyName}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-800 text-xs font-mono font-bold border border-indigo-200">
-                            {selectedDate} {selectedTimeSlot}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                          ₹{item.candle.close.toFixed(2)}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-xs">
-                          <div className="text-slate-800 font-bold">
-                            O: {item.candle.open} | H: {item.candle.high}
-                          </div>
-                          <div className="text-slate-600">
-                            L: {item.candle.low} | C: {item.candle.close}
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-xs font-mono">
-                          <div className={item.stock.rsi && item.stock.rsi > 60 ? 'text-emerald-700 font-bold' : 'text-slate-700'}>
-                            RSI: {item.stock.rsi ?? 'N/A'}
-                          </div>
-                          <div className="text-slate-500">
-                            VWAP: ₹{item.stock.vwap ?? 'N/A'}
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-12 bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                              <div
-                                className={`h-2.5 rounded-full ${
-                                  item.qualityScore >= 75 ? 'bg-emerald-500' : item.qualityScore >= 60 ? 'bg-blue-600' : 'bg-amber-500'
-                                }`}
-                                style={{ width: `${item.qualityScore}%` }}
-                              />
-                            </div>
-                            <span className="font-black text-xs text-slate-900">{item.qualityScore}/100</span>
-                          </div>
-                          <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                            item.qualityType === 'BULLISH_QUALITY' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                          }`}>
-                            {item.qualityType.replace('_', ' ')}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-xs text-slate-600">
-                          <ul className="space-y-1">
-                            {item.reasons.map((r, rIdx) => (
-                              <li key={rIdx} className="flex items-center space-x-1.5">
-                                <CheckCircle className="w-3 h-3 text-emerald-600 shrink-0" />
-                                <span>{r}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </td>
-                      </tr>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {scannedResults.map((item) => (
+                <div 
+                  key={item.stock.symbol}
+                  onClick={() => onSelectStockDetail(item.stock)}
+                  className="bg-slate-900 rounded-2xl border border-slate-800 hover:border-indigo-500 transition-all cursor-pointer p-4 space-y-3 flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-white font-mono text-base">{item.stock.symbol}</h4>
+                      <span className="text-xs text-slate-400">{item.stock.companyName}</span>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-indigo-950 text-indigo-300 border border-indigo-800 font-mono">
+                      Snapshot @ {item.snapshotTimeStr}
+                    </span>
+                  </div>
+
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Snapshot Price:</span>
+                      <span className="text-white font-bold">₹{item.snapshotPrice.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Window High / Low:</span>
+                      <span className="text-amber-300 font-bold">₹{item.snapshotHigh.toFixed(2)} / ₹{item.snapshotLow.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Quality Score:</span>
+                      <span className="text-emerald-400 font-bold">{item.qualityScore}/100</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    {item.notes.map((note, nIdx) => (
+                      <div key={nIdx} className="text-[11px] text-slate-300 flex items-start space-x-1.5">
+                        <CheckCircle className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>{note}</span>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs text-indigo-400">
+                    <span>Click for 15m Timeline</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

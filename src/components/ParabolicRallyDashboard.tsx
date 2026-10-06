@@ -46,6 +46,8 @@ interface ParabolicRallyDashboardProps {
   onOpenPositionSizer?: (stock: StockCalculated) => void;
   onOpenSettings?: () => void;
   isLoading?: boolean;
+  activeTimingFilter?: { active: boolean; date: string; timeSlot: string; qualifyingSymbols: string[] };
+  onClearTimingFilter?: () => void;
 }
 
 type ViewFilter =
@@ -67,7 +69,9 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   onSelectStockDetail,
   onOpenPositionSizer,
   onOpenSettings,
-  isLoading = false
+  isLoading = false,
+  activeTimingFilter,
+  onClearTimingFilter
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<ViewFilter>('FULLY_BULLISH');
@@ -153,6 +157,11 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
           return false;
         }
 
+        // Precision timing filter
+        if (activeTimingFilter?.active && activeTimingFilter.qualifyingSymbols && activeTimingFilter.qualifyingSymbols.length > 0) {
+          if (!activeTimingFilter.qualifyingSymbols.includes(a.stock.symbol)) return false;
+        }
+
         // Search
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
@@ -231,6 +240,26 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
   return (
     <div className="space-y-6">
+      {activeTimingFilter?.active && (
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 rounded-2xl p-4 text-white shadow-lg flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Clock className="w-5 h-5 text-yellow-300 animate-spin" />
+            <div>
+              <div className="text-xs font-black uppercase tracking-wider">⏱️ Precision Timing Filter Active</div>
+              <div className="text-xs text-indigo-100">Showing qualifying stocks for {activeTimingFilter.date} @ {activeTimingFilter.timeSlot}</div>
+            </div>
+          </div>
+          {onClearTimingFilter && (
+            <button
+              onClick={onClearTimingFilter}
+              className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Clear Filter</span>
+            </button>
+          )}
+        </div>
+      )}
       {/* 🚀 Header Banner */}
       <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-xl border border-indigo-500/20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>

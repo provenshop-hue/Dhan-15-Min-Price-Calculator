@@ -442,6 +442,18 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Global Refresh All Stocks Button */}
+            <button
+              type="button"
+              onClick={onFetchAll}
+              disabled={isBulkLoading}
+              className="flex items-center space-x-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-3 py-1.5 rounded-xl shadow-md text-xs transition-all disabled:opacity-50 cursor-pointer"
+              title="Fetch latest values for all stocks and update across all sections"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isBulkLoading ? 'animate-spin' : ''}`} />
+              <span>{isBulkLoading ? 'Refreshing All...' : '🔄 Refresh All Stocks'}</span>
+            </button>
+
             <span>Total F&O Stocks: <strong className="text-slate-900">{totalStocks}</strong></span>
             <span>Calculated: <strong className="text-blue-600">{calculatedCount} / {totalStocks}</strong></span>
             

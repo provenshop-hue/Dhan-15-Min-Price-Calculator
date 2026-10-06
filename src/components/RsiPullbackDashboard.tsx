@@ -52,6 +52,8 @@ interface RsiPullbackDashboardProps {
   onDateChange?: (date: string) => void;
   onFetchAll?: () => void;
   isBulkLoading?: boolean;
+  activeTimingFilter?: { active: boolean; date: string; timeSlot: string; qualifyingSymbols: string[] };
+  onClearTimingFilter?: () => void;
 }
 
 type PullbackFilterType = 
@@ -188,7 +190,9 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   selectedDate = new Date().toISOString().split('T')[0],
   onDateChange,
   onFetchAll,
-  isBulkLoading = false
+  isBulkLoading = false,
+  activeTimingFilter,
+  onClearTimingFilter
 }) => {
   const [activeFilter, setActiveFilter] = useState<PullbackFilterType>('ALL');
   const [globalPriceFilter, setGlobalPriceFilter] = useState<'ALL' | '1000_TO_2500' | 'ABOVE_2500'>('ALL');
@@ -487,6 +491,11 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
   // Filtered & Sorted list
   const filteredStocks = useMemo(() => {
     let list = analyzedStocks.filter(({ stock, analysis }) => {
+      // Precision timing filter
+      if (activeTimingFilter?.active && activeTimingFilter.qualifyingSymbols && activeTimingFilter.qualifyingSymbols.length > 0) {
+        if (!activeTimingFilter.qualifyingSymbols.includes(stock.symbol)) return false;
+      }
+
       // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -649,6 +658,26 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
   return (
     <div className="space-y-6">
+      {activeTimingFilter?.active && (
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 rounded-2xl p-4 text-white shadow-lg flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Clock className="w-5 h-5 text-yellow-300 animate-spin" />
+            <div>
+              <div className="text-xs font-black uppercase tracking-wider">⏱️ Precision Timing Filter Active</div>
+              <div className="text-xs text-indigo-100">Showing qualifying stocks for {activeTimingFilter.date} @ {activeTimingFilter.timeSlot}</div>
+            </div>
+          </div>
+          {onClearTimingFilter && (
+            <button
+              onClick={onClearTimingFilter}
+              className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Clear Filter</span>
+            </button>
+          )}
+        </div>
+      )}
       
       {/* Title & Banner */}
       <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-md relative overflow-hidden">

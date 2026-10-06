@@ -26,6 +26,7 @@ import { HundredPercentBullishScanner } from './components/HundredPercentBullish
 import { HundredPercentBearishScanner } from './components/HundredPercentBearishScanner';
 import { EmaConfluenceScanner } from './components/EmaConfluenceScanner';
 import { OrbBullishBearishScanner } from './components/OrbBullishBearishScanner';
+import { DhanTimingQualityScanner } from './components/DhanTimingQualityScanner';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { DhanMarketfeedModal } from './components/DhanMarketfeedModal';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
@@ -218,8 +219,16 @@ export default function App() {
   const [activeTrendFilter, setActiveTrendFilter] = useState<TrendFilterType>('ALL');
 
 
-  // Active Dashboard View Tab ('gann', 'gann_dashboard', 'rsi_pullback', 'btst', 'parabolic_rally', 'user_tracker', 'sector_strength', 'open_high_low', 'hundred_bullish', 'hundred_bearish', 'ema_confluence', or 'orb_breakout')
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'ema_confluence' | 'orb_breakout'>('gann');
+  // Active Dashboard View Tab
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'ema_confluence' | 'orb_breakout' | 'timing_quality'>('gann');
+
+  // Precision Timing Filter State
+  const [activeTimingFilter, setActiveTimingFilter] = useState({
+    active: false,
+    date: '',
+    timeSlot: '',
+    qualifyingSymbols: [] as string[]
+  });
 
   // Access Code State (7774)
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -1275,6 +1284,8 @@ export default function App() {
             onDateChange={handleDateChange}
             onFetchAll={handleFetchAllDhan}
             isBulkLoading={isBulkLoading}
+            activeTimingFilter={activeTimingFilter}
+            onClearTimingFilter={() => setActiveTimingFilter({ active: false, date: '', timeSlot: '', qualifyingSymbols: [] })}
           />
         ) : activeDashboardTab === 'parabolic_rally' ? (
           /* Dedicated 15-Minute Parabolic Rally & Breakdown Probability Engine */
@@ -1287,6 +1298,8 @@ export default function App() {
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenSettings={() => setIsDhanGateOpen(true)}
             isLoading={isBulkLoading}
+            activeTimingFilter={activeTimingFilter}
+            onClearTimingFilter={() => setActiveTimingFilter({ active: false, date: '', timeSlot: '', qualifyingSymbols: [] })}
           />
         ) : activeDashboardTab === 'user_tracker' ? (
           /* Dedicated User Trade & Option Tracker with 5-Min Dhan Refresh */
@@ -1356,6 +1369,27 @@ export default function App() {
             stocks={stocks}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+            onFetchSingleStock={(s) => handleFetchSingleDhan(s)}
+            activeTimingFilter={activeTimingFilter}
+            onClearTimingFilter={() => setActiveTimingFilter({ active: false, date: '', timeSlot: '', qualifyingSymbols: [] })}
+          />
+        ) : activeDashboardTab === 'timing_quality' ? (
+          /* Dedicated Precision Timing Range Scan */
+          <DhanTimingQualityScanner
+            stocks={stocks}
+            credentials={credentials}
+            onUpdateCredentials={(c) => setCredentials(c)}
+            onFetchSingle={(s) => handleFetchSingleDhan(s)}
+            onRefreshAll={handleFetchAllDhan}
+            isBulkLoading={isBulkLoading}
+            activeTimingFilter={activeTimingFilter}
+            onApplyTimingFilter={(date, timeSlot, symbols) => {
+              setActiveTimingFilter({ active: true, date, timeSlot, qualifyingSymbols: symbols });
+              setActiveDashboardTab('gann');
+              setNotification({ type: 'success', message: `Applied timing filter (${date} @ ${timeSlot}) across all sections.` });
+            }}
+            onClearTimingFilter={() => setActiveTimingFilter({ active: false, date: '', timeSlot: '', qualifyingSymbols: [] })}
+            onChangeDashboardTab={(t) => setActiveDashboardTab(t)}
           />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */
