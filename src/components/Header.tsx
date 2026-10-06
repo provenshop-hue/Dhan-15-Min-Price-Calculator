@@ -236,10 +236,37 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Dashboard Navigation Tabs & Stats Strip */}
-        <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+        <div className="mt-2 pt-1 border-t border-slate-100 text-[11px] text-slate-500">
           
-          {/* Main Dashboard Navigation Tabs */}
-          <div className="flex items-center space-x-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 flex-wrap">
+          {/* Mobile Collapsible Tab Switcher */}
+          <div className="md:hidden py-1">
+            <button
+              onClick={() => setMobileToolsOpen(!mobileToolsOpen)} // reuse or create mobileTabsOpen
+              className="w-full flex items-center justify-between bg-slate-900 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-md cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5">
+                <span>📊 Active View:</span>
+                <span className="text-amber-300 uppercase font-mono">
+                  {activeDashboardTab === 'gann' ? '15m Scanner' :
+                   activeDashboardTab === 'gann_dashboard' ? 'Monthly Dashboard' :
+                   activeDashboardTab === 'rsi_pullback' ? 'RSI Dashboard' :
+                   activeDashboardTab === 'btst' ? 'BTST Gap Predictor' :
+                   activeDashboardTab === 'parabolic_rally' ? 'Parabolic Rally' :
+                   activeDashboardTab === 'user_tracker' ? 'User Tracker' :
+                   activeDashboardTab === 'sector_strength' ? 'Sector Strength' :
+                   activeDashboardTab === 'open_high_low' ? 'Open = High/Low' :
+                   activeDashboardTab === 'hundred_bullish' ? '100% Bullish' :
+                   activeDashboardTab === 'ema_confluence' ? 'EMA Confluence' :
+                   activeDashboardTab === 'orb_breakout' ? 'ORB Bull/Bear Hub' : 'Precision Timing'}
+                </span>
+              </span>
+              <span>{mobileToolsOpen ? '▲ Hide Tabs' : '▼ Switch Tab'}</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* Main Dashboard Navigation Tabs */}
+            <div className={`items-center space-x-1.5 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 flex-wrap ${mobileToolsOpen ? 'flex flex-col sm:flex-row w-full gap-1 pt-2' : 'hidden md:flex'}`}>
             <button
               onClick={() => onChangeDashboardTab('gann')}
               className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
@@ -500,8 +527,8 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
         </div>
-
       </div>
+    </div>
     </header>
   );
 };
