@@ -194,6 +194,41 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         superBreakTime = orbBreakTime;
       }
 
+      // SessionStorage persistence for initial hit break metrics (persists throughout the day)
+      const sessionKey = `orb_hit_${stock.symbol}`;
+      let storedHitData = null;
+      try {
+        const raw = sessionStorage.getItem(sessionKey);
+        if (raw) storedHitData = JSON.parse(raw);
+      } catch {}
+
+      let breakPctAtOrbBreak = storedHitData?.breakPctAtOrbBreak ?? (isBullishQualified ? breakPctAbove : breakPctBelow);
+      let breakVsHeightPct = storedHitData?.breakVsHeightPct ?? (orbHeightPct > 0 ? (breakPctAtOrbBreak / orbHeightPct) * 100 : 0);
+      let breakTimeAtBreak = storedHitData?.breakTimeAtBreak ?? orbBreakTime;
+
+      if (!storedHitData && stock.rsiTimeline && stock.rsiTimeline.length > 0) {
+        for (const pt of stock.rsiTimeline) {
+          const isBullBreak = pt.close >= orbHigh;
+          const isBearBreak = pt.close <= orbLow;
+          if (isBullBreak || isBearBreak) {
+            breakTimeAtBreak = pt.timeStr;
+            breakPctAtOrbBreak = isBullBreak 
+              ? (orbHigh > 0 ? ((pt.close - orbHigh) / orbHigh) * 100 : 0)
+              : (orbLow > 0 ? ((orbLow - pt.close) / orbLow) * 100 : 0);
+            breakVsHeightPct = orbHeightPct > 0 ? (breakPctAtOrbBreak / orbHeightPct) * 100 : 0;
+            break;
+          }
+        }
+        storedHitData = {
+          breakPctAtOrbBreak: Math.round(breakPctAtOrbBreak * 100) / 100,
+          breakVsHeightPct: Math.round(breakVsHeightPct * 100) / 100,
+          breakTimeAtBreak
+        };
+        try {
+          sessionStorage.setItem(sessionKey, JSON.stringify(storedHitData));
+        } catch {}
+      }
+
       return {
         ...stock,
         orbHigh: Math.round(orbHigh * 100) / 100,
@@ -207,6 +242,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         breakPctBelow: Math.round(breakPctBelow * 100) / 100,
         orbBreakTime,
         superBreakTime,
+        breakPctAtOrbBreak: Math.round(breakPctAtOrbBreak * 100) / 100,
+        breakVsHeightPct: Math.round(breakVsHeightPct * 100) / 100,
+        breakTimeAtBreak,
         breakMinutesFromOpen,
         durationDisplay,
         lotSize,
@@ -549,6 +587,22 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     <span className="text-sm font-black font-mono text-cyan-300">
                       {stock.durationDisplay}
                     </span>
+                  </div>
+                </div>
+
+                {/* 🎯 ORB BREAK HIT METRICS BANNER (STORED FOR SESSION) */}
+                <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-sans">Break % at Initial Hit</span>
+                    <strong className="text-amber-300 font-black text-sm">
+                      {stock.breakPctAtOrbBreak > 0 ? '+' : ''}{stock.breakPctAtOrbBreak?.toFixed(2)}% @ {stock.breakTimeAtBreak || stock.orbBreakTime}
+                    </strong>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 block font-sans">vs ORB Height %</span>
+                    <strong className="text-cyan-300 font-black text-sm">
+                      {stock.breakVsHeightPct?.toFixed(1)}% of Height
+                    </strong>
                   </div>
                 </div>
 
