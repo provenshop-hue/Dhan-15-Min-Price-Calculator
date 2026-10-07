@@ -43,7 +43,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'followed'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
 
@@ -219,7 +219,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'bearish' && !s.isBearishQualified) return false;
       if (activeTab === 'super_break_bull' && !s.isSuperBreakBullish) return false;
       if (activeTab === 'super_break_bear' && !s.isSuperBreakBearish) return false;
-      if (activeTab === 'followed' && !followedSymbols.includes(s.symbol)) return false;
 
       if (activeTimingFilter?.active && activeTimingFilter.qualifyingSymbols && activeTimingFilter.qualifyingSymbols.length > 0) {
         if (!activeTimingFilter.qualifyingSymbols.includes(s.symbol)) return false;
@@ -257,7 +256,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const bearishCount = processedOrbStocks.filter(s => s.isBearishQualified).length;
   const superBreakBullCount = processedOrbStocks.filter(s => s.isSuperBreakBullish).length;
   const superBreakBearCount = processedOrbStocks.filter(s => s.isSuperBreakBearish).length;
-  const followedCount = processedOrbStocks.filter(s => followedSymbols.includes(s.symbol)).length;
 
   return (
     <div className="space-y-6 animate-fade-in pb-20 relative">
@@ -408,18 +406,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           >
             <Zap className="w-4 h-4 text-orange-300 fill-orange-300" />
             <span>💥 Super Breakdown (Bearish 50%+) ({superBreakBearCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('followed')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'followed'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 border border-amber-400'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
-            <span>⭐ Followed ({followedCount})</span>
           </button>
         </div>
 
