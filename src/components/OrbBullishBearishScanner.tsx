@@ -176,6 +176,24 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       const minsHeld = heldMinutes % 60;
       const durationDisplay = hoursHeld > 0 ? `${hoursHeld}h ${minsHeld}m Hold` : `${minsHeld}m Hold`;
 
+      let superBreakTime = '';
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 0) {
+        for (const pt of stock.rsiTimeline) {
+          const ptBreakAbove = orbHigh > 0 ? ((pt.close - orbHigh) / orbHigh) * 100 : 0;
+          const ptBreakBelow = orbLow > 0 ? ((orbLow - pt.close) / orbLow) * 100 : 0;
+          if (isBullishQualified && ptBreakAbove >= orbHeightPct * 1.5) {
+            superBreakTime = pt.timeStr;
+            break;
+          } else if (isBearishQualified && ptBreakBelow >= orbHeightPct * 1.5) {
+            superBreakTime = pt.timeStr;
+            break;
+          }
+        }
+      }
+      if (!superBreakTime && (isSuperBreakBullish || isSuperBreakBearish)) {
+        superBreakTime = orbBreakTime;
+      }
+
       return {
         ...stock,
         orbHigh: Math.round(orbHigh * 100) / 100,
@@ -188,6 +206,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         breakPctAbove: Math.round(breakPctAbove * 100) / 100,
         breakPctBelow: Math.round(breakPctBelow * 100) / 100,
         orbBreakTime,
+        superBreakTime,
         breakMinutesFromOpen,
         durationDisplay,
         lotSize,
@@ -532,6 +551,19 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     </span>
                   </div>
                 </div>
+
+                {/* ⚡ SUPER BREAK 50%+ TIMING BANNER */}
+                {isSuper && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-amber-950/90 via-yellow-950/50 to-amber-950/90 border-b border-amber-500/40 text-xs font-mono text-amber-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-amber-300 fill-amber-300 animate-pulse" />
+                      <span>50%+ Super Break Met @:</span>
+                    </span>
+                    <strong className="text-white font-black text-sm px-2 py-0.5 bg-amber-500/20 border border-amber-400 rounded-lg">
+                      {stock.superBreakTime || stock.orbBreakTime}
+                    </strong>
+                  </div>
+                )}
 
                 {/* ORB Metrics Grid (High, Low, Height %, Break %) */}
                 <div className="p-4 space-y-3 flex-1">
