@@ -197,6 +197,7 @@ export const Header: React.FC<HeaderProps> = ({
                     className="bg-purple-100 hover:bg-purple-200 text-purple-950 font-black text-[11px] rounded px-1 py-1 outline-none cursor-pointer border border-purple-300 transition-colors"
                     title="Select Auto-Fetch Interval (Fetches 15m candles)"
                   >
+                    <option value={2}>2m</option>
                     <option value={5}>5m (Default)</option>
                     <option value={10}>10m</option>
                     <option value={15}>15m</option>

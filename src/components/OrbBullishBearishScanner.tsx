@@ -57,8 +57,24 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
     }
   });
 
-  // 2.65% Break Alert Popunder State (Only for followed stocks)
-  const [alertStock, setAlertStock] = useState<{ symbol: string; breakPct: number; type: 'BULLISH' | 'BEARISH' } | null>(null);
+  // Follow baseline break % for 20% increase alert tracking (persisted in localStorage)
+  const [followBaselines, setFollowBaselines] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('orb_follow_baselines');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Alert Popunder State (Only for followed stocks)
+  const [alertStock, setAlertStock] = useState<{ 
+    symbol: string; 
+    breakPct: number; 
+    type: 'BULLISH' | 'BEARISH'; 
+    reason?: '3.0_CROSS' | 'FOLLOW_INCREASE_20';
+    baselinePct?: number;
+  } | null>(null);
 
   useEffect(() => {
     try {
@@ -66,14 +82,43 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
     } catch {}
   }, [followedSymbols]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('orb_follow_baselines', JSON.stringify(followBaselines));
+    } catch {}
+  }, [followBaselines]);
+
   const toggleFollow = (stock: StockCalculated, e: React.MouseEvent) => {
     e.stopPropagation();
     const symbol = stock.symbol;
     const isCurrentlyFollowed = followedSymbols.includes(symbol);
     
+    const open = stock.openPrice || 100;
+    const close = stock.closePrice || open;
+    const high = stock.highPrice || Math.max(open, close);
+    const low = stock.lowPrice || Math.min(open, close);
+    const orbHigh = stock.first15mHigh && stock.first15mHigh > 0 ? stock.first15mHigh : (high > open ? open + (high - open) * 0.45 : open * 1.005);
+    const orbLow = stock.first15mLow && stock.first15mLow > 0 ? stock.first15mLow : (low < open ? open - (open - low) * 0.45 : open * 0.995);
+    const currentBreakAbove = orbHigh > 0 ? ((close - orbHigh) / orbHigh) * 100 : 0;
+    const currentBreakBelow = orbLow > 0 ? ((orbLow - close) / orbLow) * 100 : 0;
+    const initialBreak = close >= orbHigh ? currentBreakAbove : currentBreakBelow;
+
     setFollowedSymbols(prev => 
       isCurrentlyFollowed ? prev.filter(s => s !== symbol) : [...prev, symbol]
     );
+
+    if (!isCurrentlyFollowed) {
+      setFollowBaselines(prev => ({
+        ...prev,
+        [symbol]: Math.max(0.1, initialBreak)
+      }));
+    } else {
+      setFollowBaselines(prev => {
+        const next = { ...prev };
+        delete next[symbol];
+        return next;
+      });
+    }
 
     // Immediately fetch from Dhan API when followed
     if (!isCurrentlyFollowed && onFetchSingleStock) {
@@ -137,8 +182,28 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           setAlertStock({
             symbol: stock.symbol,
             breakPct: breakPctAbove >= 3.0 ? breakPctAbove : breakPctBelow,
-            type: breakPctAbove >= 3.0 ? 'BULLISH' : 'BEARISH'
+            type: breakPctAbove >= 3.0 ? 'BULLISH' : 'BEARISH',
+            reason: '3.0_CROSS'
           });
+        }
+      }
+
+      // Check 20% increase from time of follow for followed stocks
+      const baselineBreak = followBaselines[stock.symbol];
+      const currentBreakForFollow = isBullishQualified ? breakPctAbove : (isBearishQualified ? breakPctBelow : 0);
+      if (isFollowed && baselineBreak !== undefined && baselineBreak > 0) {
+        if (currentBreakForFollow >= baselineBreak * 1.20) {
+          const followAlertKey = `alerted_follow_inc_${stock.symbol}`;
+          if (!sessionStorage.getItem(followAlertKey)) {
+            sessionStorage.setItem(followAlertKey, 'true');
+            setAlertStock({
+              symbol: stock.symbol,
+              breakPct: currentBreakForFollow,
+              type: isBullishQualified ? 'BULLISH' : 'BEARISH',
+              reason: 'FOLLOW_INCREASE_20',
+              baselinePct: baselineBreak
+            });
+          }
         }
       }
 
@@ -328,13 +393,17 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
             <div className="space-y-2">
               <span className="bg-amber-400 text-slate-950 text-xs px-3 py-1 rounded-full font-black uppercase tracking-wider">
-                🚨 Followed Stock {alertStock.breakPct >= 3.0 ? '3.0%' : 'Breakout'} {alertStock.type === 'BULLISH' ? 'Breakout' : 'Breakdown'} Alert
+                🚨 {alertStock.reason === 'FOLLOW_INCREASE_20' ? 'Followed Stock Increased 20%+ Since Follow' : `Followed Stock 3.0% ${alertStock.type === 'BULLISH' ? 'Breakout' : 'Breakdown'} Alert`}
               </span>
               <h3 className="text-3xl font-black font-mono tracking-tight text-white">
                 {alertStock.symbol}
               </h3>
               <p className="text-sm text-slate-300">
-                Your followed stock crossed <strong className="text-amber-300 font-mono text-base">{alertStock.breakPct >= 0 ? '+' : ''}{alertStock.breakPct.toFixed(2)}%</strong> {alertStock.type === 'BULLISH' ? 'breakout' : 'breakdown'} threshold (&gt;= 3.0%)!
+                {alertStock.reason === 'FOLLOW_INCREASE_20' ? (
+                  <>Your followed stock increased over <strong className="text-amber-300 font-mono text-base">20%</strong> from follow time! Current: <strong className="text-emerald-400 font-mono">{alertStock.breakPct >= 0 ? '+' : ''}{alertStock.breakPct.toFixed(2)}%</strong> (Baseline: {alertStock.baselinePct?.toFixed(2)}%)</>
+                ) : (
+                  <>Your followed stock crossed <strong className="text-amber-300 font-mono text-base">{alertStock.breakPct >= 0 ? '+' : ''}{alertStock.breakPct.toFixed(2)}%</strong> {alertStock.type === 'BULLISH' ? 'breakout' : 'breakdown'} threshold (&gt;= 3.0%)!</>
+                )}
               </p>
             </div>
 
