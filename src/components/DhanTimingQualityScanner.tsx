@@ -100,20 +100,22 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
       const formattedResults = serverResults.map((item: any) => {
         // Construct a StockCalculated object matching item
         const stockObj: StockCalculated = {
+          id: item.symbol,
           symbol: item.symbol,
           companyName: item.companyName,
-          lastPrice: item.lastPrice,
-          dayChangePct: item.dayChangePct,
+          screenerUrl: '',
+          lotSizeJun2026: 250,
+          lotSizeJul2026: 250,
+          lotSizeAug2026: 250,
+          closePrice: item.lastPrice,
+          pctChange: item.dayChangePct,
           openPrice: item.openPrice,
           highPrice: item.highPrice,
           lowPrice: item.lowPrice,
           volume: item.volume,
           rsi: 55,
           adx: 25,
-          vwap: item.lastPrice,
-          isBullish: item.dayChangePct >= 0,
-          lotSize: 250,
-          notes: item.notes
+          vwap: item.lastPrice
         };
 
         return {
@@ -280,7 +282,7 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
               {scannedResults.map((item) => (
                 <div 
                   key={item.stock.symbol}
-                  onClick={() => onSelectStockDetail(item.stock)}
+                  onClick={() => onFetchSingle(item.stock)}
                   className="bg-slate-900 rounded-2xl border border-slate-800 hover:border-indigo-500 transition-all cursor-pointer p-4 space-y-3 flex flex-col justify-between"
                 >
                   <div className="flex items-center justify-between">
