@@ -589,26 +589,33 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             const isBull = activeTab === 'bullish' || activeTab === 'super_break_bull';
             const breakPct = isBull ? stock.breakPctAbove : stock.breakPctBelow;
             const isSuper = (isBull && stock.isSuperBreakBullish) || (!isBull && stock.isSuperBreakBearish);
+            const is25Above = (isBull && (stock.breakPctAbove >= stock.orbHeightPct * 1.25 || stock.breakVsHeightPct >= 125)) || (!isBull && (stock.breakPctBelow >= stock.orbHeightPct * 1.25 || stock.breakVsHeightPct >= 125));
             const isFollowed = followedSymbols.includes(stock.symbol);
 
             return (
               <div 
                 key={stock.symbol}
                 onClick={() => onSelectStockDetail(stock)}
-                className={`bg-slate-900 rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-xl ${
+                className={`rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-xl ${
                   isSuper 
-                    ? 'border-amber-400 ring-2 ring-amber-500/30 shadow-amber-500/20'
+                    ? 'bg-amber-950/50 border-amber-400 ring-2 ring-amber-500/30 shadow-amber-500/20'
+                    : is25Above
+                    ? 'bg-purple-950/80 border-purple-500 ring-2 ring-purple-500/30 shadow-purple-500/20 text-white'
                     : idx === 0 
-                    ? (isBull ? 'border-emerald-400 ring-2 ring-emerald-500/30 shadow-emerald-500/20' : 'border-rose-400 ring-2 ring-rose-500/30 shadow-rose-500/20')
-                    : 'border-slate-800 hover:border-slate-700'
+                    ? (isBull ? 'bg-slate-900 border-emerald-400 ring-2 ring-emerald-500/30 shadow-emerald-500/20' : 'bg-slate-900 border-rose-400 ring-2 ring-rose-500/30 shadow-rose-500/20')
+                    : 'bg-slate-900 border-slate-800 hover:border-slate-700'
                 }`}
               >
-                {/* Card Header Top: #1 Crown / Super Break Badge */}
+                {/* Card Header Top: #1 Crown / Super Break / 25%+ Purple Badge */}
                 <div className="px-4 py-2 flex items-center justify-between border-b bg-slate-950 border-slate-800 text-slate-300">
                   <div className="flex items-center space-x-2">
                     {isSuper ? (
                       <span className="bg-amber-400 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
                         <Zap className="w-3 h-3 fill-slate-950" /> Super {isBull ? 'Break (50%+)' : 'Breakdown (50%+)'}
+                      </span>
+                    ) : is25Above ? (
+                      <span className="bg-purple-500 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
+                        💜 25%+ Above ORB Height
                       </span>
                     ) : idx === 0 ? (
                       <span className={`${isBull ? 'bg-emerald-500' : 'bg-rose-500'} text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider`}>
