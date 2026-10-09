@@ -35,8 +35,8 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
   onChangeDashboardTab
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(credentials.date || new Date().toISOString().split('T')[0]);
-  const [startTime, setStartTime] = useState<string>('09:15');
-  const [endTime, setEndTime] = useState<string>('15:30');
+  const [startTime, setStartTime] = useState<string>('09:30');
+  const [endTime, setEndTime] = useState<string>('10:00');
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [scannedResults, setScannedResults] = useState<Array<{
     stock: StockCalculated;
