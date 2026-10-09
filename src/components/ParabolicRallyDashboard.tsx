@@ -25,8 +25,7 @@ import {
   ArrowDownRight,
   PieChart,
   ArrowUpDown,
-  Calendar,
-  X
+  Calendar
 } from 'lucide-react';
 import { StockCalculated, DhanApiCredentials } from '../types';
 import {
