@@ -4,6 +4,68 @@ import path from 'path';
 import { GoogleGenAI } from '@google/genai';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap.js';
 
+// Helper to parse IST Date (YYYY-MM-DD) and hours & minutes from Epoch / Unix timestamp or formatted string using Asia/Kolkata timezone
+function getISTDateTime(tsVal: any): { dateStr: string; hours: number; minutes: number } | null {
+  if (tsVal === undefined || tsVal === null) return null;
+
+  const num = Number(tsVal);
+  if (!isNaN(num) && num > 0) {
+    const sec = num > 1e11 ? Math.floor(num / 1000) : num;
+    const dateObj = new Date(sec * 1000);
+    try {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false
+      });
+      const formatted = formatter.format(dateObj); // e.g. "2026-07-31, 09:15"
+      const parts = formatted.split(', ');
+      if (parts.length >= 2) {
+        const [dPart, tPart] = parts;
+        const [h, m] = tPart.split(':').map((n) => parseInt(n, 10));
+        return { dateStr: dPart.trim(), hours: h, minutes: m };
+      }
+    } catch (e) {
+      const utcDate = new Date(sec * 1000);
+      const istDate = new Date(utcDate.getTime() + 19800 * 1000);
+      const y = istDate.getUTCFullYear();
+      const m = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(istDate.getUTCDate()).padStart(2, '0');
+      return {
+        dateStr: `${y}-${m}-${d}`,
+        hours: istDate.getUTCHours(),
+        minutes: istDate.getUTCMinutes()
+      };
+    }
+  }
+
+  if (typeof tsVal === 'string') {
+    const dateMatch = tsVal.match(/(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})/);
+    if (dateMatch) {
+      return {
+        dateStr: dateMatch[1],
+        hours: parseInt(dateMatch[2], 10),
+        minutes: parseInt(dateMatch[3], 10)
+      };
+    }
+    const timeMatch = tsVal.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      const h = parseInt(timeMatch[1], 10);
+      const m = parseInt(timeMatch[2], 10);
+      return {
+        dateStr: new Date().toISOString().split('T')[0],
+        hours: h,
+        minutes: m
+      };
+    }
+  }
+  return null;
+}
+
 let geminiCoolOffUntil = 0;
 
 const SETTINGS_FILE_PATH = path.join(process.cwd(), 'global_settings.json');

@@ -45,7 +45,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 }) => {
   const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
+  const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
 
   // Followed stocks state (persisted in localStorage)
   const [followedSymbols, setFollowedSymbols] = useState<string[]>(() => {
@@ -359,13 +359,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (Math.abs(valB - valA) > 0.0001) {
           return valB - valA;
         }
-        return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
-      }
-      if (sortBy === 'JUST_HIT') {
-        if (a.breakMinutesFromOpen !== b.breakMinutesFromOpen) {
-          return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
-        }
-        return valB - valA;
+        return a.symbol.localeCompare(b.symbol);
       }
       if (sortBy === 'HEIGHT_PCT') {
         return b.orbHeightPct - a.orbHeightPct;
@@ -560,16 +554,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             >
               🚀 Highest Break % (#1 Top)
             </button>
-            <button
-              onClick={() => setSortBy('JUST_HIT')}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                sortBy === 'JUST_HIT'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              ⏰ Just Hit ORB
-            </button>
           </div>
         </div>
       </div>
@@ -606,24 +590,25 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     : 'bg-slate-900 border-slate-800 hover:border-slate-700'
                 }`}
               >
-                {/* Card Header Top: #1 Crown / Super Break / 25%+ Purple Badge */}
+                {/* Card Header Top: ✨ NEW Badge & #1 / Super / 25%+ Badges */}
                 <div className="px-4 py-2 flex items-center justify-between border-b bg-slate-950 border-slate-800 text-slate-300">
                   <div className="flex items-center space-x-2">
+                    <span className="bg-cyan-400 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider shadow-sm flex items-center gap-1 animate-pulse">
+                      ✨ NEW {isBull ? 'ORB BREAKOUT' : 'ORB BREAKDOWN'}
+                    </span>
                     {isSuper ? (
                       <span className="bg-amber-400 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
-                        <Zap className="w-3 h-3 fill-slate-950" /> Super {isBull ? 'Break (50%+)' : 'Breakdown (50%+)'}
+                        <Zap className="w-3 h-3 fill-slate-950" /> Super
                       </span>
                     ) : is25Above ? (
                       <span className="bg-purple-500 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
-                        💜 25%+ Above ORB Height
+                        💜 25%+
                       </span>
                     ) : idx === 0 ? (
                       <span className={`${isBull ? 'bg-emerald-500' : 'bg-rose-500'} text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider`}>
-                        👑 #1 Top {isBull ? 'Break' : 'Breakdown'}
+                        👑 #1
                       </span>
-                    ) : (
-                      <span className="text-xs text-slate-400 font-mono">ORB Setup</span>
-                    )}
+                    ) : null}
                   </div>
                   <span className="text-[10px] text-slate-500 font-mono">F&O Live</span>
                 </div>
@@ -649,51 +634,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     </div>
                   </div>
                 </div>
-
-                {/* ⏰ BIG PROMINENT ORB BREAK TIMING BANNER */}
-                <div className="px-4 py-3 bg-gradient-to-r from-slate-950 via-purple-950/40 to-slate-950 border-b border-slate-800 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">ORB Break Timing</span>
-                    <span className="text-2xl font-black font-mono text-amber-300 tracking-tight drop-shadow-sm">
-                      {stock.orbBreakTime}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Holding Duration</span>
-                    <span className="text-sm font-black font-mono text-cyan-300">
-                      {stock.durationDisplay}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 🎯 ORB BREAK HIT METRICS BANNER (STORED FOR SESSION) */}
-                <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-xs font-mono">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-sans">Break % at Initial Hit</span>
-                    <strong className="text-amber-300 font-black text-sm">
-                      {stock.breakPctAtOrbBreak > 0 ? '+' : ''}{stock.breakPctAtOrbBreak?.toFixed(2)}% @ {stock.breakTimeAtBreak || stock.orbBreakTime}
-                    </strong>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400 block font-sans">vs ORB Height %</span>
-                    <strong className="text-cyan-300 font-black text-sm">
-                      {stock.breakVsHeightPct?.toFixed(1)}% of Height
-                    </strong>
-                  </div>
-                </div>
-
-                {/* ⚡ SUPER BREAK 50%+ TIMING BANNER */}
-                {isSuper && (
-                  <div className="px-4 py-2.5 bg-gradient-to-r from-amber-950/90 via-yellow-950/50 to-amber-950/90 border-b border-amber-500/40 text-xs font-mono text-amber-200 flex items-center justify-between">
-                    <span className="font-bold flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-amber-300 fill-amber-300 animate-pulse" />
-                      <span>50%+ Super Break Met @:</span>
-                    </span>
-                    <strong className="text-white font-black text-sm px-2 py-0.5 bg-amber-500/20 border border-amber-400 rounded-lg">
-                      {stock.superBreakTime || stock.orbBreakTime}
-                    </strong>
-                  </div>
-                )}
 
                 {/* ORB Metrics Grid (High, Low, Height %, Break %) */}
                 <div className="p-4 space-y-3 flex-1">
