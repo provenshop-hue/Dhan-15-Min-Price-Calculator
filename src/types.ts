@@ -71,6 +71,9 @@ export interface StockCalculated {
   isLoading?: boolean;
   error?: string | null;
   isManual?: boolean;
+  hasRetestedAndBounced?: boolean;
+  retestTime?: string;
+  bounceTime?: string;
 }
 
 export type TrendFilterType =
