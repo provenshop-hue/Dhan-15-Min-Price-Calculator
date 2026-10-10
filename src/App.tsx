@@ -199,16 +199,6 @@ export default function App() {
     return analyzeIdealOptionsAndStocks(stocks, tradeJourneys);
   }, [stocks, tradeJourneys]);
 
-  // Automatically update and track trade journeys on every stock price/RSI fetch
-  useEffect(() => {
-    if (stocks.length > 0) {
-      setTradeJourneys((prev) => {
-        const updated = updateAllTradeJourneys(stocks, prev);
-        return updated;
-      });
-    }
-  }, [stocks]);
-
   const handleClearTradeJourneys = () => {
     clearTradeJourneys();
     setTradeJourneys({});
@@ -1415,6 +1405,7 @@ export default function App() {
             }}
             onClearTimingFilter={() => setActiveTimingFilter({ active: false, date: '', timeSlot: '', qualifyingSymbols: [] })}
             onChangeDashboardTab={(t) => setActiveDashboardTab(t)}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
           />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */

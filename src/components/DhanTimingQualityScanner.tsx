@@ -13,6 +13,7 @@ interface DhanTimingQualityScannerProps {
   onApplyTimingFilter: (date: string, timeSlot: string, symbols: string[]) => void;
   onClearTimingFilter: () => void;
   onChangeDashboardTab: (tab: any) => void;
+  onSelectStockDetail?: (stock: StockCalculated) => void;
 }
 
 const TIME_SLOTS = [
@@ -32,7 +33,8 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
   activeTimingFilter,
   onApplyTimingFilter,
   onClearTimingFilter,
-  onChangeDashboardTab
+  onChangeDashboardTab,
+  onSelectStockDetail
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(credentials.date || new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState<string>('09:15');
@@ -100,10 +102,13 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
       const formattedResults = serverResults.map((item: any) => {
         // Construct a StockCalculated object matching item
         const stockObj: StockCalculated = {
+          id: item.symbol,
           symbol: item.symbol,
           companyName: item.companyName,
-          lastPrice: item.lastPrice,
-          dayChangePct: item.dayChangePct,
+          screenerUrl: '',
+          closePrice: item.lastPrice,
+          ltp: item.lastPrice,
+          pctChange: item.dayChangePct,
           openPrice: item.openPrice,
           highPrice: item.highPrice,
           lowPrice: item.lowPrice,
@@ -111,9 +116,10 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
           rsi: 55,
           adx: 25,
           vwap: item.lastPrice,
-          isBullish: item.dayChangePct >= 0,
-          lotSize: 250,
-          notes: item.notes
+          lotSizeJun2026: 250,
+          lotSizeJul2026: 250,
+          lotSizeAug2026: 250,
+          isFetched: true
         };
 
         return {
@@ -280,7 +286,7 @@ export const DhanTimingQualityScanner: React.FC<DhanTimingQualityScannerProps> =
               {scannedResults.map((item) => (
                 <div 
                   key={item.stock.symbol}
-                  onClick={() => onSelectStockDetail(item.stock)}
+                  onClick={() => onSelectStockDetail && onSelectStockDetail(item.stock)}
                   className="bg-slate-900 rounded-2xl border border-slate-800 hover:border-indigo-500 transition-all cursor-pointer p-4 space-y-3 flex flex-col justify-between"
                 >
                   <div className="flex items-center justify-between">

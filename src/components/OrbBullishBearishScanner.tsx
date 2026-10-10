@@ -43,7 +43,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
 
@@ -336,6 +336,156 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         bounceTime = superBreakTime || orbBreakTime;
       }
 
+      let hasFailedRetest = false;
+      let failTime = '-';
+      let failReason = '';
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+        let firstBullBreakIdx = -1;
+        let firstBearBreakIdx = -1;
+
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          const pt = stock.rsiTimeline[i];
+          if (firstBullBreakIdx === -1 && pt.close >= orbHigh) {
+            firstBullBreakIdx = i;
+          }
+          if (firstBearBreakIdx === -1 && pt.close <= orbLow) {
+            firstBearBreakIdx = i;
+          }
+        }
+
+        // Case 1: Broke ORB High initially, then reversed & broke ORB Low
+        if (firstBullBreakIdx !== -1) {
+          for (let i = firstBullBreakIdx + 1; i < stock.rsiTimeline.length; i++) {
+            if (stock.rsiTimeline[i].close <= orbLow) {
+              hasFailedRetest = true;
+              failTime = stock.rsiTimeline[i].timeStr;
+              failReason = `Broke ORB High @ ${stock.rsiTimeline[firstBullBreakIdx].timeStr} ➔ Reversed & Broke Low @ ${failTime}`;
+              break;
+            }
+          }
+        }
+
+        // Case 2: Broke ORB Low initially, then reversed & broke ORB High (ended up high)
+        if (!hasFailedRetest && firstBearBreakIdx !== -1) {
+          for (let i = firstBearBreakIdx + 1; i < stock.rsiTimeline.length; i++) {
+            if (stock.rsiTimeline[i].close >= orbHigh) {
+              hasFailedRetest = true;
+              failTime = stock.rsiTimeline[i].timeStr;
+              failReason = `Broke ORB Low @ ${stock.rsiTimeline[firstBearBreakIdx].timeStr} ➔ Reversed & Broke High @ ${failTime}`;
+              break;
+            }
+          }
+        }
+
+        // Fallback for retest failure
+        if (!hasFailedRetest) {
+          const lastPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
+          if (isBullishQualified && lastPt.close < orbHigh) {
+            hasFailedRetest = true;
+            failTime = lastPt.timeStr;
+            failReason = `Broke ORB High ➔ Failed to hold (Closed below High @ ${failTime})`;
+          } else if (isBearishQualified && lastPt.close > orbLow) {
+            hasFailedRetest = true;
+            failTime = lastPt.timeStr;
+            failReason = `Broke ORB Low ➔ Failed to hold (Closed above Low @ ${failTime})`;
+          }
+        }
+      }
+
+      let hasImmediateBounce = false;
+      let immediateRetestTime = '-';
+      let immediateBounceTime = '-';
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+        let breakoutIndex = -1;
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          const pt = stock.rsiTimeline[i];
+          if ((isBullishQualified && pt.close >= orbHigh) || (isBearishQualified && pt.close <= orbLow)) {
+            breakoutIndex = i;
+            break;
+          }
+        }
+        if (breakoutIndex >= 0 && breakoutIndex < stock.rsiTimeline.length - 2) {
+          for (let i = breakoutIndex + 1; i <= Math.min(breakoutIndex + 2, stock.rsiTimeline.length - 2); i++) {
+            const pt = stock.rsiTimeline[i];
+            const isRetest = isBullishQualified 
+              ? (pt.close <= orbHigh * 1.005 && pt.close >= orbLow)
+              : (pt.close >= orbLow * 0.995 && pt.close <= orbHigh);
+            if (isRetest) {
+              const nextPt = stock.rsiTimeline[i + 1];
+              const isImmediateBounce = isBullishQualified ? (nextPt.close > pt.close) : (nextPt.close < pt.close);
+              if (isImmediateBounce) {
+                hasImmediateBounce = true;
+                immediateRetestTime = pt.timeStr;
+                immediateBounceTime = nextPt.timeStr;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (!hasImmediateBounce && breakMinutesFromOpen <= 30) {
+        hasImmediateBounce = true;
+        immediateRetestTime = orbBreakTime;
+        immediateBounceTime = superBreakTime || orbBreakTime;
+      }
+
+      let hasOrbLowBounce = false;
+      let orbLowBounceTime = '-';
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+        let breakoutIdx = -1;
+        let isBullBreak = false;
+
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          const pt = stock.rsiTimeline[i];
+          if (pt.close >= orbHigh) {
+            breakoutIdx = i;
+            isBullBreak = true;
+            break;
+          } else if (pt.close <= orbLow) {
+            breakoutIdx = i;
+            isBullBreak = false;
+            break;
+          }
+        }
+
+        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 2) {
+          for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 2, stock.rsiTimeline.length - 2); i++) {
+            const pt = stock.rsiTimeline[i];
+            const isRetest = isBullBreak 
+              ? (pt.close <= orbHigh * 1.005 && pt.close >= orbLow)
+              : (pt.close >= orbLow * 0.995 && pt.close <= orbHigh);
+
+            if (isRetest) {
+              const nextPt = stock.rsiTimeline[i + 1];
+              const isBounce = isBullBreak ? (nextPt.close > pt.close) : (nextPt.close < pt.close);
+
+              if (isBounce) {
+                let neverGoesDown = true;
+                for (let k = i + 2; k < stock.rsiTimeline.length; k++) {
+                  if (isBullBreak && stock.rsiTimeline[k].close < pt.close) {
+                    neverGoesDown = false;
+                    break;
+                  } else if (!isBullBreak && stock.rsiTimeline[k].close > pt.close) {
+                    neverGoesDown = false;
+                    break;
+                  }
+                }
+
+                if (neverGoesDown) {
+                  hasOrbLowBounce = true;
+                  orbLowBounceTime = nextPt.timeStr;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
       return {
         ...stock,
         orbHigh: Math.round(orbHigh * 100) / 100,
@@ -359,7 +509,15 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         vwap: Math.round(vwap * 100) / 100,
         hasRetestedAndBounced,
         retestTime,
-        bounceTime
+        bounceTime,
+        hasFailedRetest,
+        failTime,
+        failReason,
+        hasImmediateBounce,
+        immediateRetestTime,
+        immediateBounceTime,
+        hasOrbLowBounce,
+        orbLowBounceTime
       };
     });
   }, [stocks, followedSymbols]);
@@ -387,6 +545,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'super_break_bull' && !s.isSuperBreakBullish) return false;
       if (activeTab === 'super_break_bear' && !s.isSuperBreakBearish) return false;
       if (activeTab === 'retested_bounced' && !s.hasRetestedAndBounced) return false;
+      if (activeTab === 'failed_retest' && !s.hasFailedRetest) return false;
+      if (activeTab === 'immediate_bounce' && !s.hasImmediateBounce) return false;
+      if (activeTab === 'orb_low_bounce' && !s.hasOrbLowBounce) return false;
 
       if (activeTimingFilter?.active && activeTimingFilter.qualifyingSymbols && activeTimingFilter.qualifyingSymbols.length > 0) {
         if (!activeTimingFilter.qualifyingSymbols.includes(s.symbol)) return false;
@@ -398,7 +559,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
       return true;
     }).sort((a, b) => {
-      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified);
+      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified);
       const valA = isBear ? a.breakPctBelow : a.breakPctAbove;
       const valB = isBear ? b.breakPctBelow : b.breakPctAbove;
 
@@ -426,6 +587,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const superBreakBullCount = processedOrbStocks.filter(s => s.isSuperBreakBullish).length;
   const superBreakBearCount = processedOrbStocks.filter(s => s.isSuperBreakBearish).length;
   const retestedCount = processedOrbStocks.filter(s => s.hasRetestedAndBounced).length;
+  const failedRetestCount = processedOrbStocks.filter(s => s.hasFailedRetest).length;
+  const immediateBounceCount = processedOrbStocks.filter(s => s.hasImmediateBounce).length;
+  const orbLowBounceCount = processedOrbStocks.filter(s => s.hasOrbLowBounce).length;
 
   return (
     <div className="space-y-6 animate-fade-in pb-20 relative">
@@ -592,6 +756,42 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           >
             <RefreshCw className="w-4 h-4 text-purple-300 animate-spin" />
             <span>🔄 Retested &amp; Bounced ({retestedCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('failed_retest')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'failed_retest'
+                ? 'bg-rose-700 text-white shadow-lg shadow-rose-700/30 border border-rose-500'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-300 animate-pulse" />
+            <span>❌ Failed Retest / Fakeout ({failedRetestCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('immediate_bounce')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'immediate_bounce'
+                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30 border border-cyan-500'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-cyan-300 fill-cyan-300 animate-pulse" />
+            <span>⚡ Immediate Retest &amp; Bounce ({immediateBounceCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('orb_low_bounce')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'orb_low_bounce'
+                ? 'bg-emerald-700 text-white shadow-lg shadow-emerald-700/30 border border-emerald-500'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-300" />
+            <span>🛡️ ORB Low Support Bounce ({orbLowBounceCount})</span>
           </button>
         </div>
 
@@ -767,6 +967,47 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     <span className="text-slate-300 font-medium">Bounce: <strong className="text-emerald-300">{stock.bounceTime}</strong></span>
                   </div>
                 </div>
+
+                {/* ❌ FAILED RETEST / FAKEOUT WARNING BANNER */}
+                {stock.hasFailedRetest && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-rose-950 via-red-950/80 to-rose-950 border-b border-rose-500/50 text-xs font-mono text-rose-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <ShieldAlert className="w-4 h-4 text-rose-400 animate-bounce" />
+                      <span>{stock.failReason || 'Failed Retest / Fakeout'}</span>
+                    </span>
+                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-rose-500/20 border border-rose-400 rounded-lg">
+                      @{stock.failTime}
+                    </strong>
+                  </div>
+                )}
+
+                {/* ⚡ IMMEDIATE RETEST & BOUNCE BANNER */}
+                {stock.hasImmediateBounce && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-cyan-950/70 to-slate-950 border-b border-cyan-500/40 text-xs font-mono text-cyan-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400 animate-pulse" />
+                      <span>Immediate Retest &amp; Bounce:</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-300 font-medium">Retest: <strong className="text-amber-300">{stock.immediateRetestTime}</strong></span>
+                      <span className="text-slate-500">→</span>
+                      <span className="text-slate-300 font-medium">Bounce: <strong className="text-emerald-300">{stock.immediateBounceTime}</strong></span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 🛡️ ORB LOW SUPPORT BOUNCE BANNER */}
+                {stock.hasOrbLowBounce && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-emerald-950/70 to-slate-950 border-b border-emerald-500/40 text-xs font-mono text-emerald-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>ORB Low Support Hit &amp; Bounced:</span>
+                    </span>
+                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-emerald-500/20 border border-emerald-400 rounded-lg">
+                      @{stock.orbLowBounceTime}
+                    </strong>
+                  </div>
+                )}
 
                 {/* ORB Metrics Grid (High, Low, Height %, Break %) */}
                 <div className="p-4 space-y-3 flex-1">

@@ -74,6 +74,14 @@ export interface StockCalculated {
   hasRetestedAndBounced?: boolean;
   retestTime?: string;
   bounceTime?: string;
+  hasFailedRetest?: boolean;
+  failTime?: string;
+  failReason?: string;
+  hasImmediateBounce?: boolean;
+  immediateRetestTime?: string;
+  immediateBounceTime?: string;
+  hasOrbLowBounce?: boolean;
+  orbLowBounceTime?: string;
 }
 
 export type TrendFilterType =
