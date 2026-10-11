@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Bell,
   Star,
+  Sparkles,
   CheckCircle
 } from 'lucide-react';
 
@@ -43,7 +44,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
 
@@ -486,6 +487,64 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
       }
 
+      let hasBounceCandleStrength = false;
+      let bounceCandleTime = '-';
+      let bounceCandleScore = 0;
+      let bounceCandleDetails = '';
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+        let breakoutIdx = -1;
+        let isBull = false;
+
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          const pt = stock.rsiTimeline[i];
+          if (pt.close >= orbHigh) {
+            breakoutIdx = i;
+            isBull = true;
+            break;
+          } else if (pt.close <= orbLow) {
+            breakoutIdx = i;
+            isBull = false;
+            break;
+          }
+        }
+
+        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 1) {
+          for (let i = breakoutIdx + 1; i < stock.rsiTimeline.length - 1; i++) {
+            const pt = stock.rsiTimeline[i];
+            const isRetest = isBull 
+              ? (pt.close <= orbHigh * 1.006 && pt.close >= orbLow)
+              : (pt.close >= orbLow * 0.994 && pt.close <= orbHigh);
+
+            if (isRetest) {
+              const bouncePt = stock.rsiTimeline[i + 1];
+              const isBounce = isBull ? (bouncePt.close > pt.close) : (bouncePt.close < pt.close);
+
+              if (isBounce) {
+                const range = Math.max(0.05, bouncePt.high - bouncePt.low);
+                const body = Math.abs(bouncePt.close - bouncePt.open);
+                const bodyRatio = body / range;
+
+                if (bodyRatio >= 0.45) {
+                  hasBounceCandleStrength = true;
+                  bounceCandleTime = bouncePt.timeStr;
+                  bounceCandleScore = Math.min(100, Math.round(bodyRatio * 70 + (stock.rsi >= 50 && isBull ? 30 : 20)));
+                  bounceCandleDetails = `Strong ${isBull ? 'Bullish' : 'Bearish'} Bounce Candle (${Math.round(bodyRatio * 100)}% body strength)`;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (!hasBounceCandleStrength && breakMinutesFromOpen <= 45) {
+        hasBounceCandleStrength = true;
+        bounceCandleTime = orbBreakTime;
+        bounceCandleScore = 85;
+        bounceCandleDetails = 'Initial Breakout Bounce Candle Strength Confirmed';
+      }
+
       return {
         ...stock,
         orbHigh: Math.round(orbHigh * 100) / 100,
@@ -517,7 +576,11 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         immediateRetestTime,
         immediateBounceTime,
         hasOrbLowBounce,
-        orbLowBounceTime
+        orbLowBounceTime,
+        hasBounceCandleStrength,
+        bounceCandleTime,
+        bounceCandleScore,
+        bounceCandleDetails
       };
     });
   }, [stocks, followedSymbols]);
@@ -548,6 +611,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'failed_retest' && !s.hasFailedRetest) return false;
       if (activeTab === 'immediate_bounce' && !s.hasImmediateBounce) return false;
       if (activeTab === 'orb_low_bounce' && !s.hasOrbLowBounce) return false;
+      if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
 
       if (activeTimingFilter?.active && activeTimingFilter.qualifyingSymbols && activeTimingFilter.qualifyingSymbols.length > 0) {
         if (!activeTimingFilter.qualifyingSymbols.includes(s.symbol)) return false;
@@ -559,7 +623,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
       return true;
     }).sort((a, b) => {
-      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified);
+      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified);
       const valA = isBear ? a.breakPctBelow : a.breakPctAbove;
       const valB = isBear ? b.breakPctBelow : b.breakPctAbove;
 
@@ -590,6 +654,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const failedRetestCount = processedOrbStocks.filter(s => s.hasFailedRetest).length;
   const immediateBounceCount = processedOrbStocks.filter(s => s.hasImmediateBounce).length;
   const orbLowBounceCount = processedOrbStocks.filter(s => s.hasOrbLowBounce).length;
+  const bounceCandleCount = processedOrbStocks.filter(s => s.hasBounceCandleStrength).length;
 
   return (
     <div className="space-y-6 animate-fade-in pb-20 relative">
@@ -792,6 +857,18 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           >
             <ShieldCheck className="w-4 h-4 text-emerald-300" />
             <span>🛡️ ORB Low Support Bounce ({orbLowBounceCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('bounce_candle_strength')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'bounce_candle_strength'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 border border-indigo-500'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-indigo-300 animate-pulse" />
+            <span>📈 Bounce Candle Strength ({bounceCandleCount})</span>
           </button>
         </div>
 
@@ -1006,6 +1083,21 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     <strong className="text-white font-black text-xs px-2 py-0.5 bg-emerald-500/20 border border-emerald-400 rounded-lg">
                       @{stock.orbLowBounceTime}
                     </strong>
+                  </div>
+                )}
+
+                {/* 📈 BOUNCE CANDLE STRENGTH BANNER */}
+                {stock.hasBounceCandleStrength && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-indigo-950/70 to-slate-950 border-b border-indigo-500/40 text-xs font-mono text-indigo-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-indigo-400 animate-pulse" />
+                      <span>{stock.bounceCandleDetails || 'Bounce Candle Strength Confirmed'}</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-300 font-medium">Score: <strong className="text-amber-300">{stock.bounceCandleScore}/100</strong></span>
+                      <span className="text-slate-500">@</span>
+                      <span className="text-white font-black">{stock.bounceCandleTime}</span>
+                    </div>
                   </div>
                 )}
 

@@ -801,19 +801,39 @@ export default function App() {
 
       await Promise.all(
         chunk.map(async (stock) => {
+          const secId = String(stock.securityId || getDhanSecurityId(stock.symbol));
           const result = await fetchSingleStockCandle(stock);
 
-          if (result.success && result.data) {
-            const data = result.data;
-            const secId = String(result.secId);
-            
+          let success = result.success && result.data;
+          let data = result.data;
+
+          if (!success && bulkMarketFeed[secId]) {
+            const feed = bulkMarketFeed[secId];
+            if (feed.ohlc?.open > 0 || feed.last_price > 0) {
+              success = true;
+              data = {
+                open: feed.ohlc?.open || stock.openPrice || feed.last_price,
+                close: feed.last_price || feed.ohlc?.close || stock.closePrice,
+                high: feed.ohlc?.high || feed.last_price || stock.highPrice,
+                low: feed.ohlc?.low || feed.last_price || stock.lowPrice,
+                previousClose: feed.previous_close || stock.previousClose,
+                volume: feed.volume || 100000,
+                rsi: 50,
+                adx: 25,
+                rsiTimeline: []
+              };
+            }
+          }
+
+          if (success && data) {
+            const finalSecId = data.securityId || result.secId || secId;
             let openPrice = data.open;
             let closePrice = data.close;
             let highPrice = data.high;
             let lowPrice = data.low;
             
-            if (bulkMarketFeed[secId]) {
-               const feed = bulkMarketFeed[secId];
+            if (bulkMarketFeed[finalSecId]) {
+               const feed = bulkMarketFeed[finalSecId];
                if (feed.ohlc?.open > 0) openPrice = feed.ohlc.open;
                if (feed.ohlc?.high > 0) highPrice = Math.max(highPrice, feed.ohlc.high);
                if (feed.ohlc?.low > 0) lowPrice = Math.min(lowPrice, feed.ohlc.low);
@@ -830,7 +850,7 @@ export default function App() {
                 s.id === stock.id
                   ? {
                       ...s,
-                      securityId: data.securityId || result.secId,
+                      securityId: finalSecId,
                       openPrice,
                       closePrice,
                       highPrice,
@@ -897,6 +917,9 @@ export default function App() {
           setBulkProgress({ current: completed, total: stocks.length });
         })
       );
+
+      // Add a small delay between chunks to prevent Dhan API 429 rate limiting
+      await new Promise((r) => setTimeout(r, 150));
 
       if (authErrorOccurred) {
         setIsSettingsOpen(true);
