@@ -82,7 +82,10 @@ export interface StockCalculated {
   immediateBounceTime?: string;
   hasOrbLowBounce?: boolean;
   orbLowBounceTime?: string;
-  bounceStrengthPct?: number;
+  hasBounceCandleStrength?: boolean;
+  bounceCandleTime?: string;
+  bounceCandleScore?: number;
+  bounceCandleDetails?: string;
 }
 
 export type TrendFilterType =
