@@ -456,21 +456,22 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 2) {
           for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 2, stock.rsiTimeline.length - 2); i++) {
             const pt = stock.rsiTimeline[i];
-            const isRetest = isBullBreak 
-              ? (pt.close <= orbHigh * 1.005 && pt.close >= orbLow)
-              : (pt.close >= orbLow * 0.995 && pt.close <= orbHigh);
+            const hitOrbHighSupport = isBullBreak && (pt.low <= orbHigh * 1.006 && pt.low >= orbHigh * 0.992);
+            const hitOrbLowSupport = !isBullBreak && (pt.high >= orbLow * 0.994 && pt.high <= orbLow * 1.008);
 
-            if (isRetest) {
+            if (hitOrbHighSupport || hitOrbLowSupport) {
               const nextPt = stock.rsiTimeline[i + 1];
-              const isBounce = isBullBreak ? (nextPt.close > pt.close) : (nextPt.close < pt.close);
+              const cleanCloseBounce = isBullBreak 
+                ? (nextPt.close > orbHigh && nextPt.close > pt.close)
+                : (nextPt.close < orbLow && nextPt.close < pt.close);
 
-              if (isBounce) {
+              if (cleanCloseBounce) {
                 let neverGoesDown = true;
                 for (let k = i + 2; k < stock.rsiTimeline.length; k++) {
-                  if (isBullBreak && stock.rsiTimeline[k].close < pt.close) {
+                  if (isBullBreak && stock.rsiTimeline[k].close < orbHigh * 0.998) {
                     neverGoesDown = false;
                     break;
-                  } else if (!isBullBreak && stock.rsiTimeline[k].close > pt.close) {
+                  } else if (!isBullBreak && stock.rsiTimeline[k].close > orbLow * 1.002) {
                     neverGoesDown = false;
                     break;
                   }
