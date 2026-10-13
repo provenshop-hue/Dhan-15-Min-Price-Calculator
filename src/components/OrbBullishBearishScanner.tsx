@@ -150,13 +150,25 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       // ORB Height Percentage = ((ORB High - ORB Low) / ORB Low) * 100
       const orbHeightPct = orbLow > 0 ? Math.abs(((orbHigh - orbLow) / orbLow) * 100) : 0;
 
-      // Break percentages first
+      // Strict Bullish ORB Breakout criteria
+      const isCurrentlyAboveOrb = close >= orbHigh;
+      const positiveDay = (stock.pctChange !== undefined ? stock.pctChange : (close - open)) >= 0;
+      const greenCandle = close >= open * 0.998;
+      const rsiBullish = rsi >= 52;
+      const aboveVwap = close > vwap;
+      const isBullishQualified = isCurrentlyAboveOrb && positiveDay && greenCandle && rsiBullish && aboveVwap;
+
+      // Strict Bearish ORB Breakdown criteria
+      const isCurrentlyBelowOrb = close <= orbLow;
+      const negativeDay = (stock.pctChange !== undefined ? stock.pctChange : (close - open)) <= 0;
+      const redCandle = close <= open * 1.002;
+      const rsiBearish = rsi <= 48;
+      const belowVwap = close < vwap;
+      const isBearishQualified = isCurrentlyBelowOrb && negativeDay && redCandle && rsiBearish && belowVwap;
+
+      // Break percentages
       const breakPctAbove = orbHigh > 0 ? ((close - orbHigh) / orbHigh) * 100 : 0;
       const breakPctBelow = orbLow > 0 ? ((orbLow - close) / orbLow) * 100 : 0;
-
-      // Definitive ORB Break classification
-      const isBullishQualified = close >= orbHigh || breakPctAbove > 0;
-      const isBearishQualified = close <= orbLow && !isBullishQualified;
 
       // Super Break conditions: Break % is 50% more than ORB Height %
       const isSuperBreakBullish = isBullishQualified && breakPctAbove >= orbHeightPct * 1.5;
@@ -644,7 +656,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const immediateBounceCount = processedOrbStocks.filter(s => s.hasImmediateBounce).length;
   const orbLowBounceCount = processedOrbStocks.filter(s => s.hasOrbLowBounce).length;
   const bounceCandleCount = processedOrbStocks.filter(s => s.hasBounceCandleStrength).length;
-  const marketSentiment = bullishCount > bearishCount ? 'BULLISH' : (bearishCount > bullishCount ? 'BEARISH' : 'NEUTRAL');
 
   return (
     <div className="space-y-6 animate-fade-in pb-20 relative">
@@ -738,21 +749,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           </div>
 
           <div className="flex items-center gap-3">
-            <div className={`px-5 py-3 rounded-2xl border flex items-center space-x-3 shadow-xl ${
-              marketSentiment === 'BULLISH' 
-                ? 'bg-emerald-950/90 border-emerald-500 text-emerald-300 shadow-emerald-500/20' 
-                : marketSentiment === 'BEARISH'
-                ? 'bg-rose-950/90 border-rose-500 text-rose-300 shadow-rose-500/20'
-                : 'bg-slate-900 border-slate-700 text-slate-300 shadow-slate-900/50'
-            }`}>
-              <div>
-                <div className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Market Sentiment</div>
-                <div className="text-2xl font-black font-mono tracking-tight uppercase">
-                  {marketSentiment === 'BULLISH' ? '🟢 BULLISH' : marketSentiment === 'BEARISH' ? '🔴 BEARISH' : '⚪ NEUTRAL'}
-                </div>
-              </div>
-            </div>
-
             <div className="bg-amber-950/80 border border-amber-500/40 px-4 py-3 rounded-xl flex items-center space-x-3">
               <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
               <div>
