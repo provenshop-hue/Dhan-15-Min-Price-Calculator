@@ -437,47 +437,39 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let orbLowBounceTime = '-';
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
-        let breakoutIdx = -1;
-        let isBullBreak = false;
-
+        let breakoutIndex = -1;
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
           const pt = stock.rsiTimeline[i];
-          if (pt.close >= orbHigh) {
-            breakoutIdx = i;
-            isBullBreak = true;
-            break;
-          } else if (pt.close <= orbLow) {
-            breakoutIdx = i;
-            isBullBreak = false;
+          if ((isBullishQualified && pt.close >= orbHigh) || (isBearishQualified && pt.close <= orbLow)) {
+            breakoutIndex = i;
             break;
           }
         }
 
-        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 2) {
-          for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 2, stock.rsiTimeline.length - 2); i++) {
+        if (breakoutIndex >= 0 && breakoutIndex < stock.rsiTimeline.length - 2) {
+          for (let i = breakoutIndex + 1; i <= Math.min(breakoutIndex + 3, stock.rsiTimeline.length - 2); i++) {
             const pt = stock.rsiTimeline[i];
-            const hitOrbHighSupport = isBullBreak && (pt.low <= orbHigh * 1.006 && pt.low >= orbHigh * 0.992);
-            const hitOrbLowSupport = !isBullBreak && (pt.high >= orbLow * 0.994 && pt.high <= orbLow * 1.008);
+            const isRetest = isBullishQualified
+              ? (pt.low <= orbHigh * 1.01 && pt.low >= orbHigh * 0.985)
+              : (pt.high >= orbLow * 0.99 && pt.high <= orbLow * 1.015);
 
-            if (hitOrbHighSupport || hitOrbLowSupport) {
+            if (isRetest) {
               const nextPt = stock.rsiTimeline[i + 1];
-              const cleanCloseBounce = isBullBreak 
-                ? (nextPt.close > orbHigh && nextPt.close > pt.close)
-                : (nextPt.close < orbLow && nextPt.close < pt.close);
+              const isBounce = isBullishQualified ? (nextPt.close > pt.close || nextPt.close >= orbHigh) : (nextPt.close < pt.close || nextPt.close <= orbLow);
 
-              if (cleanCloseBounce) {
-                let neverGoesDown = true;
+              if (isBounce) {
+                let sustains = true;
                 for (let k = i + 2; k < stock.rsiTimeline.length; k++) {
-                  if (isBullBreak && stock.rsiTimeline[k].close < orbHigh * 0.998) {
-                    neverGoesDown = false;
+                  if (isBullishQualified && stock.rsiTimeline[k].close < orbHigh * 0.992) {
+                    sustains = false;
                     break;
-                  } else if (!isBullBreak && stock.rsiTimeline[k].close > orbLow * 1.002) {
-                    neverGoesDown = false;
+                  } else if (!isBullishQualified && stock.rsiTimeline[k].close > orbLow * 1.008) {
+                    sustains = false;
                     break;
                   }
                 }
 
-                if (neverGoesDown) {
+                if (sustains) {
                   hasOrbLowBounce = true;
                   orbLowBounceTime = nextPt.timeStr;
                   break;
@@ -486,6 +478,11 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             }
           }
         }
+      }
+
+      if (!hasOrbLowBounce && (hasImmediateBounce || hasRetestedAndBounced)) {
+        hasOrbLowBounce = true;
+        orbLowBounceTime = immediateBounceTime !== '-' ? immediateBounceTime : (retestTime || orbBreakTime);
       }
 
       let hasBounceCandleStrength = false;
