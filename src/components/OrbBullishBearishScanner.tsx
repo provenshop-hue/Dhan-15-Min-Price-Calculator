@@ -549,53 +549,63 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let hasOrbZeroReversal = false;
       let zeroReversalTime = '-';
 
-      if (stock.rsiTimeline && stock.rsiTimeline.length > 4) {
-        let lowestIdx = 0;
-        let lowestPrice = stock.rsiTimeline[0].low;
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 3) {
+        let breakoutIdx = -1;
+        let isBull = false;
 
-        for (let i = 1; i < stock.rsiTimeline.length - 2; i++) {
-          if (stock.rsiTimeline[i].low < lowestPrice) {
-            lowestPrice = stock.rsiTimeline[i].low;
-            lowestIdx = i;
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          const pt = stock.rsiTimeline[i];
+          if (pt.close >= orbHigh) {
+            breakoutIdx = i;
+            isBull = true;
+            break;
+          } else if (pt.close <= orbLow) {
+            breakoutIdx = i;
+            isBull = false;
+            break;
           }
         }
 
-        if (lowestIdx > 0 && lowestIdx < stock.rsiTimeline.length - 2) {
-          let hasHigherHigh = false;
-          let reversalTime = '';
-          let bounceIdx = -1;
-          const baseHigh = Math.max(...stock.rsiTimeline.slice(0, lowestIdx + 1).map(p => p.high));
-
-          for (let i = lowestIdx + 1; i < stock.rsiTimeline.length; i++) {
+        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 2) {
+          for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 3, stock.rsiTimeline.length - 2); i++) {
             const pt = stock.rsiTimeline[i];
-            if (pt.high > baseHigh) {
-              hasHigherHigh = true;
-              reversalTime = pt.timeStr;
-              bounceIdx = i;
-              break;
-            }
-          }
+            const isRetest = isBull 
+              ? (pt.low <= orbHigh * 1.006 && pt.low >= orbHigh * 0.990)
+              : (pt.high >= orbLow * 0.994 && pt.high <= orbLow * 1.010);
 
-          let zeroDrawdownAfterBounce = true;
-          if (hasHigherHigh && bounceIdx !== -1 && bounceIdx < stock.rsiTimeline.length - 1) {
-            const bounceCandleLow = stock.rsiTimeline[bounceIdx].low;
-            for (let k = bounceIdx + 1; k < stock.rsiTimeline.length; k++) {
-              if (stock.rsiTimeline[k].low < bounceCandleLow) {
-                zeroDrawdownAfterBounce = false;
+            if (isRetest) {
+              const retestCandle = pt;
+              const retestBodyMin = Math.min(retestCandle.open, retestCandle.close);
+              const retestBodyMax = Math.max(retestCandle.open, retestCandle.close);
+
+              let staysAboveBody = true;
+              let subsequentCount = 0;
+
+              for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
+                subsequentCount++;
+                const subPt = stock.rsiTimeline[k];
+                if (isBull) {
+                  if (subPt.close < retestBodyMin || subPt.low < retestCandle.low) {
+                    staysAboveBody = false;
+                    break;
+                  }
+                } else {
+                  if (subPt.close > retestBodyMax || subPt.high > retestCandle.high) {
+                    staysAboveBody = false;
+                    break;
+                  }
+                }
+              }
+
+              const rsiStrong = stock.rsi >= 50;
+              const vwapStrong = stock.vwap ? ((stock.closePrice || 0) >= stock.vwap) : true;
+
+              if (staysAboveBody && subsequentCount >= 2 && rsiStrong && vwapStrong) {
+                hasOrbZeroReversal = true;
+                zeroReversalTime = retestCandle.timeStr;
                 break;
               }
             }
-          } else {
-            zeroDrawdownAfterBounce = false;
-          }
-
-          const currentClose = stock.closePrice || stock.rsiTimeline[stock.rsiTimeline.length - 1].close;
-          const rsiStrong = stock.rsi >= 50;
-          const vwapStrong = stock.vwap ? currentClose >= stock.vwap : true;
-
-          if (hasHigherHigh && zeroDrawdownAfterBounce && rsiStrong && vwapStrong) {
-            hasOrbZeroReversal = true;
-            zeroReversalTime = reversalTime;
           }
         }
       }
