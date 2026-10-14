@@ -563,6 +563,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (lowestIdx > 0 && lowestIdx < stock.rsiTimeline.length - 2) {
           let hasHigherHigh = false;
           let reversalTime = '';
+          let bounceIdx = -1;
           const baseHigh = Math.max(...stock.rsiTimeline.slice(0, lowestIdx + 1).map(p => p.high));
 
           for (let i = lowestIdx + 1; i < stock.rsiTimeline.length; i++) {
@@ -570,15 +571,29 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             if (pt.high > baseHigh) {
               hasHigherHigh = true;
               reversalTime = pt.timeStr;
+              bounceIdx = i;
               break;
             }
+          }
+
+          let zeroDrawdownAfterBounce = true;
+          if (hasHigherHigh && bounceIdx !== -1 && bounceIdx < stock.rsiTimeline.length - 1) {
+            const bounceCandleLow = stock.rsiTimeline[bounceIdx].low;
+            for (let k = bounceIdx + 1; k < stock.rsiTimeline.length; k++) {
+              if (stock.rsiTimeline[k].low < bounceCandleLow) {
+                zeroDrawdownAfterBounce = false;
+                break;
+              }
+            }
+          } else {
+            zeroDrawdownAfterBounce = false;
           }
 
           const currentClose = stock.closePrice || stock.rsiTimeline[stock.rsiTimeline.length - 1].close;
           const rsiStrong = stock.rsi >= 50;
           const vwapStrong = stock.vwap ? currentClose >= stock.vwap : true;
 
-          if (hasHigherHigh && rsiStrong && vwapStrong) {
+          if (hasHigherHigh && zeroDrawdownAfterBounce && rsiStrong && vwapStrong) {
             hasOrbZeroReversal = true;
             zeroReversalTime = reversalTime;
           }
