@@ -44,7 +44,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
 
@@ -546,6 +546,45 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         bounceCandleDetails = 'Initial Breakout Bounce Candle Strength Confirmed';
       }
 
+      let hasOrbZeroReversal = false;
+      let zeroReversalTime = '-';
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 4) {
+        let lowestIdx = 0;
+        let lowestPrice = stock.rsiTimeline[0].low;
+
+        for (let i = 1; i < stock.rsiTimeline.length - 2; i++) {
+          if (stock.rsiTimeline[i].low < lowestPrice) {
+            lowestPrice = stock.rsiTimeline[i].low;
+            lowestIdx = i;
+          }
+        }
+
+        if (lowestIdx > 0 && lowestIdx < stock.rsiTimeline.length - 2) {
+          let hasHigherHigh = false;
+          let reversalTime = '';
+          const baseHigh = Math.max(...stock.rsiTimeline.slice(0, lowestIdx + 1).map(p => p.high));
+
+          for (let i = lowestIdx + 1; i < stock.rsiTimeline.length; i++) {
+            const pt = stock.rsiTimeline[i];
+            if (pt.high > baseHigh) {
+              hasHigherHigh = true;
+              reversalTime = pt.timeStr;
+              break;
+            }
+          }
+
+          const currentClose = stock.closePrice || stock.rsiTimeline[stock.rsiTimeline.length - 1].close;
+          const rsiStrong = stock.rsi >= 50;
+          const vwapStrong = stock.vwap ? currentClose >= stock.vwap : true;
+
+          if (hasHigherHigh && rsiStrong && vwapStrong) {
+            hasOrbZeroReversal = true;
+            zeroReversalTime = reversalTime;
+          }
+        }
+      }
+
       return {
         ...stock,
         orbHigh: Math.round(orbHigh * 100) / 100,
@@ -581,7 +620,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         hasBounceCandleStrength,
         bounceCandleTime,
         bounceCandleScore,
-        bounceCandleDetails
+        bounceCandleDetails,
+        hasOrbZeroReversal,
+        zeroReversalTime
       };
     });
   }, [stocks, followedSymbols]);
@@ -613,6 +654,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'immediate_bounce' && !s.hasImmediateBounce) return false;
       if (activeTab === 'orb_low_bounce' && !s.hasOrbLowBounce) return false;
       if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
+      if (activeTab === 'orb_zero_reversal' && !s.hasOrbZeroReversal) return false;
 
       if (activeTimingFilter?.active && activeTimingFilter.qualifyingSymbols && activeTimingFilter.qualifyingSymbols.length > 0) {
         if (!activeTimingFilter.qualifyingSymbols.includes(s.symbol)) return false;
@@ -624,7 +666,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
       return true;
     }).sort((a, b) => {
-      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified);
+      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified) || (activeTab === 'orb_zero_reversal' && !a.isBullishQualified);
       const valA = isBear ? a.breakPctBelow : a.breakPctAbove;
       const valB = isBear ? b.breakPctBelow : b.breakPctAbove;
 
@@ -656,6 +698,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const immediateBounceCount = processedOrbStocks.filter(s => s.hasImmediateBounce).length;
   const orbLowBounceCount = processedOrbStocks.filter(s => s.hasOrbLowBounce).length;
   const bounceCandleCount = processedOrbStocks.filter(s => s.hasBounceCandleStrength).length;
+  const zeroReversalCount = processedOrbStocks.filter(s => s.hasOrbZeroReversal).length;
 
   return (
     <div className="space-y-6 animate-fade-in pb-20 relative">
@@ -870,6 +913,18 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           >
             <Sparkles className="w-4 h-4 text-indigo-300 animate-pulse" />
             <span>📈 Bounce Candle Strength ({bounceCandleCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('orb_zero_reversal')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'orb_zero_reversal'
+                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30 border border-amber-500'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 text-amber-300 animate-pulse" />
+            <span>🚀 ORB Zero Reversal ({zeroReversalCount})</span>
           </button>
         </div>
 
@@ -1099,6 +1154,19 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                       <span className="text-slate-500">@</span>
                       <span className="text-white font-black">{stock.bounceCandleTime}</span>
                     </div>
+                  </div>
+                )}
+
+                {/* 🚀 ORB ZERO REVERSAL BANNER */}
+                {stock.hasOrbZeroReversal && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-amber-950/70 to-slate-950 border-b border-amber-500/40 text-xs font-mono text-amber-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-amber-400 animate-pulse" />
+                      <span>Zero Reversal &amp; Higher High Confirmed:</span>
+                    </span>
+                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-amber-500/20 border border-amber-400 rounded-lg">
+                      @{stock.zeroReversalTime}
+                    </strong>
                   </div>
                 )}
 
