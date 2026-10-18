@@ -44,7 +44,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
 
@@ -549,63 +549,53 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let hasOrbZeroReversal = false;
       let zeroReversalTime = '-';
 
-      if (stock.rsiTimeline && stock.rsiTimeline.length > 3) {
-        let breakoutIdx = -1;
-        let isBull = false;
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 4) {
+        let lowestIdx = 0;
+        let lowestPrice = stock.rsiTimeline[0].low;
 
-        for (let i = 0; i < stock.rsiTimeline.length; i++) {
-          const pt = stock.rsiTimeline[i];
-          if (pt.close >= orbHigh) {
-            breakoutIdx = i;
-            isBull = true;
-            break;
-          } else if (pt.close <= orbLow) {
-            breakoutIdx = i;
-            isBull = false;
-            break;
+        for (let i = 1; i < stock.rsiTimeline.length - 2; i++) {
+          if (stock.rsiTimeline[i].low < lowestPrice) {
+            lowestPrice = stock.rsiTimeline[i].low;
+            lowestIdx = i;
           }
         }
 
-        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 2) {
-          for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 3, stock.rsiTimeline.length - 2); i++) {
+        if (lowestIdx > 0 && lowestIdx < stock.rsiTimeline.length - 2) {
+          let hasHigherHigh = false;
+          let reversalTime = '';
+          let bounceIdx = -1;
+          const baseHigh = Math.max(...stock.rsiTimeline.slice(0, lowestIdx + 1).map(p => p.high));
+
+          for (let i = lowestIdx + 1; i < stock.rsiTimeline.length; i++) {
             const pt = stock.rsiTimeline[i];
-            const isRetest = isBull 
-              ? (pt.low <= orbHigh * 1.006 && pt.low >= orbHigh * 0.990)
-              : (pt.high >= orbLow * 0.994 && pt.high <= orbLow * 1.010);
+            if (pt.high > baseHigh) {
+              hasHigherHigh = true;
+              reversalTime = pt.timeStr;
+              bounceIdx = i;
+              break;
+            }
+          }
 
-            if (isRetest) {
-              const retestCandle = pt;
-              const retestBodyMin = Math.min(retestCandle.open, retestCandle.close);
-              const retestBodyMax = Math.max(retestCandle.open, retestCandle.close);
-
-              let staysAboveBody = true;
-              let subsequentCount = 0;
-
-              for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
-                subsequentCount++;
-                const subPt = stock.rsiTimeline[k];
-                if (isBull) {
-                  if (subPt.close < retestBodyMin || subPt.low < retestCandle.low) {
-                    staysAboveBody = false;
-                    break;
-                  }
-                } else {
-                  if (subPt.close > retestBodyMax || subPt.high > retestCandle.high) {
-                    staysAboveBody = false;
-                    break;
-                  }
-                }
-              }
-
-              const rsiStrong = stock.rsi >= 50;
-              const vwapStrong = stock.vwap ? ((stock.closePrice || 0) >= stock.vwap) : true;
-
-              if (staysAboveBody && subsequentCount >= 2 && rsiStrong && vwapStrong) {
-                hasOrbZeroReversal = true;
-                zeroReversalTime = retestCandle.timeStr;
+          let zeroDrawdownAfterBounce = true;
+          if (hasHigherHigh && bounceIdx !== -1 && bounceIdx < stock.rsiTimeline.length - 1) {
+            const bounceCandleLow = stock.rsiTimeline[bounceIdx].low;
+            for (let k = bounceIdx + 1; k < stock.rsiTimeline.length; k++) {
+              if (stock.rsiTimeline[k].low < bounceCandleLow) {
+                zeroDrawdownAfterBounce = false;
                 break;
               }
             }
+          } else {
+            zeroDrawdownAfterBounce = false;
+          }
+
+          const currentClose = stock.closePrice || stock.rsiTimeline[stock.rsiTimeline.length - 1].close;
+          const rsiStrong = stock.rsi >= 50;
+          const vwapStrong = stock.vwap ? currentClose >= stock.vwap : true;
+
+          if (hasHigherHigh && zeroDrawdownAfterBounce && rsiStrong && vwapStrong) {
+            hasOrbZeroReversal = true;
+            zeroReversalTime = reversalTime;
           }
         }
       }
@@ -666,6 +656,49 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
       }
 
+      let hasNoRetest = false;
+      let noRetestTime = '-';
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+        let breakoutIdx = -1;
+        let isBull = false;
+
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          const pt = stock.rsiTimeline[i];
+          if (pt.close >= orbHigh) {
+            breakoutIdx = i;
+            isBull = true;
+            break;
+          } else if (pt.close <= orbLow) {
+            breakoutIdx = i;
+            isBull = false;
+            break;
+          }
+        }
+
+        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 1) {
+          let stayedOut = true;
+          noRetestTime = stock.rsiTimeline[breakoutIdx].timeStr;
+
+          for (let k = breakoutIdx + 1; k < stock.rsiTimeline.length; k++) {
+            const pt = stock.rsiTimeline[k];
+            if (isBull && pt.low < orbHigh) {
+              stayedOut = false;
+              break;
+            } else if (!isBull && pt.high > orbLow) {
+              stayedOut = false;
+              break;
+            }
+          }
+
+          if (stayedOut) {
+            hasNoRetest = true;
+          }
+        }
+      }
+
+      const hasLightningScalp = (isBullishQualified || isBearishQualified) && breakMinutesFromOpen <= 15 && orbHeightPct <= 1.5 && (breakPctAbove >= 0.25 || breakPctBelow >= 0.25);
+
       return {
         ...stock,
         orbHigh: Math.round(orbHigh * 100) / 100,
@@ -705,7 +738,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         hasOrbZeroReversal,
         zeroReversalTime,
         hasBounceGreat,
-        bounceGreatTime
+        bounceGreatTime,
+        hasLightningScalp,
+        hasNoRetest,
+        noRetestTime
       };
     });
   }, [stocks, followedSymbols]);
@@ -739,6 +775,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
       if (activeTab === 'orb_zero_reversal' && !s.hasOrbZeroReversal) return false;
       if (activeTab === 'bounce_great' && !s.hasBounceGreat) return false;
+      if (activeTab === 'lightning_scalp' && !s.hasLightningScalp) return false;
+      if (activeTab === 'no_retest' && !s.hasNoRetest) return false;
 
       if (activeTimingFilter?.active && activeTimingFilter.qualifyingSymbols && activeTimingFilter.qualifyingSymbols.length > 0) {
         if (!activeTimingFilter.qualifyingSymbols.includes(s.symbol)) return false;
@@ -750,7 +788,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
       return true;
     }).sort((a, b) => {
-      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified) || (activeTab === 'orb_zero_reversal' && !a.isBullishQualified) || (activeTab === 'bounce_great' && !a.isBullishQualified);
+      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified) || (activeTab === 'orb_zero_reversal' && !a.isBullishQualified) || (activeTab === 'bounce_great' && !a.isBullishQualified) || (activeTab === 'lightning_scalp' && !a.isBullishQualified) || (activeTab === 'no_retest' && !a.isBullishQualified);
       const valA = isBear ? a.breakPctBelow : a.breakPctAbove;
       const valB = isBear ? b.breakPctBelow : b.breakPctAbove;
 
@@ -784,6 +822,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const bounceCandleCount = processedOrbStocks.filter(s => s.hasBounceCandleStrength).length;
   const zeroReversalCount = processedOrbStocks.filter(s => s.hasOrbZeroReversal).length;
   const bounceGreatCount = processedOrbStocks.filter(s => s.hasBounceGreat).length;
+  const lightningScalpCount = processedOrbStocks.filter(s => s.hasLightningScalp).length;
+  const noRetestCount = processedOrbStocks.filter(s => s.hasNoRetest).length;
 
   return (
     <div className="space-y-6 animate-fade-in pb-20 relative">
@@ -1022,6 +1062,30 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           >
             <Flame className="w-4 h-4 text-rose-300 animate-pulse fill-rose-300" />
             <span>🔥 Bounce Great ({bounceGreatCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('lightning_scalp')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'lightning_scalp'
+                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30 border border-cyan-400'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-cyan-300 fill-cyan-300 animate-bounce" />
+            <span>⚡ ORB Lightning Scalp ({lightningScalpCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('no_retest')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'no_retest'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30 border border-purple-400'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <ArrowUpRight className="w-4 h-4 text-purple-300 animate-pulse" />
+            <span>🚀 No Retest / Pure Rocket ({noRetestCount})</span>
           </button>
         </div>
 
@@ -1276,6 +1340,32 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     </span>
                     <strong className="text-white font-black text-xs px-2 py-0.5 bg-rose-500/20 border border-rose-400 rounded-lg">
                       @{stock.bounceGreatTime}
+                    </strong>
+                  </div>
+                )}
+
+                {/* ⚡ ORB LIGHTNING SCALP BANNER */}
+                {stock.hasLightningScalp && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-cyan-950/70 to-slate-950 border-b border-cyan-500/40 text-xs font-mono text-cyan-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400 animate-bounce" />
+                      <span>⚡ Lightning Scalp Setup ({stock.breakMinutesFromOpen}m from open, {stock.orbHeightPct}% height):</span>
+                    </span>
+                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-cyan-500/20 border border-cyan-400 rounded-lg">
+                      @{stock.orbBreakTime}
+                    </strong>
+                  </div>
+                )}
+
+                {/* 🚀 NO RETEST / PURE ROCKET BANNER */}
+                {stock.hasNoRetest && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-purple-950/70 to-slate-950 border-b border-purple-500/40 text-xs font-mono text-purple-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <ArrowUpRight className="w-4 h-4 text-purple-400 animate-pulse" />
+                      <span>🚀 No Retest / Pure Rocket Run (Never Touched Back):</span>
+                    </span>
+                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-purple-500/20 border border-purple-400 rounded-lg">
+                      @{stock.noRetestTime}
                     </strong>
                   </div>
                 )}
