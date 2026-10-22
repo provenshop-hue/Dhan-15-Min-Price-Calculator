@@ -1409,19 +1409,23 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
                 {/* 🛡️ ORB SUPPORT/RESISTANCE BOUNCE & RALLY BANNER */}
                 {stock.hasOrbLowBounce && (
-                  <div className="px-4 py-3 bg-gradient-to-r from-slate-950 via-emerald-950/80 to-slate-950 border-b border-emerald-500/50 text-xs font-mono text-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                    <span className="font-bold flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>
+                  <div className={`px-4 py-3.5 bg-gradient-to-r ${
+                    stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' 
+                      ? 'from-slate-950 via-emerald-950/95 to-slate-950 border-b border-emerald-500/80 shadow-lg shadow-emerald-500/20' 
+                      : 'from-slate-950 via-rose-950/95 to-slate-950 border-b border-rose-500/80 shadow-lg shadow-rose-500/20'
+                  } text-xs font-mono flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5`}>
+                    <span className="font-black flex items-center gap-1.5 uppercase tracking-wide">
+                      <ShieldCheck className={`w-4 h-4 ${stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? 'text-emerald-400' : 'text-rose-400'} shrink-0 animate-pulse`} />
+                      <span className={stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? 'text-emerald-200' : 'text-rose-200'}>
                         {stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? '🟢 ORB Support Bounce & Bullish Rally:' : '🔴 ORB Resistance Rejection & Drop:'}
                       </span>
                     </span>
                     <div className="flex items-center gap-2">
-                      <strong className="text-emerald-300 font-black bg-emerald-500/20 border border-emerald-400/50 px-2 py-0.5 rounded-lg">
-                        {stock.rallyExpansionPct >= 0 ? '+' : ''}{stock.rallyExpansionPct}% Rally 🚀
+                      <strong className={`${stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? 'text-emerald-300 bg-emerald-500/30 border-emerald-400' : 'text-rose-300 bg-rose-500/30 border-rose-400'} font-black border px-2.5 py-1 rounded-xl shadow`}>
+                        {stock.rallyExpansionPct >= 0 ? '+' : ''}{stock.rallyExpansionPct}% {stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? 'Rally 🚀' : 'Drop 📉'}
                       </strong>
                       <span className="text-slate-300 font-medium">Power: <strong className="text-amber-300">{stock.bouncePowerScore}/100</strong></span>
-                      <span className="text-white font-black">@{stock.orbLowBounceTime}</span>
+                      <span className="text-white font-black bg-slate-900/90 px-2 py-0.5 rounded-lg border border-slate-700">@{stock.orbLowBounceTime}</span>
                     </div>
                   </div>
                 )}
