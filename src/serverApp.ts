@@ -1588,17 +1588,46 @@ Return ONLY a JSON array of objects with this schema:
 
           if (candles.length === 0) continue;
 
-          // STRICT HISTORICAL WINDOW FILTER:
-          // Keep only candles strictly within [startMins, endMins]
-          const candlesInWindow = candles.filter(c => c.totalMins >= startMins && c.totalMins <= endMins);
-          if (candlesInWindow.length === 0) continue;
+          // Establish Opening Range (ORB) from first candle (09:15 AM)
+          const orbHigh = candles[0].high;
+          const orbLow = candles[0].low;
 
-          const snapshotCandle = candlesInWindow[candlesInWindow.length - 1];
+          // Find exact breakout / trigger candle where price breaks out of ORB or has strongest momentum
+          let breakoutCandle = candles[0];
+          let foundTrigger = false;
+
+          for (const c of candles) {
+            if (c.close > orbHigh || c.close < orbLow) {
+              breakoutCandle = c;
+              foundTrigger = true;
+              break;
+            }
+          }
+
+          if (!foundTrigger) {
+            let maxVol = -1;
+            for (const c of candles) {
+              if (c.volume > maxVol) {
+                maxVol = c.volume;
+                breakoutCandle = c;
+              }
+            }
+          }
+
+          const triggerMins = breakoutCandle.totalMins;
+
+          // STRICT PRECISION TIME WINDOW CHECK:
+          // Stock must have triggered/broken out strictly within [startMins, endMins]
+          if (triggerMins < startMins || triggerMins > endMins) {
+            continue;
+          }
+
+          const snapshotCandle = breakoutCandle;
           const openPrice = candles[0].open;
           const closePrice = snapshotCandle.close;
           const changePct = ((closePrice - openPrice) / openPrice) * 100;
-          const highInWindow = Math.max(...candlesInWindow.map(c => c.high));
-          const lowInWindow = Math.min(...candlesInWindow.map(c => c.low));
+          const highInWindow = Math.max(...candles.filter(c => c.totalMins <= endMins).map(c => c.high));
+          const lowInWindow = Math.min(...candles.filter(c => c.totalMins <= endMins).map(c => c.low));
 
           results.push({
             symbol,
@@ -1608,7 +1637,7 @@ Return ONLY a JSON array of objects with this schema:
             openPrice,
             highPrice: highInWindow,
             lowPrice: lowInWindow,
-            volume: candlesInWindow.reduce((acc, c) => acc + c.volume, 0),
+            volume: candles.filter(c => c.totalMins <= endMins).reduce((acc, c) => acc + c.volume, 0),
             snapshotTimeStr: snapshotCandle.timeStr,
             qualityScore: 75 + Math.round(Math.abs(changePct) * 5),
             notes: [
