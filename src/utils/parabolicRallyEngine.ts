@@ -2,6 +2,7 @@ import { StockCalculated } from '../types';
 import { getStockSector, computeAllSectorStrengths } from './sectorMaster';
 import { getAtmOptionStrikes } from './gann';
 import { formatCleanRecentTime } from './recentHitTiming';
+import { calculateSupertrend } from './supertrend';
 
 export type ParabolicStage =
   | 'PARABOLIC_RALLY'       // 12+ pts (Fully Bullish)
@@ -295,6 +296,11 @@ function assignCheckTimes(
         offsetMinutes = 8;
         phase = 'Step 6: Min 00:08 (Swing High Broken)';
         break;
+      case 'supertrend_bullish':
+      case 'supertrend_bearish':
+        offsetMinutes = 4;
+        phase = 'Step 4: Supertrend Trend Confirmation';
+        break;
       case 'market_breadth':
         offsetMinutes = 3;
         phase = 'Step 7: Sector Breadth Alignment';
@@ -334,6 +340,11 @@ export function analyzeParabolicRally(
   const first15mLow = stock.first15mLow || low;
   const buyAbove = stock.buyAbove || (open * 1.004);
   const sellBelow = stock.sellBelow || (open * 0.996);
+
+  const candlesForSupertrend = stock.rsiTimeline && stock.rsiTimeline.length > 0 
+    ? stock.rsiTimeline.map(p => ({ high: p.high, low: p.low, close: p.close }))
+    : [{ high: high, low: low, close: close }];
+  const supertrendResult = calculateSupertrend(candlesForSupertrend);
 
   // Sector stats
   const sectorInfo = getStockSector(stock.symbol);
@@ -523,6 +534,18 @@ export function analyzeParabolicRally(
       detail: isBreadthPositive ? 'Industry sector tailwinds fully backing the stock move' : 'Sector breadth weak or mixed'
     });
 
+    // 13. Supertrend Bullish (+1 pt)
+    const isSupertrendBullish = supertrendResult.isBullish;
+    checks.push({
+      id: 'supertrend_bullish',
+      name: 'Supertrend Bullish (Uptrend)',
+      points: isSupertrendBullish ? 1 : 0,
+      maxPoints: 1,
+      passed: isSupertrendBullish,
+      actualValue: isSupertrendBullish ? `Uptrend (Line @ ₹${supertrendResult.supertrendLine})` : 'Downtrend',
+      detail: isSupertrendBullish ? 'Price is trading above Supertrend dynamic support line' : 'Price is below Supertrend resistance'
+    });
+
     const totalScore = checks.reduce((sum, c) => sum + c.points, 0);
 
     // Exhaustion check: RSI > 78 OR price stretched >3.8% above VWAP
@@ -538,17 +561,17 @@ export function analyzeParabolicRally(
       stageLabel = '⚠️ EXHAUSTION / OVEREXTENDED';
       stageBadgeClass = 'bg-amber-950 text-amber-300 border-amber-500/50 animate-pulse';
       stageColor = '#f59e0b';
-    } else if (totalScore >= 12) {
+    } else if (totalScore >= 13) {
       stage = 'PARABOLIC_RALLY';
       stageLabel = '🔥 FULLY BULLISH (PARABOLIC RALLY)';
       stageBadgeClass = 'bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/30 border-emerald-400 animate-pulse';
       stageColor = '#10b981';
-    } else if (totalScore >= 9) {
+    } else if (totalScore >= 10) {
       stage = 'BULLISH_CONFIRMED';
       stageLabel = '🟢 BULLISH CONFIRMED';
       stageBadgeClass = 'bg-emerald-950 text-emerald-300 border-emerald-500/40';
       stageColor = '#059669';
-    } else if (totalScore >= 6) {
+    } else if (totalScore >= 7) {
       stage = 'BULLISH_EARLY';
       stageLabel = '🌱 BULLISH EARLY (Min 1–3)';
       stageBadgeClass = 'bg-blue-950 text-blue-300 border-blue-500/40';
@@ -573,13 +596,13 @@ export function analyzeParabolicRally(
       stock,
       direction: 'BULLISH',
       score: totalScore,
-      maxScore: 16,
+      maxScore: 17,
       stage,
       stageLabel,
       stageBadgeClass,
       stageColor,
-      confidencePercent: Math.min(100, Math.round((totalScore / 16) * 100)),
-      isFullyBullish: totalScore >= 12 && !isExhausted,
+      confidencePercent: Math.min(100, Math.round((totalScore / 17) * 100)),
+      isFullyBullish: totalScore >= 13 && !isExhausted,
       isFullyBearish: false,
       checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
@@ -766,6 +789,18 @@ export function analyzeParabolicRally(
       detail: isBreadthNegative ? 'Industry sector headwind dragging down the entire peer basket' : 'Sector breadth mixed'
     });
 
+    // 13. Supertrend Bearish (+1 pt)
+    const isSupertrendBearish = supertrendResult.isBearish;
+    checks.push({
+      id: 'supertrend_bearish',
+      name: 'Supertrend Bearish (Downtrend)',
+      points: isSupertrendBearish ? 1 : 0,
+      maxPoints: 1,
+      passed: isSupertrendBearish,
+      actualValue: isSupertrendBearish ? `Downtrend (Line @ ₹${supertrendResult.supertrendLine})` : 'Uptrend',
+      detail: isSupertrendBearish ? 'Price is trading below Supertrend dynamic resistance line' : 'Price is above Supertrend support'
+    });
+
     const totalScore = checks.reduce((sum, c) => sum + c.points, 0);
 
     // Exhaustion check: RSI < 22 OR price stretched >3.8% below VWAP
@@ -781,17 +816,17 @@ export function analyzeParabolicRally(
       stageLabel = '⚠️ OVERSOLD EXHAUSTION DUMP';
       stageBadgeClass = 'bg-amber-950 text-amber-300 border-amber-500/50 animate-pulse';
       stageColor = '#f59e0b';
-    } else if (totalScore >= 12) {
+    } else if (totalScore >= 13) {
       stage = 'PARABOLIC_BREAKDOWN';
       stageLabel = '🔥 FULLY BEARISH (PARABOLIC BREAKDOWN)';
       stageBadgeClass = 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-lg shadow-rose-500/30 border-rose-400 animate-pulse';
       stageColor = '#ef4444';
-    } else if (totalScore >= 9) {
+    } else if (totalScore >= 10) {
       stage = 'BEARISH_CONFIRMED';
       stageLabel = '🔴 BEARISH CONFIRMED';
       stageBadgeClass = 'bg-rose-950 text-rose-300 border-rose-500/40';
       stageColor = '#dc2626';
-    } else if (totalScore >= 6) {
+    } else if (totalScore >= 7) {
       stage = 'BEARISH_EARLY';
       stageLabel = '🍂 BEARISH EARLY (Min 1–3)';
       stageBadgeClass = 'bg-purple-950 text-purple-300 border-purple-500/40';
@@ -816,14 +851,14 @@ export function analyzeParabolicRally(
       stock,
       direction: 'BEARISH',
       score: totalScore,
-      maxScore: 16,
+      maxScore: 17,
       stage,
       stageLabel,
       stageBadgeClass,
       stageColor,
-      confidencePercent: Math.min(100, Math.round((totalScore / 16) * 100)),
+      confidencePercent: Math.min(100, Math.round((totalScore / 17) * 100)),
       isFullyBullish: false,
-      isFullyBearish: totalScore >= 12 && !isExhausted,
+      isFullyBearish: totalScore >= 13 && !isExhausted,
       checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
       openingRangeStatus: isOrbLowBroken ? 'ORB Low Shattered 🔴' : 'Inside ORB Range',
