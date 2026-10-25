@@ -783,6 +783,19 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                     </div>
                   </div>
 
+                  {/* ⚡ RECENT FRESH HIT BADGE */}
+                  {item.timing.isFresh && (
+                    <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-[11px] px-3 py-1.5 rounded-xl shadow-md flex items-center justify-between border border-amber-300">
+                      <span className="flex items-center gap-1.5 uppercase tracking-wide">
+                        <Sparkles className="w-3.5 h-3.5 fill-slate-950 animate-bounce" />
+                        <span>⚡ Recent Fresh Hit ({item.timing.recencyLabel})</span>
+                      </span>
+                      <span className="bg-slate-950 text-amber-300 font-mono text-xs px-2 py-0.5 rounded-lg">
+                        @{item.timing.timeStr}
+                      </span>
+                    </div>
+                  )}
+
                   {/* 🕒 EXACT SIGNAL TRIGGER TIME BADGE */}
                   <div className="bg-gradient-to-r from-indigo-50 via-slate-50 to-indigo-50/60 p-2.5 rounded-xl border border-indigo-100 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
