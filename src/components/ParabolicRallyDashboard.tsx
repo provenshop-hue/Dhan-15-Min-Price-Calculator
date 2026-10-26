@@ -58,6 +58,7 @@ type ViewFilter =
   | 'CONFIRMED_BULLISH'
   | 'CONFIRMED_BEARISH'
   | 'EARLY_1_3_MIN'
+  | 'EARLY_IGNITION'
   | 'EXHAUSTION';
 
 type SortOption = 'VOLUME_PRIORITY' | 'SCORE_DESC' | 'TIME_NEWEST' | 'GAIN_DESC' | 'SYMBOL_ASC';
@@ -203,6 +204,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
             return a.stage === 'BEARISH_CONFIRMED';
           case 'EARLY_1_3_MIN':
             return a.stage === 'BULLISH_EARLY' || a.stage === 'BEARISH_EARLY';
+          case 'EARLY_IGNITION':
+            return (a.stage === 'BULLISH_EARLY' || a.stage === 'BULLISH_CONFIRMED' || a.score >= 6) && a.score <= 12 && !a.isExhausted;
           case 'EXHAUSTION':
             return a.stage === 'EXHAUSTION';
           case 'ALL':
@@ -524,6 +527,29 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
             {stats.earlyCount}
           </div>
           <div className="text-[10px] opacity-75 mt-0.5">Forming Intra-Candle</div>
+        </button>
+
+        {/* Early Ignition (Catch Before Rally) */}
+        <button
+          onClick={() => setActiveFilter('EARLY_IGNITION')}
+          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+            activeFilter === 'EARLY_IGNITION'
+              ? 'bg-violet-700 text-white border-violet-600 shadow-md ring-2 ring-violet-400/40'
+              : 'bg-white hover:bg-violet-50/50 border-slate-200 text-slate-800'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider opacity-80 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-violet-600 animate-pulse" /> Early Ignition
+            </span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-800">
+              Catch Before Rally
+            </span>
+          </div>
+          <div className="text-2xl font-black mt-1">
+            {analyses.filter(a => (a.stage === 'BULLISH_EARLY' || a.stage === 'BULLISH_CONFIRMED' || a.score >= 6) && a.score <= 12 && !a.isExhausted).length}
+          </div>
+          <div className="text-[10px] opacity-75 mt-0.5">Pre-Rally Setup Ignition</div>
         </button>
 
         {/* Exhaustion Alerts */}
