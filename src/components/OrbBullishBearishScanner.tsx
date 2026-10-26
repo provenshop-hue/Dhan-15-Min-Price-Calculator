@@ -896,8 +896,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
       }
       if (sortBy === 'LOWER_BREAK_PCT') {
-        if (Math.abs(valA - valB) > 0.0001) {
-          return valA - valB; // Ascending order (lowest break % first)
+        const heightA = a.breakVsHeightPct || 0;
+        const heightB = b.breakVsHeightPct || 0;
+        if (Math.abs(heightA - heightB) > 0.0001) {
+          return heightA - heightB; // Lowest to highest break % in height
         }
         return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
       }
@@ -1238,7 +1240,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
               }`}
             >
-              📉 Lowest Break %
+              📉 Lowest Break % in Height
             </button>
             <button
               onClick={() => setSortBy('JUST_HIT')}
