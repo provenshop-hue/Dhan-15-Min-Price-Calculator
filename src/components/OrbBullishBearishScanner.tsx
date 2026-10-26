@@ -61,7 +61,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 }) => {
   const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'recent_discovery'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
+  const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
 
   const [lastFetchTime, setLastFetchTime] = useState<string>(() => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -895,6 +895,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
         return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
       }
+      if (sortBy === 'LOWER_BREAK_PCT') {
+        if (Math.abs(valA - valB) > 0.0001) {
+          return valA - valB; // Ascending order (lowest break % first)
+        }
+        return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
+      }
       if (sortBy === 'JUST_HIT') {
         if (a.breakMinutesFromOpen !== b.breakMinutesFromOpen) {
           return a.breakMinutesFromOpen - b.breakMinutesFromOpen;
@@ -1223,6 +1229,16 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
               }`}
             >
               🚀 Highest Break % (#1 Top)
+            </button>
+            <button
+              onClick={() => setSortBy('LOWER_BREAK_PCT')}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                sortBy === 'LOWER_BREAK_PCT'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              📉 Lowest Break %
             </button>
             <button
               onClick={() => setSortBy('JUST_HIT')}
