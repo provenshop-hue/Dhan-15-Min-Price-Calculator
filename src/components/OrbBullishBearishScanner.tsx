@@ -62,6 +62,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'recent_discovery'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
+  const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
 
   const [lastFetchTime, setLastFetchTime] = useState<string>(() => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1618,6 +1619,18 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                         <span>Refresh</span>
                       </button>
                     )}
+
+                    {/* Shall I Take This Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShallITakeThisStock(stock);
+                      }}
+                      className="px-3 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-lg text-xs font-black shadow-md transition-all cursor-pointer min-h-[38px] flex items-center space-x-1"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Shall I take this</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1625,6 +1638,93 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           })}
         </div>
       )}
+
+      {/* 🧠 SHALL I TAKE THIS - INSTITUTIONAL TRADE EXPLAINER MODAL */}
+      {shallITakeThisStock && (() => {
+        const isBull = activeTab === 'bullish' || activeTab === 'super_break_bull';
+        const breakPct = isBull ? (shallITakeThisStock.breakPctAbove || 0) : (shallITakeThisStock.breakPctBelow || 0);
+        const breakHeight = shallITakeThisStock.breakVsHeightPct || 0;
+        const lotSz = shallITakeThisStock.lotSize || 250;
+        const ltp = shallITakeThisStock.closePrice || 100;
+        const breakTime = shallITakeThisStock.orbBreakTime || '09:30 AM';
+        const tradeDir = isBull ? 'Bullish Breakout (Long 🟢)' : 'Bearish Breakdown (Short 🔴)';
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={() => setShallITakeThisStock(null)}>
+            <div className="bg-slate-900 border border-indigo-500/40 rounded-2xl max-w-lg w-full p-6 text-white shadow-2xl space-y-5" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2.5 bg-indigo-600/30 rounded-xl border border-indigo-400/40">
+                    <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight">Shall I Take This Trade?</h3>
+                    <p className="text-xs text-indigo-200 font-mono">{shallITakeThisStock.symbol} ({shallITakeThisStock.companyName})</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShallITakeThisStock(null)}
+                  className="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3.5 font-mono text-xs">
+                {/* 1. When ORB hit */}
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400 font-sans">1. When ORB Hit:</span>
+                  <strong className="text-amber-300 font-black">{breakTime} ({shallITakeThisStock.breakMinutesFromOpen}m from open)</strong>
+                </div>
+
+                {/* 2. Trade Direction */}
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400 font-sans">2. Trade Bias:</span>
+                  <strong className={isBull ? 'text-emerald-400 font-black' : 'text-rose-400 font-black'}>{tradeDir}</strong>
+                </div>
+
+                {/* 3. Stock Price */}
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400 font-sans">3. Stock Price (LTP):</span>
+                  <strong className="text-white font-black text-sm">₹{ltp.toFixed(2)} ({shallITakeThisStock.pctChange >= 0 ? '+' : ''}{shallITakeThisStock.pctChange?.toFixed(2)}%)</strong>
+                </div>
+
+                {/* 4. Break% Height */}
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400 font-sans">4. Break % in Height:</span>
+                  <strong className="text-cyan-300 font-black">{breakHeight.toFixed(1)}% of ORB Height (Initial Break: {breakPct.toFixed(2)}%)</strong>
+                </div>
+
+                {/* 5. Lot Size */}
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-400 font-sans">5. F&amp;O Lot Size:</span>
+                  <strong className="text-indigo-300 font-black">{lotSz.toLocaleString('en-IN')} shares</strong>
+                </div>
+
+                {/* 6. Is it a guaranteed profitable trade? */}
+                <div className="bg-gradient-to-br from-amber-950/80 via-slate-950 to-amber-950/80 p-4 rounded-xl border border-amber-500/50 space-y-2">
+                  <div className="flex items-center space-x-2 text-amber-300 font-bold font-sans">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                    <span>6. Is it a guaranteed profitable trade?</span>
+                  </div>
+                  <p className="text-slate-300 text-[11px] font-sans leading-relaxed">
+                    <strong>No trade in the stock market is 100% guaranteed.</strong> While this setup meets strict institutional Opening Range Breakout (ORB) criteria (RSI, VWAP, Volume, and Height Expansion), market conditions can shift rapidly. Always enforce strict risk management, appropriate position sizing, and a stop-loss near the ORB level.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => setShallITakeThisStock(null)}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg cursor-pointer"
+                >
+                  Got It
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
