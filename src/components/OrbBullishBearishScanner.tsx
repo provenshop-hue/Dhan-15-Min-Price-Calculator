@@ -63,6 +63,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
+  const [recentSubFilter, setRecentSubFilter] = useState<string>('ALL');
 
   const [lastFetchTime, setLastFetchTime] = useState<string>(() => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -868,7 +869,17 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'bounce_great' && !s.hasBounceGreat) return false;
       if (activeTab === 'lightning_scalp' && !s.hasLightningScalp) return false;
       if (activeTab === 'no_retest' && !s.hasNoRetest) return false;
-      if (activeTab === 'recent_discovery' && !s.hasRecentDiscovery) return false;
+      if (activeTab === 'recent_discovery') {
+        if (!s.hasRecentDiscovery) return false;
+        if (recentSubFilter === 'SUPER_BREAK' && !s.isSuperBreakBullish && !s.isSuperBreakBearish) return false;
+        if (recentSubFilter === 'SUPPORT_BOUNCE' && !s.hasOrbLowBounce) return false;
+        if (recentSubFilter === 'LIGHTNING_SCALP' && !s.hasLightningScalp) return false;
+        if (recentSubFilter === 'NO_RETEST' && !s.hasNoRetest) return false;
+        if (recentSubFilter === 'ZERO_REVERSAL' && !s.hasOrbZeroReversal) return false;
+        if (recentSubFilter === 'BOUNCE_CANDLE' && !s.hasBounceCandleStrength) return false;
+        if (recentSubFilter === 'IMMEDIATE_BOUNCE' && !s.hasImmediateBounce) return false;
+        if (recentSubFilter === 'BOUNCE_GREAT' && !s.hasBounceGreat) return false;
+      }
 
       if (activeTimingFilter?.active && activeTimingFilter.qualifyingSymbols && activeTimingFilter.qualifyingSymbols.length > 0) {
         if (!activeTimingFilter.qualifyingSymbols.includes(s.symbol)) return false;
@@ -1207,6 +1218,38 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             <span>🚀 No Retest / Pure Rocket ({noRetestCount})</span>
           </button>
         </div>
+
+        {/* ✨ RECENT DISCOVERY SUB-CATEGORIES SUB-BAR */}
+        {activeTab === 'recent_discovery' && (
+          <div className="bg-slate-950/90 p-3.5 rounded-2xl border border-amber-500/40 flex flex-wrap items-center gap-2 shadow-lg">
+            <span className="text-xs font-black text-amber-300 uppercase tracking-wider mr-1.5 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 animate-bounce" /> Sub-Filters:
+            </span>
+            {[
+              { id: 'ALL', label: 'All Recent' },
+              { id: 'SUPER_BREAK', label: '🚀 Super Break' },
+              { id: 'SUPPORT_BOUNCE', label: '🛡️ Support Bounce' },
+              { id: 'LIGHTNING_SCALP', label: '⚡ Lightning Scalp' },
+              { id: 'NO_RETEST', label: '🚀 Pure Rocket' },
+              { id: 'ZERO_REVERSAL', label: '📈 Zero Reversal' },
+              { id: 'BOUNCE_CANDLE', label: '📈 Bounce Candle' },
+              { id: 'IMMEDIATE_BOUNCE', label: '⚡ Immediate Bounce' },
+              { id: 'BOUNCE_GREAT', label: '🔥 Bounce Great' },
+            ].map((sub) => (
+              <button
+                key={sub.id}
+                onClick={() => setRecentSubFilter(sub.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  recentSubFilter === sub.id
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-300/50'
+                    : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                }`}
+              >
+                {sub.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Search & Sort */}
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
