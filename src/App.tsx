@@ -26,6 +26,7 @@ import { HundredPercentBullishScanner } from './components/HundredPercentBullish
 import { HundredPercentBearishScanner } from './components/HundredPercentBearishScanner';
 import { EmaConfluenceScanner } from './components/EmaConfluenceScanner';
 import { OrbBullishBearishScanner } from './components/OrbBullishBearishScanner';
+import { FiiDiiPredictorHub } from './components/FiiDiiPredictorHub';
 import { DhanTimingQualityScanner } from './components/DhanTimingQualityScanner';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { DhanMarketfeedModal } from './components/DhanMarketfeedModal';
@@ -210,7 +211,7 @@ export default function App() {
 
 
   // Active Dashboard View Tab
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'ema_confluence' | 'orb_breakout' | 'timing_quality'>('gann');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'ema_confluence' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor'>('gann');
 
   // Precision Timing Filter State
   const [activeTimingFilter, setActiveTimingFilter] = useState({
@@ -1429,6 +1430,11 @@ export default function App() {
             onClearTimingFilter={() => setActiveTimingFilter({ active: false, date: '', timeSlot: '', qualifyingSymbols: [] })}
             onChangeDashboardTab={(t) => setActiveDashboardTab(t)}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+          />
+        ) : activeDashboardTab === 'fii_dii_predictor' ? (
+          /* Dedicated FII-DII NIFTY Direction Predictor PRO */
+          <FiiDiiPredictorHub
+            stocks={stocks}
           />
         ) : (
           /* Dedicated AI BTST & STBT Gap Prediction Hub */

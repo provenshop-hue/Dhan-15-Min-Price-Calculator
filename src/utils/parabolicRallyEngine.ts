@@ -72,8 +72,40 @@ export interface ParabolicRallyAnalysis {
   sectorIcon: string;
   sectorBreadthPct: number;
   sectorAvgPct: number;
+  breakPctHeight: number;
+  lotSize: number;
   // Exact Signal Timestamp Info
   timing: ParabolicSignalTiming;
+}
+
+export function getStockLotSize(symbol: string, close: number): number {
+  const map: Record<string, number> = {
+    NIFTY: 25,
+    BANKNIFTY: 15,
+    FINNIFTY: 25,
+    RELIANCE: 250,
+    TCS: 175,
+    INFY: 400,
+    HDFCBANK: 550,
+    ICICIBANK: 700,
+    SBIN: 750,
+    ITC: 1600,
+    BHARTIARTL: 500,
+    KOTAKBANK: 400,
+    LT: 150,
+    AXISBANK: 625,
+    WIPRO: 1500,
+    MARUTI: 100,
+    TATAMOTORS: 750,
+    TATASTEEL: 5500,
+    SUNPHARMA: 350,
+    BAJFINANCE: 125
+  };
+  const clean = symbol.toUpperCase().replace('&', '').replace('-', '');
+  if (map[clean]) return map[clean];
+  const targetLotValue = 150000;
+  const rawLot = Math.round(targetLotValue / Math.max(1, close));
+  return Math.max(25, Math.round(rawLot / 25) * 25);
 }
 
 /**
@@ -591,6 +623,8 @@ export function analyzeParabolicRally(
     const timing = computeParabolicTiming(stock, 'BULLISH', totalScore);
     const timedChecks = assignCheckTimes(checks, timing, true);
     const volumePriorityScore = (totalScore * 10000) + (isVolumeIncreasing ? 8000 : 0) + (volumeRatio * 3000) + Math.log10(Math.max(10, rawVolume)) * 1000;
+    const breakPctHeight = Math.round(Math.abs(((high - low) / Math.max(1, open)) * 100) * 100) / 100;
+    const lotSize = getStockLotSize(stock.symbol, close);
 
     return {
       stock,
@@ -634,6 +668,8 @@ export function analyzeParabolicRally(
       sectorIcon: sectorInfo.icon,
       sectorBreadthPct,
       sectorAvgPct,
+      breakPctHeight,
+      lotSize,
       timing
     };
 
@@ -846,6 +882,8 @@ export function analyzeParabolicRally(
     const timing = computeParabolicTiming(stock, 'BEARISH', totalScore);
     const timedChecks = assignCheckTimes(checks, timing, false);
     const volumePriorityScore = (totalScore * 10000) + (isVolumeIncreasing ? 8000 : 0) + (volumeRatio * 3000) + Math.log10(Math.max(10, rawVolume)) * 1000;
+    const breakPctHeight = Math.round(Math.abs(((high - low) / Math.max(1, open)) * 100) * 100) / 100;
+    const lotSize = getStockLotSize(stock.symbol, close);
 
     return {
       stock,
@@ -889,6 +927,8 @@ export function analyzeParabolicRally(
       sectorIcon: sectorInfo.icon,
       sectorBreadthPct,
       sectorAvgPct,
+      breakPctHeight,
+      lotSize,
       timing
     };
   }

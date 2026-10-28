@@ -82,6 +82,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   const [sortBy, setSortBy] = useState<SortOption>('VOLUME_PRIORITY');
   const [timeWindowFilter, setTimeWindowFilter] = useState<string>('ALL');
   const [inspectedStock, setInspectedStock] = useState<ParabolicRallyAnalysis | null>(null);
+  const [shallITakeStock, setShallITakeStock] = useState<ParabolicRallyAnalysis | null>(null);
   const [chartStock, setChartStock] = useState<StockCalculated | null>(null);
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   
@@ -952,13 +953,22 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                 </div>
 
                 {/* Card Action Buttons */}
-                <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-1.5">
+                  <button
+                    onClick={() => setShallITakeStock(item)}
+                    className="flex-1 py-1.5 px-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-[11px] font-black shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    title="Shall I take this trade? Expert Guidance"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 fill-white" />
+                    <span>Shall I take this</span>
+                  </button>
+
                   <button
                     onClick={() => setInspectedStock(item)}
-                    className="flex-1 py-1.5 px-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                    className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+                    title="12-Point Checklist"
                   >
-                    <Info className="w-3.5 h-3.5 text-blue-600" />
-                    <span>12-Point Checklist</span>
+                    <Info className="w-4 h-4 text-blue-600" />
                   </button>
 
                   <button
@@ -1107,6 +1117,14 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            onClick={() => setShallITakeStock(item)}
+                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold shadow-2xs flex items-center gap-1 cursor-pointer"
+                            title="Shall I take this?"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            <span>Take?</span>
+                          </button>
                           <button
                             onClick={() => setInspectedStock(item)}
                             className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
@@ -1340,6 +1358,146 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                 className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
               >
                 Close Chart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 "SHALL I TAKE THIS?" EXPLANATORY MODAL */}
+      {shallITakeStock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white flex items-center justify-between border-b border-emerald-500/25">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="bg-emerald-500 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 fill-slate-950" /> Shall I Take This Trade?
+                  </span>
+                  <span className="text-lg font-black">{shallITakeStock.stock.symbol}</span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1">
+                  Institutional Trade Evaluation &amp; Execution Guidance for {shallITakeStock.stock.companyName}
+                </p>
+              </div>
+              <button
+                onClick={() => setShallITakeStock(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold text-sm cursor-pointer transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* 1. Guaranteed / Profitability Reality Check */}
+              <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 shadow-xs space-y-1.5">
+                <div className="font-black text-sm flex items-center gap-2 text-amber-950">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Is it a 100% Guaranteed Profitable Trade?</span>
+                </div>
+                <p className="leading-relaxed font-medium">
+                  ❌ <strong className="text-amber-950 underline">NO! There is NO 100% guaranteed trade</strong> in the stock market. Probabilities favor this setup because it satisfies <strong className="text-amber-950">{shallITakeStock.score}/16 institutional rules</strong> ({shallITakeStock.confidencePercent}% confidence score with VWAP and Volume confirmation). Always manage risk strictly with Stop Loss!
+                </p>
+              </div>
+
+              {/* 2. Core Trade Parameters Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">Trade Direction</div>
+                  <div className={`text-sm font-black mt-0.5 ${shallITakeStock.direction === 'BULLISH' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {shallITakeStock.direction === 'BULLISH' ? '🟢 Bullish Rally' : '🔴 Bearish Breakdown'}
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">Stock Price (LTP)</div>
+                  <div className="text-sm font-black text-slate-900 mt-0.5">
+                    ₹{shallITakeStock.stock.closePrice?.toFixed(2) || '0.00'}
+                    <span className={`text-[11px] ml-1.5 font-bold ${shallITakeStock.stock.pctChange && shallITakeStock.stock.pctChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {shallITakeStock.stock.pctChange && shallITakeStock.stock.pctChange >= 0 ? '+' : ''}{shallITakeStock.stock.pctChange?.toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">Break% Height</div>
+                  <div className="text-sm font-black text-indigo-700 mt-0.5">
+                    {shallITakeStock.breakPctHeight}% Expansion
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">ORB Hit Status</div>
+                  <div className="text-xs font-black text-slate-900 mt-0.5 truncate">
+                    {shallITakeStock.openingRangeStatus}
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">Lot Size &amp; Value</div>
+                  <div className="text-xs font-black text-slate-900 mt-0.5">
+                    {shallITakeStock.lotSize} Shares (~₹{Math.round(shallITakeStock.lotSize * (shallITakeStock.stock.closePrice || 100)).toLocaleString()})
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase">Signal Trigger Time</div>
+                  <div className="text-xs font-black text-indigo-700 mt-0.5">
+                    {shallITakeStock.timing.timeStr} ({shallITakeStock.timing.recencyLabel})
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Early Ignition & Neck-of-the-Moment Scalping Playbook (Answering User Request 10) */}
+              <div className="bg-gradient-to-br from-indigo-50 via-slate-50 to-indigo-50/50 p-4 rounded-xl border border-indigo-200 space-y-2.5">
+                <div className="font-black text-indigo-950 text-sm flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-indigo-600 fill-indigo-600" />
+                  <span>Early Ignition &amp; Neck-of-the-Moment Scalping Playbook</span>
+                </div>
+                <p className="text-slate-700 leading-relaxed">
+                  <strong>Why trades sometimes stall right at the breakout moment ("Neck of the moment"):</strong> Impatient retail traders chase breakout wicks without volume support, walking right into institutional profit-taking at resistance.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <div className="bg-white p-2.5 rounded-lg border border-indigo-100 shadow-2xs">
+                    <span className="font-bold text-indigo-900 block">1. Volume Confirmation Check</span>
+                    <span className="text-slate-600 text-[11px]">Only enter if volume ratio is &gt; 1.2x average. If volume is drying up at breakout, it's a fakeout trap.</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-indigo-100 shadow-2xs">
+                    <span className="font-bold text-indigo-900 block">2. Wait for 15m Candle Close</span>
+                    <span className="text-slate-600 text-[11px]">Avoid chasing intra-candle wicks. Wait for the 15-minute bar to close decisively outside the Opening Range.</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-indigo-100 shadow-2xs">
+                    <span className="font-bold text-indigo-900 block">3. VWAP / EMA Retest Execution</span>
+                    <span className="text-slate-600 text-[11px]">Buy on minor pullback retest of VWAP (₹{shallITakeStock.stock.vwap?.toFixed(1) || '-'}) instead of buying the absolute high wick.</span>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-indigo-100 shadow-2xs">
+                    <span className="font-bold text-indigo-900 block">4. Scalp &amp; Risk Discipline</span>
+                    <span className="text-slate-600 text-[11px]">Set Stop Loss at ₹{shallITakeStock.stopLoss}. Take 50% profit at Target 1 (₹{shallITakeStock.targets[0]}) and trail remainder.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  setChartStock(shallITakeStock.stock);
+                  setShallITakeStock(null);
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <BarChart2 className="w-3.5 h-3.5" />
+                <span>Open 15m Chart</span>
+              </button>
+
+              <button
+                onClick={() => setShallITakeStock(null)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Got It, Close
               </button>
             </div>
           </div>

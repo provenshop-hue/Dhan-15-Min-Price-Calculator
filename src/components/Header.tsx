@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp, Layers } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp, Layers, BarChart2 } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence' | 'timing_quality' | 'orb_breakout';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'ema_confluence' | 'timing_quality' | 'orb_breakout') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'ema_confluence' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'ema_confluence' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -471,6 +471,24 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>🎯 ORB Bull/Bear Hub</span>
                 <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   Breakout/Down
+                </span>
+              </span>
+            </button>
+
+            {/* 📊 FII-DII Predictor PRO Tab */}
+            <button
+              onClick={() => onChangeDashboardTab('fii_dii_predictor')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'fii_dii_predictor'
+                  ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white shadow-md shadow-blue-500/30 ring-1 ring-white/30'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-blue-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <BarChart2 className={`w-3.5 h-3.5 ${activeDashboardTab === 'fii_dii_predictor' ? 'text-yellow-300 animate-pulse' : 'text-blue-600'}`} />
+                <span>📊 FII–DII Predictor PRO</span>
+                <span className="bg-gradient-to-r from-yellow-400 to-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  PRO
                 </span>
               </span>
             </button>
