@@ -76,6 +76,9 @@ export interface ParabolicRallyAnalysis {
   lotSize: number;
   // Exact Signal Timestamp Info
   timing: ParabolicSignalTiming;
+  // Sector Dominance Promotion
+  isSectorDominantAligned?: boolean;
+  sectorDominanceState?: 'BULLISH_DOMINANT' | 'BEARISH_DOMINANT' | 'MIXED';
 }
 
 export function getStockLotSize(symbol: string, close: number): number {
@@ -1015,7 +1018,33 @@ export function analyzeHistoricalPeakParabolicRally(
 export function computeAllParabolicRallies(stocks: StockCalculated[]): ParabolicRallyAnalysis[] {
   const sectorMetricsMap = computeAllSectorStrengths(stocks);
 
-  return stocks.map((stock) => {
+  // 1. Determine Market-Wide Sector Dominance
+  let bullishSectorsCount = 0;
+  let bearishSectorsCount = 0;
+  let totalSectorAvgPctSum = 0;
+  let sectorCount = 0;
+
+  sectorMetricsMap.forEach((metric) => {
+    sectorCount++;
+    totalSectorAvgPctSum += metric.avgPctChange;
+    if (metric.sectorBias === 'BULLISH' || metric.sectorBias === 'STRONG_BULLISH' || metric.avgPctChange > 0.15) {
+      bullishSectorsCount++;
+    } else if (metric.sectorBias === 'BEARISH' || metric.sectorBias === 'STRONG_BEARISH' || metric.avgPctChange < -0.15) {
+      bearishSectorsCount++;
+    }
+  });
+
+  const aggregateSectorAvg = sectorCount > 0 ? totalSectorAvgPctSum / sectorCount : 0;
+  
+  let sectorDominanceState: 'BULLISH_DOMINANT' | 'BEARISH_DOMINANT' | 'MIXED' = 'MIXED';
+  if (bullishSectorsCount > bearishSectorsCount + 1 || aggregateSectorAvg > 0.20) {
+    sectorDominanceState = 'BULLISH_DOMINANT';
+  } else if (bearishSectorsCount > bullishSectorsCount + 1 || aggregateSectorAvg < -0.20) {
+    sectorDominanceState = 'BEARISH_DOMINANT';
+  }
+
+  // 2. Compute initial analyses
+  const initialAnalyses = stocks.map((stock) => {
     const secInfo = getStockSector(stock.symbol);
     const secMetric = sectorMetricsMap.get(secInfo.sectorKey);
     const breadthOverride = secMetric ? {
@@ -1024,5 +1053,35 @@ export function computeAllParabolicRallies(stocks: StockCalculated[]): Parabolic
     } : undefined;
 
     return analyzeHistoricalPeakParabolicRally(stock, breadthOverride);
+  });
+
+  // 3. Apply Sector-Conditioned Promotion & Alignment
+  return initialAnalyses.map((analysis) => {
+    const secInfo = getStockSector(analysis.stock.symbol);
+    const secMetric = sectorMetricsMap.get(secInfo.sectorKey);
+    
+    let isSectorDominantAligned = false;
+    let adjustedPriority = analysis.volumePriorityScore;
+
+    if (sectorDominanceState === 'BULLISH_DOMINANT' && analysis.direction === 'BULLISH') {
+      const isSecBullish = (secMetric?.avgPctChange ?? 0) >= 0 || secMetric?.sectorBias === 'BULLISH' || secMetric?.sectorBias === 'STRONG_BULLISH';
+      if (isSecBullish) {
+        isSectorDominantAligned = true;
+        adjustedPriority += 30000; // Promote bullish stocks when bullish sectors dominate
+      }
+    } else if (sectorDominanceState === 'BEARISH_DOMINANT' && analysis.direction === 'BEARISH') {
+      const isSecBearish = (secMetric?.avgPctChange ?? 0) <= 0 || secMetric?.sectorBias === 'BEARISH' || secMetric?.sectorBias === 'STRONG_BEARISH';
+      if (isSecBearish) {
+        isSectorDominantAligned = true;
+        adjustedPriority += 30000; // Promote bearish stocks when bearish sectors dominate
+      }
+    }
+
+    return {
+      ...analysis,
+      sectorDominanceState,
+      isSectorDominantAligned,
+      volumePriorityScore: adjustedPriority
+    };
   });
 }

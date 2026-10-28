@@ -352,6 +352,56 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
       </div>
 
 
+      {/* 🌐 Market Sector Dominance Promotion Banner */}
+      {(() => {
+        const marketDominanceState = analyses[0]?.sectorDominanceState || 'MIXED';
+        return (
+          <div className={`rounded-2xl p-4 border shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 ${
+            marketDominanceState === 'BULLISH_DOMINANT'
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+              : marketDominanceState === 'BEARISH_DOMINANT'
+              ? 'bg-rose-50 border-rose-300 text-rose-950'
+              : 'bg-slate-50 border-slate-200 text-slate-900'
+          }`}>
+            <div className="flex items-center space-x-3">
+              <div className={`p-2.5 rounded-xl text-white ${
+                marketDominanceState === 'BULLISH_DOMINANT'
+                  ? 'bg-emerald-600'
+                  : marketDominanceState === 'BEARISH_DOMINANT'
+                  ? 'bg-rose-600'
+                  : 'bg-slate-700'
+              }`}>
+                {marketDominanceState === 'BULLISH_DOMINANT' ? <TrendingUp className="w-5 h-5" /> : marketDominanceState === 'BEARISH_DOMINANT' ? <TrendingDown className="w-5 h-5" /> : <BarChart2 className="w-5 h-5" />}
+              </div>
+              <div>
+                <div className="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                  <span>Sector Dominance Promotion Engine:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                    marketDominanceState === 'BULLISH_DOMINANT'
+                      ? 'bg-emerald-200 text-emerald-900'
+                      : marketDominanceState === 'BEARISH_DOMINANT'
+                      ? 'bg-rose-200 text-rose-900'
+                      : 'bg-slate-200 text-slate-800'
+                  }`}>
+                    {marketDominanceState === 'BULLISH_DOMINANT' ? '🟢 BULLISH SECTORS DOMINANT' : marketDominanceState === 'BEARISH_DOMINANT' ? '🔴 BEARISH SECTORS DOMINANT' : '🟡 MIXED / NEUTRAL SECTORS'}
+                  </span>
+                </div>
+                <div className="text-xs mt-0.5 opacity-90">
+                  {marketDominanceState === 'BULLISH_DOMINANT'
+                    ? 'Bullish sectors hold industry dominance. Bullish stocks are automatically promoted and prioritized.'
+                    : marketDominanceState === 'BEARISH_DOMINANT'
+                    ? 'Bearish sectors hold industry dominance. Bearish stocks are automatically promoted and prioritized.'
+                    : 'Sector flows are mixed. Standard volume and confluence priority sorting active.'}
+                </div>
+              </div>
+            </div>
+            <div className="text-xs font-bold px-3 py-1.5 rounded-xl bg-white/85 border border-slate-200 shadow-2xs shrink-0">
+              {marketDominanceState === 'BULLISH_DOMINANT' ? 'Promoting Bullish Rallies 📈' : marketDominanceState === 'BEARISH_DOMINANT' ? 'Promoting Bearish Breakdowns 📉' : 'Balanced Promotion ⚖️'}
+            </div>
+          </div>
+        );
+      })()}
+
       {viewMode === 'HISTORY' ? (
         <div className="space-y-6">
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
@@ -809,6 +859,18 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                       </span>
                     </div>
                   </div>
+
+                  {/* 🌐 Sector Dominance Promoted Badge */}
+                  {item.isSectorDominantAligned && (
+                    <div className={`font-black text-[10px] px-3 py-1 rounded-xl shadow-xs flex items-center gap-1.5 border ${
+                      item.direction === 'BULLISH'
+                        ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                        : 'bg-rose-100 text-rose-900 border-rose-300'
+                    }`}>
+                      <Sparkles className="w-3 h-3 animate-pulse" />
+                      <span>⚡ Sector Dominance Promoted ({item.sectorName})</span>
+                    </div>
+                  )}
 
                   {/* ⚡ RECENT FRESH HIT BADGE */}
                   {item.timing.isFresh && (
