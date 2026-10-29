@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { StockCalculated } from '../types';
+import { SectorDominanceBadgesBar } from './SectorDominanceBadgesBar';
 import { 
   Target, 
   TrendingUp, 
@@ -945,6 +946,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
   return (
     <div className="space-y-6 animate-fade-in pb-20 relative">
+      <SectorDominanceBadgesBar 
+        stocks={stocks} 
+        onSelectStock={(stk) => onSelectStockDetail(stk)} 
+        title="🏢 ORB Scanner Sector Dominance & Stock Badges"
+      />
+
       {/* 3.0% BUY ALERT POPUNDER MODAL (ONLY FOR FOLLOWED STOCKS) */}
       {alertStock && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fade-in">

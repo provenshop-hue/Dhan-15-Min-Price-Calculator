@@ -24,7 +24,6 @@ import { SectorStrengthDashboard } from './components/SectorStrengthDashboard';
 import { OpenHighLowScanner } from './components/OpenHighLowScanner';
 import { HundredPercentBullishScanner } from './components/HundredPercentBullishScanner';
 import { HundredPercentBearishScanner } from './components/HundredPercentBearishScanner';
-import { EmaConfluenceScanner } from './components/EmaConfluenceScanner';
 import { OrbBullishBearishScanner } from './components/OrbBullishBearishScanner';
 import { FiiDiiPredictorHub } from './components/FiiDiiPredictorHub';
 import { DhanTimingQualityScanner } from './components/DhanTimingQualityScanner';
@@ -211,7 +210,7 @@ export default function App() {
 
 
   // Active Dashboard View Tab
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'ema_confluence' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor'>('gann');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor'>('gann');
 
   // Precision Timing Filter State
   const [activeTimingFilter, setActiveTimingFilter] = useState({
@@ -1392,16 +1391,7 @@ export default function App() {
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
           />
-        ) : activeDashboardTab === 'ema_confluence' ? (
-          /* Dedicated EMA Confluence Scanner */
-          <EmaConfluenceScanner
-            stocks={stocks}
-            tradeJourneys={tradeJourneys}
-            credentials={credentials}
-            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
-            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
-            onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
-          />
+
         ) : activeDashboardTab === 'orb_breakout' ? (
           /* Dedicated ORB Bullish & Bearish Breakout Hub */
           <OrbBullishBearishScanner

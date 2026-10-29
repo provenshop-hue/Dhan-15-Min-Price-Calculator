@@ -4,6 +4,7 @@ import { analyzeRsiPullback, RsiPullbackAnalysis, is100PercentBullishMove, is100
 import { analyzeBullishCombinations } from '../utils/bullishCombinations';
 import { evaluateHighConfidenceTrade, HighConfidenceTradeAnalysis } from '../utils/highConfidenceTrade';
 import { BullishFilterSection } from './BullishFilterSection';
+import { SectorDominanceBadgesBar } from './SectorDominanceBadgesBar';
 import { calculateRSI, isOpenLowPattern, isOpenHighPattern, isHighClosePattern } from '../utils/gann';
 import { 
   TrendingUp, 
@@ -658,6 +659,12 @@ export const RsiPullbackDashboard: React.FC<RsiPullbackDashboardProps> = ({
 
   return (
     <div className="space-y-6">
+      <SectorDominanceBadgesBar 
+        stocks={stocks} 
+        onSelectStock={(stk) => onSelectStockDetail(stk)} 
+        title="🏢 RSI Pullback Sector Dominance & Stock Badges"
+      />
+
       {activeTimingFilter?.active && (
         <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 rounded-2xl p-4 text-white shadow-lg flex items-center justify-between">
           <div className="flex items-center space-x-3">

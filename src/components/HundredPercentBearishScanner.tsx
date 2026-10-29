@@ -27,7 +27,29 @@ import {
   parseTimeToMinutes, 
   formatCleanRecentTime 
 } from '../utils/recentHitTiming';
-import { isStockFromToday } from '../utils/emaConfluence';
+function isStockFromToday(stock: StockCalculated): boolean {
+  const ist = getISTNow();
+  const todayDateStr = ist.dateStr;
+  if (stock.fetchedDate) {
+    const clean = stock.fetchedDate.trim();
+    if (clean && clean !== todayDateStr) {
+      return false;
+    }
+  }
+  if (stock.candleTimestamp) {
+    const ts = stock.candleTimestamp.trim();
+    if (/yesterday|prev|prior|friday/i.test(ts)) {
+      return false;
+    }
+    const matchYMD = ts.match(/(\d{4}-\d{2}-\d{2})/);
+    if (matchYMD && matchYMD[1]) {
+      if (matchYMD[1] !== todayDateStr) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
 import { getISTNow } from '../utils/bullishRally';
 
 interface Props {

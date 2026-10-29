@@ -22,13 +22,36 @@ import {
   Layers
 } from 'lucide-react';
 import { StockCalculated, StockTradeJourney } from '../types';
+import { SectorDominanceBadgesBar } from './SectorDominanceBadgesBar';
 import { generateIntradayRsiTimeline } from '../utils/rsiAnalyst';
 import { 
   resolveRecentHundredBullishHitTiming, 
   parseTimeToMinutes, 
   formatCleanRecentTime 
 } from '../utils/recentHitTiming';
-import { isStockFromToday } from '../utils/emaConfluence';
+function isStockFromToday(stock: StockCalculated): boolean {
+  const ist = getISTNow();
+  const todayDateStr = ist.dateStr;
+  if (stock.fetchedDate) {
+    const clean = stock.fetchedDate.trim();
+    if (clean && clean !== todayDateStr) {
+      return false;
+    }
+  }
+  if (stock.candleTimestamp) {
+    const ts = stock.candleTimestamp.trim();
+    if (/yesterday|prev|prior|friday/i.test(ts)) {
+      return false;
+    }
+    const matchYMD = ts.match(/(\d{4}-\d{2}-\d{2})/);
+    if (matchYMD && matchYMD[1]) {
+      if (matchYMD[1] !== todayDateStr) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
 import { getISTNow } from '../utils/bullishRally';
 import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
 
@@ -501,6 +524,12 @@ export function HundredPercentBullishScanner({
 
   return (
     <div className="space-y-6">
+      <SectorDominanceBadgesBar 
+        stocks={stocks} 
+        onSelectStock={(stk) => onSelectStockDetail(stk)} 
+        title="🏢 100% Bullish Sector Dominance & Stock Badges"
+      />
+
       {/* Header Banner */}
       <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-md">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">

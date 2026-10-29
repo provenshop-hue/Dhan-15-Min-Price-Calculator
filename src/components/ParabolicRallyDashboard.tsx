@@ -37,6 +37,7 @@ import {
 } from '../utils/parabolicRallyEngine';
 import { FifteenMinCandleChartSnapshot } from './FifteenMinCandleChartSnapshot';
 import { saveDailyHits, getHistoricalHits } from '../utils/historyDb';
+import { SectorDominanceBadgesBar } from './SectorDominanceBadgesBar';
 
 interface ParabolicRallyDashboardProps {
   stocks: StockCalculated[];
@@ -245,6 +246,14 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
   return (
     <div className="space-y-6">
+      <SectorDominanceBadgesBar 
+        stocks={stocks} 
+        onSelectStock={(stk) => { if (onSelectStockDetail) onSelectStockDetail(stk); }} 
+        onFilterBySector={(secKey) => setSelectedSector(secKey)} 
+        selectedSectorKey={selectedSector} 
+        title="🏢 Parabolic Rally Sector Dominance & Stock Badges"
+      />
+
       {activeTimingFilter?.active && (
         <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 rounded-2xl p-4 text-white shadow-lg flex items-center justify-between">
           <div className="flex items-center space-x-3">

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { StockCalculated } from '../types';
+import { SectorDominanceBadgesBar } from './SectorDominanceBadgesBar';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -89,6 +90,12 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
 
   return (
     <div className="space-y-6 animate-fade-in pb-20">
+      <SectorDominanceBadgesBar 
+        stocks={stocks} 
+        onSelectStock={(stk) => onSelectStockDetail(stk)} 
+        title="🏢 Open = High / Low Sector Dominance & Stock Badges"
+      />
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
         
