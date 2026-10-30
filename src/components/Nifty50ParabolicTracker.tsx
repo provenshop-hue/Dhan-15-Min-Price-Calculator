@@ -43,23 +43,30 @@ export const Nifty50ParabolicTracker: React.FC<Nifty50ParabolicTrackerProps> = (
       lotSizeAug2026: 25,
       securityId: '13',
       exchangeSegment: 'NSE_FNO',
-      openPrice: 22600,
-      closePrice: 22680,
-      highPrice: 22710,
-      lowPrice: 22580,
-      previousClose: 22550,
-      first15mOpen: 22600,
-      first15mClose: 22640,
-      first15mHigh: 22650,
-      first15mLow: 22590,
-      volume: 1250000,
-      rsi: 62,
-      adx: 28,
-      vwap: 22630,
-      pctChange: 0.58,
+      openPrice: null,
+      closePrice: null,
+      highPrice: null,
+      lowPrice: null,
+      previousClose: null,
+      first15mOpen: null,
+      first15mClose: null,
+      first15mHigh: null,
+      first15mLow: null,
+      volume: null,
+      rsi: null,
+      adx: null,
+      vwap: null,
+      pctChange: null,
       isFetched: false
     } as StockCalculated;
   }, [stocks]);
+
+  // Auto-fetch live Nifty data on mount if not fetched
+  useEffect(() => {
+    if (niftyStock && !niftyStock.isFetched && niftyStock.symbol === 'NIFTY') {
+      onFetchSingleStock(niftyStock);
+    }
+  }, []);
 
   // 5-Minute Auto-Fetch Tracking Effect
   useEffect(() => {
@@ -141,13 +148,29 @@ export const Nifty50ParabolicTracker: React.FC<Nifty50ParabolicTrackerProps> = (
 
   // 🚀 Early Ignition Live Detector
   const ignitionState = useMemo(() => {
-    const o = niftyStock.openPrice || niftyStock.first15mOpen || 22600;
-    const c = niftyStock.closePrice || niftyStock.first15mClose || 22640;
-    const h = niftyStock.highPrice || niftyStock.first15mHigh || 22680;
-    const l = niftyStock.lowPrice || niftyStock.first15mLow || 22580;
-    const vwap = niftyStock.vwap || 22630;
-    const rsi = niftyStock.rsi || 58;
-    const volRatio = niftyStock.volume ? niftyStock.volume / 800000 : 1.5;
+    const o = niftyStock.openPrice || niftyStock.first15mOpen || 0;
+    const c = niftyStock.closePrice || niftyStock.first15mClose || 0;
+    const h = niftyStock.highPrice || niftyStock.first15mHigh || 0;
+    const l = niftyStock.lowPrice || niftyStock.first15mLow || 0;
+    const vwap = niftyStock.vwap || c || 0;
+    const rsi = niftyStock.rsi || 50;
+    const volRatio = niftyStock.volume ? niftyStock.volume / 800000 : 1.0;
+
+    if (c === 0 || !niftyStock.isFetched) {
+      return {
+        stage: 'Stage 1: Awaiting Live Dhan API Fetch',
+        status: 'LOADING',
+        title: '⏳ NIFTY 50 LIVE DATA AWAITING FETCH',
+        badgeClass: 'bg-blue-500 text-white animate-pulse',
+        borderColor: 'border-blue-500/50',
+        bgColor: 'from-blue-950 via-slate-900 to-slate-900',
+        action: `CLICK "FETCH NOW" TO LOAD LIVE NIFTY`,
+        triggerPrice: 0,
+        stopLoss: 0,
+        timestamp: 'Awaiting Live Feed',
+        reason: 'Click "Fetch Live Nifty 15m Candle" or "Start Tracking" to pull real-time Nifty 50 data directly from Dhan HQ API.'
+      };
+    }
 
     const isAboveVwap = c >= vwap;
     const isBullishThrust = c > o && (h - o) > (o - l) * 0.3;
@@ -155,6 +178,7 @@ export const Nifty50ParabolicTracker: React.FC<Nifty50ParabolicTrackerProps> = (
 
     if (isAboveVwap && isBullishThrust && rsi >= 52) {
       return {
+        stage: 'Stage 2: Early Bullish Ignition Thrust',
         status: 'BULLISH_IGNITION',
         title: '🔥 NIFTY 50 BULLISH RALLY IGNITING NOW',
         badgeClass: 'bg-emerald-500 text-slate-950 animate-pulse',
@@ -168,6 +192,7 @@ export const Nifty50ParabolicTracker: React.FC<Nifty50ParabolicTrackerProps> = (
       };
     } else if (!isAboveVwap && isBearishThrust && rsi <= 48) {
       return {
+        stage: 'Stage 2: Early Bearish Breakdown Thrust',
         status: 'BEARISH_IGNITION',
         title: '💥 NIFTY 50 BEARISH BREAKDOWN IGNITING NOW',
         badgeClass: 'bg-rose-500 text-white animate-pulse',
@@ -181,6 +206,7 @@ export const Nifty50ParabolicTracker: React.FC<Nifty50ParabolicTrackerProps> = (
       };
     } else {
       return {
+        stage: 'Stage 1: Pre-Breakout Coiling & Compression',
         status: 'COILING',
         title: '⏳ NIFTY 50 PRE-RALLY COILING (WAITING FOR IGNITION)',
         badgeClass: 'bg-amber-400 text-slate-950',
