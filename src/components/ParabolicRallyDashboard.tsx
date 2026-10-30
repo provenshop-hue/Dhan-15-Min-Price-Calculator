@@ -216,6 +216,11 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
         }
       })
       .sort((a, b) => {
+        const isNiftyA = a.stock.symbol.toUpperCase() === 'NIFTY';
+        const isNiftyB = b.stock.symbol.toUpperCase() === 'NIFTY';
+        if (isNiftyA && !isNiftyB) return -1;
+        if (!isNiftyA && isNiftyB) return 1;
+
         if (sortBy === 'VOLUME_PRIORITY') {
           const priA = a.volumePriorityScore || (a.score * 10000 + (a.isVolumeIncreasing ? 8000 : 0) + (a.volumeRatio || 1) * 3000);
           const priB = b.volumePriorityScore || (b.score * 10000 + (b.isVolumeIncreasing ? 8000 : 0) + (b.volumeRatio || 1) * 3000);
@@ -253,6 +258,57 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
         selectedSectorKey={selectedSector} 
         title="🏢 Parabolic Rally Sector Dominance & Stock Badges"
       />
+
+      {/* ⚡ Early Ignition Trap Avoidance & Scalping Mastery Guide */}
+      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/40 rounded-2xl p-4 sm:p-5 text-white shadow-xl space-y-3">
+        <div className="flex items-center justify-between border-b border-indigo-500/30 pb-3">
+          <div className="flex items-center space-x-2">
+            <span className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
+              <Zap className="w-4 h-4 animate-bounce" />
+            </span>
+            <div>
+              <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-amber-300">
+                ⚡ Early Ignition Masterclass: How to Avoid Wicks &amp; Profit from Scalping
+              </h4>
+              <p className="text-[11px] text-slate-300">
+                Prevent false breakouts and neck-of-the-moment stalls with institutional volume confirmation rules.
+              </p>
+            </div>
+          </div>
+          <span className="hidden sm:inline-block px-3 py-1 bg-amber-400 text-slate-950 font-black text-[10px] rounded-full uppercase shadow-xs">
+            Pro Scalping Rules
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="bg-slate-800/80 border border-slate-700/80 p-3 rounded-xl space-y-1">
+            <div className="font-bold text-emerald-400 flex items-center gap-1">
+              <span>1. The 15m Candle Close Rule</span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              Never enter at the exact tick of a fresh 1st-3rd minute break. Wait for the 15-min candle to <strong className="text-white">close decisively</strong> beyond the high/low. Avoids liquidity sweeps.
+            </p>
+          </div>
+
+          <div className="bg-slate-800/80 border border-slate-700/80 p-3 rounded-xl space-y-1">
+            <div className="font-bold text-yellow-400 flex items-center gap-1">
+              <span>2. Volume Expansion Filter</span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              True ignition requires <strong className="text-white">Volume Ratio &gt; 1.5x</strong> average. If volume is low or declining during the breakout, it is a low-probability trap.
+            </p>
+          </div>
+
+          <div className="bg-slate-800/80 border border-slate-700/80 p-3 rounded-xl space-y-1">
+            <div className="font-bold text-blue-400 flex items-center gap-1">
+              <span>3. Quick Scalp &amp; Trailing SL</span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              Book partial profits at Target 1 (+0.5% to +0.8% move) and <strong className="text-white">immediately trail stop loss to cost</strong>. Never let a winning early ignition scalp turn into a loss.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {activeTimingFilter?.active && (
         <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 rounded-2xl p-4 text-white shadow-lg flex items-center justify-between">
@@ -840,8 +896,14 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-base font-black text-slate-900 tracking-tight">
-                          {item.stock.symbol}
+                        <span className="text-base font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                          {item.stock.symbol.toUpperCase() === 'NIFTY' && <span className="text-amber-500">⭐</span>}
+                          <span>{item.stock.symbol}</span>
+                          {item.stock.symbol.toUpperCase() === 'NIFTY' && (
+                            <span className="bg-indigo-600 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase shadow-xs">
+                              INDEX LEADER (TOP)
+                            </span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded font-semibold">
                           {item.sectorName}
@@ -868,6 +930,18 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
                       </span>
                     </div>
                   </div>
+
+                  {/* Open = Low / Open = High Highlight Badge */}
+                  {item.stock.isOpenEqualLow && (
+                    <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-[10px] px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 animate-pulse">
+                      <span>🟢 OPEN = LOW (Pure Bullish Ignition)</span>
+                    </div>
+                  )}
+                  {item.stock.isOpenEqualHigh && (
+                    <div className="bg-gradient-to-r from-rose-500 to-red-600 text-white font-black text-[10px] px-3 py-1.5 rounded-xl shadow-md flex items-center gap-1.5 animate-pulse">
+                      <span>🔴 OPEN = HIGH (Pure Bearish Breakdown)</span>
+                    </div>
+                  )}
 
                   {/* 🌐 Sector Dominance Promoted Badge */}
                   {item.isSectorDominantAligned && (

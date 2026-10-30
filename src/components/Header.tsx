@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -369,6 +369,23 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>⚡ Parabolic Rally</span>
                 <span className="bg-gradient-to-r from-yellow-300 to-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   15M Bull/Bear
+                </span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => onChangeDashboardTab('nifty_parabolic')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                activeDashboardTab === 'nifty_parabolic'
+                  ? 'bg-gradient-to-r from-indigo-700 via-blue-700 to-emerald-600 text-white shadow-lg shadow-indigo-500/30 ring-2 ring-white/40'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-indigo-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                <span>🎯 Nifty 50 Parabolic Pro</span>
+                <span className="bg-emerald-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  NIFTY ONLY
                 </span>
               </span>
             </button>

@@ -29,6 +29,7 @@ import { FiiDiiPredictorHub } from './components/FiiDiiPredictorHub';
 import { DhanTimingQualityScanner } from './components/DhanTimingQualityScanner';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { DhanMarketfeedModal } from './components/DhanMarketfeedModal';
+import { Nifty50ParabolicTracker } from './components/Nifty50ParabolicTracker';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -210,7 +211,7 @@ export default function App() {
 
 
   // Active Dashboard View Tab
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor'>('gann');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor' | 'nifty_parabolic'>('gann');
 
   // Precision Timing Filter State
   const [activeTimingFilter, setActiveTimingFilter] = useState({
@@ -1392,6 +1393,17 @@ export default function App() {
             onOpenRsiAnalyst={(s) => setRsiAnalystStock(s)}
           />
 
+        ) : activeDashboardTab === 'nifty_parabolic' ? (
+          /* Dedicated Exclusive Nifty 50 Parabolic Pro Module */
+          <Nifty50ParabolicTracker
+            stocks={stocks}
+            credentials={credentials}
+            onFetchSingleStock={handleFetchSingleDhan}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+            onOpenSettings={() => setIsDhanGateOpen(true)}
+            isLoading={isBulkLoading}
+          />
         ) : activeDashboardTab === 'orb_breakout' ? (
           /* Dedicated ORB Bullish & Bearish Breakout Hub */
           <OrbBullishBearishScanner

@@ -46,10 +46,20 @@ export const SectorDominanceBadgesBar: React.FC<SectorDominanceBadgesBarProps> =
     return { bullishSectors: bullish, bearishSectors: bearish };
   }, [sectorMetricsMap]);
 
+  const { totalBullishStocks, totalBearishStocks } = useMemo(() => {
+    let bCount = 0;
+    let rCount = 0;
+    (stocks || []).forEach(s => {
+      if ((s.pctChange || 0) >= 0) bCount++;
+      else rCount++;
+    });
+    return { totalBullishStocks: bCount, totalBearishStocks: rCount };
+  }, [stocks]);
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-white shadow-lg space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-800 pb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-3">
         <div className="flex items-center space-x-2">
           <div className="p-1.5 bg-indigo-500/20 text-indigo-400 rounded-lg">
             <Layers className="w-4 h-4" />
@@ -58,14 +68,22 @@ export const SectorDominanceBadgesBar: React.FC<SectorDominanceBadgesBarProps> =
             {title}
           </h3>
         </div>
-        <div className="flex items-center space-x-3 text-[11px] font-mono">
-          <span className="flex items-center gap-1 text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-            <TrendingUp className="w-3 h-3" />
-            <span>{bullishSectors.length} Bullish Sectors</span>
+        <div className="flex flex-wrap items-center gap-3 font-mono">
+          <span className="flex items-center gap-2 text-emerald-300 bg-emerald-950/90 border border-emerald-500/50 px-3.5 py-1.5 rounded-xl shadow-md">
+            <TrendingUp className="w-5 h-5 text-emerald-400 flex-shrink-0 animate-pulse" />
+            <span className="text-xl sm:text-2xl font-black text-emerald-400">{totalBullishStocks}</span>
+            <div className="flex flex-col text-left">
+              <span className="text-xs text-emerald-300 font-extrabold uppercase">Bullish Stocks</span>
+              <span className="text-[10px] text-slate-400">{bullishSectors.length} Sectors</span>
+            </div>
           </span>
-          <span className="flex items-center gap-1 text-rose-400 bg-rose-950/60 border border-rose-500/30 px-2.5 py-0.5 rounded-full">
-            <TrendingDown className="w-3 h-3" />
-            <span>{bearishSectors.length} Bearish Sectors</span>
+          <span className="flex items-center gap-2 text-rose-300 bg-rose-950/90 border border-rose-500/50 px-3.5 py-1.5 rounded-xl shadow-md">
+            <TrendingDown className="w-5 h-5 text-rose-400 flex-shrink-0 animate-pulse" />
+            <span className="text-xl sm:text-2xl font-black text-rose-400">{totalBearishStocks}</span>
+            <div className="flex flex-col text-left">
+              <span className="text-xs text-rose-300 font-extrabold uppercase">Bearish Stocks</span>
+              <span className="text-[10px] text-slate-400">{bearishSectors.length} Sectors</span>
+            </div>
           </span>
         </div>
       </div>
