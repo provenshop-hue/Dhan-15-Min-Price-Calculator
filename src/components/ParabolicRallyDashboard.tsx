@@ -86,6 +86,81 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
   const [shallITakeStock, setShallITakeStock] = useState<ParabolicRallyAnalysis | null>(null);
   const [chartStock, setChartStock] = useState<StockCalculated | null>(null);
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+  const [stockComparisonMap, setStockComparisonMap] = useState<Record<string, { prevVolume: number; prevRsi: number; prevVwap: number; prevClose: number; status: 'RISING' | 'GOING DOWN' | 'NEUTRAL'; diffs: string[]; lastFetchedAt: string }>>({});
+  const [isComparingFetching, setIsComparingFetching] = useState(false);
+
+  const handleFetchAndCompare = async (analysis: ParabolicRallyAnalysis) => {
+    setIsComparingFetching(true);
+    const oldVol = analysis.stock.volume || 0;
+    const oldRsi = analysis.stock.rsi || 50;
+    const oldVwap = analysis.stock.vwap || analysis.stock.closePrice || 0;
+    const oldClose = analysis.stock.closePrice || 0;
+
+    await onFetchSingleStock(analysis.stock);
+    setIsComparingFetching(false);
+
+    const updatedStock = stocks.find(s => s.symbol.toUpperCase() === analysis.stock.symbol.toUpperCase()) || analysis.stock;
+    const newVol = updatedStock.volume || 0;
+    const newRsi = updatedStock.rsi || 50;
+    const newVwap = updatedStock.vwap || updatedStock.closePrice || 0;
+    const newClose = updatedStock.closePrice || 0;
+
+    const volDiff = newVol - oldVol;
+    const rsiDiff = newRsi - oldRsi;
+    const vwapDiff = newVwap - oldVwap;
+    const priceDiff = newClose - oldClose;
+
+    const diffs: string[] = [];
+    let risingCount = 0;
+    let fallingCount = 0;
+
+    if (volDiff > 0) {
+      diffs.push(`Volume: +${volDiff.toLocaleString()} (Rising 📈)`);
+      risingCount++;
+    } else if (volDiff < 0) {
+      diffs.push(`Volume: ${volDiff.toLocaleString()} (Dropping 📉)`);
+      fallingCount++;
+    } else {
+      diffs.push(`Volume: Unchanged (Neutral ⚖️)`);
+    }
+
+    if (rsiDiff > 0.2) {
+      diffs.push(`RSI: +${rsiDiff.toFixed(1)} (Rising 📈)`);
+      risingCount++;
+    } else if (rsiDiff < -0.2) {
+      diffs.push(`RSI: ${rsiDiff.toFixed(1)} (Dropping 📉)`);
+      fallingCount++;
+    } else {
+      diffs.push(`RSI: Stable (Neutral ⚖️)`);
+    }
+
+    if (priceDiff > 0 && vwapDiff >= 0) {
+      diffs.push(`VWAP / Price: Strengthening 🟢`);
+      risingCount++;
+    } else if (priceDiff < 0 && vwapDiff <= 0) {
+      diffs.push(`VWAP / Price: Weakening 🔴`);
+      fallingCount++;
+    } else {
+      diffs.push(`VWAP / Price: Sideways ⚖️`);
+    }
+
+    let status: 'RISING' | 'GOING DOWN' | 'NEUTRAL' = 'NEUTRAL';
+    if (risingCount >= 2) status = 'RISING';
+    else if (fallingCount >= 2) status = 'GOING DOWN';
+
+    setStockComparisonMap(prev => ({
+      ...prev,
+      [analysis.stock.symbol]: {
+        prevVolume: oldVol,
+        prevRsi: oldRsi,
+        prevVwap: oldVwap,
+        prevClose: oldClose,
+        status,
+        diffs,
+        lastFetchedAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+      }
+    }));
+  };
   
   const [displayMode, setDisplayMode] = useState<'cards' | 'table'>('cards');
   
@@ -1536,6 +1611,70 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
             {/* Modal Body */}
             <div className="p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* Live Momentum Comparison vs Previous Snapshot */}
+              <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-500/50 rounded-2xl p-4 text-white shadow-lg space-y-3">
+                <div className="flex items-center justify-between border-b border-indigo-500/30 pb-2.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="p-1.5 bg-indigo-500/20 text-indigo-300 rounded-lg">
+                      <Activity className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-indigo-300">
+                        🔄 Live Momentum Comparison (Latest vs Previous)
+                      </h4>
+                      <p className="text-[10px] text-slate-300">
+                        Fetch latest volume, RSI &amp; VWAP and compare with old snapshot.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleFetchAndCompare(shallITakeStock)}
+                    disabled={isComparingFetching}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isComparingFetching ? 'animate-spin' : ''}`} />
+                    <span>{isComparingFetching ? 'Fetching...' : '🔄 Fetch Latest & Compare'}</span>
+                  </button>
+                </div>
+
+                {stockComparisonMap[shallITakeStock.stock.symbol] ? (
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between bg-slate-800/80 p-2.5 rounded-xl border border-slate-700">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase font-mono">Comparison Status Verdict</span>
+                        <div className={`text-sm font-black mt-0.5 font-mono ${
+                          stockComparisonMap[shallITakeStock.stock.symbol].status === 'RISING' 
+                            ? 'text-emerald-400' 
+                            : stockComparisonMap[shallITakeStock.stock.symbol].status === 'GOING DOWN' 
+                            ? 'text-rose-400' 
+                            : 'text-amber-400'
+                        }`}>
+                          {stockComparisonMap[shallITakeStock.stock.symbol].status === 'RISING' ? '📈 RISING (Momentum Building)' :
+                           stockComparisonMap[shallITakeStock.stock.symbol].status === 'GOING DOWN' ? '📉 GOING DOWN (Momentum Fading)' :
+                           '⚖️ NEUTRAL (Sideways / Stable)'}
+                        </div>
+                      </div>
+                      <div className="text-right text-[10px] text-slate-400 font-mono">
+                        Last Compared: {stockComparisonMap[shallITakeStock.stock.symbol].lastFetchedAt}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+                      {stockComparisonMap[shallITakeStock.stock.symbol].diffs.map((d, idx) => (
+                        <div key={idx} className="bg-slate-800/60 p-2 rounded-lg border border-slate-700/80 text-slate-200">
+                          {d}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-slate-400 italic py-1 text-center">
+                    Click "Fetch Latest & Compare" to fetch live volume, RSI, and VWAP and compare against previous snapshot.
+                  </div>
+                )}
+              </div>
+
               {/* 1. Guaranteed / Profitability Reality Check */}
               <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 shadow-xs space-y-1.5">
                 <div className="font-black text-sm flex items-center gap-2 text-amber-950">
