@@ -28,10 +28,16 @@ export const Nifty50ParabolicTracker: React.FC<Nifty50ParabolicTrackerProps> = (
   const [isTracking, setIsTracking] = useState(false);
   const [countdownSeconds, setCountdownSeconds] = useState(300);
 
-  // Find Nifty 50 stock object
+  // Find Nifty 50 stock object strictly by symbol
   const niftyStock = useMemo(() => {
-    const found = stocks.find(s => s.symbol.toUpperCase() === 'NIFTY' || s.companyName.toLowerCase().includes('nifty'));
-    if (found) return found;
+    const found = stocks.find(s => s.symbol.toUpperCase() === 'NIFTY' || s.symbol.toUpperCase() === 'NIFTY50');
+    if (found) {
+      return {
+        ...found,
+        securityId: '13',
+        exchangeSegment: 'IDX_I'
+      };
+    }
     // Fallback Nifty stock object if not loaded yet
     return {
       id: 'nifty-50-exclusive',
@@ -42,7 +48,7 @@ export const Nifty50ParabolicTracker: React.FC<Nifty50ParabolicTrackerProps> = (
       lotSizeJul2026: 25,
       lotSizeAug2026: 25,
       securityId: '13',
-      exchangeSegment: 'NSE_FNO',
+      exchangeSegment: 'IDX_I',
       openPrice: null,
       closePrice: null,
       highPrice: null,
