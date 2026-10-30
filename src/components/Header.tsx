@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -386,6 +386,23 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>🎯 Nifty 50 Parabolic Pro</span>
                 <span className="bg-emerald-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   NIFTY ONLY
+                </span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => onChangeDashboardTab('ema_dynamic_engine')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                activeDashboardTab === 'ema_dynamic_engine'
+                  ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-rose-700 text-white shadow-lg shadow-orange-500/30 ring-2 ring-white/40'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-amber-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-yellow-300 animate-bounce" />
+                <span>⚡ 3 EMA Dynamic Engine</span>
+                <span className="bg-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  9/21/50 EMA
                 </span>
               </span>
             </button>
