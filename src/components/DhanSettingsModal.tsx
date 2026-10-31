@@ -15,7 +15,7 @@ export const DhanSettingsModal: React.FC<DhanSettingsModalProps> = ({
   credentials,
   onSaveCredentials
 }) => {
-  const [clientId, setClientId] = useState(credentials.clientId || '');
+  const [clientId, setClientId] = useState('1108346384');
   const [accessToken, setAccessToken] = useState(credentials.accessToken || '');
   const [date, setDate] = useState(credentials.date || new Date().toISOString().split('T')[0]);
   const [segment, setSegment] = useState<'NSE_EQ' | 'NSE_FNO'>(credentials.segment || 'NSE_EQ');
@@ -26,7 +26,7 @@ export const DhanSettingsModal: React.FC<DhanSettingsModalProps> = ({
   // Sync state when modal opens
   React.useEffect(() => {
     if (isOpen) {
-      setClientId(credentials.clientId || '');
+      setClientId('1108346384');
       setAccessToken(credentials.accessToken || '');
       setDate(credentials.date || new Date().toISOString().split('T')[0]);
       setSegment(credentials.segment || 'NSE_EQ');
@@ -79,11 +79,11 @@ export const DhanSettingsModal: React.FC<DhanSettingsModalProps> = ({
 
   const handleSave = () => {
     onSaveCredentials({
-      clientId: clientId.trim(),
+      clientId: '1108346384',
       accessToken: accessToken.trim(),
       date,
       segment,
-      isConfigured: Boolean(clientId.trim() && accessToken.trim())
+      isConfigured: Boolean(accessToken.trim())
     });
     onClose();
   };
@@ -116,15 +116,19 @@ export const DhanSettingsModal: React.FC<DhanSettingsModalProps> = ({
 
           {/* Client ID */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Dhan Client ID
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-700">
+                Dhan Client ID
+              </label>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full font-mono">
+                System Hardcoded
+              </span>
+            </div>
             <input
               type="text"
-              placeholder="e.g., 1000000123"
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="w-full bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 font-mono outline-none transition-colors shadow-2xs"
+              readOnly
+              value="1108346384"
+              className="w-full bg-slate-100 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-600 font-mono cursor-not-allowed shadow-2xs"
             />
           </div>
 

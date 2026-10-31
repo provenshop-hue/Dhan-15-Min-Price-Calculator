@@ -43,7 +43,7 @@ import { getStockSector } from './utils/sectorMaster';
 import { Download, RefreshCw, Sparkles, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function App() {
-  // Dhan API Credentials State
+  // Dhan API Credentials State (Client ID hardcoded to 1108346384)
   const [credentials, setCredentials] = useState<DhanApiCredentials>(() => {
     const today = new Date().toISOString().split('T')[0];
     const saved = localStorage.getItem('dhan_gann_creds');
@@ -52,6 +52,7 @@ export default function App() {
         const parsed = JSON.parse(saved);
         return {
           ...parsed,
+          clientId: '1108346384',
           date: today // Always default to today's date on startup
         };
       } catch (e) {
@@ -59,7 +60,7 @@ export default function App() {
       }
     }
     return {
-      clientId: '',
+      clientId: '1108346384',
       accessToken: '',
       date: today,
       segment: 'NSE_EQ',
@@ -343,11 +344,12 @@ export default function App() {
       });
   }, []);
 
-  // Save credentials to localStorage and server
+  // Save credentials to localStorage and server (Client ID hardcoded to 1108346384)
   const handleSaveCredentials = (newCreds: DhanApiCredentials) => {
-    setCredentials(newCreds);
-    localStorage.setItem('dhan_gann_creds', JSON.stringify(newCreds));
-    syncGlobalSettings({ dhanCredentials: newCreds });
+    const forcedCreds = { ...newCreds, clientId: '1108346384' };
+    setCredentials(forcedCreds);
+    localStorage.setItem('dhan_gann_creds', JSON.stringify(forcedCreds));
+    syncGlobalSettings({ dhanCredentials: forcedCreds });
     setNotification({
       type: 'success',
       message: 'Dhan API credentials saved globally!'
