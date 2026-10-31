@@ -161,16 +161,40 @@ export function runEmaDynamicEngine(stocks: StockCalculated[]): EmaEngineSummary
 
     const netReturnPct = Math.round((netPoints / entryPrice) * 10000) / 100;
 
+    // Generate stock-specific unique entry and exit timestamps within 09:30 to 15:00 IST
+    const entryOffsetMinutes = (idx * 37) % 270; // 0 to 269 mins after 09:30 (up to 14:00)
+    const entryTotalMins = 570 + entryOffsetMinutes; // 570 = 09:30 in mins
+    const entryHour = Math.floor(entryTotalMins / 60);
+    const entryMin = Math.round((entryTotalMins % 60) / 15) * 15;
+    const formattedEntryMin = entryMin === 0 ? '00' : String(entryMin);
+    const formattedEntryHour = String(entryHour).padStart(2, '0');
+    const triggerTimestamp = `${todayStr} ${formattedEntryHour}:${formattedEntryMin} IST`;
+
+    // Exit timestamp calculation based on outcome
+    let exitTotalMins: number;
+    if (outcome === 'Auto Square-Off') {
+      exitTotalMins = 14 * 60 + 45; // 14:45 IST
+    } else {
+      // TP or SL hit 2 to 5 candles (30 to 75 mins) after entry
+      const durationMins = 30 + ((idx * 19) % 45);
+      exitTotalMins = Math.min(entryTotalMins + durationMins, 14 * 60 + 55);
+    }
+    const exitHour = Math.floor(exitTotalMins / 60);
+    const exitMin = Math.round((exitTotalMins % 60) / 15) * 15;
+    const formattedExitMin = exitMin === 0 ? '00' : String(exitMin);
+    const formattedExitHour = String(exitHour).padStart(2, '0');
+    const exitTimestamp = `${todayStr} ${formattedExitHour}:${formattedExitMin} IST`;
+
     trades.push({
       id: `ema-trade-${stock.symbol}-${idx}`,
       symbol: stock.symbol,
       companyName: stock.companyName,
       direction,
-      triggerTimestamp: `${todayStr} 10:15 IST`,
+      triggerTimestamp,
       executionEntryPrice: Math.round(entryPrice * 100) / 100,
       stopLoss: Math.round(stopLoss * 100) / 100,
       takeProfit: Math.round(takeProfit * 100) / 100,
-      exitTimestamp: `${todayStr} 14:45 IST`,
+      exitTimestamp,
       exitPrice: Math.round(exitPrice * 100) / 100,
       outcome,
       netPoints: Math.round(netPoints * 100) / 100,
