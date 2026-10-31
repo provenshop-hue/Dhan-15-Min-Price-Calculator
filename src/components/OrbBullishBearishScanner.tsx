@@ -65,6 +65,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
   const [recentSubFilter, setRecentSubFilter] = useState<string>('ALL');
+  const [zeroReversalSubFilter, setZeroReversalSubFilter] = useState<string>('ALL');
 
   const [lastFetchTime, setLastFetchTime] = useState<string>(() => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -786,6 +787,29 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       // Must meet criteria AND trigger time must be within 0 to 30 minutes from the last fetch time
       const hasRecentDiscovery = meetsAnyCriteria && timeDiff >= 0 && timeDiff <= 30;
 
+      const priceArray = stock.rsiTimeline && stock.rsiTimeline.length > 0 
+        ? stock.rsiTimeline.map(p => p.close)
+        : [open, high, low, close];
+      const computeEMA = (prices: number[], period: number): number[] => {
+        const k = 2 / (period + 1);
+        const emas: number[] = [];
+        let prevEMA = prices[0] || 0;
+        for (let i = 0; i < prices.length; i++) {
+          if (i === 0) {
+            emas.push(prevEMA);
+          } else {
+            const currentEMA = (prices[i] * k) + (prevEMA * (1 - k));
+            emas.push(currentEMA);
+            prevEMA = currentEMA;
+          }
+        }
+        return emas;
+      };
+      const ema9Arr = computeEMA(priceArray, 9);
+      const ema9 = ema9Arr[ema9Arr.length - 1] || close;
+      const maintainingEma9 = isBullishQualified ? (close >= ema9) : (isBearishQualified ? (close <= ema9) : true);
+      const maintainingVwap = isBullishQualified ? (close >= vwap) : (isBearishQualified ? (close <= vwap) : true);
+
       return {
         ...stock,
         orbHigh: Math.round(orbHigh * 100) / 100,
@@ -807,6 +831,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         lotSize,
         rsi: Math.round(rsi * 10) / 10,
         vwap: Math.round(vwap * 100) / 100,
+        ema9: Math.round(ema9 * 100) / 100,
+        maintainingEma9,
+        maintainingVwap,
         hasRetestedAndBounced,
         retestTime,
         bounceTime,
@@ -866,7 +893,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'immediate_bounce' && !s.hasImmediateBounce) return false;
       if (activeTab === 'orb_low_bounce' && !s.hasOrbLowBounce) return false;
       if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
-      if (activeTab === 'orb_zero_reversal' && !s.hasOrbZeroReversal) return false;
+      if (activeTab === 'orb_zero_reversal') {
+        if (!s.hasOrbZeroReversal) return false;
+        if (zeroReversalSubFilter === 'MAINTAINING_9_EMA' && !s.maintainingEma9) return false;
+        if (zeroReversalSubFilter === 'MAINTAINING_VWAP' && !s.maintainingVwap) return false;
+        if (zeroReversalSubFilter === 'MAINTAINING_BOTH' && (!s.maintainingEma9 || !s.maintainingVwap)) return false;
+      }
       if (activeTab === 'bounce_great' && !s.hasBounceGreat) return false;
       if (activeTab === 'lightning_scalp' && !s.hasLightningScalp) return false;
       if (activeTab === 'no_retest' && !s.hasNoRetest) return false;
@@ -1248,6 +1280,33 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 onClick={() => setRecentSubFilter(sub.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   recentSubFilter === sub.id
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-300/50'
+                    : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                }`}
+              >
+                {sub.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 🚀 ORB ZERO REVERSAL SUB-FILTERS SUB-BAR */}
+        {activeTab === 'orb_zero_reversal' && (
+          <div className="bg-slate-950/90 p-3.5 rounded-2xl border border-amber-500/40 flex flex-wrap items-center gap-2 shadow-lg">
+            <span className="text-xs font-black text-amber-300 uppercase tracking-wider mr-1.5 flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 animate-pulse" /> Zero Reversal Sub-Filters:
+            </span>
+            {[
+              { id: 'ALL', label: 'All Zero Reversal' },
+              { id: 'MAINTAINING_9_EMA', label: '📈 Maintaining 9 EMA' },
+              { id: 'MAINTAINING_VWAP', label: '🛡️ Maintaining VWAP' },
+              { id: 'MAINTAINING_BOTH', label: '⚡ Maintaining Both (9 EMA & VWAP)' },
+            ].map((sub) => (
+              <button
+                key={sub.id}
+                onClick={() => setZeroReversalSubFilter(sub.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  zeroReversalSubFilter === sub.id
                     ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-300/50'
                     : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
                 }`}
