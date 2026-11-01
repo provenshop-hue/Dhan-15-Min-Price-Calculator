@@ -33,7 +33,7 @@ function isStockFromToday(stock: StockCalculated): boolean {
   return true;
 }
 import { getISTNow } from '../utils/bullishRally';
-import { detect15mHighPullbackBounce } from '../utils/rsiPullback';
+import { detect15mHighPullbackBounce, is100PercentBullishMove } from '../utils/rsiPullback';
 
 interface Props {
   stocks: StockCalculated[];
@@ -115,6 +115,11 @@ export function HundredPercentBullishScanner({
     return stocks.map(stock => {
       // Must have basic prices
       if (stock.openPrice == null || stock.highPrice == null || stock.lowPrice == null || stock.closePrice == null) {
+        return null;
+      }
+
+      // Enforce 100% Bullish (Zero-Reversal / No-Chance-to-Go-Down) strict rules
+      if (!is100PercentBullishMove(stock)) {
         return null;
       }
       

@@ -36,25 +36,27 @@ export function is100PercentBullishMove(stock: StockCalculated): boolean {
   if (high === undefined || high === null || high <= 0) return false;
   if (low === undefined || low === null || low <= 0) return false;
 
-  // 1. Close > Open
-  if (close <= open) return false;
+  // 1. Open = Low exactness (Zero Drawdown from open, <= 0.20% variance)
+  const variance = Math.abs(open - low) / open * 100;
+  if (variance > 0.20) return false;
 
-  // 2. Close > Previous Close
-  if (stock.previousClose !== undefined && stock.previousClose !== null && stock.previousClose > 0) {
-    if (close <= stock.previousClose) return false;
-  } else if (stock.pctChange !== undefined && stock.pctChange !== null) {
-    if (stock.pctChange <= 0) return false;
-  }
+  // 2. Close > Open & Positive Session Return (>= 0.5%)
+  if (close <= open) return false;
+  const pctChange = stock.pctChange !== undefined && stock.pctChange !== null ? stock.pctChange : ((close - open) / open) * 100;
+  if (pctChange < 0.5) return false;
 
   const range = high - low;
   if (range <= 0) return false;
 
-  // 3. Close >= High - (Range × 0.20)
-  if (close < high - (range * 0.20) - 0.0001) return false;
+  // 3. Close strictly near High (Top 15% of day range - Zero Reversal Exhaustion)
+  if (close < high - (range * 0.15)) return false;
 
-  // 4. Body / Range >= 0.65
+  // 4. Strong Directional Body Conviction (>= 70% of range)
   const body = Math.abs(close - open);
-  if ((body / range) < 0.65 - 0.0001) return false;
+  if ((body / range) < 0.70) return false;
+
+  // 5. VWAP Confluence (Must be strictly above VWAP for zero-reversal trend day)
+  if (stock.vwap && close < stock.vwap) return false;
 
   return true;
 }
