@@ -831,8 +831,8 @@ export function HundredPercentBullishScanner({
                   <span className="text-xs text-slate-400 truncate max-w-[170px]">{stock.companyName}</span>
                 </div>
                 <div className="px-2.5 py-1 rounded-lg text-xs font-black font-mono shadow-xs flex flex-col items-end bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
-                  <span className="text-white text-sm">₹{stock.closePrice?.toFixed(2)}</span>
-                  <span>{stock.pctChange > 0 ? '+' : ''}{stock.pctChange.toFixed(2)}%</span>
+                  <span className="text-white text-sm">₹{stock.closePrice?.toFixed(2) ?? '0.00'}</span>
+                  <span>{stock.pctChange && stock.pctChange > 0 ? '+' : ''}{(stock.pctChange ?? 0).toFixed(2)}%</span>
                 </div>
               </div>
 
@@ -841,12 +841,12 @@ export function HundredPercentBullishScanner({
                 <div className="flex items-center gap-1.5 text-slate-300 min-w-0">
                   <Flame className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                   <span className="text-[11px] text-slate-400 truncate">Trigger:</span>
-                  <span className="text-[11px] font-semibold text-slate-200 truncate" title={stock.timing.firstHitTrigger}>
-                    {stock.timing.firstHitTrigger}
+                  <span className="text-[11px] font-semibold text-slate-200 truncate" title={stock.timing?.firstHitTrigger}>
+                    {stock.timing?.firstHitTrigger}
                   </span>
                 </div>
                 <span className="font-mono text-[11px] font-bold text-emerald-400 shrink-0 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60">
-                  @ ₹{stock.timing.firstHitPrice.toFixed(2)}
+                  @ ₹{(stock.timing?.firstHitPrice ?? 0).toFixed(2)}
                 </span>
               </div>
 
@@ -855,22 +855,22 @@ export function HundredPercentBullishScanner({
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                     <span>Confluence Score</span>
-                    <span className="text-[10px] text-emerald-400 font-normal">({Math.round((stock.score / 13) * 100)}% Pass)</span>
+                    <span className="text-[10px] text-emerald-400 font-normal">({Math.round(((stock.score || 0) / 13) * 100)}% Pass)</span>
                   </span>
-                  <span className="text-sm font-black text-emerald-400 font-mono">{stock.score}/13</span>
+                  <span className="text-sm font-black text-emerald-400 font-mono">{stock.score || 0}/13</span>
                 </div>
                 <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
                   <div 
                     className={`h-1.5 rounded-full transition-all ${
-                      stock.score >= 10 ? 'bg-emerald-400' : 'bg-emerald-500'
+                      (stock.score || 0) >= 10 ? 'bg-emerald-400' : 'bg-emerald-500'
                     }`} 
-                    style={{ width: `${(stock.score / 13) * 100}%` }}
+                    style={{ width: `${((stock.score || 0) / 13) * 100}%` }}
                   />
                 </div>
               </div>
 
               {/* 15M High Retest & Bounce Badge / Banner */}
-              {detect15mHighPullbackBounce(stock).isPullbackBounce && (
+              {detect15mHighPullbackBounce(stock)?.isPullbackBounce && (
                 <div className="mx-4 mt-3 bg-purple-100 text-purple-950 p-3 rounded-xl border-2 border-purple-300 shadow-sm space-y-2">
                   <div className="flex items-center justify-between text-xs font-black uppercase tracking-wide border-b border-purple-200 pb-1.5 text-purple-950">
                     <div className="flex items-center space-x-1.5">
@@ -878,21 +878,21 @@ export function HundredPercentBullishScanner({
                       <span>🎯 15m High Retest &amp; Bounce</span>
                     </div>
                     <span className="bg-purple-200 text-purple-950 px-2 py-0.5 rounded text-xs font-black shadow-2xs font-mono border border-purple-400">
-                      {detect15mHighPullbackBounce(stock).bounceTime}
+                      {detect15mHighPullbackBounce(stock)?.bounceTime}
                     </span>
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 text-[11px] font-mono pt-0.5">
                     <div className="bg-purple-50 p-1.5 rounded border border-purple-200">
                       <span className="text-purple-700 text-[9px] block font-semibold">15m High:</span>
-                      <strong className="text-purple-950 text-xs font-black">₹{detect15mHighPullbackBounce(stock).first15mHigh.toFixed(2)}</strong>
+                      <strong className="text-purple-950 text-xs font-black">₹{(detect15mHighPullbackBounce(stock)?.first15mHigh ?? 0).toFixed(2)}</strong>
                     </div>
                     <div className="bg-purple-50 p-1.5 rounded border border-purple-200">
                       <span className="text-purple-700 text-[9px] block font-semibold">Retest:</span>
-                      <strong className="text-amber-800 text-xs font-black">₹{detect15mHighPullbackBounce(stock).retestPrice.toFixed(2)}</strong>
+                      <strong className="text-amber-800 text-xs font-black">₹{(detect15mHighPullbackBounce(stock)?.retestPrice ?? 0).toFixed(2)}</strong>
                     </div>
                     <div className="bg-purple-50 p-1.5 rounded border border-purple-200">
                       <span className="text-purple-700 text-[9px] block font-semibold">Gain:</span>
-                      <strong className="text-emerald-700 text-xs font-black">+{detect15mHighPullbackBounce(stock).bouncePct.toFixed(2)}%</strong>
+                      <strong className="text-emerald-700 text-xs font-black">+{(detect15mHighPullbackBounce(stock)?.bouncePct ?? 0).toFixed(2)}%</strong>
                     </div>
                   </div>
                 </div>
@@ -901,7 +901,7 @@ export function HundredPercentBullishScanner({
               {/* Checklists */}
               <div className="p-4 flex-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5">
-                  {stock.checks.map(check => (
+                  {stock.checks?.map(check => (
                     <div 
                       key={check.id} 
                       className={`flex items-center justify-between py-1 px-1.5 rounded-lg border-b border-slate-800/40 last:border-0 ${
@@ -926,7 +926,7 @@ export function HundredPercentBullishScanner({
                 </div>
 
                 {/* Confluence Milestones Timeline Accordion Toggle */}
-                {stock.timing.milestones.length > 0 && (
+                {stock.timing?.milestones && stock.timing.milestones.length > 0 && (
                   <div className="mt-3 pt-2.5 border-t border-slate-800/70">
                     <button
                       onClick={(e) => toggleTimeline(e, stock.id)}
@@ -960,7 +960,7 @@ export function HundredPercentBullishScanner({
                                   {ms.name}
                                 </span>
                                 <span className="font-mono text-[10px] text-emerald-400 shrink-0">
-                                  ₹{ms.price.toFixed(2)}
+                                  ₹{(ms.price ?? 0).toFixed(2)}
                                 </span>
                               </div>
                               <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">{ms.detail}</p>

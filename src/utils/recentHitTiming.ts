@@ -480,13 +480,10 @@ export function resolveRecentHundredBullishHitTiming(
   const ist = getISTNow();
   const realTodayDate = ist.dateStr;
 
-  const isWeekend = ist.dayOfWeek === 0 || ist.dayOfWeek === 6;
-  const isBeforeOpen = ist.totalMinutes < 9 * 60 + 15;
-
-  if (isWeekend || isBeforeOpen || !stock.isFetched) {
+  if (!stock.openPrice && !stock.closePrice) {
     return {
       hitTime: 'Not Hit Today',
-      hitTrigger: isWeekend ? 'Market closed (Weekend) - No live hits today' : 'Market opens at 09:15 AM IST',
+      hitTrigger: 'Waiting for price data',
       hitPrice: close,
       recencyLabel: 'Not Hit Today',
       phaseBadge: '',
@@ -709,13 +706,10 @@ export function resolveRecentHundredBearishHitTiming(
   const ist = getISTNow();
   const realTodayDate = ist.dateStr;
 
-  const isWeekend = ist.dayOfWeek === 0 || ist.dayOfWeek === 6;
-  const isBeforeOpen = ist.totalMinutes < 9 * 60 + 15;
-
-  if (isWeekend || isBeforeOpen || !stock.isFetched) {
+  if (!stock.openPrice && !stock.closePrice) {
     return {
       hitTime: 'Not Hit Today',
-      hitTrigger: isWeekend ? 'Market closed (Weekend) - No live hits today' : 'Market opens at 09:15 AM IST',
+      hitTrigger: 'Waiting for price data',
       hitPrice: close,
       recencyLabel: 'Not Hit Today',
       phaseBadge: '',
