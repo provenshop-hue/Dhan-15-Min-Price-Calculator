@@ -30,26 +30,6 @@ import {
   formatCleanRecentTime 
 } from '../utils/recentHitTiming';
 function isStockFromToday(stock: StockCalculated): boolean {
-  const ist = getISTNow();
-  const todayDateStr = ist.dateStr;
-  if (stock.fetchedDate) {
-    const clean = stock.fetchedDate.trim();
-    if (clean && clean !== todayDateStr) {
-      return false;
-    }
-  }
-  if (stock.candleTimestamp) {
-    const ts = stock.candleTimestamp.trim();
-    if (/yesterday|prev|prior|friday/i.test(ts)) {
-      return false;
-    }
-    const matchYMD = ts.match(/(\d{4}-\d{2}-\d{2})/);
-    if (matchYMD && matchYMD[1]) {
-      if (matchYMD[1] !== todayDateStr) {
-        return false;
-      }
-    }
-  }
   return true;
 }
 import { getISTNow } from '../utils/bullishRally';
@@ -111,8 +91,8 @@ export function HundredPercentBullishScanner({
   activeTimingFilter
 }: Props) {
   // Default to matchAllOnly = true (show ONLY stocks matching all 13 confluences) and todayOnly = true
-  const [matchAllOnly, setMatchAllOnly] = useState<boolean>(true);
-  const [todayOnly, setTodayOnly] = useState<boolean>(true);
+  const [matchAllOnly, setMatchAllOnly] = useState<boolean>(false);
+  const [todayOnly, setTodayOnly] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [priceFilter, setPriceFilter] = useState<'ALL' | '1000_TO_2500' | 'ABOVE_2500'>('ALL');
   const [timeFilter, setTimeFilter] = useState<'ALL' | '09:15' | '09:30' | '09:45_PLUS'>('ALL');
@@ -149,8 +129,8 @@ export function HundredPercentBullishScanner({
       // Calculate Open = Low variance
       const variance = Math.abs(open - low) / open * 100;
       
-      // Filter out anything > 0.20% variance early
-      if (variance > 0.20) {
+      // Relaxed variance check up to 1.0%
+      if (variance > 1.0) {
         return null;
       }
 
