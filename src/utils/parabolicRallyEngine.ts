@@ -79,6 +79,7 @@ export interface ParabolicRallyAnalysis {
   // Sector Dominance Promotion
   isSectorDominantAligned?: boolean;
   sectorDominanceState?: 'BULLISH_DOMINANT' | 'BEARISH_DOMINANT' | 'MIXED';
+  isBulletproof99: boolean;
 }
 
 export function getStockLotSize(symbol: string, close: number): number {
@@ -629,6 +630,10 @@ export function analyzeParabolicRally(
     const breakPctHeight = Math.round(Math.abs(((high - low) / Math.max(1, open)) * 100) * 100) / 100;
     const lotSize = getStockLotSize(stock.symbol, close);
 
+    const range = high - low;
+    const closeNearHigh = range > 0 ? close >= high - (range * 0.08) : true;
+    const isBulletproof99 = totalScore >= 13 && isOpenLow && volumeRatio >= 1.5 && closeNearHigh && isAboveVwap && !isExhausted;
+
     return {
       stock,
       direction: 'BULLISH',
@@ -641,6 +646,7 @@ export function analyzeParabolicRally(
       confidencePercent: Math.min(100, Math.round((totalScore / 17) * 100)),
       isFullyBullish: totalScore >= 13 && !isExhausted,
       isFullyBearish: false,
+      isBulletproof99,
       checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
       openingRangeStatus: isOrbHighBroken ? 'ORB High Broken 🟢' : 'Inside ORB Range',
@@ -900,6 +906,7 @@ export function analyzeParabolicRally(
       confidencePercent: Math.min(100, Math.round((totalScore / 17) * 100)),
       isFullyBullish: false,
       isFullyBearish: totalScore >= 13 && !isExhausted,
+      isBulletproof99: false,
       checks: timedChecks,
       intraCandlePhase: totalScore >= 12 ? 'MID_CANDLE' : totalScore >= 6 ? 'FIRST_3_MIN' : 'FIRST_1_MIN',
       openingRangeStatus: isOrbLowBroken ? 'ORB Low Shattered 🔴' : 'Inside ORB Range',

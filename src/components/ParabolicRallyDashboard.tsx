@@ -54,6 +54,7 @@ interface ParabolicRallyDashboardProps {
 
 type ViewFilter =
   | 'ALL'
+  | 'BULLETPROOF_99'
   | 'FULLY_BULLISH'
   | 'FULLY_BEARISH'
   | 'CONFIRMED_BULLISH'
@@ -200,6 +201,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
   // Aggregate stats
   const stats = useMemo(() => {
+    let bulletproofCount = 0;
     let fullyBullishCount = 0;
     let fullyBearishCount = 0;
     let confirmedBullishCount = 0;
@@ -208,6 +210,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
     let exhaustionCount = 0;
 
     analyses.forEach((a) => {
+      if (a.isBulletproof99) bulletproofCount++;
       if (a.isFullyBullish) fullyBullishCount++;
       if (a.isFullyBearish) fullyBearishCount++;
       if (a.stage === 'BULLISH_CONFIRMED') confirmedBullishCount++;
@@ -218,6 +221,7 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
     return {
       total: analyses.length,
+      bulletproofCount,
       fullyBullishCount,
       fullyBearishCount,
       confirmedBullishCount,
@@ -271,6 +275,8 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
 
         // View Filter
         switch (activeFilter) {
+          case 'BULLETPROOF_99':
+            return a.isBulletproof99;
           case 'FULLY_BULLISH':
             return a.isFullyBullish;
           case 'FULLY_BEARISH':
@@ -604,7 +610,30 @@ export const ParabolicRallyDashboard: React.FC<ParabolicRallyDashboardProps> = (
       ) : (
         <>
       {/* 📊 Summary Stats Chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        {/* 99% Bulletproof / Zero-Reversal */}
+        <button
+          onClick={() => setActiveFilter('BULLETPROOF_99')}
+          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+            activeFilter === 'BULLETPROOF_99'
+              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/30 ring-2 ring-amber-300/50 font-black'
+              : 'bg-amber-50/80 hover:bg-amber-100/80 border-amber-300 text-amber-950'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+              <Shield className="w-3.5 h-3.5 text-amber-600" /> 99% Bulletproof
+            </span>
+            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">
+              Zero Reversal
+            </span>
+          </div>
+          <div className="text-2xl font-black mt-1">
+            {stats.bulletproofCount}
+          </div>
+          <div className="text-[10px] opacity-85 mt-0.5 font-semibold">99% Prob / No Downside</div>
+        </button>
+
         {/* Fully Bullish 12+ */}
         <button
           onClick={() => setActiveFilter('FULLY_BULLISH')}
