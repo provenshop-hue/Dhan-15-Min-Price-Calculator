@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp, BarChart2 } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp, BarChart2, Star } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -370,6 +370,20 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="bg-gradient-to-r from-yellow-300 to-amber-400 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   15M Bull/Bear
                 </span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => onChangeDashboardTab('followed_stocks')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                activeDashboardTab === 'followed_stocks'
+                  ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-300'
+                  : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-600 animate-pulse" />
+                <span>⭐ Followed Monitor</span>
               </span>
             </button>
 

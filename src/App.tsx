@@ -31,6 +31,7 @@ import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { DhanMarketfeedModal } from './components/DhanMarketfeedModal';
 import { Nifty50ParabolicTracker } from './components/Nifty50ParabolicTracker';
 import { EmaDynamicEngineDashboard } from './components/EmaDynamicEngineDashboard';
+import { FollowedStocksDashboard } from './components/FollowedStocksDashboard';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -40,7 +41,7 @@ import { getStoredTradeJourneys, updateAllTradeJourneys, clearTradeJourneys } fr
 import { analyzeIdealOptionsAndStocks } from './utils/idealTradeAnalyzer';
 import { getStockSector } from './utils/sectorMaster';
 
-import { Download, RefreshCw, Sparkles, CheckCircle, AlertCircle } from 'lucide-react';
+import { Download, RefreshCw, Sparkles, CheckCircle, AlertCircle, Star } from 'lucide-react';
 
 export default function App() {
   // Dhan API Credentials State (Client ID hardcoded to 1108346384)
@@ -213,7 +214,129 @@ export default function App() {
 
 
   // Active Dashboard View Tab
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine'>('gann');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks'>('gann');
+
+  // Followed Stocks State & 2-min Polling with Alarms
+  const [followedSymbols, setFollowedSymbols] = useState<string[]>(() => {
+    const saved = localStorage.getItem('dhan_followed_symbols');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [];
+  });
+
+  const [followedAlerts, setFollowedAlerts] = useState<Array<{ id: string; symbol: string; timestamp: string; oldStatus: string; newStatus: string; reason: string }>>(() => {
+    const saved = localStorage.getItem('dhan_followed_alerts');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dhan_followed_symbols', JSON.stringify(followedSymbols));
+  }, [followedSymbols]);
+
+  useEffect(() => {
+    localStorage.setItem('dhan_followed_alerts', JSON.stringify(followedAlerts));
+  }, [followedAlerts]);
+
+  const handleToggleFollow = (symbol: string) => {
+    const clean = symbol.toUpperCase();
+    setFollowedSymbols(prev => {
+      const exists = prev.includes(clean);
+      const next = exists ? prev.filter(s => s !== clean) : [...prev, clean];
+      setNotification({
+        type: 'success',
+        message: exists ? `Unfollowed ${clean}` : `⭐ Added ${clean} to Followed Live Monitor (Auto-polls every 2m)`
+      });
+      return next;
+    });
+  };
+
+  // 2-Minute Auto-Polling Effect for Followed Stocks with Direction Reversal Alarm
+  useEffect(() => {
+    if (followedSymbols.length === 0) return;
+
+    const pollFollowed = async () => {
+      if (!credentials.isConfigured) return;
+
+      for (const sym of followedSymbols) {
+        const stk = stocks.find(s => s.symbol.toUpperCase() === sym);
+        if (!stk) continue;
+
+        const wasBullish = is100PercentBullishMove(stk) || (stk.closePrice !== undefined && stk.vwap !== undefined && stk.closePrice >= stk.vwap);
+
+        const result = await fetchSingleStockCandle(stk);
+        if (result.success && result.data) {
+          const data = result.data;
+          const openPrice = data.open;
+          const closePrice = data.close;
+          const highPrice = data.high;
+          const lowPrice = data.low;
+          const rsi = data.rsi;
+          const adx = data.adx;
+          const vwap = data.vwap !== undefined ? data.vwap : (highPrice && lowPrice ? Math.round(((highPrice + lowPrice + closePrice) / 3) * 100) / 100 : null);
+          const calc = calculateGann15Min(openPrice, closePrice, rsi, vwap, highPrice, lowPrice, 0.001, adx, data.first15mHigh, data.first15mLow, stk.symbol, data.candleTimestamp);
+
+          const updatedObj: StockCalculated = {
+            ...stk,
+            securityId: data.securityId || result.secId,
+            openPrice,
+            closePrice,
+            highPrice,
+            lowPrice,
+            previousClose: data.previousClose !== undefined ? data.previousClose : stk.previousClose,
+            first15mHigh: data.first15mHigh,
+            first15mLow: data.first15mLow,
+            volume: data.volume,
+            rsi: rsi !== undefined && rsi !== null ? rsi : (stk.rsi ?? null),
+            adx: calc.adx ?? adx ?? stk.adx ?? null,
+            rsiTimeline: data.rsiTimeline || stk.rsiTimeline,
+            vwap: calc.vwap,
+            candleTimestamp: data.candleTimestamp,
+            fetchedDate: data.fetchedDate || stk.fetchedDate,
+            openCalc: calc.openCalc,
+            closeCalc: calc.closeCalc,
+            totalCalc: calc.totalCalc,
+            buyAbove: calc.buyAbove,
+            sellBelow: calc.sellBelow,
+            trend: calc.trend,
+            pctChange: calc.pctChange,
+            gannScore: calc.gannScore,
+            isOpenEqualLow: calc.isOpenEqualLow,
+            isOpenEqualHigh: calc.isOpenEqualHigh,
+            isFetched: true,
+            isLoading: false,
+            error: null
+          };
+
+          setStocks(prev => prev.map(s => s.symbol.toUpperCase() === sym ? updatedObj : s));
+
+          const isNowBullish = is100PercentBullishMove(updatedObj) || (updatedObj.closePrice !== undefined && updatedObj.vwap !== undefined && updatedObj.closePrice >= updatedObj.vwap);
+          if (wasBullish && !isNowBullish) {
+            const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            const alertItem = {
+              id: `${sym}-alarm-${Date.now()}`,
+              symbol: sym,
+              timestamp: timeStr,
+              oldStatus: 'Committed Bullish',
+              newStatus: 'Direction Reversal / Faded',
+              reason: `⚠️ ALARM: Followed stock ${sym} changed direction unexpectedly! Price (₹${closePrice}) dropped below VWAP/Formula.`
+            };
+            setFollowedAlerts(prev => [alertItem, ...prev].slice(0, 50));
+            setNotification({
+              type: 'error',
+              message: `🚨 DIRECTION ALARM: Followed stock ${sym} reversed direction unexpectedly!`
+            });
+          }
+        }
+      }
+    };
+
+    const intervalId = setInterval(pollFollowed, 120000); // every 2 minutes
+    return () => clearInterval(intervalId);
+  }, [followedSymbols, credentials.isConfigured, stocks]);
 
   // Precision Timing Filter State
   const [activeTimingFilter, setActiveTimingFilter] = useState({
@@ -1241,7 +1364,20 @@ export default function App() {
         )}
 
         {/* Dashboard View Switcher */}
-        {activeDashboardTab === 'gann' ? (
+        {activeDashboardTab === 'followed_stocks' ? (
+          /* Dedicated Followed Stocks Real-Time Monitor with 2-Min Polling & Alarms */
+          <FollowedStocksDashboard
+            followedSymbols={followedSymbols}
+            onToggleFollow={handleToggleFollow}
+            stocks={stocks}
+            onFetchSingleStock={handleFetchSingleDhan}
+            followedAlerts={followedAlerts}
+            onClearAlerts={() => setFollowedAlerts([])}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
+            isLoading={isBulkLoading}
+          />
+        ) : activeDashboardTab === 'gann' ? (
           <>
             {/* Gann Pro Signals & Open=Low/High Highlights Banner */}
             <GannHighlights
