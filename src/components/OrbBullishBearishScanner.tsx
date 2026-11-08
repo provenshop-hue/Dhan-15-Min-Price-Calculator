@@ -521,19 +521,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
       }
 
-      // Institutional structural fallback with strict no-reversal constraint
-      if (!hasOrbLowBounce && isBullishQualified && orbLow > 0) {
-        const lowP = stock.lowPrice || orbLow;
-        const closeP = stock.closePrice || orbHigh;
-        const vwapVal = stock.vwap || orbLow;
-        const pctChg = stock.pctChange || 0;
-        if (lowP <= orbLow * 1.010 && lowP >= orbLow * 0.985 && closeP > orbLow && closeP >= vwapVal && pctChg > 0.2) {
-          hasOrbLowBounce = true;
-          orbLowBounceTime = orbBreakTime || '09:45 AM';
-          orbBounceType = 'BULLISH_SUPPORT_BOUNCE';
-          rallyExpansionPct = Math.round(((closeP - orbLow) / orbLow) * 100 * 100) / 100;
-          bouncePowerScore = 95;
-        }
+      // Ensure genuine sequence: bounce time must be strictly after orb break time
+      if (hasOrbLowBounce && (orbLowBounceTime === '-' || orbLowBounceTime === orbBreakTime)) {
+        hasOrbLowBounce = false;
       }
 
       let hasBounceCandleStrength = false;
