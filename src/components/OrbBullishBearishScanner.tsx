@@ -470,57 +470,49 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
         let breakoutIdx = -1;
+        let isBullBreak = false;
 
-        // Condition 1: ORB Broken (Breakout above ORB High)
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
           const pt = stock.rsiTimeline[i];
           if (pt.close >= orbHigh) {
             breakoutIdx = i;
+            isBullBreak = true;
+            break;
+          } else if (pt.close <= orbLow) {
+            breakoutIdx = i;
+            isBullBreak = false;
             break;
           }
         }
 
         if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 2) {
-          // Condition 2: Subsequent candle touches back the ORB support (orbLow)
-          for (let i = breakoutIdx + 1; i < stock.rsiTimeline.length - 1; i++) {
+          for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 4, stock.rsiTimeline.length - 2); i++) {
             const pt = stock.rsiTimeline[i];
-            const hitSupport = pt.low <= orbLow * 1.015 && pt.low >= orbLow * 0.985;
+            const hitSupport = isBullBreak ? (pt.low <= orbLow * 1.012 && pt.low >= orbLow * 0.985) : false;
 
             if (hitSupport) {
-              // Condition 3: Bounce happens on the subsequent candle
-              const bouncePt = stock.rsiTimeline[i + 1];
-              const isBounce = bouncePt.close > pt.close && bouncePt.close >= orbLow * 1.002;
+              const nextPt = stock.rsiTimeline[i + 1];
+              const cleanBounce = nextPt.close > pt.close && nextPt.close >= orbLow * 1.002;
 
-              if (isBounce) {
-                // Condition 4: Subsequent candle price goes above the bounce candle high
-                let priceWentAboveBounceHigh = false;
-                const bounceHigh = Math.max(bouncePt.high, bouncePt.close);
-
-                for (let k = i + 2; k < stock.rsiTimeline.length; k++) {
-                  if (stock.rsiTimeline[k].close > bounceHigh || stock.rsiTimeline[k].high > bounceHigh) {
-                    priceWentAboveBounceHigh = true;
-                    break;
-                  }
-                }
-                if (!priceWentAboveBounceHigh && stock.closePrice && stock.closePrice > bounceHigh) {
-                  priceWentAboveBounceHigh = true;
-                }
-
-                // Strict no-reversal check after support touch
-                let zeroReversal = true;
+              if (cleanBounce) {
+                // NO REVERSAL CHECK: Ensure ALL subsequent candles after support touch never broke below support or turned negative
+                let zeroReversalAfterTouch = true;
                 for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
-                  if (stock.rsiTimeline[k].close < orbLow * 0.995) {
-                    zeroReversal = false;
+                  if (stock.rsiTimeline[k].close < orbLow * 0.998 || stock.rsiTimeline[k].close < stock.rsiTimeline[i+1].close * 0.995) {
+                    zeroReversalAfterTouch = false;
                     break;
                   }
                 }
 
-                if (priceWentAboveBounceHigh && zeroReversal) {
+                const endPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
+                const expansionPct = Math.round(((endPt.close - nextPt.close) / nextPt.close) * 100 * 100) / 100;
+
+                if (zeroReversalAfterTouch && expansionPct >= 0.1 && (stock.pctChange === undefined || stock.pctChange > 0)) {
                   hasOrbLowBounce = true;
-                  orbLowBounceTime = bouncePt.timeStr;
+                  orbLowBounceTime = nextPt.timeStr;
                   orbBounceType = 'BULLISH_SUPPORT_BOUNCE';
-                  rallyExpansionPct = Math.round(((stock.closePrice || bounceHigh) - orbLow) / orbLow * 100 * 100) / 100;
-                  bouncePowerScore = 95;
+                  rallyExpansionPct = Math.max(0.5, expansionPct);
+                  bouncePowerScore = Math.min(100, Math.round(85 + rallyExpansionPct * 10));
                   break;
                 }
               }
