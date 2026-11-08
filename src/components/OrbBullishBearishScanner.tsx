@@ -1864,24 +1864,30 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     return (
                       <div 
                         key={`${stock.symbol}-${idx}`} 
-                        className={`bg-slate-900 border ${isBull ? 'border-emerald-500/60 hover:border-emerald-400' : 'border-rose-500/60 hover:border-rose-400'} rounded-xl px-3.5 py-2 flex items-center gap-3 font-mono text-xs shrink-0 shadow-lg transition-all cursor-pointer`}
+                        className={`bg-slate-900 border ${isBull ? 'border-emerald-500/80 hover:border-emerald-400 shadow-emerald-950/50' : 'border-rose-500/80 hover:border-rose-400 shadow-rose-950/50'} rounded-xl px-4 py-2.5 flex items-center gap-3.5 font-mono text-xs shrink-0 shadow-xl transition-all cursor-pointer`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${isBull ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-rose-950 text-rose-300 border border-rose-500/40'}`}>
-                            {isBull ? '🟢 LONG' : '🔴 SHORT'}
-                          </span>
-                          <strong className="text-white font-black text-sm">{stock.symbol}</strong>
-                          <span className={`text-[10px] ${isBull ? 'text-emerald-400' : 'text-rose-400'} font-bold`}>@ ₹{stock.closePrice?.toFixed(2)}</span>
+                        {/* ⏱️ Prominent Entry Time Badge */}
+                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${isBull ? 'bg-emerald-500 text-slate-950 border border-emerald-300' : 'bg-rose-500 text-slate-950 border border-rose-300'} font-black text-xs shadow-sm`}>
+                          <Clock className="w-3.5 h-3.5 animate-pulse" />
+                          <span>{stock.orbLowBounceTime}</span>
                         </div>
 
-                        <span className={`text-[10px] ${isBull ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-rose-950 text-rose-300 border-rose-800'} px-2 py-0.5 rounded font-sans shrink-0 border`}>
-                          ⏱️ {stock.orbLowBounceTime} ({isBull ? 'Support Bounce' : 'Resistance Rejection'})
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${isBull ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-rose-950 text-rose-300 border border-rose-500/40'}`}>
+                            {isBull ? '🟢 LONG' : '🔴 SHORT'}
+                          </span>
+                          <strong className="text-white font-black text-sm tracking-wide">{stock.symbol}</strong>
+                          <span className={`text-xs ${isBull ? 'text-emerald-400' : 'text-rose-400'} font-bold`}>@ ₹{stock.closePrice?.toFixed(2)}</span>
+                        </div>
+
+                        <span className="text-[10px] text-slate-400 font-sans hidden sm:inline">
+                          ({isBull ? 'Support Bounce' : 'Resistance Rejection'})
                         </span>
 
                         {onOpenPositionSizer && (
                           <button
                             onClick={() => onOpenPositionSizer(stock)}
-                            className={`px-2.5 py-1 ${isBull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'} text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm shrink-0`}
+                            className={`px-3 py-1.5 ${isBull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'} text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer shadow-md shrink-0`}
                           >
                             Sizer
                           </button>
