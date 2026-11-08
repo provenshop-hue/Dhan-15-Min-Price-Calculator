@@ -66,6 +66,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
   const [recentSubFilter, setRecentSubFilter] = useState<string>('ALL');
   const [zeroReversalSubFilter, setZeroReversalSubFilter] = useState<string>('ALL');
+  const [tickerSpeed, setTickerSpeed] = useState<number>(40);
 
   const [lastFetchTime, setLastFetchTime] = useState<string>(() => {
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -1852,46 +1853,90 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
               </div>
             </div>
 
+            {/* Speed Control (+ / -) */}
+            <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-700 text-xs font-mono shrink-0">
+              <span className="text-slate-400">Speed:</span>
+              <button 
+                onClick={() => setTickerSpeed(prev => Math.max(15, prev - 5))}
+                className="w-6 h-6 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-black rounded flex items-center justify-center cursor-pointer shadow"
+                title="Speed Up (-)"
+              >
+                -
+              </button>
+              <span className="font-bold text-amber-300 w-8 text-center">{tickerSpeed}s</span>
+              <button 
+                onClick={() => setTickerSpeed(prev => Math.min(100, prev + 5))}
+                className="w-6 h-6 bg-slate-800 hover:bg-slate-700 text-rose-400 font-black rounded flex items-center justify-center cursor-pointer shadow"
+                title="Slow Down (+)"
+              >
+                +
+              </button>
+            </div>
+
             <div className="flex-1 overflow-hidden relative w-full lg:w-auto">
               {processedOrbStocks.filter(s => s.hasOrbLowBounce).length === 0 ? (
                 <div className="text-xs text-slate-400 italic py-1 text-center font-mono">
                   ⏳ Scanning live session candles for stocks meeting all 4 ORB Low Support Bounce conditions...
                 </div>
               ) : (
-                <div className="overflow-x-auto scrollbar-none flex items-center gap-3 py-1 animate-marquee whitespace-nowrap">
+                <div className="overflow-x-auto scrollbar-none flex items-center gap-3 py-1 animate-marquee whitespace-nowrap" style={{ animationDuration: `${tickerSpeed}s` }}>
                   {processedOrbStocks.filter(s => s.hasOrbLowBounce).concat(processedOrbStocks.filter(s => s.hasOrbLowBounce)).map((stock, idx) => {
                     const isBull = stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE';
                     return (
                       <div 
                         key={`${stock.symbol}-${idx}`} 
-                        className={`bg-slate-900 border ${isBull ? 'border-emerald-500/80 hover:border-emerald-400 shadow-emerald-950/50' : 'border-rose-500/80 hover:border-rose-400 shadow-rose-950/50'} rounded-xl px-4 py-2.5 flex items-center gap-3.5 font-mono text-xs shrink-0 shadow-xl transition-all cursor-pointer`}
+                        onClick={() => onSelectStockDetail(stock)}
+                        className={`bg-slate-900 border ${isBull ? 'border-emerald-500/85 hover:border-emerald-400 shadow-emerald-950/60' : 'border-rose-500/85 hover:border-rose-400 shadow-rose-950/60'} rounded-2xl p-3.5 flex flex-col gap-2.5 font-mono text-xs shrink-0 shadow-2xl transition-all cursor-pointer w-80`}
                       >
-                        {/* ⏱️ Prominent Entry Time Badge */}
-                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${isBull ? 'bg-emerald-500 text-slate-950 border border-emerald-300' : 'bg-rose-500 text-slate-950 border border-rose-300'} font-black text-xs shadow-sm`}>
-                          <Clock className="w-3.5 h-3.5 animate-pulse" />
-                          <span>{stock.orbLowBounceTime}</span>
+                        {/* Row 1: Time, Direction, Signal Strength */}
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg ${isBull ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-slate-950'} font-black text-xs`}>
+                              <Clock className="w-3 h-3 animate-pulse" />
+                              <span>{stock.orbLowBounceTime}</span>
+                            </div>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${isBull ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-rose-950 text-rose-300 border border-rose-500/40'}`}>
+                              {isBull ? '🟢 LONG' : '🔴 SHORT'}
+                            </span>
+                          </div>
+                          <div className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded font-black text-[10px]">
+                            ⚡ Strength: {stock.bouncePowerScore}/100
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${isBull ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-rose-950 text-rose-300 border border-rose-500/40'}`}>
-                            {isBull ? '🟢 LONG' : '🔴 SHORT'}
-                          </span>
-                          <strong className="text-white font-black text-sm tracking-wide">{stock.symbol}</strong>
-                          <span className={`text-xs ${isBull ? 'text-emerald-400' : 'text-rose-400'} font-bold`}>@ ₹{stock.closePrice?.toFixed(2)}</span>
+                        {/* Row 2: Symbol & Price */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <strong className="text-white font-black text-sm">{stock.symbol}</strong>
+                            <p className="text-[10px] text-slate-400 font-sans truncate max-w-[140px]">{stock.companyName}</p>
+                          </div>
+                          <div className="text-right">
+                            <strong className="text-white font-black text-sm">₹{stock.closePrice?.toFixed(2)}</strong>
+                            <span className={`block text-[10px] font-bold ${stock.pctChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {stock.pctChange >= 0 ? '+' : ''}{stock.pctChange?.toFixed(2)}%
+                            </span>
+                          </div>
                         </div>
 
-                        <span className="text-[10px] text-slate-400 font-sans hidden sm:inline">
-                          ({isBull ? 'Support Bounce' : 'Resistance Rejection'})
-                        </span>
+                        {/* Row 3: ORB Levels & Break % */}
+                        <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-950 p-2 rounded-xl border border-slate-800">
+                          <div>
+                            <span className="text-slate-400 text-[9px] block">ORB High / Low</span>
+                            <span className="text-emerald-400 font-bold">₹{stock.orbHigh}</span> / <span className="text-rose-400 font-bold">₹{stock.orbLow}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 text-[9px] block">Break &amp; Height</span>
+                            <span className="text-amber-300 font-bold">{stock.breakPctAbove > 0 ? `+${stock.breakPctAbove}%` : `+${stock.breakPctBelow}%`}</span> ({stock.orbHeightPct}%)
+                          </div>
+                        </div>
 
-                        {onOpenPositionSizer && (
-                          <button
-                            onClick={() => onOpenPositionSizer(stock)}
-                            className={`px-3 py-1.5 ${isBull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'} text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer shadow-md shrink-0`}
-                          >
-                            Sizer
-                          </button>
-                        )}
+                        {/* Row 4: Technicals & Rally */}
+                        <div className="flex items-center justify-between text-[10px] text-slate-300 pt-1 border-t border-slate-800">
+                          <span>RSI: <strong className={stock.rsi >= 50 ? 'text-emerald-400' : 'text-rose-400'}>{stock.rsi}</strong></span>
+                          <span>VWAP: <strong>₹{stock.vwap}</strong></span>
+                          <span>ADX: <strong className="text-amber-300">{stock.adx}</strong></span>
+                          <span className="text-emerald-300 font-bold">+{stock.rallyExpansionPct}% 🚀</span>
+                        </div>
                       </div>
                     );
                   })}
