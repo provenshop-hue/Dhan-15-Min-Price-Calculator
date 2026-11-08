@@ -1839,38 +1839,38 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       {/* 🚀 ORB LOW SUPPORT BOUNCE ENTRY POPUNDER BAR */}
       {activeTab === 'orb_low_bounce' && processedOrbStocks.filter(s => s.hasOrbLowBounce).length > 0 && (
         <div className="fixed bottom-0 left-0 w-full z-40 bg-gradient-to-r from-slate-950 via-emerald-950 to-slate-950 border-t-2 border-emerald-500 shadow-[0_-10px_30px_rgba(16,185,129,0.3)] p-4 text-white animate-slide-up">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center space-x-3">
+          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-3">
+            <div className="flex items-center space-x-3 shrink-0">
               <span className="p-2 bg-emerald-500 text-slate-950 rounded-xl animate-bounce shrink-0">
                 <ShieldCheck className="w-5 h-5 font-black" />
               </span>
               <div>
                 <div className="text-xs font-black text-emerald-300 uppercase tracking-wider flex items-center gap-2">
                   <span>⚡ Active ORB Low Support Bounce Entry Popunder</span>
-                  <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[10px] border border-emerald-500/40">
-                    4/4 Conditions Met
+                  <span className="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[10px] border border-emerald-500/40 font-mono">
+                    {processedOrbStocks.filter(s => s.hasOrbLowBounce).length} Stocks (4/4 Met)
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 mt-0.5">
-                  Stocks have broken ORB, touched support, bounced, and crossed above the bounce candle high. Ready for entry!
+                  All stocks meeting 4/4 conditions. Scroll horizontally to view every setup.
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {processedOrbStocks.filter(s => s.hasOrbLowBounce).slice(0, 3).map(stock => (
-                <div key={stock.symbol} className="bg-slate-900 border border-emerald-500/50 rounded-xl px-3 py-1.5 flex items-center gap-3 font-mono text-xs">
+            <div className="flex items-center gap-2.5 overflow-x-auto w-full lg:w-auto py-1 px-1 scrollbar-thin scrollbar-thumb-emerald-500">
+              {processedOrbStocks.filter(s => s.hasOrbLowBounce).map(stock => (
+                <div key={stock.symbol} className="bg-slate-900 border border-emerald-500/50 rounded-xl px-3 py-2 flex items-center gap-3 font-mono text-xs shrink-0 shadow-md hover:border-emerald-400 transition-all">
                   <div>
                     <strong className="text-white font-black">{stock.symbol}</strong>
-                    <span className="text-[10px] text-emerald-400 ml-1.5">@ ₹{stock.closePrice?.toFixed(2)}</span>
+                    <span className="text-[10px] text-emerald-400 ml-1.5 font-bold">@ ₹{stock.closePrice?.toFixed(2)}</span>
                   </div>
-                  <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-sans">
+                  <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-sans shrink-0 border border-slate-700">
                     ⏱️ {stock.orbLowBounceTime}
                   </span>
                   {onOpenPositionSizer && (
                     <button
                       onClick={() => onOpenPositionSizer(stock)}
-                      className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer"
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm shrink-0"
                     >
                       Sizer
                     </button>
