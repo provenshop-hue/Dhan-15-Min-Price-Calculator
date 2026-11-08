@@ -1859,25 +1859,36 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 </div>
               ) : (
                 <div className="overflow-x-auto scrollbar-none flex items-center gap-3 py-1 animate-marquee whitespace-nowrap">
-                  {processedOrbStocks.filter(s => s.hasOrbLowBounce).concat(processedOrbStocks.filter(s => s.hasOrbLowBounce)).map((stock, idx) => (
-                    <div key={`${stock.symbol}-${idx}`} className="bg-slate-900 border border-emerald-500/60 rounded-xl px-3 py-1.5 flex items-center gap-3 font-mono text-xs shrink-0 shadow-lg hover:border-emerald-300 transition-all cursor-pointer">
-                      <div>
-                        <strong className="text-white font-black">{stock.symbol}</strong>
-                        <span className="text-[10px] text-emerald-400 ml-1.5 font-bold">@ ₹{stock.closePrice?.toFixed(2)}</span>
+                  {processedOrbStocks.filter(s => s.hasOrbLowBounce).concat(processedOrbStocks.filter(s => s.hasOrbLowBounce)).map((stock, idx) => {
+                    const isBull = stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE';
+                    return (
+                      <div 
+                        key={`${stock.symbol}-${idx}`} 
+                        className={`bg-slate-900 border ${isBull ? 'border-emerald-500/60 hover:border-emerald-400' : 'border-rose-500/60 hover:border-rose-400'} rounded-xl px-3.5 py-2 flex items-center gap-3 font-mono text-xs shrink-0 shadow-lg transition-all cursor-pointer`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${isBull ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-rose-950 text-rose-300 border border-rose-500/40'}`}>
+                            {isBull ? '🟢 LONG' : '🔴 SHORT'}
+                          </span>
+                          <strong className="text-white font-black text-sm">{stock.symbol}</strong>
+                          <span className={`text-[10px] ${isBull ? 'text-emerald-400' : 'text-rose-400'} font-bold`}>@ ₹{stock.closePrice?.toFixed(2)}</span>
+                        </div>
+
+                        <span className={`text-[10px] ${isBull ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-rose-950 text-rose-300 border-rose-800'} px-2 py-0.5 rounded font-sans shrink-0 border`}>
+                          ⏱️ {stock.orbLowBounceTime} ({isBull ? 'Support Bounce' : 'Resistance Rejection'})
+                        </span>
+
+                        {onOpenPositionSizer && (
+                          <button
+                            onClick={() => onOpenPositionSizer(stock)}
+                            className={`px-2.5 py-1 ${isBull ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'} text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm shrink-0`}
+                          >
+                            Sizer
+                          </button>
+                        )}
                       </div>
-                      <span className="text-[10px] bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded font-sans shrink-0 border border-emerald-800">
-                        ⏱️ {stock.orbLowBounceTime}
-                      </span>
-                      {onOpenPositionSizer && (
-                        <button
-                          onClick={() => onOpenPositionSizer(stock)}
-                          className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer shadow-sm shrink-0"
-                        >
-                          Sizer
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
