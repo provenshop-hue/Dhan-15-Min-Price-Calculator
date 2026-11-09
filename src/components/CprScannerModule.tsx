@@ -141,6 +141,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
 
       // Crossed Previous Day High / Low and R1 / S1
       const crossedPdH = close >= prevHigh;
+      const crossedPdL = close <= prevLow;
       const aboveR1 = close >= r1;
       const belowS1 = close <= s1;
 
@@ -152,7 +153,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
 
       // Bullish Pro & Bearish Pro conditions
       const isBullishPro = above200Ema && crossedPdH && aboveR1;
-      const isBearishPro = below200Ema && belowS1;
+      const isBearishPro = below200Ema && belowS1 && crossedPdL;
 
       // Directional Bias
       const isAboveCpr = close >= cprTop;

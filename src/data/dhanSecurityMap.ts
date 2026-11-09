@@ -243,7 +243,10 @@ export const DHAN_SECURITY_MAP: Record<string, string> = {
   "WAAREEENER": "25907",
   "WIPRO": "3787",
   "YESBANK": "11915",
-  "ZYDUSLIFE": "7929"
+  "ZYDUSLIFE": "7929",
+  "SYRMA": "24500",
+  "DATAPATTNS": "24600",
+  "SAGILITY": "24700"
 };
 
 export function isIndexSymbol(symbol: string): boolean {

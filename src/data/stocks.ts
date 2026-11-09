@@ -238,7 +238,10 @@ Voltas,https://scanx.trade/company/voltas-ltd,VOLTAS,375,375,375
 Waaree Energies,https://scanx.trade/company/waaree-energies-ltd,WAAREEENER,175,175,175
 Wipro,https://scanx.trade/company/wipro-ltd,WIPRO,3000,3000,3000
 Yes Bank,https://scanx.trade/company/yes-bank-ltd,YESBANK,31100,31100,31100
-Zydus Life Science,https://scanx.trade/company/cadila-healthcare-ltd,ZYDUSLIFE,900,900,900`;
+Zydus Life Science,https://scanx.trade/company/cadila-healthcare-ltd,ZYDUSLIFE,900,900,900
+Syrma SGS Technology,https://scanx.trade/company/syrma-sgs-technology-ltd,SYRMA,500,500,500
+Data Patterns India,https://scanx.trade/company/data-patterns-india-ltd,DATAPATTNS,350,350,350
+Sagility India,https://scanx.trade/company/sagility-india-ltd,SAGILITY,1500,1500,1500`;
 
 export function parseCSVToStocks(csvText: string): StockItem[] {
   const lines = csvText.trim().split('\n');
@@ -302,6 +305,9 @@ export function parseCSVToStocks(csvText: string): StockItem[] {
         'AXISBANK': { open: 1180.50, close: 1210.75, high: 1215.00, low: 1175.00, vol: 48000 },
         'SUNPHARMA': { open: 1850.00, close: 1890.00, high: 1898.00, low: 1850.00, vol: 62000 },
         'BHARTIARTL': { open: 1650.00, close: 1690.00, high: 1700.00, low: 1650.00, vol: 72000 },
+        'SYRMA': { open: 450.00, close: 468.50, high: 472.00, low: 448.00, vol: 45000 },
+        'DATAPATTNS': { open: 2850.00, close: 2920.00, high: 2950.00, low: 2840.00, vol: 38000 },
+        'SAGILITY': { open: 35.00, close: 37.20, high: 37.80, low: 34.50, vol: 85000 },
       };
 
       const sample = SAMPLE_PRICES[symbol.toUpperCase()];
