@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks' | 'cpr_scanner';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks' | 'cpr_scanner') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -502,6 +502,24 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>🎯 ORB Bull/Bear Hub</span>
                 <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   Breakout/Down
+                </span>
+              </span>
+            </button>
+
+            {/* 🎯 CPR Scanner Pro Tab */}
+            <button
+              onClick={() => onChangeDashboardTab('cpr_scanner')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'cpr_scanner'
+                  ? 'bg-gradient-to-r from-purple-700 via-indigo-700 to-violet-700 text-white shadow-md shadow-purple-500/30 ring-1 ring-white/30'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-purple-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Target className={`w-3.5 h-3.5 ${activeDashboardTab === 'cpr_scanner' ? 'text-yellow-300 animate-pulse' : 'text-purple-600'}`} />
+                <span>🎯 CPR Scanner Pro</span>
+                <span className="bg-gradient-to-r from-purple-400 to-indigo-400 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  Narrow+Reversal
                 </span>
               </span>
             </button>
