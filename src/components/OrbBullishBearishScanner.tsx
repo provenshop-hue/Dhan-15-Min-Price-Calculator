@@ -743,7 +743,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         let breakoutIdx = -1;
         let isBull = false;
 
-        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+        for (let i = 0; i < stock.rsiTimeline.length - 1; i++) {
           const pt = stock.rsiTimeline[i];
           if (pt.close >= orbHigh) {
             breakoutIdx = i;
@@ -756,33 +756,36 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           }
         }
 
-        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 1) {
-          for (let i = breakoutIdx + 1; i < stock.rsiTimeline.length; i++) {
-            const pt = stock.rsiTimeline[i];
-            const nearOrb = isBull 
-              ? (pt.low <= orbHigh * 1.008 && pt.low >= orbHigh * 0.992)
-              : (pt.high >= orbLow * 0.992 && pt.high <= orbLow * 1.008);
+        if (breakoutIdx !== -1 && breakoutIdx + 1 < stock.rsiTimeline.length) {
+          // The very next candle after ORB break
+          const nextPt = stock.rsiTimeline[breakoutIdx + 1];
+          const testsOrb = isBull 
+            ? (nextPt.low <= orbHigh * 1.008 && nextPt.low >= orbHigh * 0.992)
+            : (nextPt.high >= orbLow * 0.992 && nextPt.high <= orbLow * 1.008);
 
-            if (nearOrb && i < stock.rsiTimeline.length - 1) {
-              const resumePt = stock.rsiTimeline[i + 1];
-              const resumed = isBull 
-                ? (resumePt.close > pt.close && resumePt.close >= orbHigh && resumePt.close > resumePt.open)
-                : (resumePt.close < pt.close && resumePt.close <= orbLow && resumePt.close < resumePt.open);
-              const volGood = resumePt.volume !== undefined ? resumePt.volume >= 500 : true;
+          if (testsOrb) {
+            const resumes = isBull 
+              ? (nextPt.close > nextPt.open && nextPt.close >= orbHigh)
+              : (nextPt.close < nextPt.open && nextPt.close <= orbLow);
+            const volGood = nextPt.volume !== undefined ? nextPt.volume >= 500 : true;
 
-              if (resumed && volGood) {
+            if (resumes && volGood) {
+              hasBreakAndContinue = true;
+              breakAndContinueTime = nextPt.timeStr;
+            } else if (breakoutIdx + 2 < stock.rsiTimeline.length) {
+              const resumePt = stock.rsiTimeline[breakoutIdx + 2];
+              const resumedNext = isBull 
+                ? (resumePt.close > nextPt.close && resumePt.close >= orbHigh && resumePt.close > resumePt.open)
+                : (resumePt.close < nextPt.close && resumePt.close <= orbLow && resumePt.close < resumePt.open);
+              const volGoodNext = resumePt.volume !== undefined ? resumePt.volume >= 500 : true;
+
+              if (resumedNext && volGoodNext) {
                 hasBreakAndContinue = true;
                 breakAndContinueTime = resumePt.timeStr;
-                break;
               }
             }
           }
         }
-      }
-
-      if (!hasBreakAndContinue && (isBullishQualified || isBearishQualified)) {
-        hasBreakAndContinue = true;
-        breakAndContinueTime = orbBreakTime;
       }
 
       const hasLightningScalp = (isBullishQualified || isBearishQualified) && breakMinutesFromOpen <= 15 && orbHeightPct <= 1.5 && (breakPctAbove >= 0.25 || breakPctBelow >= 0.25);
