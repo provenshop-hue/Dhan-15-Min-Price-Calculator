@@ -469,10 +469,11 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let rallyExpansionPct = 0;
       let bouncePowerScore = 0;
 
-      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 3) {
         let breakoutIdx = -1;
         let isBullBreak = false;
 
+        // Condition 1: ORB SUPPORT broken
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
           const pt = stock.rsiTimeline[i];
           if (pt.close >= orbHigh) {
@@ -486,36 +487,46 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           }
         }
 
-        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 2) {
-          for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 4, stock.rsiTimeline.length - 2); i++) {
+        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 3) {
+          for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 4, stock.rsiTimeline.length - 3); i++) {
             const pt = stock.rsiTimeline[i];
+            // Condition 2: Subsequent candle touch the low support
             const hitSupport = isBullBreak ? (pt.low <= orbLow * 1.012 && pt.low >= orbLow * 0.985) : false;
 
             if (hitSupport) {
-              const nextPt = stock.rsiTimeline[i + 1];
-              const cleanBounce = nextPt.close > pt.close && nextPt.close >= orbLow * 1.002;
+              const bouncePt = stock.rsiTimeline[i + 1];
+              // Condition 3: Bounce happens
+              const cleanBounce = bouncePt.close > pt.close && bouncePt.close >= orbLow * 1.002;
 
-              if (cleanBounce) {
-                // NO REVERSAL CHECK: Ensure ALL subsequent candles after support touch never broke below support or turned negative
-                let zeroReversalAfterTouch = true;
-                for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
-                  if (stock.rsiTimeline[k].close < orbLow * 0.998 || stock.rsiTimeline[k].close < stock.rsiTimeline[i+1].close * 0.995) {
-                    zeroReversalAfterTouch = false;
-                    break;
+              if (cleanBounce && i + 2 < stock.rsiTimeline.length) {
+                // Condition 4: Price goes above the bounce candle and closes
+                for (let j = i + 2; j < stock.rsiTimeline.length; j++) {
+                  const confirmPt = stock.rsiTimeline[j];
+                  const goesAboveBounce = confirmPt.close > bouncePt.high || confirmPt.close > bouncePt.close;
+
+                  if (goesAboveBounce) {
+                    let zeroReversalAfterTouch = true;
+                    for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
+                      if (stock.rsiTimeline[k].close < orbLow * 0.998) {
+                        zeroReversalAfterTouch = false;
+                        break;
+                      }
+                    }
+
+                    const endPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
+                    const expansionPct = Math.round(((endPt.close - confirmPt.close) / confirmPt.close) * 100 * 100) / 100;
+
+                    if (zeroReversalAfterTouch && (stock.pctChange === undefined || stock.pctChange > 0)) {
+                      hasOrbLowBounce = true;
+                      orbLowBounceTime = confirmPt.timeStr; // Exact time when 4th condition is met!
+                      orbBounceType = 'BULLISH_SUPPORT_BOUNCE';
+                      rallyExpansionPct = Math.max(0.5, expansionPct);
+                      bouncePowerScore = Math.min(100, Math.round(88 + rallyExpansionPct * 10));
+                      break;
+                    }
                   }
                 }
-
-                const endPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
-                const expansionPct = Math.round(((endPt.close - nextPt.close) / nextPt.close) * 100 * 100) / 100;
-
-                if (zeroReversalAfterTouch && expansionPct >= 0.1 && (stock.pctChange === undefined || stock.pctChange > 0)) {
-                  hasOrbLowBounce = true;
-                  orbLowBounceTime = nextPt.timeStr;
-                  orbBounceType = 'BULLISH_SUPPORT_BOUNCE';
-                  rallyExpansionPct = Math.max(0.5, expansionPct);
-                  bouncePowerScore = Math.min(100, Math.round(85 + rallyExpansionPct * 10));
-                  break;
-                }
+                if (hasOrbLowBounce) break;
               }
             }
           }
