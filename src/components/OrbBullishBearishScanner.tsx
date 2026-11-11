@@ -60,7 +60,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'recent_discovery'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'recent_discovery'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
@@ -734,6 +734,54 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             hasNoRetest = true;
           }
         }
+      }
+
+      let hasBreakAndContinue = false;
+      let breakAndContinueTime = '-';
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+        let breakoutIdx = -1;
+        let isBull = false;
+
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          const pt = stock.rsiTimeline[i];
+          if (pt.close >= orbHigh) {
+            breakoutIdx = i;
+            isBull = true;
+            break;
+          } else if (pt.close <= orbLow) {
+            breakoutIdx = i;
+            isBull = false;
+            break;
+          }
+        }
+
+        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 1) {
+          for (let i = breakoutIdx + 1; i < stock.rsiTimeline.length; i++) {
+            const pt = stock.rsiTimeline[i];
+            const nearOrb = isBull 
+              ? (pt.low <= orbHigh * 1.008 && pt.low >= orbHigh * 0.992)
+              : (pt.high >= orbLow * 0.992 && pt.high <= orbLow * 1.008);
+
+            if (nearOrb && i < stock.rsiTimeline.length - 1) {
+              const resumePt = stock.rsiTimeline[i + 1];
+              const resumed = isBull 
+                ? (resumePt.close > pt.close && resumePt.close >= orbHigh)
+                : (resumePt.close < pt.close && resumePt.close <= orbLow);
+
+              if (resumed) {
+                hasBreakAndContinue = true;
+                breakAndContinueTime = resumePt.timeStr;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (!hasBreakAndContinue && (isBullishQualified || isBearishQualified)) {
+        hasBreakAndContinue = true;
+        breakAndContinueTime = orbBreakTime;
       }
 
       const hasLightningScalp = (isBullishQualified || isBearishQualified) && breakMinutesFromOpen <= 15 && orbHeightPct <= 1.5 && (breakPctAbove >= 0.25 || breakPctBelow >= 0.25);
