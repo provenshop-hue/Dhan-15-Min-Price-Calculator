@@ -469,11 +469,33 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let rallyExpansionPct = 0;
       let bouncePowerScore = 0;
 
+      const priceArrForEma = stock.rsiTimeline && stock.rsiTimeline.length > 0 
+        ? stock.rsiTimeline.map(p => p.close) 
+        : [open, close];
+      const computeEMA = (prices: number[], period: number): number[] => {
+        const k = 2 / (period + 1);
+        const emas: number[] = [];
+        let prevEMA = prices[0] || 0;
+        for (let idx = 0; idx < prices.length; idx++) {
+          if (idx === 0) {
+            emas.push(prevEMA);
+          } else {
+            const currentEMA = (prices[idx] * k) + (prevEMA * (1 - k));
+            emas.push(currentEMA);
+            prevEMA = currentEMA;
+          }
+        }
+        return emas;
+      };
+      const ema9Arr = computeEMA(priceArrForEma, 9);
+      const ema20Arr = computeEMA(priceArrForEma, 20);
+      const ema9 = ema9Arr[ema9Arr.length - 1] || close;
+      const ema20 = ema20Arr[ema20Arr.length - 1] || close;
+
       if (stock.rsiTimeline && stock.rsiTimeline.length > 3) {
         let breakoutIdx = -1;
         let isBullBreak = false;
 
-        // Condition 1: ORB SUPPORT broken
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
           const pt = stock.rsiTimeline[i];
           if (pt.close >= orbHigh) {
@@ -488,27 +510,30 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
 
         if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 3) {
+          // 1. Bullish Support Bounce (Long)
           for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 4, stock.rsiTimeline.length - 3); i++) {
             const pt = stock.rsiTimeline[i];
-            // Condition 2: Subsequent candle touch the low support
-            const hitSupport = isBullBreak ? (pt.low <= orbLow * 1.012 && pt.low >= orbLow * 0.985) : false;
+            const hitSupport = pt.low <= orbLow * 1.012 && pt.low >= orbLow * 0.985;
 
             if (hitSupport) {
               const bouncePt = stock.rsiTimeline[i + 1];
-              // Condition 3: Bounce happens
               const cleanBounce = bouncePt.close > pt.close && bouncePt.close >= orbLow * 1.002;
 
               if (cleanBounce && i + 2 < stock.rsiTimeline.length) {
-                // Condition 4: Price goes above the bounce candle and closes
                 for (let j = i + 2; j < stock.rsiTimeline.length; j++) {
                   const confirmPt = stock.rsiTimeline[j];
-                  const goesAboveBounce = confirmPt.close > bouncePt.high || confirmPt.close > bouncePt.close;
+                  // 4th Condition: Close above bounce high, sufficient volume, above VWAP, EMA9 >= EMA20, not immediately at major resistance
+                  const goesAboveBounceHigh = confirmPt.close > bouncePt.high;
+                  const sufficientVol = (confirmPt.volume || 0) >= (bouncePt.volume || 0) * 0.85;
+                  const aboveVwap = confirmPt.close >= vwap;
+                  const ema9Bullish = ema9 >= ema20;
+                  const notAtResistance = confirmPt.close < orbHigh * 1.025;
 
-                  if (goesAboveBounce) {
-                    let zeroReversalAfterTouch = true;
+                  if (goesAboveBounceHigh && sufficientVol && aboveVwap && ema9Bullish && notAtResistance) {
+                    let zeroReversal = true;
                     for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
                       if (stock.rsiTimeline[k].close < orbLow * 0.998) {
-                        zeroReversalAfterTouch = false;
+                        zeroReversal = false;
                         break;
                       }
                     }
@@ -516,17 +541,65 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     const endPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
                     const expansionPct = Math.round(((endPt.close - confirmPt.close) / confirmPt.close) * 100 * 100) / 100;
 
-                    if (zeroReversalAfterTouch && (stock.pctChange === undefined || stock.pctChange > 0)) {
+                    if (zeroReversal && (stock.pctChange === undefined || stock.pctChange >= 0)) {
                       hasOrbLowBounce = true;
-                      orbLowBounceTime = confirmPt.timeStr; // Exact time when 4th condition is met!
+                      orbLowBounceTime = confirmPt.timeStr;
                       orbBounceType = 'BULLISH_SUPPORT_BOUNCE';
                       rallyExpansionPct = Math.max(0.5, expansionPct);
-                      bouncePowerScore = Math.min(100, Math.round(88 + rallyExpansionPct * 10));
+                      bouncePowerScore = Math.min(100, Math.round(90 + rallyExpansionPct * 10));
                       break;
                     }
                   }
                 }
                 if (hasOrbLowBounce) break;
+              }
+            }
+          }
+
+          // 2. Bearish Resistance Rejection (Short)
+          if (!hasOrbLowBounce) {
+            for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 4, stock.rsiTimeline.length - 3); i++) {
+              const pt = stock.rsiTimeline[i];
+              const hitResistance = pt.high >= orbHigh * 0.988 && pt.high <= orbHigh * 1.015;
+
+              if (hitResistance) {
+                const rejectPt = stock.rsiTimeline[i + 1];
+                const cleanRejection = rejectPt.close < pt.close && rejectPt.close <= orbHigh * 0.998;
+
+                if (cleanRejection && i + 2 < stock.rsiTimeline.length) {
+                  for (let j = i + 2; j < stock.rsiTimeline.length; j++) {
+                    const confirmPt = stock.rsiTimeline[j];
+                    // 4th Condition for Short: Close below rejection low, sufficient volume, below VWAP, EMA9 <= EMA20, not immediately at major support
+                    const goesBelowRejectLow = confirmPt.close < rejectPt.low;
+                    const sufficientVol = (confirmPt.volume || 0) >= (rejectPt.volume || 0) * 0.85;
+                    const belowVwap = confirmPt.close <= vwap;
+                    const ema9Bearish = ema9 <= ema20;
+                    const notAtSupport = confirmPt.close > orbLow * 0.975;
+
+                    if (goesBelowRejectLow && sufficientVol && belowVwap && ema9Bearish && notAtSupport) {
+                      let zeroReversalShort = true;
+                      for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
+                        if (stock.rsiTimeline[k].close > orbHigh * 1.002) {
+                          zeroReversalShort = false;
+                          break;
+                        }
+                      }
+
+                      const endPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
+                      const dropPct = Math.round(((confirmPt.close - endPt.close) / confirmPt.close) * 100 * 100) / 100;
+
+                      if (zeroReversalShort && (stock.pctChange === undefined || stock.pctChange <= 0)) {
+                        hasOrbLowBounce = true;
+                        orbLowBounceTime = confirmPt.timeStr;
+                        orbBounceType = 'BEARISH_RESISTANCE_REJECTION';
+                        rallyExpansionPct = Math.max(0.5, dropPct);
+                        bouncePowerScore = Math.min(100, Math.round(90 + rallyExpansionPct * 10));
+                        break;
+                      }
+                    }
+                  }
+                  if (hasOrbLowBounce) break;
+                }
               }
             }
           }
@@ -800,26 +873,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       // Must meet criteria AND trigger time must be within 0 to 30 minutes from the last fetch time
       const hasRecentDiscovery = meetsAnyCriteria && timeDiff >= 0 && timeDiff <= 30;
 
-      const priceArray = stock.rsiTimeline && stock.rsiTimeline.length > 0 
-        ? stock.rsiTimeline.map(p => p.close)
-        : [open, high, low, close];
-      const computeEMA = (prices: number[], period: number): number[] => {
-        const k = 2 / (period + 1);
-        const emas: number[] = [];
-        let prevEMA = prices[0] || 0;
-        for (let i = 0; i < prices.length; i++) {
-          if (i === 0) {
-            emas.push(prevEMA);
-          } else {
-            const currentEMA = (prices[i] * k) + (prevEMA * (1 - k));
-            emas.push(currentEMA);
-            prevEMA = currentEMA;
-          }
-        }
-        return emas;
-      };
-      const ema9Arr = computeEMA(priceArray, 9);
-      const ema9 = ema9Arr[ema9Arr.length - 1] || close;
       const maintainingEma9 = isBullishQualified ? (close >= ema9) : (isBearishQualified ? (close <= ema9) : true);
       const maintainingVwap = isBullishQualified ? (close >= vwap) : (isBearishQualified ? (close <= vwap) : true);
 
