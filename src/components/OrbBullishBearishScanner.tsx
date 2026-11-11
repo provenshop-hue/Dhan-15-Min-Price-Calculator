@@ -738,6 +738,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
       let hasBreakAndContinue = false;
       let breakAndContinueTime = '-';
+      let isNextCandleTestAndReverse = false;
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
         let breakoutIdx = -1;
@@ -772,6 +773,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             if (resumes && volGood) {
               hasBreakAndContinue = true;
               breakAndContinueTime = nextPt.timeStr;
+              isNextCandleTestAndReverse = true;
             } else if (breakoutIdx + 2 < stock.rsiTimeline.length) {
               const resumePt = stock.rsiTimeline[breakoutIdx + 2];
               const resumedNext = isBull 
@@ -782,6 +784,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
               if (resumedNext && volGoodNext) {
                 hasBreakAndContinue = true;
                 breakAndContinueTime = resumePt.timeStr;
+                isNextCandleTestAndReverse = false;
               }
             }
           }
@@ -915,6 +918,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         noRetestTime,
         hasBreakAndContinue,
         breakAndContinueTime,
+        isNextCandleTestAndReverse,
         hasRecentDiscovery,
         discoveryLabel,
         discoveryTime
@@ -981,6 +985,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
       return true;
     }).sort((a, b) => {
+      if (activeTab === 'break_and_continue') {
+        const pA = a.isNextCandleTestAndReverse ? 1 : 0;
+        const pB = b.isNextCandleTestAndReverse ? 1 : 0;
+        if (pA !== pB) return pB - pA; // Top priority first
+      }
+
       if (activeTab === 'recent_discovery') {
         const timeA = parseTimeToMinutes(a.discoveryTime);
         const timeB = parseTimeToMinutes(b.discoveryTime);
@@ -1703,12 +1713,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
                 {/* ⚡ BREAK & CONTINUE BANNER */}
                 {stock.hasBreakAndContinue && (
-                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-amber-950/70 to-slate-950 border-b border-amber-500/40 text-xs font-mono text-amber-200 flex items-center justify-between">
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-amber-950/90 to-slate-950 border-b border-amber-500/60 text-xs font-mono text-amber-200 flex items-center justify-between shadow-md">
                     <span className="font-bold flex items-center gap-1.5">
                       <Zap className="w-4 h-4 text-amber-400 fill-amber-400 animate-pulse" />
-                      <span>⚡ Break &amp; Continue (ORB Break @ {stock.orbBreakTime} ➔ Retest &amp; Volume Reversal):</span>
+                      <span>{stock.isNextCandleTestAndReverse ? '⚡ Next-Candle Touch & Reverse (Top Priority):' : '⚡ Break & Continue:'}</span>
                     </span>
-                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-amber-500/20 border border-amber-400 rounded-lg">
+                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-amber-500/30 border border-amber-400 rounded-lg">
                       @{stock.breakAndContinueTime}
                     </strong>
                   </div>
