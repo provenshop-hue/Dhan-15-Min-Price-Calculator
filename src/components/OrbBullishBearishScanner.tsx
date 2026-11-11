@@ -738,7 +738,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
       let hasBreakAndContinue = false;
       let breakAndContinueTime = '-';
-      let isNextCandleTestAndReverse = false;
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
         let breakoutIdx = -1;
@@ -758,6 +757,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
 
         if (breakoutIdx !== -1 && breakoutIdx + 1 < stock.rsiTimeline.length) {
+          const breakoutPt = stock.rsiTimeline[breakoutIdx];
+          const breakVol = breakoutPt.volume !== undefined && breakoutPt.volume > 0 ? breakoutPt.volume : 1000;
+
           // The very next candle after ORB break
           const nextPt = stock.rsiTimeline[breakoutIdx + 1];
           const testsOrb = isBull 
@@ -765,26 +767,28 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             : (nextPt.high >= orbLow * 0.992 && nextPt.high <= orbLow * 1.008);
 
           if (testsOrb) {
+            const nextVol = nextPt.volume !== undefined && nextPt.volume > 0 ? nextPt.volume : 1000;
+            const isVolumeMoreThanBreak = nextVol >= breakVol * 1.5;
+
             const resumes = isBull 
               ? (nextPt.close > nextPt.open && nextPt.close >= orbHigh)
               : (nextPt.close < nextPt.open && nextPt.close <= orbLow);
-            const volGood = nextPt.volume !== undefined ? nextPt.volume >= 500 : true;
 
-            if (resumes && volGood) {
+            if (resumes && isVolumeMoreThanBreak) {
               hasBreakAndContinue = true;
               breakAndContinueTime = nextPt.timeStr;
-              isNextCandleTestAndReverse = true;
             } else if (breakoutIdx + 2 < stock.rsiTimeline.length) {
               const resumePt = stock.rsiTimeline[breakoutIdx + 2];
+              const resumeVol = resumePt.volume !== undefined && resumePt.volume > 0 ? resumePt.volume : 1000;
+              const isResumeVolMore = resumeVol >= breakVol * 1.5;
+
               const resumedNext = isBull 
                 ? (resumePt.close > nextPt.close && resumePt.close >= orbHigh && resumePt.close > resumePt.open)
                 : (resumePt.close < nextPt.close && resumePt.close <= orbLow && resumePt.close < resumePt.open);
-              const volGoodNext = resumePt.volume !== undefined ? resumePt.volume >= 500 : true;
 
-              if (resumedNext && volGoodNext) {
+              if (resumedNext && isResumeVolMore) {
                 hasBreakAndContinue = true;
                 breakAndContinueTime = resumePt.timeStr;
-                isNextCandleTestAndReverse = false;
               }
             }
           }
@@ -918,7 +922,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         noRetestTime,
         hasBreakAndContinue,
         breakAndContinueTime,
-        isNextCandleTestAndReverse,
         hasRecentDiscovery,
         discoveryLabel,
         discoveryTime
@@ -985,12 +988,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
       return true;
     }).sort((a, b) => {
-      if (activeTab === 'break_and_continue') {
-        const pA = a.isNextCandleTestAndReverse ? 1 : 0;
-        const pB = b.isNextCandleTestAndReverse ? 1 : 0;
-        if (pA !== pB) return pB - pA; // Top priority first
-      }
-
       if (activeTab === 'recent_discovery') {
         const timeA = parseTimeToMinutes(a.discoveryTime);
         const timeB = parseTimeToMinutes(b.discoveryTime);
@@ -1713,12 +1710,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
                 {/* ⚡ BREAK & CONTINUE BANNER */}
                 {stock.hasBreakAndContinue && (
-                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-amber-950/90 to-slate-950 border-b border-amber-500/60 text-xs font-mono text-amber-200 flex items-center justify-between shadow-md">
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-amber-950/70 to-slate-950 border-b border-amber-500/40 text-xs font-mono text-amber-200 flex items-center justify-between">
                     <span className="font-bold flex items-center gap-1.5">
                       <Zap className="w-4 h-4 text-amber-400 fill-amber-400 animate-pulse" />
-                      <span>{stock.isNextCandleTestAndReverse ? '⚡ Next-Candle Touch & Reverse (Top Priority):' : '⚡ Break & Continue:'}</span>
+                      <span>⚡ Break &amp; Continue (ORB Break @ {stock.orbBreakTime} ➔ Retest &amp; Volume Reversal):</span>
                     </span>
-                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-amber-500/30 border border-amber-400 rounded-lg">
+                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-amber-500/20 border border-amber-400 rounded-lg">
                       @{stock.breakAndContinueTime}
                     </strong>
                   </div>
