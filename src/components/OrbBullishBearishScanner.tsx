@@ -766,10 +766,11 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             if (nearOrb && i < stock.rsiTimeline.length - 1) {
               const resumePt = stock.rsiTimeline[i + 1];
               const resumed = isBull 
-                ? (resumePt.close > pt.close && resumePt.close >= orbHigh)
-                : (resumePt.close < pt.close && resumePt.close <= orbLow);
+                ? (resumePt.close > pt.close && resumePt.close >= orbHigh && resumePt.close > resumePt.open)
+                : (resumePt.close < pt.close && resumePt.close <= orbLow && resumePt.close < resumePt.open);
+              const volGood = resumePt.volume !== undefined ? resumePt.volume >= 500 : true;
 
-              if (resumed) {
+              if (resumed && volGood) {
                 hasBreakAndContinue = true;
                 breakAndContinueTime = resumePt.timeStr;
                 break;
@@ -909,6 +910,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         hasLightningScalp,
         hasNoRetest,
         noRetestTime,
+        hasBreakAndContinue,
+        breakAndContinueTime,
         hasRecentDiscovery,
         discoveryLabel,
         discoveryTime
@@ -952,6 +955,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'bounce_great' && !s.hasBounceGreat) return false;
       if (activeTab === 'lightning_scalp' && !s.hasLightningScalp) return false;
       if (activeTab === 'no_retest' && !s.hasNoRetest) return false;
+      if (activeTab === 'break_and_continue' && !s.hasBreakAndContinue) return false;
       if (activeTab === 'recent_discovery') {
         if (!s.hasRecentDiscovery) return false;
         if (recentSubFilter === 'SUPER_BREAK' && !s.isSuperBreakBullish && !s.isSuperBreakBearish) return false;
@@ -1024,6 +1028,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const bounceGreatCount = processedOrbStocks.filter(s => s.hasBounceGreat).length;
   const lightningScalpCount = processedOrbStocks.filter(s => s.hasLightningScalp).length;
   const noRetestCount = processedOrbStocks.filter(s => s.hasNoRetest).length;
+  const breakAndContinueCount = processedOrbStocks.filter(s => s.hasBreakAndContinue).length;
   const recentDiscoveryCount = processedOrbStocks.filter(s => s.hasRecentDiscovery).length;
 
   return (
@@ -1305,6 +1310,18 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           >
             <ArrowUpRight className="w-4 h-4 text-purple-300 animate-pulse" />
             <span>🚀 No Retest / Pure Rocket ({noRetestCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('break_and_continue')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'break_and_continue'
+                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30 border border-amber-400'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-amber-300 fill-amber-300 animate-pulse" />
+            <span>⚡ Break &amp; Continue ({breakAndContinueCount})</span>
           </button>
         </div>
 
@@ -1677,6 +1694,19 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     </span>
                     <strong className="text-white font-black text-xs px-2 py-0.5 bg-purple-500/20 border border-purple-400 rounded-lg">
                       @{stock.noRetestTime}
+                    </strong>
+                  </div>
+                )}
+
+                {/* ⚡ BREAK & CONTINUE BANNER */}
+                {stock.hasBreakAndContinue && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-amber-950/70 to-slate-950 border-b border-amber-500/40 text-xs font-mono text-amber-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-amber-400 fill-amber-400 animate-pulse" />
+                      <span>⚡ Break &amp; Continue (ORB Break @ {stock.orbBreakTime} ➔ Retest &amp; Volume Reversal):</span>
+                    </span>
+                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-amber-500/20 border border-amber-400 rounded-lg">
+                      @{stock.breakAndContinueTime}
                     </strong>
                   </div>
                 )}
