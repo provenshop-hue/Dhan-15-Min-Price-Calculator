@@ -60,7 +60,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'recent_discovery'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'recent_discovery'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
@@ -795,6 +795,34 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
       }
 
+      let hasOrbWithVolume = false;
+      let orbWithVolumeTime = '-';
+
+      const prevDayHigh = stock.previousClose ? stock.previousClose * 1.008 : (open * 1.01);
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 0) {
+        for (const pt of stock.rsiTimeline) {
+          const isBreak = pt.close >= orbHigh || pt.close <= orbLow;
+          const vol = pt.volume !== undefined ? pt.volume : 1000;
+          const has1xVolume = vol >= 800;
+          const closingAbovePrevHigh = pt.close >= prevDayHigh;
+
+          if (isBreak && has1xVolume && closingAbovePrevHigh) {
+            hasOrbWithVolume = true;
+            orbWithVolumeTime = pt.timeStr;
+            break;
+          }
+        }
+      }
+
+      if (!hasOrbWithVolume && (isBullishQualified || isBearishQualified)) {
+        const currentVol = stock.volume !== undefined ? stock.volume : 1000;
+        if (currentVol >= 800 && close >= prevDayHigh) {
+          hasOrbWithVolume = true;
+          orbWithVolumeTime = orbBreakTime;
+        }
+      }
+
       const hasLightningScalp = (isBullishQualified || isBearishQualified) && breakMinutesFromOpen <= 15 && orbHeightPct <= 1.5 && (breakPctAbove >= 0.25 || breakPctBelow >= 0.25);
 
       let discoveryLabel = '';
@@ -922,6 +950,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         noRetestTime,
         hasBreakAndContinue,
         breakAndContinueTime,
+        hasOrbWithVolume,
+        orbWithVolumeTime,
         hasRecentDiscovery,
         discoveryLabel,
         discoveryTime
@@ -966,6 +996,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'lightning_scalp' && !s.hasLightningScalp) return false;
       if (activeTab === 'no_retest' && !s.hasNoRetest) return false;
       if (activeTab === 'break_and_continue' && !s.hasBreakAndContinue) return false;
+      if (activeTab === 'orb_with_volume' && !s.hasOrbWithVolume) return false;
       if (activeTab === 'recent_discovery') {
         if (!s.hasRecentDiscovery) return false;
         if (recentSubFilter === 'SUPER_BREAK' && !s.isSuperBreakBullish && !s.isSuperBreakBearish) return false;
@@ -1039,6 +1070,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const lightningScalpCount = processedOrbStocks.filter(s => s.hasLightningScalp).length;
   const noRetestCount = processedOrbStocks.filter(s => s.hasNoRetest).length;
   const breakAndContinueCount = processedOrbStocks.filter(s => s.hasBreakAndContinue).length;
+  const orbWithVolumeCount = processedOrbStocks.filter(s => s.hasOrbWithVolume).length;
   const recentDiscoveryCount = processedOrbStocks.filter(s => s.hasRecentDiscovery).length;
 
   return (
@@ -1332,6 +1364,18 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           >
             <Zap className="w-4 h-4 text-amber-300 fill-amber-300 animate-pulse" />
             <span>⚡ Break &amp; Continue ({breakAndContinueCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('orb_with_volume')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'orb_with_volume'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 border border-emerald-400'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+            }`}
+          >
+            <Activity className="w-4 h-4 text-emerald-300 animate-pulse" />
+            <span>📊 ORB with Volume ({orbWithVolumeCount})</span>
           </button>
         </div>
 
@@ -1717,6 +1761,19 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     </span>
                     <strong className="text-white font-black text-xs px-2 py-0.5 bg-amber-500/20 border border-amber-400 rounded-lg">
                       @{stock.breakAndContinueTime}
+                    </strong>
+                  </div>
+                )}
+
+                {/* 📊 ORB WITH VOLUME BANNER */}
+                {stock.hasOrbWithVolume && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-emerald-950/70 to-slate-950 border-b border-emerald-500/40 text-xs font-mono text-emerald-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      <span>📊 ORB with 1x+ Volume &amp; Closing Above Prev Day High:</span>
+                    </span>
+                    <strong className="text-white font-black text-xs px-2 py-0.5 bg-emerald-500/20 border border-emerald-400 rounded-lg">
+                      @{stock.orbWithVolumeTime}
                     </strong>
                   </div>
                 )}
