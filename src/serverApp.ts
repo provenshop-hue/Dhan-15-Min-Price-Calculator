@@ -480,6 +480,22 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
       let openCandles = result.data?.open;
 
       if (!openCandles || !Array.isArray(openCandles) || openCandles.length === 0) {
+        // Try up to 3 days back for weekends/holidays
+        for (let d = 1; d <= 3; d++) {
+          const prevDt = new Date(targetDate);
+          prevDt.setDate(prevDt.getDate() - d);
+          const prevDateStr = prevDt.toISOString().split('T')[0];
+          const prevResult = await fetchDhanCandles(prevDateStr);
+          if (prevResult.ok && prevResult.data?.open && Array.isArray(prevResult.data.open) && prevResult.data.open.length > 0) {
+            result = prevResult;
+            foundDate = prevDateStr;
+            openCandles = result.data.open;
+            break;
+          }
+        }
+      }
+
+      if (!openCandles || !Array.isArray(openCandles) || openCandles.length === 0) {
         // Fallback generator for stocks whose security ID or historical candles are unavailable on Dhan API
         const symKey = (symbol || 'STOCK').toUpperCase();
         let baseP = 100;
