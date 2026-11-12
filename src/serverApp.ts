@@ -781,6 +781,9 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
               const instrumentFeed = segmentData?.[String(secId)] || segmentData?.[Number(secId)];
 
               if (instrumentFeed) {
+                if (instrumentFeed.ohlc?.open && instrumentFeed.ohlc.open > 0) {
+                  accurateOpen = instrumentFeed.ohlc.open;
+                }
                 // If last_price (LTP) is valid, it is the exact real-time live current price
                 if (instrumentFeed.last_price && instrumentFeed.last_price > 0) {
                   accurateClose = instrumentFeed.last_price;
