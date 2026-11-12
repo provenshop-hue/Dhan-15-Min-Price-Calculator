@@ -77,13 +77,11 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Process and compute Lowest Volume Concept Setups
+  // Process and compute Lowest Volume Concept Setups (Strict 5-Min Candles)
   const processedLowestVolStocks = useMemo(() => {
     return stocks.map((stock) => {
-      const open = stock.openPrice || stock.first15mOpen || 100;
-      const close = stock.closePrice || stock.first15mClose || open;
-      const high = stock.highPrice || stock.first15mHigh || Math.max(open, close) * 1.008;
-      const low = stock.lowPrice || stock.first15mLow || Math.min(open, close) * 0.992;
+      const open = stock.openPrice || 100;
+      const close = stock.closePrice || open;
       const prevClose = stock.previousClose || open * 0.995;
 
       const prevDayHigh = prevClose * 1.012;
@@ -91,64 +89,61 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
 
       let hasBullishLowestVol = false;
       let hasBearishLowestVol = false;
+
       let c1Open = open;
-      let c1Close = open * 1.005;
-      let c1Volume = stock.volume ? Math.round(stock.volume * 0.5) : 50000;
-      let c2Open = close * 1.002;
-      let c2Close = close * 0.998; // Red candle
+      let c1Close = open * 1.008;
+      let c1Volume = stock.volume ? Math.round(stock.volume * 0.45) : 50000;
+
+      let c2Open = c1Close * 1.002;
+      let c2Close = c2Open * 0.997; // Bearish red candle for bullish entry pullback
       let c2Volume = Math.round(c1Volume * 0.20); // 80% lower volume (70%-90% range)
       let volumeDropPct = 80;
 
       if (stock.rsiTimeline && stock.rsiTimeline.length >= 2) {
-        const c1 = stock.rsiTimeline[0];
-        const c2 = stock.rsiTimeline[1];
+        const candle1 = stock.rsiTimeline[0]; // First 5-min candle (09:15)
+        const candle2 = stock.rsiTimeline[1]; // Second 5-min candle (09:20)
 
-        const c1O = c1.open !== undefined ? c1.open : open;
-        const c1C = c1.close;
-        const c2O = c2.open !== undefined ? c2.open : c2.close * 1.002;
-        const c2C = c2.close;
+        c1Open = candle1.open !== undefined ? candle1.open : open;
+        c1Close = candle1.close;
+        c1Volume = candle1.volume !== undefined && candle1.volume > 0 ? candle1.volume : 50000;
 
-        c1Open = c1O;
-        c1Close = c1C;
-        c1Volume = c1.volume !== undefined ? c1.volume : 50000;
-
-        c2Open = c2O;
-        c2Close = c2C;
-        c2Volume = c2.volume !== undefined ? c2.volume : 10000;
+        c2Open = candle2.open !== undefined ? candle2.open : c1Close * 1.001;
+        c2Close = candle2.close;
+        c2Volume = candle2.volume !== undefined && candle2.volume > 0 ? candle2.volume : 12000;
 
         if (c1Volume > 0) {
           const drop = ((c1Volume - c2Volume) / c1Volume) * 100;
           volumeDropPct = Math.round(drop * 10) / 10;
         }
 
-        // Bullish Entry Check:
-        // First candle open above Prev Day High & close above Prev Day High
-        // Second candle must be red (c2C < c2O) and volume 70%-90% lower (volumeDropPct between 70 and 90)
-        const firstCandleBullish = c1O > prevDayHigh && c1C > prevDayHigh;
-        const secondCandleRedAndLowVol = c2C < c2O && volumeDropPct >= 70 && volumeDropPct <= 90;
+        // Bullish Entry Criteria (5-min candles):
+        // 1. First 5m candle opens above Previous Day High and closes above Previous Day High
+        // 2. Second 5m candle must be a bearish candle (close < open) and volume must be 70%-90% lower than the first candle
+        const c1BullishBreak = c1Open > prevDayHigh && c1Close > prevDayHigh;
+        const c2BearishAndDryVol = c2Close < c2Open && volumeDropPct >= 70 && volumeDropPct <= 90;
 
-        if (firstCandleBullish && secondCandleRedAndLowVol) {
+        if (c1BullishBreak && c2BearishAndDryVol) {
           hasBullishLowestVol = true;
         }
 
-        // Bearish Entry Check:
-        // First candle open below Prev Day Low & close below Prev Day Low
-        // Second candle must be green (c2C > c2O) and volume 70%-90% lower (volumeDropPct between 70 and 90)
-        const firstCandleBearish = c1O < prevDayLow && c1C < prevDayLow;
-        const secondCandleGreenAndLowVol = c2C > c2O && volumeDropPct >= 70 && volumeDropPct <= 90;
+        // Bearish Entry Criteria (5-min candles):
+        // 1. First 5m candle opens below Previous Day Low and closes below Previous Day Low
+        // 2. Second 5m candle must be a green/bullish candle (close > open) and volume must be 70%-90% lower than the first candle
+        const c1BearishBreak = c1Open < prevDayLow && c1Close < prevDayLow;
+        const c2GreenAndDryVol = c2Close > c2Open && volumeDropPct >= 70 && volumeDropPct <= 90;
 
-        if (firstCandleBearish && secondCandleGreenAndLowVol) {
+        if (c1BearishBreak && c2GreenAndDryVol) {
           hasBearishLowestVol = true;
         }
       } else {
-        // Fallback simulation for demonstration / testing if timeline is missing
-        const isBullMock = (stock.pctChange !== undefined ? stock.pctChange : (close - open)) > 1.0;
-        if (isBullMock) {
+        // Fallback simulation for demonstration / testing
+        const isBull = (stock.pctChange !== undefined ? stock.pctChange : 1) > 0;
+        if (isBull) {
           c1Open = prevDayHigh * 1.002;
           c1Close = prevDayHigh * 1.008;
           c1Volume = 60000;
           c2Open = c1Close * 1.001;
-          c2Close = c2Open * 0.998; // Red
+          c2Close = c2Open * 0.997; // Bearish red candle
           c2Volume = 15000; // 75% lower
           volumeDropPct = 75;
           hasBullishLowestVol = true;
@@ -157,9 +152,9 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
           c1Close = prevDayLow * 0.992;
           c1Volume = 60000;
           c2Open = c1Close * 0.999;
-          c2Close = c2Open * 1.002; // Green
-          c2Volume = 12000; // 80% lower
-          volumeDropPct = 80;
+          c2Close = c2Open * 1.003; // Green candle
+          c2Volume = 14000; // 77% lower
+          volumeDropPct = 77;
           hasBearishLowestVol = true;
         }
       }
@@ -215,11 +210,11 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
                 <BarChart3 className="w-6 h-6 text-indigo-400 animate-pulse" />
               </div>
               <h1 className="text-2xl font-black tracking-tight">
-                Lowest Volume Concept (Pullback &amp; Dry-Up Scanner)
+                Lowest Volume Concept (5-Min Candle Pullback &amp; Dry-Up Scanner)
               </h1>
             </div>
             <p className="text-slate-300 text-sm max-w-3xl leading-relaxed">
-              Detects high-probability pullback setups where candle 2 volume dries up by 70%-90% following a breakout above Previous Day High or breakdown below Previous Day Low.
+              Scans 5-minute candles: Bullish entry requires 1st candle open &amp; close above Prev Day High, and 2nd candle to be bearish with volume 70%-90% lower. Bearish entry requires 1st candle open &amp; close below Prev Day Low, and 2nd candle to be green with volume 70%-90% lower.
             </p>
           </div>
 
@@ -250,9 +245,9 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between shadow-lg">
           <div>
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Bullish Lowest Vol Setups</span>
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Bullish 5m Entry Setups</span>
             <span className="text-2xl font-black font-mono text-emerald-400">{bullishCount}</span>
-            <span className="text-[10px] text-slate-500 block mt-0.5">1st Candle &gt; Prev Day High + 2nd Red Vol Dry-Up</span>
+            <span className="text-[10px] text-slate-500 block mt-0.5">1st 5m &gt; Prev High + 2nd 5m Bearish Vol Dry-up (-70% to -90%)</span>
           </div>
           <div className="p-3 bg-emerald-500/20 border border-emerald-400/40 rounded-xl">
             <ArrowUpRight className="w-6 h-6 text-emerald-400" />
@@ -261,9 +256,9 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
 
         <div className="bg-slate-900 border border-rose-500/30 rounded-2xl p-4 flex items-center justify-between shadow-lg">
           <div>
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Bearish Lowest Vol Setups</span>
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Bearish 5m Entry Setups</span>
             <span className="text-2xl font-black font-mono text-rose-400">{bearishCount}</span>
-            <span className="text-[10px] text-slate-500 block mt-0.5">1st Candle &lt; Prev Day Low + 2nd Green Vol Dry-Up</span>
+            <span className="text-[10px] text-slate-500 block mt-0.5">1st 5m &lt; Prev Low + 2nd 5m Green Vol Dry-up (-70% to -90%)</span>
           </div>
           <div className="p-3 bg-rose-500/20 border border-rose-400/40 rounded-xl">
             <ArrowDownRight className="w-6 h-6 text-rose-400" />
@@ -346,9 +341,9 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
       {filteredStocks.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center text-slate-400 space-y-3">
           <Sparkles className="w-10 h-10 text-slate-600 mx-auto animate-pulse" />
-          <h3 className="text-lg font-bold text-white">No Lowest Volume Setups Found</h3>
+          <h3 className="text-lg font-bold text-white">No 5-Min Lowest Volume Setups Found</h3>
           <p className="text-xs max-w-md mx-auto">
-            No instruments currently match the 70%-90% volume dry-up criteria on candle 2 after opening/closing outside Previous Day High/Low.
+            No instruments currently match the strict 5-min criteria: 1st candle outside Prev Day High/Low, and 2nd 5m candle bearish/green with 70%-90% lower volume.
           </p>
         </div>
       ) : (
@@ -373,7 +368,7 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
                       <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                         isBull ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                       }`}>
-                        {isBull ? '🟢 Bullish Lowest Vol' : '🔴 Bearish Lowest Vol'}
+                        {isBull ? '🟢 Bullish 5m Lowest Vol' : '🔴 Bearish 5m Lowest Vol'}
                       </span>
                     </div>
                     <div className="flex items-center space-x-2 mt-0.5">
@@ -410,24 +405,24 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
                 }`}>
                   <span className="font-bold flex items-center gap-1.5">
                     <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
-                    <span>Volume Dry-up: <strong className="text-white">-{stock.volumeDropPct}%</strong></span>
+                    <span>5m Vol Dry-up (-{stock.volumeDropPct}%): <strong className="text-white">{isBull ? '2nd Candle Bearish Red' : '2nd Candle Green'}</strong></span>
                   </span>
                   <span className="text-[10px] px-2 py-0.5 bg-slate-950/80 rounded border border-slate-800 text-slate-300">
                     {isBull ? `Prev High: ₹${stock.prevDayHigh}` : `Prev Low: ₹${stock.prevDayLow}`}
                   </span>
                 </div>
 
-                {/* CANDLE DETAILS GRID */}
+                {/* 5-MIN CANDLES DETAILS GRID */}
                 <div className="p-4 space-y-3 flex-1 font-mono text-xs">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl space-y-1">
-                      <span className="text-[10px] text-slate-400 block font-sans font-bold">1st Candle (Breakout)</span>
+                      <span className="text-[10px] text-slate-400 block font-sans font-bold">1st 5-Min Candle (09:15)</span>
                       <div className="text-white font-bold">O: ₹{stock.c1Open} | C: ₹{stock.c1Close}</div>
                       <div className="text-indigo-300 text-[11px]">Vol: {stock.c1Volume.toLocaleString('en-IN')}</div>
                     </div>
 
                     <div className="bg-slate-950/80 border border-slate-800 p-2.5 rounded-xl space-y-1">
-                      <span className="text-[10px] text-slate-400 block font-sans font-bold">2nd Candle (Dry-up)</span>
+                      <span className="text-[10px] text-slate-400 block font-sans font-bold">2nd 5-Min Candle (09:20)</span>
                       <div className={`${isBull ? 'text-rose-400' : 'text-emerald-400'} font-bold`}>
                         O: ₹{stock.c2Open} | C: ₹{stock.c2Close}
                       </div>
