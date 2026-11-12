@@ -64,7 +64,9 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
         ...s,
         strategyType,
         difference,
-        isTopPriorityOpenLow
+        isTopPriorityOpenLow,
+        opensAbovePrevHigh,
+        closesAbovePrevHigh
       };
     }).filter(Boolean) as (StockCalculated & { strategyType: 'OPEN_LOW' | 'OPEN_HIGH', difference: number, isTopPriorityOpenLow: boolean })[];
     
@@ -280,6 +282,18 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                       Difference: ₹{(stock as any).difference.toFixed(2)}
                     </p>
                   </div>
+                </div>
+
+                {/* Previous Day High Status Indicator */}
+                <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-mono font-bold ${
+                  (stock as any).opensAbovePrevHigh 
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
+                    : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                }`}>
+                  <span>Prev Day High:</span>
+                  <span className={(stock as any).opensAbovePrevHigh ? 'text-emerald-400 font-black' : 'text-slate-400'}>
+                    {(stock as any).opensAbovePrevHigh ? '🟢 Opened Above Prev High' : '⚪ Opened Below Prev High'}
+                  </span>
                 </div>
 
                 {/* Open, High, Low, Close (OHLC) Metrics Bar */}
