@@ -117,9 +117,9 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
         }
 
         // Bullish Entry Criteria (5-min candles):
-        // 1. First 5m candle opens above Previous Day High and closes above Previous Day High
-        // 2. Second 5m candle must be a bearish candle (close < open) and volume must be 70%-90% lower than the first candle
-        const c1BullishBreak = c1Open > prevDayHigh && c1Close > prevDayHigh;
+        // 1. First 5m candle opens above Previous Day High, closes above Previous Day High, AND must be a GREEN candle (c1Close > c1Open)
+        // 2. Second 5m candle must be a bearish candle (c2Close < c2Open) and volume must be 70%-90% lower than the first candle
+        const c1BullishBreak = c1Open > prevDayHigh && c1Close > prevDayHigh && c1Close > c1Open;
         const c2BearishAndDryVol = c2Close < c2Open && volumeDropPct >= 70 && volumeDropPct <= 90;
 
         if (c1BullishBreak && c2BearishAndDryVol) {
@@ -127,9 +127,9 @@ export const LowestVolumeScanner: React.FC<LowestVolumeScannerProps> = ({
         }
 
         // Bearish Entry Criteria (5-min candles):
-        // 1. First 5m candle opens below Previous Day Low and closes below Previous Day Low
-        // 2. Second 5m candle must be a green/bullish candle (close > open) and volume must be 70%-90% lower than the first candle
-        const c1BearishBreak = c1Open < prevDayLow && c1Close < prevDayLow;
+        // 1. First 5m candle opens below Previous Day Low, closes below Previous Day Low, AND must be a RED candle (c1Close < c1Open)
+        // 2. Second 5m candle must be a green/bullish candle (c2Close > c2Open) and volume must be 70%-90% lower than the first candle
+        const c1BearishBreak = c1Open < prevDayLow && c1Close < prevDayLow && c1Close < c1Open;
         const c2GreenAndDryVol = c2Close > c2Open && volumeDropPct >= 70 && volumeDropPct <= 90;
 
         if (c1BearishBreak && c2GreenAndDryVol) {
