@@ -60,7 +60,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'lowest_volume_concept' | 'recent_discovery'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'retested_bounced' | 'failed_retest' | 'immediate_bounce' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'recent_discovery'>('bullish');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
@@ -802,7 +802,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 0) {
         for (const pt of stock.rsiTimeline) {
-          const isBreak = pt.close >= orbHigh;
+          const isBreak = pt.close >= orbHigh || pt.close <= orbLow;
           const vol = pt.volume !== undefined ? pt.volume : 1000;
           const has1xVolume = vol >= 800;
           const closingAbovePrevHigh = pt.close >= prevDayHigh;
@@ -815,42 +815,13 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
       }
 
-      let hasLowestVolumeBullish = false;
-      let hasLowestVolumeBearish = false;
-      let lowestVolumeTime = '-';
-
-      const prevDayLow = stock.previousClose ? stock.previousClose * 0.992 : (open * 0.99);
-
-      if (stock.rsiTimeline && stock.rsiTimeline.length >= 2) {
-        const c1 = stock.rsiTimeline[0];
-        const c2 = stock.rsiTimeline[1];
-
-        const c1Open = c1.open !== undefined ? c1.open : open;
-        const c1Close = c1.close !== undefined ? c1.close : close;
-        const c1Vol = c1.volume !== undefined ? c1.volume : 1000;
-
-        const c2Open = c2.open !== undefined ? c2.open : open;
-        const c2Close = c2.close !== undefined ? c2.close : close;
-        const c2Vol = c2.volume !== undefined ? c2.volume : 500;
-
-        const c1Bullish = c1Open > prevDayHigh && c1Close > prevDayHigh;
-        const c2RedLowVol = c2Close < c2Open && c2Vol <= c1Vol * 0.30 && c2Vol >= c1Vol * 0.05;
-
-        if (c1Bullish && c2RedLowVol) {
-          hasLowestVolumeBullish = true;
-          lowestVolumeTime = c2.timeStr;
-        }
-
-        const c1Bearish = c1Open < prevDayLow && c1Close < prevDayLow;
-        const c2GreenLowVol = c2Close > c2Open && c2Vol <= c1Vol * 0.30 && c2Vol >= c1Vol * 0.05;
-
-        if (c1Bearish && c2GreenLowVol) {
-          hasLowestVolumeBearish = true;
-          lowestVolumeTime = c2.timeStr;
+      if (!hasOrbWithVolume && (isBullishQualified || isBearishQualified)) {
+        const currentVol = stock.volume !== undefined ? stock.volume : 1000;
+        if (currentVol >= 800 && close >= prevDayHigh) {
+          hasOrbWithVolume = true;
+          orbWithVolumeTime = orbBreakTime;
         }
       }
-
-      const hasLowestVolumeConcept = hasLowestVolumeBullish || hasLowestVolumeBearish;
 
       const hasLightningScalp = (isBullishQualified || isBearishQualified) && breakMinutesFromOpen <= 15 && orbHeightPct <= 1.5 && (breakPctAbove >= 0.25 || breakPctBelow >= 0.25);
 
@@ -981,10 +952,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         breakAndContinueTime,
         hasOrbWithVolume,
         orbWithVolumeTime,
-        hasLowestVolumeConcept,
-        hasLowestVolumeBullish,
-        hasLowestVolumeBearish,
-        lowestVolumeTime,
         hasRecentDiscovery,
         discoveryLabel,
         discoveryTime
@@ -1030,7 +997,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'no_retest' && !s.hasNoRetest) return false;
       if (activeTab === 'break_and_continue' && !s.hasBreakAndContinue) return false;
       if (activeTab === 'orb_with_volume' && !s.hasOrbWithVolume) return false;
-      if (activeTab === 'lowest_volume_concept' && !s.hasLowestVolumeConcept) return false;
       if (activeTab === 'recent_discovery') {
         if (!s.hasRecentDiscovery) return false;
         if (recentSubFilter === 'SUPER_BREAK' && !s.isSuperBreakBullish && !s.isSuperBreakBearish) return false;
@@ -1105,7 +1071,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const noRetestCount = processedOrbStocks.filter(s => s.hasNoRetest).length;
   const breakAndContinueCount = processedOrbStocks.filter(s => s.hasBreakAndContinue).length;
   const orbWithVolumeCount = processedOrbStocks.filter(s => s.hasOrbWithVolume).length;
-  const lowestVolumeCount = processedOrbStocks.filter(s => s.hasLowestVolumeConcept).length;
   const recentDiscoveryCount = processedOrbStocks.filter(s => s.hasRecentDiscovery).length;
 
   return (

@@ -33,7 +33,6 @@ import { Nifty50ParabolicTracker } from './components/Nifty50ParabolicTracker';
 import { EmaDynamicEngineDashboard } from './components/EmaDynamicEngineDashboard';
 import { FollowedStocksDashboard } from './components/FollowedStocksDashboard';
 import { CprScannerModule } from './components/CprScannerModule';
-import { LowestVolumeScanner } from './components/LowestVolumeScanner';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -216,7 +215,7 @@ export default function App() {
 
 
   // Active Dashboard View Tab
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'cpr_scanner' | 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks' | 'lowest_volume_concept'>('gann');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'cpr_scanner' | 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks'>('gann');
 
   // Followed Stocks State & 2-min Polling with Alarms
   const [followedSymbols, setFollowedSymbols] = useState<string[]>(() => {
@@ -1585,16 +1584,6 @@ export default function App() {
         ) : activeDashboardTab === 'cpr_scanner' ? (
           /* Dedicated Narrow CPR + Reversal CPR Scanner Pro Module */
           <CprScannerModule
-            stocks={stocks}
-            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
-            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
-            onFetchSingleStock={(s) => handleFetchSingleDhan(s)}
-            onRefreshAll={handleFetchAllDhan}
-            isLoading={isBulkLoading}
-          />
-        ) : activeDashboardTab === 'lowest_volume_concept' ? (
-          /* Dedicated Lowest Volume Concept Module */
-          <LowestVolumeScanner
             stocks={stocks}
             onSelectStockDetail={(s) => setSelectedDetailStock(s)}
             onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
