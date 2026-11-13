@@ -9,6 +9,7 @@ import { formatStrikePrice } from '../utils/nseStrikeMaster';
 import { evaluateStockSectorStrength } from '../utils/sectorMaster';
 import { get15mBounce930Info } from '../utils/rsiPullback';
 import { StockTimingHistoryAnalysis } from './StockTimingHistoryAnalysis';
+import { openDhanChart } from '../utils/dhanChartHelper';
 
 interface StockDetailModalProps {
   stock: StockCalculated | null;
@@ -63,6 +64,12 @@ export const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, allSt
               >
                 ScanX Screener <ExternalLink className="w-3 h-3" />
               </a>
+              <button
+                onClick={() => openDhanChart(stock)}
+                className="text-xs text-cyan-700 hover:underline flex items-center gap-1 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-200/60 font-medium cursor-pointer"
+              >
+                Dhan Chart <ExternalLink className="w-3 h-3" />
+              </button>
             </div>
             <h3 className="text-sm text-slate-500 font-medium mt-0.5">{stock.companyName}</h3>
           </div>

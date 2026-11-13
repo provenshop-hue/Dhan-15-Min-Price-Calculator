@@ -83,6 +83,17 @@ export interface StockCalculated {
   hasOrbLowBounce?: boolean;
   orbLowBounceTime?: string;
   bounceStrengthPct?: number;
+  hasHighQualityBreakout?: boolean;
+  continuationScore?: number;
+  continuationStatus?: 'BREAKOUT CANDIDATE' | 'WAIT FOR CONFIRMATION' | 'CONFIRMED CONTINUATION' | 'REJECTED' | 'DATA UNAVAILABLE';
+  continuationReasons?: string[];
+  bodyRangeRatio?: number;
+  closeInUpperOrLower20?: boolean;
+  nextCandleConfirmed?: boolean;
+  nearestOpposingLevel?: number;
+  opposingLevelName?: string;
+  distanceToOpposing?: number;
+  roomRatio?: number;
 }
 
 export type TrendFilterType =

@@ -30,6 +30,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       const open = s.first1mOpen ?? s.first15mOpen ?? s.openPrice;
       const high = s.first1mHigh ?? s.first15mHigh ?? s.highPrice;
       const low = s.first1mLow ?? s.first15mLow ?? s.lowPrice;
+      const close = s.closePrice ?? s.ltp ?? open;
       
       if (open == null || high == null || low == null) {
         return null;
@@ -53,16 +54,28 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       if (strategyType === 'NEUTRAL') return null;
       
       const difference = strategyType === 'OPEN_LOW' ? diffLow : diffHigh;
+
+      const prevDayHigh = s.previousClose ? s.previousClose * 1.01 : (open * 1.005);
+      const opensAbovePrevHigh = open >= prevDayHigh;
+      const closesAbovePrevHigh = close >= prevDayHigh;
+      const isTopPriorityOpenLow = strategyType === 'OPEN_LOW' && opensAbovePrevHigh && closesAbovePrevHigh;
           
       return {
         ...s,
         strategyType,
-        difference
+        difference,
+        isTopPriorityOpenLow,
+        opensAbovePrevHigh,
+        closesAbovePrevHigh
       };
-    }).filter(Boolean) as (StockCalculated & { strategyType: 'OPEN_LOW' | 'OPEN_HIGH', difference: number })[];
+    }).filter(Boolean) as (StockCalculated & { strategyType: 'OPEN_LOW' | 'OPEN_HIGH', difference: number, isTopPriorityOpenLow: boolean })[];
     
-    // Sort by difference ascending (least difference on top)
-    return list.sort((a, b) => a.difference - b.difference);
+    // Sort: Top priority Open=Low (opens & closes above prev day high) first, then by difference ascending
+    return list.sort((a, b) => {
+      if (a.isTopPriorityOpenLow && !b.isTopPriorityOpenLow) return -1;
+      if (!a.isTopPriorityOpenLow && b.isTopPriorityOpenLow) return 1;
+      return a.difference - b.difference;
+    });
   }, [stocks]);
 
   const filteredStocks = useMemo(() => {
@@ -85,8 +98,11 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
   const openHighCount = scannedStocks.filter(s => s.strategyType === 'OPEN_HIGH').length;
 
   // AI Recommendation Logic (Best Open=Low)
-  // Closest difference to 0, if multiple have same difference, sort by highest volumeRatio
-  const topRecommendation = scannedStocks.filter(s => s.strategyType === 'OPEN_LOW').sort((a, b) => a.difference - b.difference || (b.volumeRatio || 0) - (a.volumeRatio || 0))[0];
+  const topRecommendation = scannedStocks.filter(s => s.strategyType === 'OPEN_LOW').sort((a, b) => {
+    if (a.isTopPriorityOpenLow && !b.isTopPriorityOpenLow) return -1;
+    if (!a.isTopPriorityOpenLow && b.isTopPriorityOpenLow) return 1;
+    return a.difference - b.difference || (b.volumeRatio || 0) - (a.volumeRatio || 0);
+  })[0];
 
   return (
     <div className="space-y-6 animate-fade-in pb-20">
@@ -266,6 +282,18 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                       Difference: ₹{(stock as any).difference.toFixed(2)}
                     </p>
                   </div>
+                </div>
+
+                {/* Previous Day High Status Indicator */}
+                <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-mono font-bold ${
+                  (stock as any).opensAbovePrevHigh 
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
+                    : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                }`}>
+                  <span>Prev Day High:</span>
+                  <span className={(stock as any).opensAbovePrevHigh ? 'text-emerald-400 font-black' : 'text-slate-400'}>
+                    {(stock as any).opensAbovePrevHigh ? '🟢 Opened Above Prev High' : '⚪ Opened Below Prev High'}
+                  </span>
                 </div>
 
                 {/* Open, High, Low, Close (OHLC) Metrics Bar */}
