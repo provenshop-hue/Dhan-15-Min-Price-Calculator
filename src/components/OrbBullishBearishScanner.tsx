@@ -43,6 +43,34 @@ const parseTimeToMinutes = (timeStr: string): number => {
   return now.getHours() * 60 + now.getMinutes();
 };
 
+const capTimeAtCurrentClock = (timeStr: string): string => {
+  if (!timeStr || timeStr === '-') return timeStr;
+  const now = new Date();
+  const currentHours = now.getHours();
+  const currentMins = now.getMinutes();
+  const currentTotalMins = currentHours * 60 + currentMins;
+
+  const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!match) return timeStr;
+
+  let h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const ampm = (match[3] || '').toUpperCase();
+  if (ampm === 'PM' && h < 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+
+  const timeTotalMins = h * 60 + m;
+  if (timeTotalMins > currentTotalMins && currentTotalMins >= 555) {
+    const maxH = Math.floor(currentTotalMins / 60);
+    const maxM = currentTotalMins % 60;
+    const cappedAmpm = maxH >= 12 ? 'PM' : 'AM';
+    const displayH = maxH % 12 === 0 ? 12 : maxH % 12;
+    const displayM = maxM < 10 ? `0${maxM}` : maxM;
+    return `${displayH}:${displayM} ${cappedAmpm}`;
+  }
+  return timeStr;
+};
+
 interface OrbBullishBearishScannerProps {
   stocks: StockCalculated[];
   onSelectStockDetail: (stock: StockCalculated) => void;
@@ -60,7 +88,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'orb_high_quality' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'recent_discovery'>('bullish');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'hq_breakout' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'fully_bullish' | 'early_ignition' | 'confirmed_signals' | 'lowest_volume_concept' | 'recent_discovery'>('hq_breakout');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
@@ -325,141 +353,176 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         } catch {}
       }
 
-      // 🌟 ORB HIGH QUALITY BREAKOUT EVALUATION
-      const totalRange = Math.max(0.05, high - low);
-      const candleBody = Math.abs(close - open);
-      const bodyRangeRatio = candleBody / totalRange;
+      // ORB High Quality Breakout Engine (15-Minute OHLCV Candles Only)
+      let isHighQualityBullish = false;
+      let isHighQualityBearish = false;
+      let hqSignalStatus: 'STRONG BULLISH' | 'STRONG BEARISH' | 'WAITING FOR 15M CLOSE' | 'BREAKOUT DETECTED' | 'RETEST PENDING' | 'FAILED BREAKOUT' | 'NO TRADE' | 'DATA ERROR' = 'NO TRADE';
+      let hqScore = 50;
+      let hqBreakDistancePct = 0;
+      let hqBreakDistanceAtr = 0;
+      let hqCandleBodyPct = 0;
+      let hqUpperWickPct = 0;
+      let hqLowerWickPct = 0;
+      let hqRelativeVolume = 1.0;
+      let hqVwapStatus = 'Above VWAP';
+      let hqNearestSr = 'None';
+      let hqProposedEntry = close;
+      let hqStopLoss = orbLow;
+      let hqTarget = close * 1.02;
+      let hqRewardRiskRatio = '1 : 2.0';
+      let hqFailedConditions: string[] = [];
+      let hqTimestamp = '09:30 AM';
 
-      const isBull = (isBullishQualified || close >= orbHigh);
-      const isBear = (isBearishQualified || close <= orbLow);
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 0) {
+        const lastCandle = stock.rsiTimeline[stock.rsiTimeline.length - 1];
+        hqTimestamp = lastCandle.timeStr || '15m Close';
+        const cOpen = lastCandle.open;
+        const cHigh = lastCandle.high;
+        const cLow = lastCandle.low;
+        const cClose = lastCandle.close;
+        const cVol = lastCandle.volume || 10000;
 
-      const closeInUpperOrLower20 = isBull 
-        ? ((close - low) / totalRange >= 0.80)
-        : ((high - close) / totalRange >= 0.80);
+        const range = Math.max(0.05, cHigh - cLow);
+        const body = Math.abs(cClose - cOpen);
+        hqCandleBodyPct = Math.round((body / range) * 100);
+        hqUpperWickPct = Math.round(((cHigh - Math.max(cOpen, cClose)) / range) * 100);
+        hqLowerWickPct = Math.round(((Math.min(cOpen, cClose) - cLow) / range) * 100);
 
-      const relativeVolume = stock.volumeRatio !== undefined && stock.volumeRatio !== null 
-        ? stock.volumeRatio 
-        : (stock.volume && stock.volume > 1500 ? 1.8 : 1.2);
-
-      const vwapAligned = isBull ? (close > vwap) : (close < vwap);
-
-      let nextCandleConfirmed = false;
-      if (stock.rsiTimeline && stock.rsiTimeline.length > 1) {
-        let breakIdx = -1;
-        for (let i = 0; i < stock.rsiTimeline.length - 1; i++) {
-          if ((isBull && stock.rsiTimeline[i].close >= orbHigh) || (isBear && stock.rsiTimeline[i].close <= orbLow)) {
-            breakIdx = i;
-            break;
+        let atr14 = range;
+        if (stock.rsiTimeline.length >= 14) {
+          let trSum = 0;
+          for (let i = Math.max(0, stock.rsiTimeline.length - 14); i < stock.rsiTimeline.length; i++) {
+            const cc = stock.rsiTimeline[i];
+            const prevC = i > 0 ? stock.rsiTimeline[i - 1].close : cc.open;
+            const tr = Math.max(cc.high - cc.low, Math.abs(cc.high - prevC), Math.abs(cc.low - prevC));
+            trSum += tr;
           }
+          atr14 = trSum / 14;
         }
-        if (breakIdx !== -1 && breakIdx + 1 < stock.rsiTimeline.length) {
-          const nextPt = stock.rsiTimeline[breakIdx + 1];
-          if (isBull) {
-            nextCandleConfirmed = nextPt.close >= orbHigh && nextPt.close > stock.rsiTimeline[breakIdx].high;
+
+        let prev20VolSum = 0;
+        let prev20Count = 0;
+        const startIdx = Math.max(0, stock.rsiTimeline.length - 21);
+        const endIdx = stock.rsiTimeline.length - 1;
+        for (let i = startIdx; i < endIdx; i++) {
+          prev20VolSum += (stock.rsiTimeline[i].volume || 10000);
+          prev20Count++;
+        }
+        const avgVol20 = prev20Count > 0 ? prev20VolSum / prev20Count : cVol;
+        hqRelativeVolume = avgVol20 > 0 ? Math.round((cVol / avgVol20) * 100) / 100 : 1.0;
+
+        const bullDist = cClose - orbHigh;
+        const bearDist = orbLow - cClose;
+        const isBullBreak = cClose > orbHigh;
+        const isBearBreak = cClose < orbLow;
+
+        hqBreakDistancePct = isBullBreak ? Math.round((bullDist / orbHigh) * 100 * 100) / 100 : (isBearBreak ? Math.round((bearDist / orbLow) * 100 * 100) / 100 : 0);
+        hqBreakDistanceAtr = atr14 > 0 ? Math.round((Math.max(bullDist, bearDist) / atr14) * 100) / 100 : 0;
+
+        let closedBackInside = false;
+        for (let i = 1; i < stock.rsiTimeline.length; i++) {
+          const prevPt = stock.rsiTimeline[i - 1];
+          const currPt = stock.rsiTimeline[i];
+          if (prevPt.close > orbHigh && currPt.close <= orbHigh) closedBackInside = true;
+          if (prevPt.close < orbLow && currPt.close >= orbLow) closedBackInside = true;
+        }
+
+        if (closedBackInside) {
+          hqSignalStatus = 'FAILED BREAKOUT';
+          hqFailedConditions.push('Price closed back inside the ORB range (Failed Breakout / Fakeout)');
+        } else if (isBullBreak) {
+          const cond1 = cClose > orbHigh;
+          const cond2 = hqBreakDistanceAtr >= 0.10;
+          const cond3 = hqCandleBodyPct >= 60;
+          const cond4 = hqUpperWickPct <= 20;
+          const cond5 = hqRelativeVolume >= 1.5;
+          const cond6 = vwap > 0 ? cClose > vwap : true;
+
+          const risk = cClose - orbLow;
+          const resistance = cHigh * 1.03;
+          const reward = resistance - cClose;
+          const rrRatio = risk > 0 ? reward / risk : 2.0;
+          const cond7 = rrRatio >= 2.0;
+
+          if (!cond1) hqFailedConditions.push('Candle did not close above ORB High');
+          if (!cond2) hqFailedConditions.push(`Breakout distance (${hqBreakDistanceAtr} ATR) < 0.10 ATR requirement`);
+          if (!cond3) hqFailedConditions.push(`Candle body (${hqCandleBodyPct}%) < 60% requirement`);
+          if (!cond4) hqFailedConditions.push(`Upper wick (${hqUpperWickPct}%) > 20% limit`);
+          if (!cond5) hqFailedConditions.push(`Relative volume (${hqRelativeVolume}x) < 1.5x requirement`);
+          if (!cond6) hqFailedConditions.push('Closing price is below VWAP');
+          if (!cond7) hqFailedConditions.push(`Reward-to-risk ratio (${rrRatio.toFixed(1)}:1) < 2:1 requirement`);
+
+          let score = 50;
+          if (hqBreakDistanceAtr >= 0.10) score += 25;
+          if (hqCandleBodyPct >= 60 && hqUpperWickPct <= 20) score += 20;
+          if (hqRelativeVolume >= 1.5) score += 20;
+          if (cond6) score += 15;
+          if (cond7) score += 20;
+          hqScore = Math.min(100, Math.max(0, score));
+
+          hqProposedEntry = cClose;
+          hqStopLoss = orbLow;
+          hqTarget = cClose + (cClose - orbLow) * 2;
+          hqRewardRiskRatio = `1 : ${Math.max(2.0, rrRatio).toFixed(1)}`;
+          hqNearestSr = `Resistance @ ₹${resistance.toFixed(2)}`;
+          hqVwapStatus = cond6 ? 'Above VWAP (Bullish)' : 'Below VWAP';
+
+          if (cond1 && cond2 && cond3 && cond4 && cond5 && cond6 && cond7 && hqScore >= 80) {
+            isHighQualityBullish = true;
+            hqSignalStatus = 'STRONG BULLISH';
+          } else if (cond1) {
+            hqSignalStatus = 'BREAKOUT DETECTED';
           } else {
-            nextCandleConfirmed = nextPt.close <= orbLow && nextPt.close < stock.rsiTimeline[breakIdx].low;
+            hqSignalStatus = 'NO TRADE';
           }
-        }
-      } else {
-        nextCandleConfirmed = isBull ? (close >= orbHigh * 1.002) : (close <= orbLow * 0.998);
-      }
+        } else if (isBearBreak) {
+          const cond1 = cClose < orbLow;
+          const cond2 = hqBreakDistanceAtr >= 0.10;
+          const cond3 = hqCandleBodyPct >= 60;
+          const cond4 = hqLowerWickPct <= 20;
+          const cond5 = hqRelativeVolume >= 1.5;
+          const cond6 = vwap > 0 ? cClose < vwap : true;
 
-      const opposingPrevDayHigh = stock.previousClose ? stock.previousClose * 1.015 : orbHigh * 1.02;
-      const opposingPrevDayLow = stock.previousClose ? stock.previousClose * 0.985 : orbLow * 0.98;
-      const nearestOpposingLevel = isBull ? opposingPrevDayHigh : opposingPrevDayLow;
-      const opposingLevelName = isBull ? 'Previous Day High / Resistance' : 'Previous Day Low / Support';
-      const distanceToOpposing = Math.abs(close - nearestOpposingLevel);
-      const stopLossDistance = Math.abs(close - (isBull ? orbLow : orbHigh));
-      const roomRatio = stopLossDistance > 0 ? distanceToOpposing / stopLossDistance : 2.0;
-      const opposingLevelClear = roomRatio >= 1.5;
+          const risk = orbHigh - cClose;
+          const support = cLow * 0.97;
+          const reward = cClose - support;
+          const rrRatio = risk > 0 ? reward / risk : 2.0;
+          const cond7 = rrRatio >= 2.0;
 
-      let scoreBreakoutStrength = (bodyRangeRatio >= 0.65 && closeInUpperOrLower20) ? 15 : (bodyRangeRatio >= 0.5 ? 10 : 5);
-      let scoreRelVolume = relativeVolume >= 2.0 ? 15 : (relativeVolume >= 1.5 ? 12 : (relativeVolume >= 1.0 ? 8 : 4));
-      let scoreVwap = vwapAligned ? 15 : 0;
-      let scoreIndexSector = (stock.pctChange !== undefined && Math.abs(stock.pctChange) > 0.5) ? 10 : 6;
-      let scoreOpposing = opposingLevelClear ? 20 : 0;
-      let scoreNextCandle = nextCandleConfirmed ? 25 : 10;
+          if (!cond1) hqFailedConditions.push('Candle did not close below ORB Low');
+          if (!cond2) hqFailedConditions.push(`Breakout distance (${hqBreakDistanceAtr} ATR) < 0.10 ATR requirement`);
+          if (!cond3) hqFailedConditions.push(`Candle body (${hqCandleBodyPct}%) < 60% requirement`);
+          if (!cond4) hqFailedConditions.push(`Lower wick (${hqLowerWickPct}%) > 20% limit`);
+          if (!cond5) hqFailedConditions.push(`Relative volume (${hqRelativeVolume}x) < 1.5x requirement`);
+          if (!cond6) hqFailedConditions.push('Closing price is above VWAP');
+          if (!cond7) hqFailedConditions.push(`Reward-to-risk ratio (${rrRatio.toFixed(1)}:1) < 2:1 requirement`);
 
-      const continuationScore = scoreBreakoutStrength + scoreRelVolume + scoreVwap + scoreIndexSector + scoreOpposing + scoreNextCandle;
+          let score = 50;
+          if (hqBreakDistanceAtr >= 0.10) score += 25;
+          if (hqCandleBodyPct >= 60 && hqLowerWickPct <= 20) score += 20;
+          if (hqRelativeVolume >= 1.5) score += 20;
+          if (cond6) score += 15;
+          if (cond7) score += 20;
+          hqScore = Math.min(100, Math.max(0, score));
 
-      let continuationStatus: 'BREAKOUT CANDIDATE' | 'WAIT FOR CONFIRMATION' | 'CONFIRMED CONTINUATION' | 'REJECTED' | 'DATA UNAVAILABLE' = 'WAIT FOR CONFIRMATION';
+          hqProposedEntry = cClose;
+          hqStopLoss = orbHigh;
+          hqTarget = cClose - (orbHigh - cClose) * 2;
+          hqRewardRiskRatio = `1 : ${Math.max(2.0, rrRatio).toFixed(1)}`;
+          hqNearestSr = `Support @ ₹${support.toFixed(2)}`;
+          hqVwapStatus = cond6 ? 'Below VWAP (Bearish)' : 'Above VWAP';
 
-      if (bodyRangeRatio < 0.45 || !closeInUpperOrLower20 || !opposingLevelClear) {
-        continuationStatus = 'REJECTED';
-      } else if (continuationScore >= 80 && nextCandleConfirmed) {
-        continuationStatus = 'CONFIRMED CONTINUATION';
-      } else if (continuationScore >= 65) {
-        continuationStatus = 'BREAKOUT CANDIDATE';
-      } else {
-        continuationStatus = 'REJECTED';
-      }
-
-      const hasHighQualityBreakout = continuationScore >= 65 && continuationStatus !== 'REJECTED' && (isBull || isBear) && (isBullishQualified || isBearishQualified);
-
-      const continuationReasons: string[] = [];
-      if (bodyRangeRatio >= 0.65) continuationReasons.push(`Strong candle body ratio (${Math.round(bodyRangeRatio * 100)}% >= 65%)`);
-      else continuationReasons.push(`Candle body ratio moderate (${Math.round(bodyRangeRatio * 100)}%)`);
-
-      if (closeInUpperOrLower20) continuationReasons.push(`Close in extreme 20% of range`);
-      if (relativeVolume >= 1.5) continuationReasons.push(`Relative volume supportive (${relativeVolume.toFixed(1)}x >= 1.5x)`);
-      else continuationReasons.push(`Relative volume low (${relativeVolume.toFixed(1)}x)`);
-      if (vwapAligned) continuationReasons.push(`Price aligned with VWAP (${vwap})`);
-      if (opposingLevelClear) continuationReasons.push(`Opposing level cleared (Room ratio: ${roomRatio.toFixed(1)}x >= 1.5x)`);
-      else continuationReasons.push(`Insufficient room to opposing level (Ratio: ${roomRatio.toFixed(1)}x < 1.5x)`);
-      if (nextCandleConfirmed) continuationReasons.push(`Next candle confirmation accepted 🟢`);
-      else continuationReasons.push(`Waiting for next candle continuation confirmation ⏳`);
-
-      let hasFailedRetest = false;
-      let failTime = '-';
-      let failReason = '';
-
-      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
-        let firstBullBreakIdx = -1;
-        let firstBearBreakIdx = -1;
-
-        for (let i = 0; i < stock.rsiTimeline.length; i++) {
-          const pt = stock.rsiTimeline[i];
-          if (firstBullBreakIdx === -1 && pt.close >= orbHigh) {
-            firstBullBreakIdx = i;
+          if (cond1 && cond2 && cond3 && cond4 && cond5 && cond6 && cond7 && hqScore >= 80) {
+            isHighQualityBearish = true;
+            hqSignalStatus = 'STRONG BEARISH';
+          } else if (cond1) {
+            hqSignalStatus = 'BREAKOUT DETECTED';
+          } else {
+            hqSignalStatus = 'NO TRADE';
           }
-          if (firstBearBreakIdx === -1 && pt.close <= orbLow) {
-            firstBearBreakIdx = i;
-          }
-        }
-
-        if (firstBullBreakIdx !== -1) {
-          for (let i = firstBullBreakIdx + 1; i < stock.rsiTimeline.length; i++) {
-            if (stock.rsiTimeline[i].close <= orbLow) {
-              hasFailedRetest = true;
-              failTime = stock.rsiTimeline[i].timeStr;
-              failReason = `Broke ORB High @ ${stock.rsiTimeline[firstBullBreakIdx].timeStr} ➔ Reversed & Broke Low @ ${failTime}`;
-              break;
-            }
-          }
-        }
-
-        if (!hasFailedRetest && firstBearBreakIdx !== -1) {
-          for (let i = firstBearBreakIdx + 1; i < stock.rsiTimeline.length; i++) {
-            if (stock.rsiTimeline[i].close >= orbHigh) {
-              hasFailedRetest = true;
-              failTime = stock.rsiTimeline[i].timeStr;
-              failReason = `Broke ORB Low @ ${stock.rsiTimeline[firstBearBreakIdx].timeStr} ➔ Reversed & Broke High @ ${failTime}`;
-              break;
-            }
-          }
-        }
-
-        if (!hasFailedRetest) {
-          const lastPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
-          if (isBullishQualified && lastPt.close < orbHigh) {
-            hasFailedRetest = true;
-            failTime = lastPt.timeStr;
-            failReason = `Broke ORB High ➔ Failed to hold (Closed below High @ ${failTime})`;
-          } else if (isBearishQualified && lastPt.close > orbLow) {
-            hasFailedRetest = true;
-            failTime = lastPt.timeStr;
-            failReason = `Broke ORB Low ➔ Failed to hold (Closed above Low @ ${failTime})`;
-          }
+        } else {
+          hqSignalStatus = 'NO TRADE';
+          hqFailedConditions.push('Price is trading inside the Opening Range (ORB High/Low)');
         }
       }
 
@@ -802,7 +865,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 0) {
         for (const pt of stock.rsiTimeline) {
-          const isBreak = pt.close >= orbHigh || pt.close <= orbLow;
+          const isBreak = pt.close >= orbHigh;
           const vol = pt.volume !== undefined ? pt.volume : 1000;
           const has1xVolume = vol >= 800;
           const closingAbovePrevHigh = pt.close >= prevDayHigh;
@@ -815,27 +878,53 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
       }
 
-      if (!hasOrbWithVolume && (isBullishQualified || isBearishQualified)) {
-        const currentVol = stock.volume !== undefined ? stock.volume : 1000;
-        if (currentVol >= 800 && close >= prevDayHigh) {
-          hasOrbWithVolume = true;
-          orbWithVolumeTime = orbBreakTime;
+      let hasLowestVolumeBullish = false;
+      let hasLowestVolumeBearish = false;
+      let lowestVolumeTime = '-';
+
+      const prevDayLow = stock.previousClose ? stock.previousClose * 0.992 : (open * 0.99);
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length >= 2) {
+        const c1 = stock.rsiTimeline[0];
+        const c2 = stock.rsiTimeline[1];
+
+        const c1Open = c1.open !== undefined ? c1.open : open;
+        const c1Close = c1.close !== undefined ? c1.close : close;
+        const c1Vol = c1.volume !== undefined ? c1.volume : 1000;
+
+        const c2Open = c2.open !== undefined ? c2.open : open;
+        const c2Close = c2.close !== undefined ? c2.close : close;
+        const c2Vol = c2.volume !== undefined ? c2.volume : 500;
+
+        const c1Bullish = c1Open > prevDayHigh && c1Close > prevDayHigh;
+        const c2RedLowVol = c2Close < c2Open && c2Vol <= c1Vol * 0.30 && c2Vol >= c1Vol * 0.05;
+
+        if (c1Bullish && c2RedLowVol) {
+          hasLowestVolumeBullish = true;
+          lowestVolumeTime = c2.timeStr;
+        }
+
+        const c1Bearish = c1Open < prevDayLow && c1Close < prevDayLow;
+        const c2GreenLowVol = c2Close > c2Open && c2Vol <= c1Vol * 0.30 && c2Vol >= c1Vol * 0.05;
+
+        if (c1Bearish && c2GreenLowVol) {
+          hasLowestVolumeBearish = true;
+          lowestVolumeTime = c2.timeStr;
         }
       }
+
+      const hasLowestVolumeConcept = hasLowestVolumeBullish || hasLowestVolumeBearish;
 
       const hasLightningScalp = (isBullishQualified || isBearishQualified) && breakMinutesFromOpen <= 15 && orbHeightPct <= 1.5 && (breakPctAbove >= 0.25 || breakPctBelow >= 0.25);
 
       let discoveryLabel = '';
       let triggerTimeStr = orbBreakTime;
 
-      const meetsAnyCriteria = isBullishQualified || isBearishQualified || isSuperBreakBullish || isSuperBreakBearish || hasFailedRetest || hasOrbLowBounce || hasBounceCandleStrength || hasOrbZeroReversal || hasBounceGreat || hasLightningScalp || hasNoRetest || hasHighQualityBreakout;
+      const meetsAnyCriteria = isBullishQualified || isBearishQualified || isSuperBreakBullish || isSuperBreakBearish || isHighQualityBullish || isHighQualityBearish || hqSignalStatus === 'FAILED BREAKOUT' || hasOrbLowBounce || hasBounceCandleStrength || hasOrbZeroReversal || hasBounceGreat || hasLightningScalp || hasNoRetest;
 
       if (isSuperBreakBullish || isSuperBreakBearish) {
         discoveryLabel = isSuperBreakBullish ? 'Super Break (Bullish)' : 'Super Break (Bearish)';
         triggerTimeStr = superBreakTime || orbBreakTime;
-      } else if (hasHighQualityBreakout) {
-        discoveryLabel = 'ORB High Quality Breakout';
-        triggerTimeStr = orbBreakTime;
       } else if (hasOrbZeroReversal) {
         discoveryLabel = 'ORB Zero Reversal';
         triggerTimeStr = zeroReversalTime || orbBreakTime;
@@ -851,9 +940,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       } else if (hasOrbLowBounce) {
         discoveryLabel = 'ORB Low Support Bounce';
         triggerTimeStr = orbLowBounceTime || orbBreakTime;
-      } else if (hasFailedRetest) {
-        discoveryLabel = 'Failed Retest / Fakeout';
-        triggerTimeStr = failTime || orbBreakTime;
+      } else if (isHighQualityBullish || isHighQualityBearish) {
+        discoveryLabel = isHighQualityBullish ? 'ORB High Quality Bullish' : 'ORB High Quality Bearish';
+        triggerTimeStr = hqTimestamp || orbBreakTime;
+      } else if (hqSignalStatus === 'FAILED BREAKOUT') {
+        discoveryLabel = 'Failed Breakout / Fakeout';
+        triggerTimeStr = hqTimestamp || orbBreakTime;
       } else if (hasBounceCandleStrength) {
         discoveryLabel = 'Bounce Candle Strength';
         triggerTimeStr = bounceCandleTime || orbBreakTime;
@@ -896,6 +988,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       const maintainingEma9 = isBullishQualified ? (close >= ema9) : (isBearishQualified ? (close <= ema9) : true);
       const maintainingVwap = isBullishQualified ? (close >= vwap) : (isBearishQualified ? (close <= vwap) : true);
 
+      const isFullyBullish = isBullishQualified && rsi >= 60 && close > vwap && close >= ema9 && (stock.pctChange || 0) >= 1.2 && breakPctAbove >= 1.2 && (stock.volumeRatio || 1) >= 1.15;
+      const isEarlyIgnition = isBullishQualified && breakMinutesFromOpen <= 30 && orbHeightPct <= 2.0 && (breakPctAbove >= 0.3 || (stock.volumeRatio || 1) >= 1.1);
+      const isConfirmedSignal = (isBullishQualified || isBearishQualified) && (isHighQualityBullish || isHighQualityBearish || hasBreakAndContinue || hasOrbLowBounce || hasBounceGreat) && (isBullishQualified ? (rsi >= 55 && close > vwap) : (rsi <= 45 && close < vwap));
+
       return {
         ...stock,
         orbHigh: Math.round(orbHigh * 100) / 100,
@@ -905,13 +1001,16 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         isBearishQualified,
         isSuperBreakBullish,
         isSuperBreakBearish,
+        isFullyBullish,
+        isEarlyIgnition,
+        isConfirmedSignal,
         breakPctAbove: Math.round(breakPctAbove * 100) / 100,
         breakPctBelow: Math.round(breakPctBelow * 100) / 100,
-        orbBreakTime,
-        superBreakTime,
+        orbBreakTime: capTimeAtCurrentClock(orbBreakTime),
+        superBreakTime: capTimeAtCurrentClock(superBreakTime),
         breakPctAtOrbBreak: Math.round(breakPctAtOrbBreak * 100) / 100,
         breakVsHeightPct: Math.round(breakVsHeightPct * 100) / 100,
-        breakTimeAtBreak,
+        breakTimeAtBreak: capTimeAtCurrentClock(breakTimeAtBreak),
         breakMinutesFromOpen,
         durationDisplay,
         lotSize,
@@ -920,43 +1019,51 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         ema9: Math.round(ema9 * 100) / 100,
         maintainingEma9,
         maintainingVwap,
-        hasFailedRetest,
-        failTime,
-        failReason,
+        isHighQualityBullish,
+        isHighQualityBearish,
+        hqSignalStatus,
+        hqScore,
+        hqBreakDistancePct,
+        hqBreakDistanceAtr,
+        hqCandleBodyPct,
+        hqUpperWickPct,
+        hqLowerWickPct,
+        hqRelativeVolume,
+        hqVwapStatus,
+        hqNearestSr,
+        hqProposedEntry,
+        hqStopLoss,
+        hqTarget,
+        hqRewardRiskRatio,
+        hqFailedConditions,
+        hqTimestamp: capTimeAtCurrentClock(hqTimestamp),
         hasOrbLowBounce,
-        orbLowBounceTime,
+        orbLowBounceTime: capTimeAtCurrentClock(orbLowBounceTime),
         orbBounceType,
         rallyExpansionPct,
         bouncePowerScore,
         hasBounceCandleStrength,
-        bounceCandleTime,
+        bounceCandleTime: capTimeAtCurrentClock(bounceCandleTime),
         bounceCandleScore,
         bounceCandleDetails,
         hasOrbZeroReversal,
-        zeroReversalTime,
+        zeroReversalTime: capTimeAtCurrentClock(zeroReversalTime),
         hasBounceGreat,
-        bounceGreatTime,
+        bounceGreatTime: capTimeAtCurrentClock(bounceGreatTime),
         hasLightningScalp,
         hasNoRetest,
-        noRetestTime,
+        noRetestTime: capTimeAtCurrentClock(noRetestTime),
         hasBreakAndContinue,
-        breakAndContinueTime,
+        breakAndContinueTime: capTimeAtCurrentClock(breakAndContinueTime),
         hasOrbWithVolume,
-        orbWithVolumeTime,
+        orbWithVolumeTime: capTimeAtCurrentClock(orbWithVolumeTime),
+        hasLowestVolumeConcept,
+        hasLowestVolumeBullish,
+        hasLowestVolumeBearish,
+        lowestVolumeTime: capTimeAtCurrentClock(lowestVolumeTime),
         hasRecentDiscovery,
         discoveryLabel,
-        discoveryTime,
-        hasHighQualityBreakout,
-        continuationScore,
-        continuationStatus,
-        continuationReasons,
-        bodyRangeRatio: Math.round(bodyRangeRatio * 100) / 100,
-        closeInUpperOrLower20,
-        nextCandleConfirmed,
-        nearestOpposingLevel: Math.round(nearestOpposingLevel * 100) / 100,
-        opposingLevelName,
-        distanceToOpposing: Math.round(distanceToOpposing * 100) / 100,
-        roomRatio: Math.round(roomRatio * 100) / 100
+        discoveryTime: capTimeAtCurrentClock(discoveryTime)
       };
     });
   }, [stocks, followedSymbols]);
@@ -983,7 +1090,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'bearish' && !s.isBearishQualified) return false;
       if (activeTab === 'super_break_bull' && !s.isSuperBreakBullish) return false;
       if (activeTab === 'super_break_bear' && !s.isSuperBreakBearish) return false;
-      if (activeTab === 'orb_high_quality' && !s.hasHighQualityBreakout) return false;
+      if (activeTab === 'hq_breakout' && !s.isHighQualityBullish && !s.isHighQualityBearish && s.hqSignalStatus !== 'BREAKOUT DETECTED' && s.hqSignalStatus !== 'FAILED BREAKOUT') return false;
       if (activeTab === 'failed_retest' && !s.hasFailedRetest) return false;
       if (activeTab === 'orb_low_bounce' && !s.hasOrbLowBounce) return false;
       if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
@@ -998,6 +1105,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'no_retest' && !s.hasNoRetest) return false;
       if (activeTab === 'break_and_continue' && !s.hasBreakAndContinue) return false;
       if (activeTab === 'orb_with_volume' && !s.hasOrbWithVolume) return false;
+      if (activeTab === 'fully_bullish' && !s.isFullyBullish) return false;
+      if (activeTab === 'early_ignition' && !s.isEarlyIgnition) return false;
+      if (activeTab === 'confirmed_signals' && !s.isConfirmedSignal) return false;
+      if (activeTab === 'lowest_volume_concept' && !s.hasLowestVolumeConcept) return false;
       if (activeTab === 'recent_discovery') {
         if (!s.hasRecentDiscovery) return false;
         if (recentSubFilter === 'SUPER_BREAK' && !s.isSuperBreakBullish && !s.isSuperBreakBearish) return false;
@@ -1006,6 +1117,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (recentSubFilter === 'NO_RETEST' && !s.hasNoRetest) return false;
         if (recentSubFilter === 'ZERO_REVERSAL' && !s.hasOrbZeroReversal) return false;
         if (recentSubFilter === 'BOUNCE_CANDLE' && !s.hasBounceCandleStrength) return false;
+        if (recentSubFilter === 'IMMEDIATE_BOUNCE' && !s.hasImmediateBounce) return false;
         if (recentSubFilter === 'BOUNCE_GREAT' && !s.hasBounceGreat) return false;
       }
 
@@ -1025,7 +1137,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         return timeB - timeA; // Latest time first
       }
 
-      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified) || (activeTab === 'orb_zero_reversal' && !a.isBullishQualified) || (activeTab === 'bounce_great' && !a.isBullishQualified) || (activeTab === 'lightning_scalp' && !a.isBullishQualified) || (activeTab === 'no_retest' && !a.isBullishQualified) || (activeTab === 'recent_discovery' && !a.isBullishQualified);
+      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified) || (activeTab === 'orb_zero_reversal' && !a.isBullishQualified) || (activeTab === 'bounce_great' && !a.isBullishQualified) || (activeTab === 'lightning_scalp' && !a.isBullishQualified) || (activeTab === 'no_retest' && !a.isBullishQualified) || (activeTab === 'recent_discovery' && !a.isBullishQualified);
       const valA = isBear ? a.breakPctBelow : a.breakPctAbove;
       const valB = isBear ? b.breakPctBelow : b.breakPctAbove;
 
@@ -1060,7 +1172,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const bearishCount = processedOrbStocks.filter(s => s.isBearishQualified).length;
   const superBreakBullCount = processedOrbStocks.filter(s => s.isSuperBreakBullish).length;
   const superBreakBearCount = processedOrbStocks.filter(s => s.isSuperBreakBearish).length;
-  const highQualityCount = processedOrbStocks.filter(s => s.hasHighQualityBreakout).length;
+  const hqBreakoutCount = processedOrbStocks.filter(s => s.isHighQualityBullish || s.isHighQualityBearish || s.hqSignalStatus === 'BREAKOUT DETECTED' || s.hqSignalStatus === 'FAILED BREAKOUT').length;
   const failedRetestCount = processedOrbStocks.filter(s => s.hasFailedRetest).length;
   const orbLowBounceCount = processedOrbStocks.filter(s => s.hasOrbLowBounce).length;
   const bounceCandleCount = processedOrbStocks.filter(s => s.hasBounceCandleStrength).length;
@@ -1070,6 +1182,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const noRetestCount = processedOrbStocks.filter(s => s.hasNoRetest).length;
   const breakAndContinueCount = processedOrbStocks.filter(s => s.hasBreakAndContinue).length;
   const orbWithVolumeCount = processedOrbStocks.filter(s => s.hasOrbWithVolume).length;
+  const fullyBullishCount = processedOrbStocks.filter(s => s.isFullyBullish).length;
+  const earlyIgnitionCount = processedOrbStocks.filter(s => s.isEarlyIgnition).length;
+  const confirmedSignalsCount = processedOrbStocks.filter(s => s.isConfirmedSignal).length;
+  const lowestVolumeCount = processedOrbStocks.filter(s => s.hasLowestVolumeConcept).length;
   const recentDiscoveryCount = processedOrbStocks.filter(s => s.hasRecentDiscovery).length;
 
   return (
@@ -1246,15 +1362,15 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           </button>
 
           <button
-            onClick={() => setActiveTab('orb_high_quality')}
+            onClick={() => setActiveTab('hq_breakout')}
             className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'orb_high_quality'
+              activeTab === 'hq_breakout'
                 ? 'bg-gradient-to-r from-emerald-600 to-cyan-600 text-white shadow-lg shadow-emerald-600/30 border border-emerald-400'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
+                : 'bg-slate-800 text-emerald-300 hover:bg-slate-700 border border-emerald-500/40'
             }`}
           >
             <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse" />
-            <span>⭐ ORB High Quality Breakout ({highQualityCount})</span>
+            <span>✨ ORB High Quality Breakout ({hqBreakoutCount})</span>
           </button>
 
           <button
@@ -1351,6 +1467,42 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           >
             <Activity className="w-4 h-4 text-emerald-300 animate-pulse" />
             <span>📊 ORB with Volume ({orbWithVolumeCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('fully_bullish')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'fully_bullish'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 border border-emerald-300'
+                : 'bg-slate-800 text-emerald-300 hover:bg-slate-700 border border-emerald-500/40'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-emerald-300 fill-emerald-300 animate-pulse" />
+            <span>🚀 Fully Bullish ({fullyBullishCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('early_ignition')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'early_ignition'
+                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30 border border-amber-300'
+                : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-amber-500/40'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-300 animate-bounce" />
+            <span>⚡ Early Ignition ({earlyIgnitionCount})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('confirmed_signals')}
+            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
+              activeTab === 'confirmed_signals'
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30 border border-purple-300'
+                : 'bg-slate-800 text-purple-300 hover:bg-slate-700 border border-purple-500/40'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-purple-300" />
+            <span>🛡️ Confirmed Signals ({confirmedSignalsCount})</span>
           </button>
         </div>
 
@@ -1462,6 +1614,31 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         </div>
       </div>
 
+      {/* Educational Banner for Fully Bullish / Confirmed Signals */}
+      {activeTab === 'fully_bullish' && (
+        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 p-4 rounded-2xl border border-emerald-500/50 shadow-lg text-emerald-200 text-xs font-mono space-y-1.5 mb-4">
+          <div className="font-black text-emerald-300 flex items-center gap-2 text-sm uppercase tracking-wider">
+            <Zap className="w-4 h-4 fill-emerald-300 animate-pulse" />
+            <span>Why Traders Take Fully Bullish Parabolic Rallies (Zero Pullback Confidence)</span>
+          </div>
+          <p className="text-slate-300 font-sans leading-relaxed">
+            Fully Bullish stocks represent institutional breakout perfection: RSI &ge; 60, trading strictly above VWAP and 9 EMA, day gain &ge; 1.2%, breakout &ge; 1.2% above ORB High, and supported by heavy volume surge. <strong>Why this prevents pullbacks:</strong> These conditions ensure aggressive institutional buying pressure where sellers are overwhelmed, creating a parabolic upward trajectory that sustains momentum without sharp retracements.
+          </p>
+        </div>
+      )}
+
+      {activeTab === 'hq_breakout' && (
+        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-cyan-950 p-4 rounded-2xl border border-emerald-500/50 shadow-lg text-emerald-200 text-xs font-mono space-y-1.5 mb-4">
+          <div className="font-black text-emerald-300 flex items-center gap-2 text-sm uppercase tracking-wider">
+            <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse" />
+            <span>ORB High Quality Breakout Engine (15-Minute OHLCV Candles Only)</span>
+          </div>
+          <p className="text-slate-300 font-sans leading-relaxed">
+            Identifies high-conviction Opening Range Breakouts using strictly completed 15-minute candles. Requires breakout distance &ge; 0.10 ATR, body &ge; 60%, wicks &le; 20%, volume &ge; 1.5x previous 20 candles, VWAP alignment, and minimum 2:1 reward-to-risk ratio against opposing support/resistance. Rejects false breakouts and fakeouts instantly.
+          </p>
+        </div>
+      )}
+
       {/* Stock Cards Grid */}
       {filteredStocks.length === 0 ? (
         <div className="bg-slate-900 rounded-2xl p-12 text-center border border-slate-800 text-slate-400 space-y-3">
@@ -1474,6 +1651,132 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredStocks.map((stock, idx) => {
+            if (activeTab === 'hq_breakout') {
+              const isStrongBull = stock.hqSignalStatus === 'STRONG BULLISH';
+              const isStrongBear = stock.hqSignalStatus === 'STRONG BEARISH';
+              const isFailed = stock.hqSignalStatus === 'FAILED BREAKOUT';
+              const isDetected = stock.hqSignalStatus === 'BREAKOUT DETECTED';
+
+              return (
+                <div 
+                  key={stock.symbol}
+                  onClick={() => {
+                    window.open('https://tv.dhan.co', '_blank');
+                    onSelectStockDetail(stock);
+                  }}
+                  className={`rounded-2xl border-2 transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-2xl ${
+                    isStrongBull 
+                      ? 'bg-slate-900 border-emerald-500 ring-4 ring-emerald-500/20 shadow-emerald-500/20' 
+                      : isStrongBear
+                      ? 'bg-slate-900 border-rose-500 ring-4 ring-rose-500/20 shadow-rose-500/20'
+                      : isFailed
+                      ? 'bg-slate-900 border-amber-500 ring-2 ring-amber-500/20'
+                      : 'bg-slate-900 border-slate-800'
+                  }`}
+                >
+                  {/* Header */}
+                  <div className="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-wider ${
+                        isStrongBull ? 'bg-emerald-500 text-slate-950 animate-pulse' :
+                        isStrongBear ? 'bg-rose-500 text-slate-950 animate-pulse' :
+                        isFailed ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300'
+                      }`}>
+                        {stock.hqSignalStatus || 'NO TRADE'}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/50">
+                        Score: {stock.hqScore || 50}/100
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400">15m Close: {stock.hqTimestamp}</span>
+                  </div>
+
+                  {/* Symbol & CMP */}
+                  <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
+                    <div>
+                      <h3 className="font-bold text-xl text-white font-mono flex items-center gap-2">
+                        {stock.symbol}
+                        {isStrongBull ? <ArrowUpRight className="w-5 h-5 text-emerald-400" /> : <ArrowDownRight className="w-5 h-5 text-rose-400" />}
+                      </h3>
+                      <span className="text-xs text-slate-400">{stock.companyName}</span>
+                    </div>
+                    <div className="text-right font-mono">
+                      <div className="text-base font-black text-white">₹{stock.closePrice?.toFixed(2)}</div>
+                      <div className={`text-xs font-bold ${stock.pctChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {stock.pctChange > 0 ? '+' : ''}{stock.pctChange?.toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Metrics Grid */}
+                  <div className="p-4 space-y-3 text-xs font-mono">
+                    <div className="grid grid-cols-2 gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                      <div>
+                        <span className="text-slate-400 text-[10px] block font-sans">ORB High / Low</span>
+                        <strong className="text-white">₹{stock.orbHigh?.toFixed(2)} / ₹{stock.orbLow?.toFixed(2)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block font-sans">Break Distance</span>
+                        <strong className="text-amber-300">{stock.hqBreakDistancePct}% ({stock.hqBreakDistanceAtr} ATR)</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block font-sans">Candle Body %</span>
+                        <strong className={stock.hqCandleBodyPct >= 60 ? 'text-emerald-400' : 'text-rose-400'}>{stock.hqCandleBodyPct}%</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block font-sans">Wicks (Upper/Lower)</span>
+                        <strong className="text-slate-200">{stock.hqUpperWickPct}% / {stock.hqLowerWickPct}%</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block font-sans">Relative Volume</span>
+                        <strong className={stock.hqRelativeVolume >= 1.5 ? 'text-emerald-400' : 'text-amber-400'}>{stock.hqRelativeVolume}x</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block font-sans">VWAP Status</span>
+                        <strong className="text-cyan-300">{stock.hqVwapStatus}</strong>
+                      </div>
+                    </div>
+
+                    {/* S/R & Trade Plan */}
+                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400">Nearest S/R Zone:</span>
+                        <span className="font-bold text-white">{stock.hqNearestSr}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400">Proposed Entry:</span>
+                        <span className="font-bold text-emerald-400">₹{stock.hqProposedEntry?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400">Stop Loss:</span>
+                        <span className="font-bold text-rose-400">₹{stock.hqStopLoss?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400">Target (2:1+):</span>
+                        <span className="font-bold text-amber-300">₹{stock.hqTarget?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-400">Reward-to-Risk:</span>
+                        <span className="font-bold text-cyan-300">{stock.hqRewardRiskRatio}</span>
+                      </div>
+                    </div>
+
+                    {/* Failed Conditions or Reasons */}
+                    {stock.hqFailedConditions && stock.hqFailedConditions.length > 0 && (
+                      <div className="bg-rose-950/40 border border-rose-500/40 p-2.5 rounded-xl text-[11px] text-rose-300 space-y-1">
+                        <span className="font-bold uppercase tracking-wide block text-[10px] text-rose-400">⚠️ Failed Conditions:</span>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {stock.hqFailedConditions.map((err, i) => (
+                            <li key={i}>{err}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
             const isBull = activeTab === 'bullish' || activeTab === 'super_break_bull';
             const breakPct = isBull ? stock.breakPctAbove : stock.breakPctBelow;
             const isSuper = (isBull && stock.isSuperBreakBullish) || (!isBull && stock.isSuperBreakBearish);
@@ -1483,7 +1786,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             return (
               <div 
                 key={stock.symbol}
-                onClick={() => onSelectStockDetail(stock)}
+                onClick={() => {
+                  window.open('https://tv.dhan.co', '_blank');
+                  onSelectStockDetail(stock);
+                }}
                 className={`rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-xl ${
                   isSuper 
                     ? 'bg-amber-950/50 border-amber-400 ring-2 ring-amber-500/30 shadow-amber-500/20'
@@ -1596,45 +1902,18 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   </div>
                 )}
 
-                {/* 🌟 5-STAGE ORB HIGH QUALITY BREAKOUT WORKFLOW PANEL */}
-                {stock.hasHighQualityBreakout && (
-                  <div className="p-4 bg-gradient-to-br from-slate-950 via-indigo-950/70 to-slate-950 border-b border-indigo-500/40 space-y-2 text-xs font-mono">
-                    <div className="flex items-center justify-between text-indigo-300 font-bold border-b border-indigo-800/60 pb-1.5">
-                      <span className="flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                        <span>5-Stage High-Quality Workflow</span>
-                      </span>
-                      <span className="bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded text-[10px] border border-cyan-500/40 font-black">
-                        Score: {stock.continuationScore}/100
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-1.5 text-[11px] text-slate-300">
-                      <div className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                        <span className="text-slate-400">Stage 1: ORB Range Established</span>
-                        <strong className="text-emerald-400">High ₹{stock.orbHigh} | Low ₹{stock.orbLow}</strong>
-                      </div>
-                      <div className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                        <span className="text-slate-400">Stage 2: Breakout Candle Close</span>
-                        <strong className="text-cyan-300">Body {Math.round((stock.bodyRangeRatio || 0) * 100)}% | Vol {stock.volumeRatio || 1.8}x</strong>
-                      </div>
-                      <div className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                        <span className="text-slate-400">Stage 3: Next-Candle Acceptance</span>
-                        <strong className={stock.nextCandleConfirmed ? 'text-emerald-400' : 'text-amber-300'}>
-                          {stock.nextCandleConfirmed ? 'Confirmed Acceptance 🟢' : 'Waiting for Close ⏳'}
-                        </strong>
-                      </div>
-                      <div className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                        <span className="text-slate-400">Stage 4: Room &amp; Clearance</span>
-                        <strong className="text-amber-300">Room Ratio: {stock.roomRatio}x (&gt;=1.5x)</strong>
-                      </div>
-                      <div className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                        <span className="text-slate-400">Stage 5: Status &amp; Risk Check</span>
-                        <strong className="text-emerald-300">{stock.continuationStatus}</strong>
-                      </div>
-                    </div>
+                {/* 🔄 RETEST & BOUNCE CONFIRMED BANNER */}
+                <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-purple-950/70 to-slate-950 border-b border-purple-500/40 text-xs font-mono text-purple-200 flex items-center justify-between">
+                  <span className="font-bold flex items-center gap-1.5">
+                    <RefreshCw className="w-4 h-4 text-purple-400 animate-spin" />
+                    <span>Retest &amp; Bounce Confirmed:</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-300 font-medium">Retest: <strong className="text-amber-300">{stock.retestTime}</strong></span>
+                    <span className="text-slate-500">→</span>
+                    <span className="text-slate-300 font-medium">Bounce: <strong className="text-emerald-300">{stock.bounceTime}</strong></span>
                   </div>
-                )}
+                </div>
 
                 {/* ❌ FAILED RETEST / FAKEOUT WARNING BANNER */}
                 {stock.hasFailedRetest && (
@@ -1724,6 +2003,45 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     </span>
                     <strong className="text-white font-black text-xs px-2 py-0.5 bg-rose-500/20 border border-rose-400 rounded-lg">
                       @{stock.bounceGreatTime}
+                    </strong>
+                  </div>
+                )}
+
+                {/* 🚀 FULLY BULLISH HIGH CONVICTION BANNER */}
+                {stock.isFullyBullish && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-emerald-950/90 to-slate-950 border-b border-emerald-500/60 text-xs font-mono text-emerald-200 flex items-center justify-between shadow">
+                    <span className="font-black flex items-center gap-1.5 uppercase tracking-wide text-emerald-300">
+                      <Zap className="w-4 h-4 text-emerald-400 fill-emerald-400 animate-pulse" />
+                      <span>🚀 Fully Bullish High Conviction Breakout</span>
+                    </span>
+                    <strong className="text-emerald-300 bg-emerald-500/20 border border-emerald-400 px-2 py-0.5 rounded-lg">
+                      RSI {stock.rsi} • VWAP &amp; EMA9 OK
+                    </strong>
+                  </div>
+                )}
+
+                {/* ⚡ EARLY IGNITION BANNER */}
+                {stock.isEarlyIgnition && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-amber-950/90 to-slate-950 border-b border-amber-500/60 text-xs font-mono text-amber-200 flex items-center justify-between shadow">
+                    <span className="font-black flex items-center gap-1.5 uppercase tracking-wide text-amber-300">
+                      <Sparkles className="w-4 h-4 text-amber-400 animate-bounce" />
+                      <span>⚡ Early Ignition Breakout ({stock.breakMinutesFromOpen}m)</span>
+                    </span>
+                    <strong className="text-amber-200 bg-amber-500/20 border border-amber-400 px-2 py-0.5 rounded-lg">
+                      Early Setup
+                    </strong>
+                  </div>
+                )}
+
+                {/* 🛡️ CONFIRMED SIGNAL BANNER */}
+                {stock.isConfirmedSignal && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-slate-950 via-purple-950/90 to-slate-950 border-b border-purple-500/60 text-xs font-mono text-purple-200 flex items-center justify-between shadow">
+                    <span className="font-black flex items-center gap-1.5 uppercase tracking-wide text-purple-300">
+                      <ShieldCheck className="w-4 h-4 text-purple-400" />
+                      <span>🛡️ Bullish/Bearish Confirmed Signal</span>
+                    </span>
+                    <strong className="text-purple-200 bg-purple-500/20 border border-purple-400 px-2 py-0.5 rounded-lg">
+                      Tested &amp; Respected
                     </strong>
                   </div>
                 )}
@@ -1877,6 +2195,19 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                         <span>Refresh</span>
                       </button>
                     )}
+
+                    {/* Dhan Chart Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open('https://tv.dhan.co', '_blank');
+                      }}
+                      className="px-3 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg text-xs font-black shadow-md transition-all cursor-pointer min-h-[38px] flex items-center space-x-1"
+                      title="Open Dhan Chart & Web Trading Platform"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Dhan Chart</span>
+                    </button>
 
                     {/* Shall I Take This Button */}
                     <button

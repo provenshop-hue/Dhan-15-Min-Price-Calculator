@@ -83,17 +83,24 @@ export interface StockCalculated {
   hasOrbLowBounce?: boolean;
   orbLowBounceTime?: string;
   bounceStrengthPct?: number;
-  hasHighQualityBreakout?: boolean;
-  continuationScore?: number;
-  continuationStatus?: 'BREAKOUT CANDIDATE' | 'WAIT FOR CONFIRMATION' | 'CONFIRMED CONTINUATION' | 'REJECTED' | 'DATA UNAVAILABLE';
-  continuationReasons?: string[];
-  bodyRangeRatio?: number;
-  closeInUpperOrLower20?: boolean;
-  nextCandleConfirmed?: boolean;
-  nearestOpposingLevel?: number;
-  opposingLevelName?: string;
-  distanceToOpposing?: number;
-  roomRatio?: number;
+  isHighQualityBullish?: boolean;
+  isHighQualityBearish?: boolean;
+  hqSignalStatus?: string;
+  hqScore?: number;
+  hqBreakDistancePct?: number;
+  hqBreakDistanceAtr?: number;
+  hqCandleBodyPct?: number;
+  hqUpperWickPct?: number;
+  hqLowerWickPct?: number;
+  hqRelativeVolume?: number;
+  hqVwapStatus?: string;
+  hqNearestSr?: string;
+  hqProposedEntry?: number;
+  hqStopLoss?: number;
+  hqTarget?: number;
+  hqRewardRiskRatio?: string;
+  hqFailedConditions?: string[];
+  hqTimestamp?: string;
 }
 
 export type TrendFilterType =
