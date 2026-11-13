@@ -1132,7 +1132,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'bearish' && !s.isBearishQualified) return false;
       if (activeTab === 'super_break_bull' && !s.isSuperBreakBullish) return false;
       if (activeTab === 'super_break_bear' && !s.isSuperBreakBearish) return false;
-      if (activeTab === 'hq_breakout' && !s.isHighQualityBullish && !s.isHighQualityBearish && s.hqSignalStatus !== 'BREAKOUT DETECTED' && s.hqSignalStatus !== 'FAILED BREAKOUT') return false;
+      if (activeTab === 'hq_breakout') {
+        if (!s.isHighQualityBullish && !s.isHighQualityBearish && s.hqSignalStatus !== 'BREAKOUT DETECTED' && s.hqSignalStatus !== 'FAILED BREAKOUT') return false;
+        const bMins = parseTimeToMinutes(s.orbBreakTime || s.hqBreakoutTime);
+        const eMins = parseTimeToMinutes(s.hqEntryTime || s.hqTimestamp);
+        if (Math.abs(eMins - bMins) > 30) return false;
+      }
       if (activeTab === 'failed_retest' && !s.hasFailedRetest) return false;
       if (activeTab === 'orb_low_bounce' && !s.hasOrbLowBounce) return false;
       if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
