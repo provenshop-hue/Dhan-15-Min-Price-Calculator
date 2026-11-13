@@ -44,7 +44,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
   isLoading = false
 }) => {
   // Navigation Tabs inside CPR Scanner Module
-  const [cprTab, setCprTab] = useState<'narrow' | 'reversal' | 'breakout' | 'confirmed' | 'watchlist' | 'backtest'>('narrow');
+  const [cprTab, setCprTab] = useState<'narrow' | 'very_narrow_no_trend' | 'reversal' | 'breakout' | 'confirmed' | 'watchlist' | 'backtest'>('narrow');
 
   // Filters
   const [instrumentFilter, setInstrumentFilter] = useState<'ALL' | 'NIFTY50' | 'BANKNIFTY' | 'NSE_STOCKS'>('ALL');
@@ -198,6 +198,8 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const target3 = bias === 'BULLISH' ? entryPrice + (riskPts * 4.0) : entryPrice - (riskPts * 4.0);
       const rrRatio = riskPts > 0 ? `1:${((Math.abs(target1 - entryPrice)) / riskPts).toFixed(1)}` : '1:1.5';
 
+      const isVeryNarrowNoTrend = cprWidthPct <= 0.22 && Math.abs(stock.pctChange !== undefined ? stock.pctChange : (close - open)) <= 0.6;
+
       const isWatched = watchlistSymbols.includes(stock.symbol);
 
       return {
@@ -212,6 +214,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
         cprWidthPct: Math.round(cprWidthPct * 100) / 100,
         cprClassification,
         isNarrowCpr,
+        isVeryNarrowNoTrend,
         bias,
         hasReversal,
         hasBreakout,
@@ -238,6 +241,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
   const filteredCprStocks = useMemo(() => {
     return processedCprStocks.filter((s) => {
       // Tab filter
+      if (cprTab === 'very_narrow_no_trend' && !s.isVeryNarrowNoTrend) return false;
       if (cprTab === 'narrow' && !s.isNarrowCpr) return false;
       if (cprTab === 'reversal' && !s.hasReversal) return false;
       if (cprTab === 'breakout' && !s.hasBreakout) return false;
@@ -289,12 +293,13 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
   const stats = useMemo(() => {
     const totalScanned = processedCprStocks.length;
     const narrowCount = processedCprStocks.filter(s => s.isNarrowCpr).length;
+    const veryNarrowNoTrendCount = processedCprStocks.filter(s => s.isVeryNarrowNoTrend).length;
     const bullishCount = processedCprStocks.filter(s => s.bias === 'BULLISH').length;
     const bearishCount = processedCprStocks.filter(s => s.bias === 'BEARISH').length;
     const bullishProCount = processedCprStocks.filter(s => s.isBullishPro).length;
     const bearishProCount = processedCprStocks.filter(s => s.isBearishPro).length;
     const hammerCount = processedCprStocks.filter(s => s.isInvertedHammer).length;
-    return { totalScanned, narrowCount, bullishCount, bearishCount, bullishProCount, bearishProCount, hammerCount };
+    return { totalScanned, narrowCount, veryNarrowNoTrendCount, bullishCount, bearishCount, bullishProCount, bearishProCount, hammerCount };
   }, [processedCprStocks]);
 
   return (
@@ -371,6 +376,16 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
 
       {/* 📂 MODULE NAVIGATION TABS */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-2 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => setCprTab('very_narrow_no_trend')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+            cprTab === 'very_narrow_no_trend' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+          <span>⚡ Very Narrow CPR &amp; No Trending Day ({stats.veryNarrowNoTrendCount})</span>
+        </button>
+
         <button
           onClick={() => setCprTab('narrow')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
