@@ -428,10 +428,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             const dist = isBull ? cClose - orbHigh : orbLow - cClose;
             const distAtr = atr14 > 0 ? dist / atr14 : 0;
 
-            const bodyOk = bodyPct >= 60;
-            const wickOk = isBull ? upperWick <= 20 : lowerWick <= 20;
-            const volOk = relVol >= 1.5;
-            const atrOk = distAtr >= 0.10;
+            const bodyOk = bodyPct >= 65;
+            const wickOk = isBull ? upperWick <= 18 : lowerWick <= 18;
+            const volOk = relVol >= 1.8; // Strict volume requirement: must have strong breakout volume
+            const atrOk = distAtr >= 0.12;
             const vwapOk = vwap > 0 ? (isBull ? cClose > vwap : cClose < vwap) : true;
 
             if (bodyOk && wickOk && volOk && atrOk && vwapOk) {
@@ -477,7 +477,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           const cond2 = hqBreakDistanceAtr >= 0.10;
           const cond3 = hqCandleBodyPct >= 60;
           const cond4 = hqUpperWickPct <= 20;
-          const cond5 = hqRelativeVolume >= 1.5;
+          const cond5 = hqRelativeVolume >= 1.8;
           const cond6 = vwap > 0 ? entryCandle.close > vwap : true;
 
           const risk = entryCandle.close - orbLow;
@@ -487,17 +487,17 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           const cond7 = rrRatio >= 2.0;
 
           if (!cond1) hqFailedConditions.push('Candle did not close above ORB High');
-          if (!cond2) hqFailedConditions.push(`Breakout distance (${hqBreakDistanceAtr} ATR) < 0.10 ATR requirement`);
-          if (!cond3) hqFailedConditions.push(`Candle body (${hqCandleBodyPct}%) < 60% requirement`);
-          if (!cond4) hqFailedConditions.push(`Upper wick (${hqUpperWickPct}%) > 20% limit`);
-          if (!cond5) hqFailedConditions.push(`Relative volume (${hqRelativeVolume}x) < 1.5x requirement`);
+          if (!cond2) hqFailedConditions.push(`Breakout distance (${hqBreakDistanceAtr} ATR) < 0.12 ATR requirement`);
+          if (!cond3) hqFailedConditions.push(`Candle body (${hqCandleBodyPct}%) < 65% requirement`);
+          if (!cond4) hqFailedConditions.push(`Upper wick (${hqUpperWickPct}%) > 18% limit`);
+          if (!cond5) hqFailedConditions.push(`Relative volume (${hqRelativeVolume}x) < 1.8x requirement (Insufficient breakout volume)`);
           if (!cond6) hqFailedConditions.push('Closing price is below VWAP');
           if (!cond7) hqFailedConditions.push(`Reward-to-risk ratio (${rrRatio.toFixed(1)}:1) < 2:1 requirement`);
 
           let score = 50;
-          if (hqBreakDistanceAtr >= 0.10) score += 25;
-          if (hqCandleBodyPct >= 60 && hqUpperWickPct <= 20) score += 20;
-          if (hqRelativeVolume >= 1.5) score += 20;
+          if (hqBreakDistanceAtr >= 0.12) score += 25;
+          if (hqCandleBodyPct >= 65 && hqUpperWickPct <= 18) score += 20;
+          if (hqRelativeVolume >= 1.8) score += 20;
           if (cond6) score += 15;
           if (cond7) score += 20;
           hqScore = Math.min(100, Math.max(0, score));
@@ -509,7 +509,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           hqNearestSr = `Resistance @ ₹${resistance.toFixed(2)}`;
           hqVwapStatus = cond6 ? 'Above VWAP (Bullish)' : 'Below VWAP';
 
-          if (cond1 && cond2 && cond3 && cond4 && cond5 && cond6 && cond7 && hqScore >= 80) {
+          if (cond1 && cond2 && cond3 && cond4 && cond5 && cond6 && cond7 && hqScore >= 90) {
             isHighQualityBullish = true;
             hqSignalStatus = 'STRONG BULLISH';
           } else if (cond1) {
@@ -519,10 +519,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           }
         } else if (entryCandle.close < orbLow) {
           const cond1 = entryCandle.close < orbLow;
-          const cond2 = hqBreakDistanceAtr >= 0.10;
-          const cond3 = hqCandleBodyPct >= 60;
-          const cond4 = hqLowerWickPct <= 20;
-          const cond5 = hqRelativeVolume >= 1.5;
+          const cond2 = hqBreakDistanceAtr >= 0.12;
+          const cond3 = hqCandleBodyPct >= 65;
+          const cond4 = hqLowerWickPct <= 18;
+          const cond5 = hqRelativeVolume >= 1.8;
           const cond6 = vwap > 0 ? entryCandle.close < vwap : true;
 
           const risk = orbHigh - entryCandle.close;
@@ -532,17 +532,17 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           const cond7 = rrRatio >= 2.0;
 
           if (!cond1) hqFailedConditions.push('Candle did not close below ORB Low');
-          if (!cond2) hqFailedConditions.push(`Breakout distance (${hqBreakDistanceAtr} ATR) < 0.10 ATR requirement`);
-          if (!cond3) hqFailedConditions.push(`Candle body (${hqCandleBodyPct}%) < 60% requirement`);
-          if (!cond4) hqFailedConditions.push(`Lower wick (${hqLowerWickPct}%) > 20% limit`);
-          if (!cond5) hqFailedConditions.push(`Relative volume (${hqRelativeVolume}x) < 1.5x requirement`);
+          if (!cond2) hqFailedConditions.push(`Breakout distance (${hqBreakDistanceAtr} ATR) < 0.12 ATR requirement`);
+          if (!cond3) hqFailedConditions.push(`Candle body (${hqCandleBodyPct}%) < 65% requirement`);
+          if (!cond4) hqFailedConditions.push(`Lower wick (${hqLowerWickPct}%) > 18% limit`);
+          if (!cond5) hqFailedConditions.push(`Relative volume (${hqRelativeVolume}x) < 1.8x requirement (Insufficient breakout volume)`);
           if (!cond6) hqFailedConditions.push('Closing price is above VWAP');
           if (!cond7) hqFailedConditions.push(`Reward-to-risk ratio (${rrRatio.toFixed(1)}:1) < 2:1 requirement`);
 
           let score = 50;
-          if (hqBreakDistanceAtr >= 0.10) score += 25;
-          if (hqCandleBodyPct >= 60 && hqLowerWickPct <= 20) score += 20;
-          if (hqRelativeVolume >= 1.5) score += 20;
+          if (hqBreakDistanceAtr >= 0.12) score += 25;
+          if (hqCandleBodyPct >= 65 && hqLowerWickPct <= 18) score += 20;
+          if (hqRelativeVolume >= 1.8) score += 20;
           if (cond6) score += 15;
           if (cond7) score += 20;
           hqScore = Math.min(100, Math.max(0, score));
@@ -554,7 +554,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           hqNearestSr = `Support @ ₹${support.toFixed(2)}`;
           hqVwapStatus = cond6 ? 'Below VWAP (Bearish)' : 'Above VWAP';
 
-          if (cond1 && cond2 && cond3 && cond4 && cond5 && cond6 && cond7 && hqScore >= 80) {
+          if (cond1 && cond2 && cond3 && cond4 && cond5 && cond6 && cond7 && hqScore >= 90) {
             isHighQualityBearish = true;
             hqSignalStatus = 'STRONG BEARISH';
           } else if (cond1) {
