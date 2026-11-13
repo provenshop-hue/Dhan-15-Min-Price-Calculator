@@ -101,6 +101,8 @@ export interface StockCalculated {
   hqRewardRiskRatio?: string;
   hqFailedConditions?: string[];
   hqTimestamp?: string;
+  hqBreakoutTime?: string;
+  hqEntryTime?: string;
 }
 
 export type TrendFilterType =

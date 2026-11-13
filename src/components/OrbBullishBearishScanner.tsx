@@ -372,55 +372,94 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let hqRewardRiskRatio = '1 : 2.0';
       let hqFailedConditions: string[] = [];
       let hqTimestamp = '09:30 AM';
+      let hqBreakoutTime = '09:30 AM';
+      let hqEntryTime = '09:30 AM';
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 0) {
-        const lastCandle = stock.rsiTimeline[stock.rsiTimeline.length - 1];
-        hqTimestamp = lastCandle.timeStr || '15m Close';
-        const cOpen = lastCandle.open;
-        const cHigh = lastCandle.high;
-        const cLow = lastCandle.low;
-        const cClose = lastCandle.close;
-        const cVol = lastCandle.volume || 10000;
+        let breakoutFoundIdx = -1;
+        let entryFoundIdx = -1;
 
-        const range = Math.max(0.05, cHigh - cLow);
-        const body = Math.abs(cClose - cOpen);
-        hqCandleBodyPct = Math.round((body / range) * 100);
-        hqUpperWickPct = Math.round(((cHigh - Math.max(cOpen, cClose)) / range) * 100);
-        hqLowerWickPct = Math.round(((Math.min(cOpen, cClose) - cLow) / range) * 100);
+        for (let idx = 0; idx < stock.rsiTimeline.length; idx++) {
+          const pt = stock.rsiTimeline[idx];
+          const cOpen = pt.open;
+          const cHigh = pt.high;
+          const cLow = pt.low;
+          const cClose = pt.close;
+          const cVol = pt.volume || 10000;
 
-        let atr14 = range;
-        if (stock.rsiTimeline.length >= 14) {
-          let trSum = 0;
-          for (let i = Math.max(0, stock.rsiTimeline.length - 14); i < stock.rsiTimeline.length; i++) {
-            const cc = stock.rsiTimeline[i];
-            const prevC = i > 0 ? stock.rsiTimeline[i - 1].close : cc.open;
-            const tr = Math.max(cc.high - cc.low, Math.abs(cc.high - prevC), Math.abs(cc.low - prevC));
-            trSum += tr;
+          const isBull = cClose > orbHigh;
+          const isBear = cClose < orbLow;
+
+          if (isBull || isBear) {
+            if (breakoutFoundIdx === -1) {
+              breakoutFoundIdx = idx;
+              hqBreakoutTime = pt.timeStr || '09:30 AM';
+            }
+
+            const range = Math.max(0.05, cHigh - cLow);
+            const body = Math.abs(cClose - cOpen);
+            const bodyPct = (body / range) * 100;
+            const upperWick = ((cHigh - Math.max(cOpen, cClose)) / range) * 100;
+            const lowerWick = ((Math.min(cOpen, cClose) - cLow) / range) * 100;
+
+            let atr14 = range;
+            if (idx >= 1) {
+              let trSum = 0;
+              for (let k = Math.max(0, idx - 14); k <= idx; k++) {
+                const cc = stock.rsiTimeline[k];
+                const prevC = k > 0 ? stock.rsiTimeline[k - 1].close : cc.open;
+                const tr = Math.max(cc.high - cc.low, Math.abs(cc.high - prevC), Math.abs(cc.low - prevC));
+                trSum += tr;
+              }
+              atr14 = trSum / Math.min(15, idx + 1);
+            }
+
+            let prevVolSum = 0;
+            let prevCount = 0;
+            for (let k = Math.max(0, idx - 20); k < idx; k++) {
+              prevVolSum += (stock.rsiTimeline[k].volume || 10000);
+              prevCount++;
+            }
+            const avgVol = prevCount > 0 ? prevVolSum / prevCount : cVol;
+            const relVol = avgVol > 0 ? cVol / avgVol : 1.0;
+
+            const dist = isBull ? cClose - orbHigh : orbLow - cClose;
+            const distAtr = atr14 > 0 ? dist / atr14 : 0;
+
+            const bodyOk = bodyPct >= 60;
+            const wickOk = isBull ? upperWick <= 20 : lowerWick <= 20;
+            const volOk = relVol >= 1.5;
+            const atrOk = distAtr >= 0.10;
+            const vwapOk = vwap > 0 ? (isBull ? cClose > vwap : cClose < vwap) : true;
+
+            if (bodyOk && wickOk && volOk && atrOk && vwapOk) {
+              entryFoundIdx = idx;
+              hqEntryTime = pt.timeStr || '09:30 AM';
+              hqBreakDistancePct = isBull ? Math.round((dist / orbHigh) * 100 * 100) / 100 : Math.round((dist / orbLow) * 100 * 100) / 100;
+              hqBreakDistanceAtr = Math.round(distAtr * 100) / 100;
+              hqCandleBodyPct = Math.round(bodyPct);
+              hqUpperWickPct = Math.round(upperWick);
+              hqLowerWickPct = Math.round(lowerWick);
+              hqRelativeVolume = Math.round(relVol * 100) / 100;
+              break;
+            }
           }
-          atr14 = trSum / 14;
         }
 
-        let prev20VolSum = 0;
-        let prev20Count = 0;
-        const startIdx = Math.max(0, stock.rsiTimeline.length - 21);
-        const endIdx = stock.rsiTimeline.length - 1;
-        for (let i = startIdx; i < endIdx; i++) {
-          prev20VolSum += (stock.rsiTimeline[i].volume || 10000);
-          prev20Count++;
+        if (entryFoundIdx === -1 && breakoutFoundIdx !== -1) {
+          entryFoundIdx = breakoutFoundIdx;
+          hqEntryTime = stock.rsiTimeline[breakoutFoundIdx].timeStr;
+        } else if (entryFoundIdx === -1) {
+          entryFoundIdx = stock.rsiTimeline.length - 1;
+          hqEntryTime = stock.rsiTimeline[entryFoundIdx].timeStr;
         }
-        const avgVol20 = prev20Count > 0 ? prev20VolSum / prev20Count : cVol;
-        hqRelativeVolume = avgVol20 > 0 ? Math.round((cVol / avgVol20) * 100) / 100 : 1.0;
 
-        const bullDist = cClose - orbHigh;
-        const bearDist = orbLow - cClose;
-        const isBullBreak = cClose > orbHigh;
-        const isBearBreak = cClose < orbLow;
-
-        hqBreakDistancePct = isBullBreak ? Math.round((bullDist / orbHigh) * 100 * 100) / 100 : (isBearBreak ? Math.round((bearDist / orbLow) * 100 * 100) / 100 : 0);
-        hqBreakDistanceAtr = atr14 > 0 ? Math.round((Math.max(bullDist, bearDist) / atr14) * 100) / 100 : 0;
+        const entryCandle = stock.rsiTimeline[entryFoundIdx];
+        hqBreakoutTime = stock.rsiTimeline[breakoutFoundIdx !== -1 ? breakoutFoundIdx : entryFoundIdx].timeStr;
+        hqTimestamp = entryCandle.timeStr;
 
         let closedBackInside = false;
-        for (let i = 1; i < stock.rsiTimeline.length; i++) {
+        for (let i = 1; i <= entryFoundIdx; i++) {
           const prevPt = stock.rsiTimeline[i - 1];
           const currPt = stock.rsiTimeline[i];
           if (prevPt.close > orbHigh && currPt.close <= orbHigh) closedBackInside = true;
@@ -430,17 +469,17 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (closedBackInside) {
           hqSignalStatus = 'FAILED BREAKOUT';
           hqFailedConditions.push('Price closed back inside the ORB range (Failed Breakout / Fakeout)');
-        } else if (isBullBreak) {
-          const cond1 = cClose > orbHigh;
+        } else if (entryCandle.close > orbHigh) {
+          const cond1 = entryCandle.close > orbHigh;
           const cond2 = hqBreakDistanceAtr >= 0.10;
           const cond3 = hqCandleBodyPct >= 60;
           const cond4 = hqUpperWickPct <= 20;
           const cond5 = hqRelativeVolume >= 1.5;
-          const cond6 = vwap > 0 ? cClose > vwap : true;
+          const cond6 = vwap > 0 ? entryCandle.close > vwap : true;
 
-          const risk = cClose - orbLow;
-          const resistance = cHigh * 1.03;
-          const reward = resistance - cClose;
+          const risk = entryCandle.close - orbLow;
+          const resistance = entryCandle.high * 1.03;
+          const reward = resistance - entryCandle.close;
           const rrRatio = risk > 0 ? reward / risk : 2.0;
           const cond7 = rrRatio >= 2.0;
 
@@ -460,9 +499,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           if (cond7) score += 20;
           hqScore = Math.min(100, Math.max(0, score));
 
-          hqProposedEntry = cClose;
+          hqProposedEntry = entryCandle.close;
           hqStopLoss = orbLow;
-          hqTarget = cClose + (cClose - orbLow) * 2;
+          hqTarget = entryCandle.close + (entryCandle.close - orbLow) * 2;
           hqRewardRiskRatio = `1 : ${Math.max(2.0, rrRatio).toFixed(1)}`;
           hqNearestSr = `Resistance @ ₹${resistance.toFixed(2)}`;
           hqVwapStatus = cond6 ? 'Above VWAP (Bullish)' : 'Below VWAP';
@@ -475,17 +514,17 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           } else {
             hqSignalStatus = 'NO TRADE';
           }
-        } else if (isBearBreak) {
-          const cond1 = cClose < orbLow;
+        } else if (entryCandle.close < orbLow) {
+          const cond1 = entryCandle.close < orbLow;
           const cond2 = hqBreakDistanceAtr >= 0.10;
           const cond3 = hqCandleBodyPct >= 60;
           const cond4 = hqLowerWickPct <= 20;
           const cond5 = hqRelativeVolume >= 1.5;
-          const cond6 = vwap > 0 ? cClose < vwap : true;
+          const cond6 = vwap > 0 ? entryCandle.close < vwap : true;
 
-          const risk = orbHigh - cClose;
-          const support = cLow * 0.97;
-          const reward = cClose - support;
+          const risk = orbHigh - entryCandle.close;
+          const support = entryCandle.low * 0.97;
+          const reward = entryCandle.close - support;
           const rrRatio = risk > 0 ? reward / risk : 2.0;
           const cond7 = rrRatio >= 2.0;
 
@@ -505,9 +544,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           if (cond7) score += 20;
           hqScore = Math.min(100, Math.max(0, score));
 
-          hqProposedEntry = cClose;
+          hqProposedEntry = entryCandle.close;
           hqStopLoss = orbHigh;
-          hqTarget = cClose - (orbHigh - cClose) * 2;
+          hqTarget = entryCandle.close - (orbHigh - entryCandle.close) * 2;
           hqRewardRiskRatio = `1 : ${Math.max(2.0, rrRatio).toFixed(1)}`;
           hqNearestSr = `Support @ ₹${support.toFixed(2)}`;
           hqVwapStatus = cond6 ? 'Below VWAP (Bearish)' : 'Above VWAP';
