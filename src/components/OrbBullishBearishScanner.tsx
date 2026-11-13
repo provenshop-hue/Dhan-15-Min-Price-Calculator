@@ -956,9 +956,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       const maintainingEma9 = isBullishQualified ? (close >= ema9) : (isBearishQualified ? (close <= ema9) : true);
       const maintainingVwap = isBullishQualified ? (close >= vwap) : (isBearishQualified ? (close <= vwap) : true);
 
-      const isFullyBullish = isBullishQualified && rsi >= 60 && close > vwap && close >= ema9 && (stock.pctChange || 0) >= 1.2 && breakPctAbove >= 1.2 && (stock.volumeRatio || 1) >= 1.15;
+      const isFullyBullish = isBullishQualified && rsi >= 58 && close > vwap && close >= ema9 && (stock.pctChange || 0) >= 1.0 && breakPctAbove >= 1.0;
       const isEarlyIgnition = isBullishQualified && breakMinutesFromOpen <= 30 && orbHeightPct <= 2.0 && (breakPctAbove >= 0.3 || (stock.volumeRatio || 1) >= 1.1);
-      const isConfirmedSignal = (isBullishQualified || isBearishQualified) && (hasRetestedAndBounced || hasBreakAndContinue || hasOrbLowBounce || hasBounceGreat || hasImmediateBounce) && (isBullishQualified ? (rsi >= 55 && close > vwap) : (rsi <= 45 && close < vwap));
+      const isConfirmedSignal = (isBullishQualified || isBearishQualified) && (hasRetestedAndBounced || hasBreakAndContinue || hasOrbLowBounce || hasBounceGreat || hasImmediateBounce);
 
       return {
         ...stock,
@@ -1599,31 +1599,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         </div>
       </div>
 
-      {/* Educational Banner for Fully Bullish / Confirmed Signals */}
-      {activeTab === 'fully_bullish' && (
-        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 p-4 rounded-2xl border border-emerald-500/50 shadow-lg text-emerald-200 text-xs font-mono space-y-1.5 mb-4">
-          <div className="font-black text-emerald-300 flex items-center gap-2 text-sm uppercase tracking-wider">
-            <Zap className="w-4 h-4 fill-emerald-300 animate-pulse" />
-            <span>Why Traders Take Fully Bullish Parabolic Rallies (Zero Pullback Confidence)</span>
-          </div>
-          <p className="text-slate-300 font-sans leading-relaxed">
-            Fully Bullish stocks represent institutional breakout perfection: RSI &ge; 60, trading strictly above VWAP and 9 EMA, day gain &ge; 1.2%, breakout &ge; 1.2% above ORB High, and supported by heavy volume surge. <strong>Why this prevents pullbacks:</strong> These conditions ensure aggressive institutional buying pressure where sellers are overwhelmed, creating a parabolic upward trajectory that sustains momentum without sharp retracements.
-          </p>
-        </div>
-      )}
-
-      {activeTab === 'confirmed_signals' && (
-        <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-purple-950 p-4 rounded-2xl border border-purple-500/50 shadow-lg text-purple-200 text-xs font-mono space-y-1.5 mb-4">
-          <div className="font-black text-purple-300 flex items-center gap-2 text-sm uppercase tracking-wider">
-            <ShieldCheck className="w-4 h-4 text-purple-300" />
-            <span>Why Bullish & Bearish Confirmed Signals Eliminate Fakeouts</span>
-          </div>
-          <p className="text-slate-300 font-sans leading-relaxed">
-            Confirmed Signals filter out false breakouts by requiring a verified retest of the ORB level followed by a strong volume-backed continuation bounce. <strong>Why traders rely on this:</strong> By waiting for price to test support/resistance and respect it, you eliminate fake breakouts and enter with maximum directional confidence.
-          </p>
-        </div>
-      )}
-
       {/* Stock Cards Grid */}
       {filteredStocks.length === 0 ? (
         <div className="bg-slate-900 rounded-2xl p-12 text-center border border-slate-800 text-slate-400 space-y-3">
@@ -1645,10 +1620,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             return (
               <div 
                 key={stock.symbol}
-                onClick={() => {
-                  window.open('https://tv.dhan.co', '_blank');
-                  onSelectStockDetail(stock);
-                }}
+                onClick={() => onSelectStockDetail(stock)}
                 className={`rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-xl ${
                   isSuper 
                     ? 'bg-amber-950/50 border-amber-400 ring-2 ring-amber-500/30 shadow-amber-500/20'
@@ -2054,19 +2026,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                         <span>Refresh</span>
                       </button>
                     )}
-
-                    {/* Dhan Chart Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open('https://tv.dhan.co', '_blank');
-                      }}
-                      className="px-3 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg text-xs font-black shadow-md transition-all cursor-pointer min-h-[38px] flex items-center space-x-1"
-                      title="Open Dhan Chart & Web Trading Platform"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Dhan Chart</span>
-                    </button>
 
                     {/* Shall I Take This Button */}
                     <button
