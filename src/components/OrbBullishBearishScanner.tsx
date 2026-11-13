@@ -394,6 +394,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             if (breakoutFoundIdx === -1) {
               breakoutFoundIdx = idx;
               hqBreakoutTime = pt.timeStr || '09:30 AM';
+              // EARLY CATCH ENTRY TIMING: Set entry time to the exact moment of breakout touch/ignition so user never misses the train
+              hqEntryTime = pt.timeStr || '09:30 AM';
             }
 
             const range = Math.max(0.05, cHigh - cLow);
@@ -434,7 +436,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
             if (bodyOk && wickOk && volOk && atrOk && vwapOk) {
               entryFoundIdx = idx;
-              hqEntryTime = pt.timeStr || '09:30 AM';
               hqBreakDistancePct = isBull ? Math.round((dist / orbHigh) * 100 * 100) / 100 : Math.round((dist / orbLow) * 100 * 100) / 100;
               hqBreakDistanceAtr = Math.round(distAtr * 100) / 100;
               hqCandleBodyPct = Math.round(bodyPct);
@@ -452,6 +453,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         } else if (entryFoundIdx === -1) {
           entryFoundIdx = stock.rsiTimeline.length - 1;
           hqEntryTime = stock.rsiTimeline[entryFoundIdx].timeStr;
+        } else if (breakoutFoundIdx !== -1) {
+          hqEntryTime = stock.rsiTimeline[breakoutFoundIdx].timeStr;
         }
 
         const entryCandle = stock.rsiTimeline[entryFoundIdx];
@@ -499,10 +502,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           if (cond7) score += 20;
           hqScore = Math.min(100, Math.max(0, score));
 
-          hqProposedEntry = entryCandle.close;
+          hqProposedEntry = Math.min(entryCandle.close, orbHigh * 1.002);
           hqStopLoss = orbLow;
-          hqTarget = entryCandle.close + (entryCandle.close - orbLow) * 2;
-          hqRewardRiskRatio = `1 : ${Math.max(2.0, rrRatio).toFixed(1)}`;
+          hqTarget = hqProposedEntry + (hqProposedEntry - orbLow) * 2.2;
+          hqRewardRiskRatio = `1 : ${Math.max(2.2, rrRatio).toFixed(1)}`;
           hqNearestSr = `Resistance @ ₹${resistance.toFixed(2)}`;
           hqVwapStatus = cond6 ? 'Above VWAP (Bullish)' : 'Below VWAP';
 
@@ -544,10 +547,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           if (cond7) score += 20;
           hqScore = Math.min(100, Math.max(0, score));
 
-          hqProposedEntry = entryCandle.close;
+          hqProposedEntry = Math.max(entryCandle.close, orbLow * 0.998);
           hqStopLoss = orbHigh;
-          hqTarget = entryCandle.close - (orbHigh - entryCandle.close) * 2;
-          hqRewardRiskRatio = `1 : ${Math.max(2.0, rrRatio).toFixed(1)}`;
+          hqTarget = hqProposedEntry - (orbHigh - hqProposedEntry) * 2.2;
+          hqRewardRiskRatio = `1 : ${Math.max(2.2, rrRatio).toFixed(1)}`;
           hqNearestSr = `Support @ ₹${support.toFixed(2)}`;
           hqVwapStatus = cond6 ? 'Below VWAP (Bearish)' : 'Above VWAP';
 
