@@ -1646,7 +1646,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
               <div 
                 key={stock.symbol}
                 onClick={() => {
-                  window.open('https://trade.dhan.co', '_blank');
+                  window.open('https://tv.dhan.co', '_blank');
                   onSelectStockDetail(stock);
                 }}
                 className={`rounded-2xl border transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-xl ${
@@ -2059,7 +2059,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.open('https://trade.dhan.co', '_blank');
+                        window.open('https://tv.dhan.co', '_blank');
                       }}
                       className="px-3 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg text-xs font-black shadow-md transition-all cursor-pointer min-h-[38px] flex items-center space-x-1"
                       title="Open Dhan Chart & Web Trading Platform"
