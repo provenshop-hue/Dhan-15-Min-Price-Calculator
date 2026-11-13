@@ -785,6 +785,10 @@ apiRouter.post('/dhan/intraday-15m', async (req, res) => {
                 if (instrumentFeed.last_price && instrumentFeed.last_price > 0) {
                   accurateClose = instrumentFeed.last_price;
                 }
+                // Official Open from Dhan marketfeed
+                if (instrumentFeed.ohlc?.open && instrumentFeed.ohlc.open > 0) {
+                  accurateOpen = instrumentFeed.ohlc.open;
+                }
                 // Check if marketfeed has higher high or lower low
                 if (instrumentFeed.ohlc?.high && instrumentFeed.ohlc.high > 0) {
                   accurateHigh = Math.max(accurateHigh, instrumentFeed.ohlc.high);
