@@ -1,8 +1,12 @@
-import { getDhanSecurityId } from '../data/dhanSecurityMap';
+import { getDhanSecurityId, isIndexSymbol } from '../data/dhanSecurityMap';
 
 export function openDhanChart(stock: { symbol: string; securityId?: string }) {
-  const symbol = stock.symbol || 'NIFTY';
-  const secId = stock.securityId || getDhanSecurityId(symbol) || '13';
-  console.log(`Opening Dhan TV Chart (https://tv.dhan.co) for symbol: ${symbol}, Security ID: ${secId}`);
-  window.open('https://tv.dhan.co', '_blank');
+  const symbol = (stock.symbol || 'NIFTY').toUpperCase().trim();
+  const isIdx = isIndexSymbol ? isIndexSymbol(symbol) : (symbol.includes('NIFTY') || symbol.includes('SENSEX') || symbol === 'NIFTY' || symbol === 'BANKNIFTY' || symbol === 'SENSEX');
+  const exchPrefix = symbol === 'SENSEX' ? 'BSE' : 'NSE';
+  
+  // Open direct TradingView interactive chart for the exact stock symbol (which powers Dhan charts)
+  const chartUrl = `https://in.tradingview.com/chart/?symbol=${exchPrefix}:${symbol}`;
+  console.log(`Opening stock chart for ${exchPrefix}:${symbol} -> ${chartUrl}`);
+  window.open(chartUrl, '_blank');
 }
