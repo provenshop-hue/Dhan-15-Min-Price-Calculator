@@ -98,7 +98,7 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
       const volumeRatio = stock.volumeRatio !== undefined && stock.volumeRatio !== null ? stock.volumeRatio : 1.0;
 
       // Bollinger Bands (Period 20, StdDev 2)
-      const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + close + prevClose) / 4;
+      const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + (close * 2)) / 4;
       const bandDev = atr * 2; // 2 standard deviations
       const upperBand = middleBand + bandDev;
       const lowerBand = middleBand - bandDev;
@@ -125,12 +125,20 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
         marketRegime = 'UNCERTAIN';
       }
 
-      // Strict Bollinger Band Extremity & Reversal Conditions
-      const touchesLowerBand = low <= lowerBand * 1.015 || close <= lowerBand + (bandWidth * 0.3);
-      const touchesUpperBand = high >= upperBand * 0.985 || close >= upperBand - (bandWidth * 0.3);
+      // Candlestick rejection & touch checks (matching real-time Dhan/TradingView charts)
+      const isBullishRejection = close >= open || intradayPos >= 0.35;
+      const isBearishRejection = close <= open || intradayPos <= 0.65;
 
-      const isBuyCandidate = touchesLowerBand && rsi <= 52 && close >= low;
-      const isSellCandidate = touchesUpperBand && rsi >= 48 && close <= high;
+      const touchesLowerBand = low <= lowerBand || close <= lowerBand * 1.008;
+      const touchesUpperBand = high >= upperBand || close >= upperBand * 0.992;
+
+      // Strong trend override check (avoid fading strong trend breakouts)
+      const isStrongTrend = adx >= 28;
+      const isTrendAgainstBuy = isStrongTrend && marketRegime === 'BEARISH_TREND';
+      const isTrendAgainstSell = isStrongTrend && marketRegime === 'BULLISH_TREND';
+
+      const isBuyCandidate = touchesLowerBand && isBullishRejection && rsi <= 52 && !isTrendAgainstBuy;
+      const isSellCandidate = touchesUpperBand && isBearishRejection && rsi >= 48 && !isTrendAgainstSell;
 
       const passedConditions: string[] = [];
       const failedConditions: string[] = [];
@@ -138,20 +146,22 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
       let signalState: 'BUY' | 'SELL' | 'WAIT' | 'NO_TRADE' = 'NO_TRADE';
       if (isBuyCandidate) {
         signalState = 'BUY';
-        passedConditions.push('🟢 Lower Band Support Reached (Price tested/dipped to Lower Band)');
-        passedConditions.push(`🟢 RSI Oversold / Rebound Confirmation (RSI ${rsi.toFixed(1)} <= 52)`);
-        passedConditions.push('🟢 Price holding support, targeting Middle Band (SMA 20)');
+        passedConditions.push('🟢 Lower Band Support Touch & Bullish Rejection Confirmed');
+        passedConditions.push(`🟢 RSI Oversold Bounce (RSI ${rsi.toFixed(1)} <= 52)`);
+        passedConditions.push('🟢 Mean Reversion Target set to Middle Band (SMA 20)');
       } else if (isSellCandidate) {
         signalState = 'SELL';
-        passedConditions.push('🔴 Upper Band Resistance Reached (Price tested/spiked to Upper Band)');
-        passedConditions.push(`🔴 RSI Overbought / Rejection Confirmation (RSI ${rsi.toFixed(1)} >= 48)`);
-        passedConditions.push('🔴 Price rejecting resistance, targeting Middle Band (SMA 20)');
+        passedConditions.push('🔴 Upper Band Resistance Touch & Bearish Rejection Confirmed');
+        passedConditions.push(`🔴 RSI Overbought Rejection (RSI ${rsi.toFixed(1)} >= 48)`);
+        passedConditions.push('🔴 Mean Reversion Target set to Middle Band (SMA 20)');
       } else {
         signalState = 'WAIT';
-        if (!touchesLowerBand && !touchesUpperBand) {
-          failedConditions.push('⏳ Price is in middle range (No touch of Upper or Lower Bollinger Band extremes)');
+        if (isTrendAgainstBuy || isTrendAgainstSell) {
+          failedConditions.push(`⚠️ Market regime is ${marketRegime} (Strong trend override - mean reversal skipped)`);
+        } else if (!touchesLowerBand && !touchesUpperBand) {
+          failedConditions.push('⏳ Price inside bands (No Lower or Upper Band extremity touch)');
         } else {
-          failedConditions.push('⏳ Awaiting strict RSI & candle rejection confirmation');
+          failedConditions.push('⏳ Awaiting strict candlestick bounce/rejection confirmation');
         }
       }
 
