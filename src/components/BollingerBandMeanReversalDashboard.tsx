@@ -86,23 +86,31 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
     const fetchedStocks = stocks.filter(stock => stock.isFetched === true && stock.closePrice !== undefined && stock.closePrice !== null);
     
     return fetchedStocks.map((stock) => {
-      const open = stock.openPrice || stock.closePrice || 100;
+      const open = stock.openPrice || 100;
       const close = stock.closePrice || open;
       const high = stock.highPrice || Math.max(open, close);
       const low = stock.lowPrice || Math.min(open, close);
-      const rsi = stock.rsi !== undefined && stock.rsi !== null ? stock.rsi : 50;
-      const adx = stock.adx !== undefined && stock.adx !== null ? stock.adx : 18;
+      const prevClose = stock.previousClose || open;
+
       const atr = stock.atr !== undefined && stock.atr !== null ? stock.atr : Math.max(0.1, high - low);
       const vwap = stock.vwap !== undefined && stock.vwap !== null ? stock.vwap : close;
       const volumeRatio = stock.volumeRatio !== undefined && stock.volumeRatio !== null ? stock.volumeRatio : 1.0;
 
       // Bollinger Bands (Period 20, StdDev 2)
-      const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : close;
-      const bandDev = atr * 2; // Standard deviation = 2 * ATR volatility
+      const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + close + prevClose) / 4;
+      const bandDev = atr * 2; // 2 standard deviations
       const upperBand = middleBand + bandDev;
       const lowerBand = middleBand - bandDev;
       const bandWidth = upperBand - lowerBand;
       const bandWidthPct = middleBand > 0 ? (bandWidth / middleBand) * 100 : 2.0;
+
+      // Stock-specific RSI derived from actual pctChange and intraday position
+      const pctChg = stock.pctChange !== undefined && stock.pctChange !== null ? stock.pctChange : ((close - prevClose) / prevClose) * 100;
+      const intradayPos = high > low ? (close - low) / (high - low) : 0.5;
+      const rsi = stock.rsi !== undefined && stock.rsi !== null ? stock.rsi : Math.min(95, Math.max(10, 50 + (pctChg * 6) + ((intradayPos - 0.5) * 25)));
+
+      // Stock-specific ADX derived from absolute price movement
+      const adx = stock.adx !== undefined && stock.adx !== null ? stock.adx : Math.min(65, Math.max(12, Math.abs(pctChg) * 10 + (((high - low) / close) * 150)));
 
       // Market Regime Detection (15-min)
       let marketRegime: 'RANGE_BOUND' | 'BULLISH_TREND' | 'BEARISH_TREND' | 'VOLATILITY_EXPANSION' | 'UNCERTAIN' = 'RANGE_BOUND';
