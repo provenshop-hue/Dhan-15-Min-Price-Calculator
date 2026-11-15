@@ -81,39 +81,34 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
     return () => clearInterval(timer);
   }, []);
 
-  // Process and compute Bollinger Band Mean Reversal Engine on 15m Candles ONLY
+  // Process and compute Bollinger Band Mean Reversal Engine on 15m Candles ONLY using pure real-time Dhan API data
   const processedBbStocks = useMemo(() => {
-    return stocks.map((stock) => {
-      const sym = stock.symbol || 'STOCK';
-      let hash = 0;
-      for (let i = 0; i < sym.length; i++) hash += sym.charCodeAt(i);
-
-      const basePrice = stock.closePrice || stock.openPrice || (200 + (hash % 1800));
-      const open = stock.openPrice || basePrice * (1 + ((hash % 5 - 2) * 0.003));
-      const close = stock.closePrice || basePrice;
-      const high = stock.highPrice || Math.max(open, close) * 1.012;
-      const low = stock.lowPrice || Math.min(open, close) * 0.988;
-
-      const mod = hash % 4;
-      const rsi = stock.rsi !== undefined && stock.rsi !== null ? stock.rsi : (mod === 0 ? 28 : mod === 1 ? 72 : 48);
-      const adx = stock.adx !== undefined && stock.adx !== null ? stock.adx : (16 + (hash % 8));
-      const atr = stock.atr !== undefined && stock.atr !== null ? stock.atr : basePrice * 0.015;
-      const vwap = stock.vwap !== undefined && stock.vwap !== null ? stock.vwap : close * 0.999;
-      const volumeRatio = stock.volumeRatio !== undefined && stock.volumeRatio !== null ? stock.volumeRatio : 1.4;
+    const fetchedStocks = stocks.filter(stock => stock.isFetched === true && stock.closePrice !== undefined && stock.closePrice !== null);
+    
+    return fetchedStocks.map((stock) => {
+      const open = stock.openPrice || stock.closePrice || 100;
+      const close = stock.closePrice || open;
+      const high = stock.highPrice || Math.max(open, close);
+      const low = stock.lowPrice || Math.min(open, close);
+      const rsi = stock.rsi !== undefined && stock.rsi !== null ? stock.rsi : 50;
+      const adx = stock.adx !== undefined && stock.adx !== null ? stock.adx : 18;
+      const atr = stock.atr !== undefined && stock.atr !== null ? stock.atr : Math.max(0.1, high - low);
+      const vwap = stock.vwap !== undefined && stock.vwap !== null ? stock.vwap : close;
+      const volumeRatio = stock.volumeRatio !== undefined && stock.volumeRatio !== null ? stock.volumeRatio : 1.0;
 
       // Bollinger Bands (Period 20, StdDev 2)
-      const middleBand = stock.ema20 || close * (mod === 0 ? 1.008 : mod === 1 ? 0.992 : 1.0);
-      const bandDev = atr * 1.3;
-      const upperBand = middleBand + (bandDev * 1.2);
-      const lowerBand = middleBand - (bandDev * 1.2);
+      const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : close;
+      const bandDev = atr * 2; // Standard deviation = 2 * ATR volatility
+      const upperBand = middleBand + bandDev;
+      const lowerBand = middleBand - bandDev;
       const bandWidth = upperBand - lowerBand;
-      const bandWidthPct = middleBand > 0 ? (bandWidth / middleBand) * 100 : 2.5;
+      const bandWidthPct = middleBand > 0 ? (bandWidth / middleBand) * 100 : 2.0;
 
       // Market Regime Detection (15-min)
       let marketRegime: 'RANGE_BOUND' | 'BULLISH_TREND' | 'BEARISH_TREND' | 'VOLATILITY_EXPANSION' | 'UNCERTAIN' = 'RANGE_BOUND';
       if (adx >= 25) {
         marketRegime = close > middleBand ? 'BULLISH_TREND' : 'BEARISH_TREND';
-      } else if (bandWidthPct > 4.5) {
+      } else if (bandWidthPct > 5.0) {
         marketRegime = 'VOLATILITY_EXPANSION';
       } else if (adx <= 22) {
         marketRegime = 'RANGE_BOUND';
@@ -121,65 +116,64 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
         marketRegime = 'UNCERTAIN';
       }
 
-      const body = Math.abs(close - open);
-      const upperWick = high - Math.max(open, close);
-      const lowerWick = Math.min(open, close) - low;
-      const lowerWickRatio = body > 0 ? lowerWick / body : (mod === 0 ? 1.8 : 0.9);
-      const upperWickRatio = body > 0 ? upperWick / body : (mod === 1 ? 1.8 : 0.9);
-
-      const touchesLower = mod === 0 || low <= lowerBand || close <= lowerBand * 1.004;
-      const touchesUpper = mod === 1 || high >= upperBand || close >= upperBand * 0.996;
+      // Touch / Penetration of Bollinger Bands
+      const touchesLower = low <= lowerBand || close <= lowerBand * 1.002;
+      const touchesUpper = high >= upperBand || close >= upperBand * 0.998;
 
       const passedConditions: string[] = [];
       const failedConditions: string[] = [];
 
       const regimeOk = marketRegime === 'RANGE_BOUND' || marketRegime === 'UNCERTAIN';
-      if (regimeOk) passedConditions.push('Market regime is Range Bound / Mean Reversion favorable');
-      else failedConditions.push(`Market regime is ${marketRegime} (Trend risk override)`);
+      if (regimeOk) {
+        passedConditions.push('Market regime is Range Bound / Mean Reversion favorable (ADX < 22)');
+      } else {
+        failedConditions.push(`Market regime is ${marketRegime} (Strong trend override - mean reversal skipped)`);
+      }
 
       const distToMiddleBuy = middleBand - close;
       const distToMiddleSell = close - middleBand;
-      const sufficientRewardBuy = distToMiddleBuy >= atr * 0.8 || mod === 0;
-      const sufficientRewardSell = distToMiddleSell >= atr * 0.8 || mod === 1;
+      const sufficientRewardBuy = distToMiddleBuy >= atr * 1.0;
+      const sufficientRewardSell = distToMiddleSell >= atr * 1.0;
 
-      const isBuyReversalCandidate = (touchesLower && rsi <= 45 && regimeOk) || mod === 0;
+      // Buy Reversal Condition
+      const isBuyReversalCandidate = touchesLower && rsi <= 40 && regimeOk;
       let isBuyConfirmed = false;
-      if (isBuyReversalCandidate && sufficientRewardBuy) {
+      if (isBuyReversalCandidate && close > lowerBand && sufficientRewardBuy) {
         isBuyConfirmed = true;
-        passedConditions.push('Lower Bollinger Band touch with bullish rejection lower wick');
-        passedConditions.push(`RSI oversold (${rsi.toFixed(1)})`);
-        passedConditions.push('Sufficient distance to Middle Band for 1:1.5+ R:R');
+        passedConditions.push('Price touched/penetrated Lower Bollinger Band and closed back inside');
+        passedConditions.push(`RSI oversold (${rsi.toFixed(1)} <= 40)`);
+        passedConditions.push('Sufficient distance to Middle Band for profitable R:R');
+      } else if (touchesLower) {
+        if (rsi > 40) failedConditions.push(`RSI (${rsi.toFixed(1)}) is above 40 threshold`);
+        if (!regimeOk) failedConditions.push('Market regime indicates strong trend risk');
       }
 
-      const isSellReversalCandidate = (touchesUpper && rsi >= 55 && regimeOk) || mod === 1;
+      // Sell Reversal Condition
+      const isSellReversalCandidate = touchesUpper && rsi >= 60 && regimeOk;
       let isSellConfirmed = false;
-      if (isSellReversalCandidate && sufficientRewardSell) {
+      if (isSellReversalCandidate && close < upperBand && sufficientRewardSell) {
         isSellConfirmed = true;
-        passedConditions.push('Upper Bollinger Band touch with bearish rejection upper wick');
-        passedConditions.push(`RSI overbought (${rsi.toFixed(1)})`);
-        passedConditions.push('Sufficient distance to Middle Band for 1:1.5+ R:R');
+        passedConditions.push('Price touched/penetrated Upper Bollinger Band and closed back inside');
+        passedConditions.push(`RSI overbought (${rsi.toFixed(1)} >= 60)`);
+        passedConditions.push('Sufficient distance to Middle Band for profitable R:R');
+      } else if (touchesUpper) {
+        if (rsi < 60) failedConditions.push(`RSI (${rsi.toFixed(1)}) is below 60 threshold`);
+        if (!regimeOk) failedConditions.push('Market regime indicates strong trend risk');
       }
 
-      let score = 55;
+      // Confidence Score
+      let score = 50;
       if (marketRegime === 'RANGE_BOUND') score += 20;
-      else if (marketRegime === 'UNCERTAIN') score += 10;
-      if (touchesLower || touchesUpper || mod <= 1) score += 20;
+      if (touchesLower || touchesUpper) score += 15;
       if (isBuyConfirmed || isSellConfirmed) score += 15;
-      if (rsi <= 38 || rsi >= 62) score += 10;
-      if (volumeRatio >= 1.2) score += 10;
-      const confidenceScore = Math.min(98, Math.max(68, score));
+      if (rsi <= 35 || rsi >= 65) score += 10;
+      const confidenceScore = Math.min(98, Math.max(40, score));
 
       let signalState: 'BUY' | 'SELL' | 'WAIT' | 'NO_TRADE' = 'NO_TRADE';
-      if (isBuyConfirmed) signalState = 'BUY';
-      else if (isSellConfirmed) signalState = 'SELL';
+      if (isBuyConfirmed && confidenceScore >= 70) signalState = 'BUY';
+      else if (isSellConfirmed && confidenceScore >= 70) signalState = 'SELL';
       else if (touchesLower || touchesUpper) signalState = 'WAIT';
-      else signalState = mod === 2 ? 'BUY' : mod === 3 ? 'SELL' : 'WAIT';
-
-      const touchTimes = ['10:00 - 10:15', '10:30 - 10:45', '11:15 - 11:30', '12:00 - 12:15', '01:15 - 01:30', '02:00 - 02:15'];
-      const rejTimes = ['10:15 - 10:30', '10:45 - 11:00', '11:30 - 11:45', '12:15 - 12:30', '01:30 - 01:45', '02:15 - 02:30'];
-      const bandTouchTime = touchTimes[hash % touchTimes.length];
-      const rejectionTime = rejTimes[hash % rejTimes.length];
-      const confirmationTime = rejectionTime.split(' - ')[1] || '11:00 AM';
+      else signalState = 'NO_TRADE';
 
       const entryPrice = close;
       const stopLoss = signalState === 'BUY' ? low - (atr * 0.5) : (signalState === 'SELL' ? high + (atr * 0.5) : close);
@@ -187,16 +181,13 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
       const target1 = middleBand;
       const target2 = signalState === 'BUY' ? upperBand : lowerBand;
       const reward = Math.abs(target1 - entryPrice);
-      const rrRatio = risk > 0 ? `1:${(reward / risk).toFixed(1)}` : '1:1.8';
+      const rrRatio = risk > 0 ? `1:${(reward / risk).toFixed(1)}` : '1:1.5';
 
       const isWatched = bbWatchlist.includes(stock.symbol);
+      const confirmationTime = '11:15 AM';
 
       return {
         ...stock,
-        closePrice: close,
-        openPrice: open,
-        highPrice: high,
-        lowPrice: low,
         middleBand: Math.round(middleBand * 100) / 100,
         upperBand: Math.round(upperBand * 100) / 100,
         lowerBand: Math.round(lowerBand * 100) / 100,
@@ -207,8 +198,8 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
         marketRegime,
         signalState,
         confidenceScore,
-        bandTouchTime,
-        rejectionTime,
+        bandTouchTime: '10:45 AM',
+        rejectionTime: '11:00 AM',
         confirmationTime,
         entryPrice: Math.round(entryPrice * 100) / 100,
         stopLoss: Math.round(stopLoss * 100) / 100,
@@ -441,12 +432,17 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
         }
 
         if (filteredBbStocks.length === 0) {
+          const hasFetchedAny = stocks.some(s => s.isFetched);
           return (
             <div className="bg-slate-900 rounded-2xl p-12 text-center border border-slate-800 text-slate-400 space-y-3">
-              <AlertCircle className="w-10 h-10 text-slate-600 mx-auto" />
-              <h3 className="text-lg font-bold text-white">No Stocks Found</h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                No stocks currently match this Bollinger Mean Reversal filter configuration.
+              <AlertCircle className="w-10 h-10 text-indigo-400 mx-auto" />
+              <h3 className="text-lg font-bold text-white">
+                {hasFetchedAny ? 'No Matching Stocks' : 'No Data Loaded From Dhan API'}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                {hasFetchedAny 
+                  ? 'No stocks currently match this Bollinger Mean Reversal filter configuration.' 
+                  : 'Bollinger Band Mean Reversal data is empty. Click "Fetch Market Universe" or "Simulate All" from the top header to retrieve live data from Dhan API and populate signals.'}
               </p>
             </div>
           );
