@@ -155,6 +155,7 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
 
       const hitTimes = ['09:45 AM', '10:15 AM', '10:45 AM', '11:15 AM', '11:45 AM', '01:15 PM', '02:00 PM', '02:30 PM'];
       let hash = 0;
+      const sym = stock.symbol || 'STOCK';
       for (let i = 0; i < sym.length; i++) hash += sym.charCodeAt(i);
       const confirmationTime = hitTimes[hash % hitTimes.length];
 
@@ -494,19 +495,20 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
               else if (isSell) badgeText = '🔴 SELL REVERSAL';
               else if (isWait) badgeText = '⏳ BAND TOUCH (WAIT)';
 
+              const timeHeaderLabel = isBuy ? '🟢 BUY SIGNAL TIME' : isSell ? '🔴 SELL SIGNAL TIME' : '⏳ BAND TOUCH (WAIT TIME)';
+              const timeSpanClass = 'text-3xl font-black font-mono tracking-wider block ' + (isBuy ? 'text-emerald-400 animate-pulse' : isSell ? 'text-rose-400 animate-pulse' : 'text-amber-400 animate-pulse');
+              const cardClassName = cardBorder + ' rounded-2xl border-2 transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-2xl';
+
               return (
                 <div
                   key={stock.symbol}
-                  onClick={() => {
-                    window.open('https://tv.dhan.co', '_blank');
-                    onSelectStockDetail(stock);
-                  }}
-                  className={`rounded-2xl border-2 transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-2xl ${cardBorder}`}
+                  onClick={() => onSelectStockDetail(stock)}
+                  className="rounded-2xl border-2 transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-2xl bg-slate-900 border-slate-800"
                 >
                   {/* Header */}
                   <div className="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className={`text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-wider ${badgeClass}`}>
+                      <span className={'text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-wider ' + badgeClass}>
                         {badgeText}
                       </span>
                       <span className="text-xs font-mono font-bold text-indigo-300 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/50">
@@ -534,7 +536,7 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
                     </div>
                     <div className="text-right">
                       <div className="text-base font-black text-white">₹{formattedPrice}</div>
-                      <div className={`text-xs font-bold ${pctColor}`}>
+                      <div className={'text-xs font-bold ' + pctColor}>
                         {formattedPct}
                       </div>
                     </div>
@@ -576,9 +578,9 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
                         {/* Big Font Time Display */}
                         <div className="text-center bg-slate-950/90 py-3 px-3 rounded-xl border-2 border-indigo-500/60 shadow-lg">
                           <div className="text-[10px] uppercase font-bold text-indigo-300 tracking-widest mb-0.5">
-                            {isBuy ? '🟢 BUY SIGNAL TIME' : isSell ? '🔴 SELL SIGNAL TIME' : '⏳ BAND TOUCH (WAIT TIME)'}
+                            {timeHeaderLabel}
                           </div>
-                          <span className={`text-3xl font-black font-mono tracking-wider block ${isBuy ? 'text-emerald-400 animate-pulse' : isSell ? 'text-rose-400 animate-pulse' : 'text-amber-400 animate-pulse'}`}>
+                          <span className={timeSpanClass}>
                             {stock.confirmationTime || '11:15 AM'}
                           </span>
                         </div>
@@ -606,7 +608,7 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
 
                     {/* Conditions Passed / Failed */}
                     <div className="space-y-2">
-                      {stock.passedConditions.length > 0 ? (
+                      {Array.isArray(stock.passedConditions) && stock.passedConditions.length > 0 ? (
                         <div className="bg-emerald-950/30 border border-emerald-500/30 p-2.5 rounded-xl text-[11px] text-emerald-200 space-y-1">
                           <strong className="text-emerald-400 block font-bold">Passed Conditions:</strong>
                           <ul className="list-disc list-inside space-y-0.5 text-slate-300">
@@ -616,7 +618,7 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
                           </ul>
                         </div>
                       ) : null}
-                      {stock.failedConditions.length > 0 ? (
+                      {Array.isArray(stock.failedConditions) && stock.failedConditions.length > 0 ? (
                         <div className="bg-rose-950/30 border border-rose-500/30 p-2.5 rounded-xl text-[11px] text-rose-200 space-y-1">
                           <strong className="text-rose-400 block font-bold">Failed / Warnings:</strong>
                           <ul className="list-disc list-inside space-y-0.5 text-slate-300">
