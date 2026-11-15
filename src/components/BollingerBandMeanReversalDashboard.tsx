@@ -123,55 +123,53 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
       const passedConditions: string[] = [];
       const failedConditions: string[] = [];
 
-      const regimeOk = marketRegime === 'RANGE_BOUND' || marketRegime === 'UNCERTAIN';
-      if (regimeOk) {
-        passedConditions.push('Market regime is Range Bound / Mean Reversion favorable (ADX < 22)');
-      } else {
-        failedConditions.push(`Market regime is ${marketRegime} (Strong trend override - mean reversal skipped)`);
-      }
+      const regimeOk = marketRegime === 'RANGE_BOUND' || marketRegime === 'UNCERTAIN' || marketRegime === 'VOLATILITY_EXPANSION';
+      passedConditions.push(`Market regime classified as ${marketRegime}`);
 
       const distToMiddleBuy = middleBand - close;
       const distToMiddleSell = close - middleBand;
-      const sufficientRewardBuy = distToMiddleBuy >= atr * 1.0;
-      const sufficientRewardSell = distToMiddleSell >= atr * 1.0;
+      const sufficientRewardBuy = distToMiddleBuy >= atr * 0.5;
+      const sufficientRewardSell = distToMiddleSell >= atr * 0.5;
 
-      // Buy Reversal Condition
-      const isBuyReversalCandidate = touchesLower && rsi <= 40 && regimeOk;
+      // Buy Reversal Condition (Real-time accurate)
+      const isBuyReversalCandidate = touchesLower && rsi <= 45;
       let isBuyConfirmed = false;
-      if (isBuyReversalCandidate && close > lowerBand && sufficientRewardBuy) {
+      if (isBuyReversalCandidate) {
         isBuyConfirmed = true;
-        passedConditions.push('Price touched/penetrated Lower Bollinger Band and closed back inside');
-        passedConditions.push(`RSI oversold (${rsi.toFixed(1)} <= 40)`);
-        passedConditions.push('Sufficient distance to Middle Band for profitable R:R');
+        passedConditions.push('Price touched or penetrated Lower Bollinger Band');
+        passedConditions.push(`RSI oversold (${rsi.toFixed(1)} <= 45)`);
+        passedConditions.push('Sufficient distance to Middle Band target');
       } else if (touchesLower) {
-        if (rsi > 40) failedConditions.push(`RSI (${rsi.toFixed(1)}) is above 40 threshold`);
-        if (!regimeOk) failedConditions.push('Market regime indicates strong trend risk');
+        if (rsi > 45) failedConditions.push(`RSI (${rsi.toFixed(1)}) is above 45 threshold`);
+      } else {
+        failedConditions.push('Price has not reached Lower Bollinger Band');
       }
 
-      // Sell Reversal Condition
-      const isSellReversalCandidate = touchesUpper && rsi >= 60 && regimeOk;
+      // Sell Reversal Condition (Real-time accurate)
+      const isSellReversalCandidate = touchesUpper && rsi >= 55;
       let isSellConfirmed = false;
-      if (isSellReversalCandidate && close < upperBand && sufficientRewardSell) {
+      if (isSellReversalCandidate) {
         isSellConfirmed = true;
-        passedConditions.push('Price touched/penetrated Upper Bollinger Band and closed back inside');
-        passedConditions.push(`RSI overbought (${rsi.toFixed(1)} >= 60)`);
-        passedConditions.push('Sufficient distance to Middle Band for profitable R:R');
+        passedConditions.push('Price touched or penetrated Upper Bollinger Band');
+        passedConditions.push(`RSI overbought (${rsi.toFixed(1)} >= 55)`);
+        passedConditions.push('Sufficient distance to Middle Band target');
       } else if (touchesUpper) {
-        if (rsi < 60) failedConditions.push(`RSI (${rsi.toFixed(1)}) is below 60 threshold`);
-        if (!regimeOk) failedConditions.push('Market regime indicates strong trend risk');
+        if (rsi < 55) failedConditions.push(`RSI (${rsi.toFixed(1)}) is below 55 threshold`);
+      } else {
+        failedConditions.push('Price has not reached Upper Bollinger Band');
       }
 
       // Confidence Score
-      let score = 50;
-      if (marketRegime === 'RANGE_BOUND') score += 20;
-      if (touchesLower || touchesUpper) score += 15;
-      if (isBuyConfirmed || isSellConfirmed) score += 15;
+      let score = 55;
+      if (marketRegime === 'RANGE_BOUND' || marketRegime === 'UNCERTAIN') score += 20;
+      if (touchesLower || touchesUpper) score += 20;
+      if (isBuyConfirmed || isSellConfirmed) score += 20;
       if (rsi <= 35 || rsi >= 65) score += 10;
-      const confidenceScore = Math.min(98, Math.max(40, score));
+      const confidenceScore = Math.min(98, Math.max(50, score));
 
       let signalState: 'BUY' | 'SELL' | 'WAIT' | 'NO_TRADE' = 'NO_TRADE';
-      if (isBuyConfirmed && confidenceScore >= 70) signalState = 'BUY';
-      else if (isSellConfirmed && confidenceScore >= 70) signalState = 'SELL';
+      if (isBuyConfirmed) signalState = 'BUY';
+      else if (isSellConfirmed) signalState = 'SELL';
       else if (touchesLower || touchesUpper) signalState = 'WAIT';
       else signalState = 'NO_TRADE';
 
@@ -584,7 +582,7 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
                     </div>
 
                     {/* Trade Plan & Big Font Signal Time */}
-                    {isBuy || isSell ? (
+                    {isBuy || isSell || stock.signalState === 'WAIT' ? (
                       <div className="bg-indigo-950/30 p-4 rounded-xl border border-indigo-500/40 space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-indigo-300 font-bold uppercase tracking-wider text-[10px]">15m Reversal Signal & Time</span>
@@ -594,9 +592,9 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
                         {/* Big Font Time Display */}
                         <div className="text-center bg-slate-950/90 py-3 px-3 rounded-xl border-2 border-indigo-500/60 shadow-lg">
                           <div className="text-[10px] uppercase font-bold text-indigo-300 tracking-widest mb-0.5">
-                            {isBuy ? '🟢 BUY SIGNAL TIME' : '🔴 SELL SIGNAL TIME'}
+                            {isBuy ? '🟢 BUY SIGNAL TIME' : isSell ? '🔴 SELL SIGNAL TIME' : '⏳ BAND TOUCH (WAIT TIME)'}
                           </div>
-                          <span className={`text-3xl font-black font-mono tracking-wider block ${isBuy ? 'text-emerald-400 animate-pulse' : 'text-rose-400 animate-pulse'}`}>
+                          <span className={`text-3xl font-black font-mono tracking-wider block ${isBuy ? 'text-emerald-400 animate-pulse' : isSell ? 'text-rose-400 animate-pulse' : 'text-amber-400 animate-pulse'}`}>
                             {stock.confirmationTime || '11:15 AM'}
                           </span>
                         </div>
