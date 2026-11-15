@@ -171,11 +171,7 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
 
       const confidenceScore = Math.min(98, Math.max(70, 65 + Math.round(Math.abs(rsi - 50))));
 
-      const hitTimes = ['09:45 AM', '10:15 AM', '10:45 AM', '11:15 AM', '11:45 AM', '01:15 PM', '02:00 PM', '02:30 PM'];
-      let hash = 0;
-      const sym = stock.symbol || 'STOCK';
-      for (let i = 0; i < sym.length; i++) hash += sym.charCodeAt(i);
-      const confirmationTime = hitTimes[hash % hitTimes.length];
+      const confirmationTime = stock.candleTimestamp || (isBuy ? '10:15 AM' : isSell ? '02:00 PM' : '11:30 AM');
 
       const entryPrice = close;
       const stopLoss = signalState === 'BUY' ? low - (atr * 0.5) : (signalState === 'SELL' ? high + (atr * 0.5) : close);
