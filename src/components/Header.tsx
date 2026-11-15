@@ -1,5 +1,5 @@
 import React from 'react';
-import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp, BarChart2, BarChart3, Star } from 'lucide-react';
+import { Key, Calculator, Download, Upload, RefreshCw, ShieldCheck, Calendar, Lock, Clock, PauseCircle, PlayCircle, Zap, Moon, Target, Compass, Flame, TrendingUp, BarChart2, BarChart3, Star, Activity } from 'lucide-react';
 import { DhanApiCredentials } from '../types';
 
 interface HeaderProps {
@@ -16,8 +16,8 @@ interface HeaderProps {
   onFetchAll: () => void;
   onDateChange: (newDate: string) => void;
   onLock?: () => void;
-  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks' | 'cpr_scanner';
-  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks' | 'cpr_scanner') => void;
+  activeDashboardTab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks' | 'cpr_scanner' | 'bb_mean_reversal';
+  onChangeDashboardTab: (tab: 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'timing_quality' | 'orb_breakout' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks' | 'cpr_scanner' | 'bb_mean_reversal') => void;
   // Auto-Fetch Props
   isAutoFetchEnabled?: boolean;
   onToggleAutoFetch?: () => void;
@@ -520,6 +520,24 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>🎯 CPR Scanner Pro</span>
                 <span className="bg-gradient-to-r from-purple-400 to-indigo-400 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
                   Narrow+Reversal
+                </span>
+              </span>
+            </button>
+
+            {/* 📈 Bollinger Mean Reversal Tab */}
+            <button
+              onClick={() => onChangeDashboardTab('bb_mean_reversal')}
+              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeDashboardTab === 'bb_mean_reversal'
+                  ? 'bg-gradient-to-r from-indigo-700 via-purple-700 to-violet-700 text-white shadow-md shadow-indigo-500/30 ring-1 ring-white/30'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-indigo-50'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Activity className={`w-3.5 h-3.5 ${activeDashboardTab === 'bb_mean_reversal' ? 'text-yellow-300 animate-pulse' : 'text-indigo-600'}`} />
+                <span>📈 Bollinger Mean Reversal</span>
+                <span className="bg-gradient-to-r from-indigo-400 to-purple-400 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
+                  15m Only
                 </span>
               </span>
             </button>
