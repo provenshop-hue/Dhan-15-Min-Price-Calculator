@@ -587,25 +587,41 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
                       </div>
                     </div>
 
-                    {/* Trade Plan */}
+                    {/* Trade Plan & Big Font Signal Time */}
                     {isBuy || isSell ? (
-                      <div className="bg-indigo-950/30 p-3.5 rounded-xl border border-indigo-500/40 space-y-2">
-                        <span className="text-indigo-300 font-bold uppercase tracking-wider block text-[10px]">15m Mean Reversion Trade Plan</span>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-400">Entry Price:</span>
-                          <span className="font-bold text-white">₹{stock.entryPrice}</span>
+                      <div className="bg-indigo-950/30 p-4 rounded-xl border border-indigo-500/40 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-indigo-300 font-bold uppercase tracking-wider text-[10px]">15m Reversal Signal & Time</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Candle Close</span>
                         </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-400">Stop-Loss:</span>
-                          <span className="font-bold text-rose-400">₹{stock.stopLoss}</span>
+                        
+                        {/* Big Font Time Display */}
+                        <div className="text-center bg-slate-950/90 py-3 px-3 rounded-xl border-2 border-indigo-500/60 shadow-lg">
+                          <div className="text-[10px] uppercase font-bold text-indigo-300 tracking-widest mb-0.5">
+                            {isBuy ? '🟢 BUY SIGNAL TIME' : '🔴 SELL SIGNAL TIME'}
+                          </div>
+                          <span className={`text-3xl font-black font-mono tracking-wider block ${isBuy ? 'text-emerald-400 animate-pulse' : 'text-rose-400 animate-pulse'}`}>
+                            {stock.confirmationTime || '11:15 AM'}
+                          </span>
                         </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-400">Target 1 (Middle Band):</span>
-                          <span className="font-bold text-emerald-400">₹{stock.target1}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-400">Risk / Reward:</span>
-                          <span className="font-bold text-amber-300">{stock.rrRatio}</span>
+
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400">Entry Price:</span>
+                            <span className="font-bold text-white">₹{stock.entryPrice}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400">Stop-Loss:</span>
+                            <span className="font-bold text-rose-400">₹{stock.stopLoss}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400">Target 1 (Middle Band):</span>
+                            <span className="font-bold text-emerald-400">₹{stock.target1}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400">Risk / Reward:</span>
+                            <span className="font-bold text-amber-300">{stock.rrRatio}</span>
+                          </div>
                         </div>
                       </div>
                     ) : null}
