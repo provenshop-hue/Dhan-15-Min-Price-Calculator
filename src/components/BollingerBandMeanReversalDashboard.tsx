@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { StockCalculated } from '../types';
+import { roundToExactNseStrike, getExactNseStrikeStep, formatStrikePrice } from '../utils/nseStrikeMaster';
 import { SectorDominanceBadgesBar } from './SectorDominanceBadgesBar';
 import { 
   Target, 
@@ -176,6 +177,16 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
 
       const isWatched = bbWatchlist.includes(stock.symbol);
 
+      const optionType = signalState === 'BUY' ? 'CE' : (signalState === 'SELL' ? 'PE' : 'CE');
+      const strikeStep = getExactNseStrikeStep(stock.symbol, close);
+      const atmStrike = roundToExactNseStrike(close, stock.symbol);
+      const itmStrike = signalState === 'BUY' ? atmStrike - strikeStep : atmStrike + strikeStep;
+      const otmStrike = signalState === 'BUY' ? atmStrike + strikeStep : atmStrike - strikeStep;
+
+      const recommendedContract = `${stock.symbol} ${formatStrikePrice(atmStrike)} ${optionType}`;
+      const itmContract = `${stock.symbol} ${formatStrikePrice(itmStrike)} ${optionType}`;
+      const otmContract = `${stock.symbol} ${formatStrikePrice(otmStrike)} ${optionType}`;
+
       return {
         ...stock,
         middleBand: Math.round(middleBand * 100) / 100,
@@ -198,7 +209,13 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
         rrRatio,
         passedConditions,
         failedConditions,
-        isWatched
+        isWatched,
+        optionType,
+        strikeStep,
+        atmStrike,
+        recommendedContract,
+        itmContract,
+        otmContract
       };
     });
   }, [stocks, bbWatchlist]);
@@ -632,6 +649,40 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
                             <span className="font-bold text-amber-300">{stock.rrRatio}</span>
                           </div>
                         </div>
+
+                        {/* Best Option Strike Suggestion */}
+                        {(isBuy || isSell) && stock.recommendedContract && (
+                          <div className="bg-slate-950 p-3.5 rounded-xl border border-indigo-500/40 space-y-2 mt-2 pt-2 border-t border-indigo-500/20">
+                            <div className="flex items-center justify-between">
+                              <span className="text-amber-300 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                                <span>🎯 Best Option Strike Suggestion</span>
+                              </span>
+                              <span className="text-[10px] font-mono font-bold bg-indigo-900/60 text-indigo-200 px-2 py-0.5 rounded uppercase">
+                                {stock.optionType} Options
+                              </span>
+                            </div>
+                            <div className="bg-indigo-950/50 p-2.5 rounded-lg border border-indigo-500/30 flex items-center justify-between font-mono">
+                              <div>
+                                <span className="text-[10px] text-slate-400 block">Recommended ATM Contract</span>
+                                <strong className="text-white text-xs font-black">{stock.recommendedContract}</strong>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-[10px] text-slate-400 block">Strike Step</span>
+                                <span className="text-indigo-300 font-bold">₹{stock.strikeStep}</span>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                              <div className="bg-slate-900 p-2 rounded border border-slate-800">
+                                <span className="text-slate-400 block text-[10px]">ITM Strike (Higher Delta):</span>
+                                <span className="text-emerald-300 font-bold">{stock.itmContract}</span>
+                              </div>
+                              <div className="bg-slate-900 p-2 rounded border border-slate-800">
+                                <span className="text-slate-400 block text-[10px]">OTM Strike (Lower Cost):</span>
+                                <span className="text-amber-300 font-bold">{stock.otmContract}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : null}
 
