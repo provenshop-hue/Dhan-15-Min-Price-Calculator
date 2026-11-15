@@ -134,17 +134,17 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
       let signalState: 'BUY' | 'SELL' | 'WAIT' | 'NO_TRADE' = 'NO_TRADE';
       if (isBuyCandidate && rsi <= 52) {
         signalState = 'BUY';
-        passedConditions.push('Price approached or tested Lower Bollinger Band / Support');
+        passedConditions.push('🟢 Lower Band Bullish Reversal Trigger Met (Price dipped to Lower Band Support & bouncing toward Middle Band)');
         passedConditions.push(`RSI confirmation (${rsi.toFixed(1)} <= 52)`);
         passedConditions.push('Sufficient upside room to Middle Band target');
       } else if (isSellCandidate && rsi >= 48) {
         signalState = 'SELL';
-        passedConditions.push('Price approached or tested Upper Bollinger Band / Resistance');
+        passedConditions.push('🔴 Upper Band Bearish Reversal Trigger Met (Price spiked to Upper Band Resistance & retreating toward Middle Band)');
         passedConditions.push(`RSI confirmation (${rsi.toFixed(1)} >= 48)`);
         passedConditions.push('Sufficient downside room to Middle Band target');
       } else {
         signalState = 'WAIT';
-        failedConditions.push('Price consolidating near Bollinger Middle Band');
+        failedConditions.push('⏳ Price consolidating near Bollinger Middle Band (Waiting for Band Touch & Reversal)');
       }
 
       const isBuy = signalState === 'BUY';
@@ -272,6 +272,28 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
             <span className="text-slate-400 text-[10px] block font-sans">Range-Bound Regimes</span>
             <strong className="text-indigo-300 text-base font-black">{stats.rangeBoundCount}</strong>
+          </div>
+        </div>
+
+        {/* Trigger Rule Guide Card */}
+        <div className="bg-slate-950/90 p-4 rounded-xl border border-indigo-500/30 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-sans">
+          <div className="flex items-start space-x-2.5">
+            <span className="text-emerald-400 font-black text-base">🟢</span>
+            <div>
+              <strong className="text-emerald-400 font-bold block">BUY Reversal Trigger (Lower Band Support):</strong>
+              <p className="text-slate-300 text-[11px] mt-0.5">
+                Triggered when price tests or dips near the <strong>Lower Bollinger Band</strong> (oversold support) and begins rebounding upward toward the Middle Band (SMA 20).
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-2.5">
+            <span className="text-rose-400 font-black text-base">🔴</span>
+            <div>
+              <strong className="text-rose-400 font-bold block">SELL Reversal Trigger (Upper Band Resistance):</strong>
+              <p className="text-slate-300 text-[11px] mt-0.5">
+                Triggered when price tests or spikes near the <strong>Upper Bollinger Band</strong> (overbought resistance) and begins retreating downward toward the Middle Band (SMA 20).
+              </p>
+            </div>
           </div>
         </div>
       </div>
