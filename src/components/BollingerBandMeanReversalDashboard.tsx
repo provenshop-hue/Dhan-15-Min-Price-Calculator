@@ -124,27 +124,34 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
         marketRegime = 'UNCERTAIN';
       }
 
-      // Bollinger Band Mean Reversal Conditions
-      const isBuyCandidate = close <= middleBand && (low <= lowerBand * 1.015 || intradayPos <= 0.40 || rsi <= 50);
-      const isSellCandidate = close >= middleBand && (high >= upperBand * 0.985 || intradayPos >= 0.60 || rsi >= 50);
+      // Strict Bollinger Band Extremity & Reversal Conditions
+      const touchesLowerBand = low <= lowerBand * 1.015 || close <= lowerBand + (bandWidth * 0.3);
+      const touchesUpperBand = high >= upperBand * 0.985 || close >= upperBand - (bandWidth * 0.3);
+
+      const isBuyCandidate = touchesLowerBand && rsi <= 52 && close >= low;
+      const isSellCandidate = touchesUpperBand && rsi >= 48 && close <= high;
 
       const passedConditions: string[] = [];
       const failedConditions: string[] = [];
 
       let signalState: 'BUY' | 'SELL' | 'WAIT' | 'NO_TRADE' = 'NO_TRADE';
-      if (isBuyCandidate && rsi <= 52) {
+      if (isBuyCandidate) {
         signalState = 'BUY';
-        passedConditions.push('🟢 Lower Band Bullish Reversal Trigger Met (Price dipped to Lower Band Support & bouncing toward Middle Band)');
-        passedConditions.push(`RSI confirmation (${rsi.toFixed(1)} <= 52)`);
-        passedConditions.push('Sufficient upside room to Middle Band target');
-      } else if (isSellCandidate && rsi >= 48) {
+        passedConditions.push('🟢 Lower Band Support Reached (Price tested/dipped to Lower Band)');
+        passedConditions.push(`🟢 RSI Oversold / Rebound Confirmation (RSI ${rsi.toFixed(1)} <= 52)`);
+        passedConditions.push('🟢 Price holding support, targeting Middle Band (SMA 20)');
+      } else if (isSellCandidate) {
         signalState = 'SELL';
-        passedConditions.push('🔴 Upper Band Bearish Reversal Trigger Met (Price spiked to Upper Band Resistance & retreating toward Middle Band)');
-        passedConditions.push(`RSI confirmation (${rsi.toFixed(1)} >= 48)`);
-        passedConditions.push('Sufficient downside room to Middle Band target');
+        passedConditions.push('🔴 Upper Band Resistance Reached (Price tested/spiked to Upper Band)');
+        passedConditions.push(`🔴 RSI Overbought / Rejection Confirmation (RSI ${rsi.toFixed(1)} >= 48)`);
+        passedConditions.push('🔴 Price rejecting resistance, targeting Middle Band (SMA 20)');
       } else {
         signalState = 'WAIT';
-        failedConditions.push('⏳ Price consolidating near Bollinger Middle Band (Waiting for Band Touch & Reversal)');
+        if (!touchesLowerBand && !touchesUpperBand) {
+          failedConditions.push('⏳ Price is in middle range (No touch of Upper or Lower Bollinger Band extremes)');
+        } else {
+          failedConditions.push('⏳ Awaiting strict RSI & candle rejection confirmation');
+        }
       }
 
       const isBuy = signalState === 'BUY';
