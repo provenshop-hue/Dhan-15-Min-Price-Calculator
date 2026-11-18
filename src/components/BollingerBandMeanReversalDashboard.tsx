@@ -500,12 +500,19 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
               }
 
               let cardBorder = 'bg-slate-900 border-slate-800';
-              if (isBuy) {
-                cardBorder = 'bg-slate-900 border-emerald-500';
-              } else if (isSell) {
-                cardBorder = 'bg-slate-900 border-rose-500';
-              } else if (isWait) {
-                cardBorder = 'bg-slate-900 border-amber-500';
+              switch (stock.signalState) {
+                case 'BUY':
+                  cardBorder = 'bg-slate-900 border-emerald-500';
+                  break;
+                case 'SELL':
+                  cardBorder = 'bg-slate-900 border-rose-500';
+                  break;
+                case 'WAIT':
+                  cardBorder = 'bg-slate-900 border-amber-500';
+                  break;
+                default:
+                  cardBorder = 'bg-slate-900 border-slate-800';
+                  break;
               }
 
               let pctColor = 'text-rose-400';
