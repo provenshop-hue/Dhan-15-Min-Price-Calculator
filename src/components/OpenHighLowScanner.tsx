@@ -46,8 +46,20 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       // Whole-rupee decimal .0 check (mathematically divisible by 1, e.g. 190.0, 225.0)
       const isWholeRupee = Math.abs(open - Math.round(open)) < 1e-4;
 
-      const isPerfectBullish = isOpenLow && isWholeRupee && high > open && close > open;
-      const isPerfectBearish = isOpenHigh && isWholeRupee && low < open && close < open;
+      // Bollinger Bands calculation (Period 20, StdDev 2)
+      const atr = s.atr !== undefined && s.atr !== null ? s.atr : Math.max(0.1, high - low);
+      const middleBand = s.ema20 !== undefined && s.ema20 !== null ? s.ema20 : (high + low + (close * 2)) / 4;
+      const bandDev = atr * 2;
+      const upperBand = middleBand + bandDev;
+      const lowerBand = middleBand - bandDev;
+
+      const isLowerHalfBb = open <= middleBand;
+      const isHigherHalfBb = open >= middleBand;
+
+      // Perfect Bullish: Open = Low, decimal .0, High > Open, Close > Open, and opened in the lower half of Bollinger Band
+      const isPerfectBullish = isOpenLow && isWholeRupee && high > open && close > open && isLowerHalfBb;
+      // Perfect Bearish: Open = High, decimal .0, Low < Open, Close < Open, and opened in the higher half of Bollinger Band
+      const isPerfectBearish = isOpenHigh && isWholeRupee && low < open && close < open && isHigherHalfBb;
       
       if (!isOpenLow && !isOpenHigh && !isPerfectBullish && !isPerfectBearish) return null;
       
@@ -72,6 +84,11 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
         high,
         low,
         close,
+        middleBand,
+        upperBand,
+        lowerBand,
+        isLowerHalfBb,
+        isHigherHalfBb,
         strategyType,
         difference,
         isWholeRupee,
@@ -128,7 +145,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       <SectorDominanceBadgesBar 
         stocks={stocks} 
         onSelectStock={(stk) => onSelectStockDetail(stk)} 
-        title="🏢 Open = High / Low & Whole-Rupee Sector Dominance"
+        title="🏢 Open = High / Low, Whole-Rupee & Bollinger Band Sector Dominance"
       />
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden">
@@ -139,12 +156,13 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
             <div className="p-2 bg-cyan-500/20 text-cyan-400 rounded-xl">
               <Zap className="w-5 h-5" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Open = High / Low & Whole-Rupee (.0) Scanner</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Open = High / Low & Bollinger Band Filter Hub</h1>
           </div>
           <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
-            Identifies stocks where the first 15-minute candle open matches High or Low, including <strong className="text-emerald-400">Perfect Bullish (.0)</strong> and <strong className="text-rose-400">Perfect Bearish (.0)</strong> whole-rupee alignment candidates.
+            Identifies stocks where Open matches High or Low with whole-rupee decimal (.0) alignment.
             <br />
-            Prices are validated to exactly 1 decimal place format (e.g. 190.0, 225.0).
+            <strong className="text-emerald-400">Perfect Bullish (.0)</strong> requires opening in the <strong className="text-white">lower half of Bollinger Band</strong>.
+            <strong className="text-rose-400 ml-1">Perfect Bearish (.0)</strong> requires opening in the <strong className="text-white">higher half of Bollinger Band</strong>.
           </p>
         </div>
 
@@ -172,21 +190,23 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
              </div>
              <div>
                <div className="text-emerald-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-1">
-                 <Zap className="w-3 h-3"/> {topRecommendation.isPerfectBullish ? 'Perfect Bullish Whole-Rupee Pick' : 'AI Algorithmic Top Pick'}
+                 <Zap className="w-3 h-3"/> {topRecommendation.isPerfectBullish ? 'Perfect Bullish (.0) + BB Lower Half Pick' : 'AI Algorithmic Top Pick'}
                </div>
                <h2 className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">{topRecommendation.symbol}</h2>
                <p className="text-slate-300 mt-1">
-                 {topRecommendation.isPerfectBullish ? 'Perfect Open=Low with exact whole-rupee .0 alignment.' : 'Exceptional Open=Low candidate.'}
+                 {topRecommendation.isPerfectBullish ? 'Perfect Open=Low (.0) in Lower Bollinger Band.' : 'Exceptional Open=Low candidate.'}
                  <strong className="text-emerald-300 ml-1">₹{topRecommendation.difference.toFixed(1)}</strong> variance.
                </p>
                <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-mono text-slate-300 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-emerald-500/20">
                  <span>Open: <strong className="text-white">₹{topRecommendation.open.toFixed(1)}</strong></span>
                  <span className="text-slate-600">•</span>
+                 <span>BB Middle: <strong className="text-amber-400">₹{topRecommendation.middleBand.toFixed(1)}</strong></span>
+                 <span className="text-slate-600">•</span>
                  <span>High: <strong className="text-rose-400">₹{topRecommendation.high.toFixed(1)}</strong></span>
                  <span className="text-slate-600">•</span>
                  <span>Low: <strong className="text-emerald-400">₹{topRecommendation.low.toFixed(1)}</strong></span>
                  <span className="text-slate-600">•</span>
-                 <span>Close/LTP: <strong className="text-blue-400">₹{topRecommendation.close.toFixed(1)}</strong></span>
+                 <span>Close: <strong className="text-blue-400">₹{topRecommendation.close.toFixed(1)}</strong></span>
                </div>
              </div>
            </div>
@@ -215,7 +235,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
           }`}
         >
           <TrendingUp className="w-4 h-4 text-emerald-400" />
-          <span>PERFECT BULLISH (.0) – Open = Low ({perfectBullishCount})</span>
+          <span>PERFECT BULLISH (.0 + BB Lower) ({perfectBullishCount})</span>
         </button>
         <button
           onClick={() => setFilterType('PERFECT_BEARISH')}
@@ -226,7 +246,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
           }`}
         >
           <TrendingDown className="w-4 h-4 text-rose-400" />
-          <span>PERFECT BEARISH (.0) – Open = High ({perfectBearishCount})</span>
+          <span>PERFECT BEARISH (.0 + BB Higher) ({perfectBearishCount})</span>
         </button>
         <button
           onClick={() => setFilterType('OPEN_LOW')}
@@ -303,22 +323,33 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
               </div>
 
               {/* Strategy Badge & Classification */}
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-3">
                 {isPerfect && (
-                  <div className={`border rounded-xl p-3 text-center mb-1 ${
+                  <div className={`border rounded-xl p-2.5 text-center mb-1 ${
                     stock.strategyType === 'PERFECT_BULLISH' 
                       ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' 
                       : 'bg-rose-500/20 border-rose-500/50 text-rose-400'
                   }`}>
-                    <p className="font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4" />
-                      {stock.strategyType === 'PERFECT_BULLISH' ? 'PERFECT BULLISH – WHOLE-RUPEE ALIGNMENT' : 'PERFECT BEARISH – WHOLE-RUPEE ALIGNMENT'}
+                    <p className="font-black text-[11px] uppercase tracking-wider flex items-center justify-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {stock.strategyType === 'PERFECT_BULLISH' ? 'PERFECT BULLISH (.0) + BB LOWER' : 'PERFECT BEARISH (.0) + BB HIGHER'}
                     </p>
                     <p className="text-[10px] font-mono mt-0.5 opacity-90">
-                      Open: ₹{stock.open.toFixed(1)} (Exact .0 Whole-Rupee)
+                      Open: ₹{stock.open.toFixed(1)} • BB Mid: ₹{stock.middleBand.toFixed(1)}
                     </p>
                   </div>
                 )}
+
+                <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-mono font-bold ${
+                  stock.strategyType === 'PERFECT_BULLISH' || (stock.strategyType === 'OPEN_LOW' && stock.isLowerHalfBb)
+                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                    : stock.strategyType === 'PERFECT_BEARISH' || (stock.strategyType === 'OPEN_HIGH' && stock.isHigherHalfBb)
+                      ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                }`}>
+                  <span>Bollinger Band Half:</span>
+                  <span>{stock.isLowerHalfBb ? '🟢 Lower Half (<= Mid)' : '🔴 Higher Half (> Mid)'}</span>
+                </div>
 
                 <div className={`p-3 rounded-xl border flex items-center gap-3 ${
                   isBull ? 'bg-emerald-950/30 border-emerald-500/30' : 'bg-rose-950/30 border-rose-500/30'
@@ -336,18 +367,6 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                       Difference: ₹{stock.difference.toFixed(1)} {stock.isWholeRupee ? '• Whole-Rupee (.0)' : ''}
                     </p>
                   </div>
-                </div>
-
-                {/* Previous Day High Status Indicator */}
-                <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-mono font-bold ${
-                  stock.opensAbovePrevHigh 
-                    ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
-                    : 'bg-slate-950/60 border-slate-800 text-slate-400'
-                }`}>
-                  <span>Prev Day High:</span>
-                  <span className={stock.opensAbovePrevHigh ? 'text-emerald-400 font-black' : 'text-slate-400'}>
-                    {stock.opensAbovePrevHigh ? '🟢 Opened Above Prev High' : '⚪ Opened Below Prev High'}
-                  </span>
                 </div>
 
                 {/* Open, High, Low, Close (OHLC) Metrics Bar (1 Decimal Place) */}
@@ -438,7 +457,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
           <p className="text-slate-400 max-w-md mx-auto">
             {searchTerm 
               ? `No stocks matching "${searchTerm}" found in the scan.`
-              : `No stocks currently meet the selected filter criteria (${filterType}) with 1-decimal place whole-rupee alignment.`}
+              : `No stocks currently meet the selected filter criteria (${filterType}) with Bollinger Band half position and whole-rupee alignment.`}
           </p>
         </div>
       )}

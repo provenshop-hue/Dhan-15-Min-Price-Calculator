@@ -555,7 +555,7 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
                 <div
                   key={stock.symbol}
                   onClick={() => onSelectStockDetail(stock)}
-                  className="rounded-2xl border-2 transition-all cursor-pointer overflow-hidden flex flex-col hover:shadow-2xl bg-slate-900 border-slate-800"
+                  className={cardClassName}
                 >
                   {/* Header */}
                   <div className="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
