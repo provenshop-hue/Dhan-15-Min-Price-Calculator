@@ -594,17 +594,17 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 2) {
           for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 4, stock.rsiTimeline.length - 2); i++) {
             const pt = stock.rsiTimeline[i];
-            const hitSupport = isBullBreak ? (pt.low <= orbLow * 1.012 && pt.low >= orbLow * 0.985) : false;
+            const hitSupport = pt.low <= orbLow * 1.012 && pt.low >= orbLow * 0.985;
+            const hitResistance = pt.high >= orbHigh * 0.988 && pt.high <= orbHigh * 1.015;
 
             if (hitSupport) {
               const nextPt = stock.rsiTimeline[i + 1];
               const cleanBounce = nextPt.close > pt.close && nextPt.close >= orbLow * 1.002;
 
               if (cleanBounce) {
-                // NO REVERSAL CHECK: Ensure ALL subsequent candles after support touch never broke below support or turned negative
                 let zeroReversalAfterTouch = true;
                 for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
-                  if (stock.rsiTimeline[k].close < orbLow * 0.998 || stock.rsiTimeline[k].close < stock.rsiTimeline[i+1].close * 0.995) {
+                  if (stock.rsiTimeline[k].close < orbLow * 0.998) {
                     zeroReversalAfterTouch = false;
                     break;
                   }
@@ -613,15 +613,36 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 const endPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
                 const expansionPct = Math.round(((endPt.close - nextPt.close) / nextPt.close) * 100 * 100) / 100;
 
-                const isStockBearish = (stock.pctChange !== undefined && stock.pctChange < 0) || (stock.rsi !== undefined && stock.rsi < 48) || (stock.vwap !== undefined && close < stock.vwap);
-                const bounceTypeVal = isStockBearish ? 'BEARISH_SUPPORT_BOUNCE' : 'BULLISH_SUPPORT_BOUNCE';
-                const validCondition = isStockBearish ? (zeroReversalAfterTouch && Math.abs(expansionPct) >= 0.1) : (zeroReversalAfterTouch && expansionPct >= 0.1 && (stock.pctChange === undefined || stock.pctChange >= 0));
-
-                if (validCondition) {
+                if (zeroReversalAfterTouch) {
                   hasOrbLowBounce = true;
                   orbLowBounceTime = nextPt.timeStr;
-                  orbBounceType = bounceTypeVal;
+                  orbBounceType = 'BULLISH_SUPPORT_BOUNCE'; // Support bounce is Bullish Signal
                   rallyExpansionPct = Math.max(0.5, Math.abs(expansionPct));
+                  bouncePowerScore = Math.min(100, Math.round(85 + rallyExpansionPct * 10));
+                  break;
+                }
+              }
+            } else if (hitResistance) {
+              const nextPt = stock.rsiTimeline[i + 1];
+              const cleanReject = nextPt.close < pt.close;
+
+              if (cleanReject) {
+                let zeroReversalAfterTouch = true;
+                for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
+                  if (stock.rsiTimeline[k].close > orbHigh * 1.002) {
+                    zeroReversalAfterTouch = false;
+                    break;
+                  }
+                }
+
+                const endPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
+                const dropPct = Math.round(((nextPt.close - endPt.close) / nextPt.close) * 100 * 100) / 100;
+
+                if (zeroReversalAfterTouch) {
+                  hasOrbLowBounce = true;
+                  orbLowBounceTime = nextPt.timeStr;
+                  orbBounceType = 'BEARISH_SUPPORT_BOUNCE'; // Resistance rejection is Bearish Signal
+                  rallyExpansionPct = Math.max(0.5, Math.abs(dropPct));
                   bouncePowerScore = Math.min(100, Math.round(85 + rallyExpansionPct * 10));
                   break;
                 }

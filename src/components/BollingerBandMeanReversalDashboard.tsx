@@ -501,11 +501,11 @@ export const BollingerBandMeanReversalDashboard: React.FC<BollingerBandMeanRever
 
               let cardBorder = 'bg-slate-900 border-slate-800';
               if (isBuy) {
-                cardBorder = 'bg-slate-900 border-emerald-500 ring-4 ring-emerald-500/20 shadow-emerald-500/20';
+                cardBorder = 'bg-slate-900 border-emerald-500';
               } else if (isSell) {
-                cardBorder = 'bg-slate-900 border-rose-500 ring-4 ring-rose-500/20 shadow-rose-500/20';
+                cardBorder = 'bg-slate-900 border-rose-500';
               } else if (isWait) {
-                cardBorder = 'bg-slate-900 border-amber-500 ring-2 ring-amber-500/20';
+                cardBorder = 'bg-slate-900 border-amber-500';
               }
 
               let pctColor = 'text-rose-400';
