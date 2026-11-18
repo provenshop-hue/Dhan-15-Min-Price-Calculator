@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   Search,
   Filter,
-  Cpu
+  Cpu,
+  CheckCircle2
 } from 'lucide-react';
 
 interface Props {
@@ -21,57 +22,71 @@ interface Props {
 
 export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPositionSizer }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'ALL' | 'OPEN_LOW' | 'OPEN_HIGH'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'PERFECT_BULLISH' | 'PERFECT_BEARISH' | 'OPEN_LOW' | 'OPEN_HIGH'>('ALL');
   const [priceAbove1000, setPriceAbove1000] = useState(false);
 
   const scannedStocks = useMemo(() => {
     const list = stocks.map(s => {
-      // Use 1-minute data for precision, fallback to 15m or daily if missing
-      const open = s.first1mOpen ?? s.first15mOpen ?? s.openPrice;
-      const high = s.first1mHigh ?? s.first15mHigh ?? s.highPrice;
-      const low = s.first1mLow ?? s.first15mLow ?? s.lowPrice;
-      const close = s.closePrice ?? s.ltp ?? open;
+      // Use first completed 15-minute candle or 1-minute/daily data as fallback
+      const open = s.first15mOpen ?? s.first1mOpen ?? s.openPrice;
+      const high = s.first15mHigh ?? s.first1mHigh ?? s.highPrice;
+      const low = s.first15mLow ?? s.first1mLow ?? s.lowPrice;
+      const close = s.first15mClose ?? s.closePrice ?? s.ltp ?? open;
       
-      if (open == null || high == null || low == null) {
+      if (open == null || high == null || low == null || close == null) {
         return null;
       }
       
       const diffLow = Math.abs(open - low);
       const diffHigh = Math.abs(open - high);
       
-      // Use a percentage-based tolerance (0.15%) for high-priced stocks, or absolute 0.15 for low-priced stocks
-      const isOpenLow = (diffLow / open) * 100 <= 0.15 || diffLow <= 0.15;
-      const isOpenHigh = (diffHigh / open) * 100 <= 0.15 || diffHigh <= 0.15;
+      const isOpenLow = diffLow <= 0.15 || (diffLow / open) * 100 <= 0.15;
+      const isOpenHigh = diffHigh <= 0.15 || (diffHigh / open) * 100 <= 0.15;
       
-      if (!isOpenLow && !isOpenHigh) return null;
+      // Whole-rupee decimal .0 check (mathematically divisible by 1, e.g. 190.0, 225.0)
+      const isWholeRupee = Math.abs(open - Math.round(open)) < 1e-4;
+
+      const isPerfectBullish = isOpenLow && isWholeRupee && high > open && close > open;
+      const isPerfectBearish = isOpenHigh && isWholeRupee && low < open && close < open;
       
-      const strategyType = isOpenLow && isOpenHigh 
-        ? 'NEUTRAL' // very rare
-        : isOpenLow 
-          ? 'OPEN_LOW' 
-          : 'OPEN_HIGH';
+      if (!isOpenLow && !isOpenHigh && !isPerfectBullish && !isPerfectBearish) return null;
+      
+      const strategyType = isPerfectBullish 
+        ? 'PERFECT_BULLISH' 
+        : isPerfectBearish 
+          ? 'PERFECT_BEARISH' 
+          : isOpenLow 
+            ? 'OPEN_LOW' 
+            : 'OPEN_HIGH';
           
-      if (strategyType === 'NEUTRAL') return null;
-      
-      const difference = strategyType === 'OPEN_LOW' ? diffLow : diffHigh;
+      const difference = (strategyType === 'PERFECT_BULLISH' || strategyType === 'OPEN_LOW') ? diffLow : diffHigh;
 
       const prevDayHigh = s.previousClose ? s.previousClose * 1.01 : (open * 1.005);
       const opensAbovePrevHigh = open >= prevDayHigh;
       const closesAbovePrevHigh = close >= prevDayHigh;
-      const isTopPriorityOpenLow = strategyType === 'OPEN_LOW' && opensAbovePrevHigh && closesAbovePrevHigh;
+      const isTopPriorityOpenLow = (strategyType === 'PERFECT_BULLISH' || strategyType === 'OPEN_LOW') && opensAbovePrevHigh && closesAbovePrevHigh;
           
       return {
         ...s,
+        open,
+        high,
+        low,
+        close,
         strategyType,
         difference,
+        isWholeRupee,
+        isPerfectBullish,
+        isPerfectBearish,
         isTopPriorityOpenLow,
         opensAbovePrevHigh,
         closesAbovePrevHigh
       };
-    }).filter(Boolean) as (StockCalculated & { strategyType: 'OPEN_LOW' | 'OPEN_HIGH', difference: number, isTopPriorityOpenLow: boolean })[];
+    }).filter(Boolean) as any[];
     
-    // Sort: Top priority Open=Low (opens & closes above prev day high) first, then by difference ascending
+    // Sort: Perfect Bullish first, then top priority Open=Low, then by difference ascending
     return list.sort((a, b) => {
+      if (a.strategyType === 'PERFECT_BULLISH' && b.strategyType !== 'PERFECT_BULLISH') return -1;
+      if (a.strategyType !== 'PERFECT_BULLISH' && b.strategyType === 'PERFECT_BULLISH') return 1;
       if (a.isTopPriorityOpenLow && !b.isTopPriorityOpenLow) return -1;
       if (!a.isTopPriorityOpenLow && b.isTopPriorityOpenLow) return 1;
       return a.difference - b.difference;
@@ -82,7 +97,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
     return scannedStocks.filter(s => {
       if (filterType !== 'ALL' && s.strategyType !== filterType) return false;
       if (priceAbove1000) {
-        const currentPrice = s.closePrice || s.openPrice || 0;
+        const currentPrice = s.close || s.open || 0;
         if (currentPrice <= 1000) return false;
       }
       if (searchTerm) {
@@ -94,11 +109,15 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
     });
   }, [scannedStocks, filterType, searchTerm, priceAbove1000]);
 
+  const perfectBullishCount = scannedStocks.filter(s => s.strategyType === 'PERFECT_BULLISH').length;
+  const perfectBearishCount = scannedStocks.filter(s => s.strategyType === 'PERFECT_BEARISH').length;
   const openLowCount = scannedStocks.filter(s => s.strategyType === 'OPEN_LOW').length;
   const openHighCount = scannedStocks.filter(s => s.strategyType === 'OPEN_HIGH').length;
 
-  // AI Recommendation Logic (Best Open=Low)
-  const topRecommendation = scannedStocks.filter(s => s.strategyType === 'OPEN_LOW').sort((a, b) => {
+  // AI Recommendation Logic (Best Perfect Bullish or Open=Low)
+  const topRecommendation = scannedStocks.filter(s => s.strategyType === 'PERFECT_BULLISH' || s.strategyType === 'OPEN_LOW').sort((a, b) => {
+    if (a.strategyType === 'PERFECT_BULLISH' && b.strategyType !== 'PERFECT_BULLISH') return -1;
+    if (a.strategyType !== 'PERFECT_BULLISH' && b.strategyType === 'PERFECT_BULLISH') return 1;
     if (a.isTopPriorityOpenLow && !b.isTopPriorityOpenLow) return -1;
     if (!a.isTopPriorityOpenLow && b.isTopPriorityOpenLow) return 1;
     return a.difference - b.difference || (b.volumeRatio || 0) - (a.volumeRatio || 0);
@@ -109,7 +128,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       <SectorDominanceBadgesBar 
         stocks={stocks} 
         onSelectStock={(stk) => onSelectStockDetail(stk)} 
-        title="🏢 Open = High / Low Sector Dominance & Stock Badges"
+        title="🏢 Open = High / Low & Whole-Rupee Sector Dominance"
       />
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden">
@@ -120,14 +139,12 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
             <div className="p-2 bg-cyan-500/20 text-cyan-400 rounded-xl">
               <Zap className="w-5 h-5" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Open = High / Low Scanner</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Open = High / Low & Whole-Rupee (.0) Scanner</h1>
           </div>
-          <p className="text-sm text-slate-400 max-w-xl leading-relaxed">
-            Identifies stocks where the 9:15 AM - 9:16 AM (1-minute) Open price matches the High or Low. 
-            Sorted by the <strong className="text-white">least difference</strong> between Open and High/Low.
+          <p className="text-sm text-slate-400 max-w-2xl leading-relaxed">
+            Identifies stocks where the first 15-minute candle open matches High or Low, including <strong className="text-emerald-400">Perfect Bullish (.0)</strong> and <strong className="text-rose-400">Perfect Bearish (.0)</strong> whole-rupee alignment candidates.
             <br />
-            <strong className="text-emerald-400 mr-1">Open = Low</strong> indicates strong bullish momentum. 
-            <strong className="text-rose-400 mx-1">Open = High</strong> indicates strong bearish pressure.
+            Prices are validated to exactly 1 decimal place format (e.g. 190.0, 225.0).
           </p>
         </div>
 
@@ -154,17 +171,22 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                <Cpu className="w-8 h-8" />
              </div>
              <div>
-               <div className="text-emerald-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-1"><Zap className="w-3 h-3"/> AI Algorithmic Top Pick</div>
+               <div className="text-emerald-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-1">
+                 <Zap className="w-3 h-3"/> {topRecommendation.isPerfectBullish ? 'Perfect Bullish Whole-Rupee Pick' : 'AI Algorithmic Top Pick'}
+               </div>
                <h2 className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">{topRecommendation.symbol}</h2>
-               <p className="text-slate-300 mt-1">Exceptional Open=Low candidate with <strong className="text-emerald-300">₹{topRecommendation.difference.toFixed(2)}</strong> variance.</p>
+               <p className="text-slate-300 mt-1">
+                 {topRecommendation.isPerfectBullish ? 'Perfect Open=Low with exact whole-rupee .0 alignment.' : 'Exceptional Open=Low candidate.'}
+                 <strong className="text-emerald-300 ml-1">₹{topRecommendation.difference.toFixed(1)}</strong> variance.
+               </p>
                <div className="flex flex-wrap items-center gap-3 mt-2 text-xs font-mono text-slate-300 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-emerald-500/20">
-                 <span>Open: <strong className="text-white">₹{(topRecommendation.first1mOpen ?? topRecommendation.openPrice)?.toFixed(2)}</strong></span>
+                 <span>Open: <strong className="text-white">₹{topRecommendation.open.toFixed(1)}</strong></span>
                  <span className="text-slate-600">•</span>
-                 <span>High: <strong className="text-rose-400">₹{(topRecommendation.dayHigh ?? topRecommendation.highPrice ?? topRecommendation.first1mHigh)?.toFixed(2)}</strong></span>
+                 <span>High: <strong className="text-rose-400">₹{topRecommendation.high.toFixed(1)}</strong></span>
                  <span className="text-slate-600">•</span>
-                 <span>Low: <strong className="text-emerald-400">₹{(topRecommendation.first1mLow ?? topRecommendation.dayLow ?? topRecommendation.lowPrice)?.toFixed(2)}</strong></span>
+                 <span>Low: <strong className="text-emerald-400">₹{topRecommendation.low.toFixed(1)}</strong></span>
                  <span className="text-slate-600">•</span>
-                 <span>Close/LTP: <strong className="text-blue-400">₹{(topRecommendation.ltp ?? topRecommendation.closePrice)?.toFixed(2)}</strong></span>
+                 <span>Close/LTP: <strong className="text-blue-400">₹{topRecommendation.close.toFixed(1)}</strong></span>
                </div>
              </div>
            </div>
@@ -183,6 +205,28 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
         >
           <Filter className="w-4 h-4" />
           <span>All Scans ({scannedStocks.length})</span>
+        </button>
+        <button
+          onClick={() => setFilterType('PERFECT_BULLISH')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm flex items-center space-x-2 ${
+            filterType === 'PERFECT_BULLISH'
+              ? 'bg-emerald-600 text-white border-emerald-400 shadow-md ring-2 ring-emerald-500/20' 
+              : 'bg-emerald-950/30 text-emerald-300 border border-emerald-800/60 hover:bg-emerald-900/40'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <span>PERFECT BULLISH (.0) – Open = Low ({perfectBullishCount})</span>
+        </button>
+        <button
+          onClick={() => setFilterType('PERFECT_BEARISH')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm flex items-center space-x-2 ${
+            filterType === 'PERFECT_BEARISH'
+              ? 'bg-rose-600 text-white border-rose-400 shadow-md ring-2 ring-rose-500/20' 
+              : 'bg-rose-950/30 text-rose-300 border border-rose-800/60 hover:bg-rose-900/40'
+          }`}
+        >
+          <TrendingDown className="w-4 h-4 text-rose-400" />
+          <span>PERFECT BEARISH (.0) – Open = High ({perfectBearishCount})</span>
         </button>
         <button
           onClick={() => setFilterType('OPEN_LOW')}
@@ -221,8 +265,9 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       {/* Scanner Results Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredStocks.map(stock => {
-          const isBull = stock.strategyType === 'OPEN_LOW';
-          const pctChange = stock.pctChange !== undefined ? stock.pctChange : ((stock.closePrice! - stock.openPrice!) / stock.openPrice!) * 100;
+          const isBull = stock.strategyType === 'PERFECT_BULLISH' || stock.strategyType === 'OPEN_LOW';
+          const isPerfect = stock.strategyType === 'PERFECT_BULLISH' || stock.strategyType === 'PERFECT_BEARISH';
+          const pctChange = stock.pctChange !== undefined && stock.pctChange !== null ? stock.pctChange : ((stock.close - stock.open) / stock.open) * 100;
           
           return (
             <div 
@@ -230,13 +275,13 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
               onClick={() => onSelectStockDetail(stock)}
               className={`group bg-slate-900 rounded-2xl border-2 transition-all cursor-pointer overflow-hidden ${
                 isBull 
-                  ? 'border-emerald-500/20 hover:border-emerald-500/50 hover:shadow-[0_8px_30px_rgba(16,185,129,0.15)]' 
-                  : 'border-rose-500/20 hover:border-rose-500/50 hover:shadow-[0_8px_30px_rgba(244,63,94,0.15)]'
+                  ? 'border-emerald-500/30 hover:border-emerald-500/60 hover:shadow-[0_8px_30px_rgba(16,185,129,0.2)]' 
+                  : 'border-rose-500/30 hover:border-rose-500/60 hover:shadow-[0_8px_30px_rgba(244,63,94,0.2)]'
               }`}
             >
               {/* Card Header */}
               <div className={`px-4 py-3 border-b flex items-center justify-between ${
-                isBull ? 'border-emerald-500/10 bg-emerald-500/5' : 'border-rose-500/10 bg-rose-500/5'
+                isBull ? 'border-emerald-500/10 bg-emerald-500/10' : 'border-rose-500/10 bg-rose-500/10'
               }`}>
                 <div className="flex flex-col">
                   <h3 className="font-bold text-lg text-white font-mono flex items-center gap-2">
@@ -252,22 +297,29 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                 <div className={`px-2.5 py-1 rounded-lg text-xs font-black font-mono shadow-sm flex flex-col items-end ${
                   pctChange >= 0 ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30' : 'bg-rose-950/80 text-rose-400 border border-rose-500/30'
                 }`}>
-                  <span className="text-white text-sm">₹{stock.closePrice?.toFixed(2) || stock.openPrice?.toFixed(2)}</span>
+                  <span className="text-white text-sm">₹{stock.close.toFixed(1)}</span>
                   <span>{pctChange > 0 ? '+' : ''}{pctChange.toFixed(2)}%</span>
                 </div>
               </div>
 
-              {/* Strategy Badge */}
+              {/* Strategy Badge & Classification */}
               <div className="p-4 space-y-4">
-                {(stock as any).difference <= 0.05 && (
-                  <div className="bg-emerald-500/20 border border-emerald-500/50 rounded-xl p-3 text-center mb-3 animate-pulse">
-                    <p className="text-emerald-400 font-black text-lg uppercase tracking-widest flex items-center justify-center gap-2">
-                      <Zap className="w-5 h-5" />
-                      AI Recommends
+                {isPerfect && (
+                  <div className={`border rounded-xl p-3 text-center mb-1 ${
+                    stock.strategyType === 'PERFECT_BULLISH' 
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' 
+                      : 'bg-rose-500/20 border-rose-500/50 text-rose-400'
+                  }`}>
+                    <p className="font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {stock.strategyType === 'PERFECT_BULLISH' ? 'PERFECT BULLISH – WHOLE-RUPEE ALIGNMENT' : 'PERFECT BEARISH – WHOLE-RUPEE ALIGNMENT'}
                     </p>
-                    <p className="text-emerald-500 text-[10px] font-bold mt-1">Exceptional Match</p>
+                    <p className="text-[10px] font-mono mt-0.5 opacity-90">
+                      Open: ₹{stock.open.toFixed(1)} (Exact .0 Whole-Rupee)
+                    </p>
                   </div>
                 )}
+
                 <div className={`p-3 rounded-xl border flex items-center gap-3 ${
                   isBull ? 'bg-emerald-950/30 border-emerald-500/30' : 'bg-rose-950/30 border-rose-500/30'
                 }`}>
@@ -275,48 +327,50 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                     <Target className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className={`text-sm font-black uppercase tracking-wider ${isBull ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {isBull ? 'OPEN = LOW' : 'OPEN = HIGH'}
+                    <h4 className={`text-xs font-black uppercase tracking-wider ${isBull ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {stock.strategyType === 'PERFECT_BULLISH' ? 'PERFECT BULLISH (.0)' :
+                       stock.strategyType === 'PERFECT_BEARISH' ? 'PERFECT BEARISH (.0)' :
+                       stock.strategyType === 'OPEN_LOW' ? 'OPEN = LOW' : 'OPEN = HIGH'}
                     </h4>
                     <p className={`text-[11px] font-mono mt-0.5 ${isBull ? 'text-emerald-500' : 'text-rose-500'}`}>
-                      Difference: ₹{(stock as any).difference.toFixed(2)}
+                      Difference: ₹{stock.difference.toFixed(1)} {stock.isWholeRupee ? '• Whole-Rupee (.0)' : ''}
                     </p>
                   </div>
                 </div>
 
                 {/* Previous Day High Status Indicator */}
                 <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs font-mono font-bold ${
-                  (stock as any).opensAbovePrevHigh 
+                  stock.opensAbovePrevHigh 
                     ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
                     : 'bg-slate-950/60 border-slate-800 text-slate-400'
                 }`}>
                   <span>Prev Day High:</span>
-                  <span className={(stock as any).opensAbovePrevHigh ? 'text-emerald-400 font-black' : 'text-slate-400'}>
-                    {(stock as any).opensAbovePrevHigh ? '🟢 Opened Above Prev High' : '⚪ Opened Below Prev High'}
+                  <span className={stock.opensAbovePrevHigh ? 'text-emerald-400 font-black' : 'text-slate-400'}>
+                    {stock.opensAbovePrevHigh ? '🟢 Opened Above Prev High' : '⚪ Opened Below Prev High'}
                   </span>
                 </div>
 
-                {/* Open, High, Low, Close (OHLC) Metrics Bar */}
+                {/* Open, High, Low, Close (OHLC) Metrics Bar (1 Decimal Place) */}
                 <div className="grid grid-cols-4 gap-1.5 p-2 bg-slate-950/80 rounded-xl border border-slate-800 text-center font-mono">
                   <div className="p-1 rounded bg-slate-900/60 border border-slate-800/60">
                     <div className="text-[9px] uppercase text-slate-400 font-sans font-bold">Open</div>
-                    <div className="text-xs font-black text-white">₹{(stock.first1mOpen ?? stock.openPrice)?.toFixed(2)}</div>
+                    <div className="text-xs font-black text-white">₹{stock.open.toFixed(1)}</div>
                   </div>
                   <div className="p-1 rounded bg-rose-950/30 border border-rose-900/40">
                     <div className="text-[9px] uppercase text-rose-400 font-sans font-bold">High</div>
-                    <div className="text-xs font-black text-rose-300">₹{(stock.dayHigh ?? stock.highPrice ?? stock.first15mHigh ?? stock.first1mHigh)?.toFixed(2)}</div>
+                    <div className="text-xs font-black text-rose-300">₹{stock.high.toFixed(1)}</div>
                   </div>
                   <div className="p-1 rounded bg-emerald-950/30 border border-emerald-900/40">
                     <div className="text-[9px] uppercase text-emerald-400 font-sans font-bold">Low</div>
-                    <div className="text-xs font-black text-emerald-300">₹{(stock.first1mLow ?? stock.dayLow ?? stock.lowPrice ?? stock.first15mLow)?.toFixed(2)}</div>
+                    <div className="text-xs font-black text-emerald-300">₹{stock.low.toFixed(1)}</div>
                   </div>
                   <div className="p-1 rounded bg-blue-950/30 border border-blue-900/40">
-                    <div className="text-[9px] uppercase text-blue-400 font-sans font-bold">Close/LTP</div>
-                    <div className="text-xs font-black text-blue-300">₹{(stock.ltp ?? stock.closePrice)?.toFixed(2)}</div>
+                    <div className="text-[9px] uppercase text-blue-400 font-sans font-bold">Close</div>
+                    <div className="text-xs font-black text-blue-300">₹{stock.close.toFixed(1)}</div>
                   </div>
                 </div>
 
-                {/* Additional metrics if available */}
+                {/* Additional metrics */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800">
                     <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">Lot Size</div>
@@ -324,7 +378,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                       {stock.lotSizeAug2026 ?? stock.lotSizeJul2026 ?? stock.lotSizeJun2026 ?? '-'}
                     </div>
                   </div>
-                  {stock.volumeRatio !== undefined && (
+                  {stock.volumeRatio !== undefined && stock.volumeRatio !== null && (
                     <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800">
                       <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">Vol Spike</div>
                       <div className={`text-sm font-mono font-black ${stock.volumeRatio >= 1.5 ? 'text-amber-400' : 'text-slate-300'}`}>
@@ -332,7 +386,7 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
                       </div>
                     </div>
                   )}
-                  {stock.rsi !== undefined && (
+                  {stock.rsi !== undefined && stock.rsi !== null && (
                     <div className="bg-slate-950/50 p-2 rounded-lg border border-slate-800">
                       <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">RSI (14)</div>
                       <div className={`text-sm font-mono font-black ${stock.rsi >= 60 ? 'text-emerald-400' : stock.rsi <= 40 ? 'text-rose-400' : 'text-slate-300'}`}>
@@ -383,8 +437,8 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
           <h3 className="text-xl font-bold text-white mb-2">No Matches Found</h3>
           <p className="text-slate-400 max-w-md mx-auto">
             {searchTerm 
-              ? `No stocks matching "${searchTerm}" found in the Open = High/Low scan.`
-              : `No stocks currently meet the Open = ${filterType === 'OPEN_LOW' ? 'Low' : filterType === 'OPEN_HIGH' ? 'High' : 'High/Low'} criteria based on the imported data.`}
+              ? `No stocks matching "${searchTerm}" found in the scan.`
+              : `No stocks currently meet the selected filter criteria (${filterType}) with 1-decimal place whole-rupee alignment.`}
           </p>
         </div>
       )}

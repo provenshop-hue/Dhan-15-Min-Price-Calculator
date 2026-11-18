@@ -594,17 +594,17 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 2) {
           for (let i = breakoutIdx + 1; i <= Math.min(breakoutIdx + 4, stock.rsiTimeline.length - 2); i++) {
             const pt = stock.rsiTimeline[i];
-            const hitSupport = isBullBreak ? (pt.low <= orbLow * 1.012 && pt.low >= orbLow * 0.985) : false;
+            const hitSupport = pt.low <= orbLow * 1.012 && pt.low >= orbLow * 0.985;
+            const hitResistance = pt.high >= orbHigh * 0.988 && pt.high <= orbHigh * 1.015;
 
             if (hitSupport) {
               const nextPt = stock.rsiTimeline[i + 1];
               const cleanBounce = nextPt.close > pt.close && nextPt.close >= orbLow * 1.002;
 
               if (cleanBounce) {
-                // NO REVERSAL CHECK: Ensure ALL subsequent candles after support touch never broke below support or turned negative
                 let zeroReversalAfterTouch = true;
                 for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
-                  if (stock.rsiTimeline[k].close < orbLow * 0.998 || stock.rsiTimeline[k].close < stock.rsiTimeline[i+1].close * 0.995) {
+                  if (stock.rsiTimeline[k].close < orbLow * 0.998) {
                     zeroReversalAfterTouch = false;
                     break;
                   }
@@ -613,11 +613,36 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 const endPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
                 const expansionPct = Math.round(((endPt.close - nextPt.close) / nextPt.close) * 100 * 100) / 100;
 
-                if (zeroReversalAfterTouch && expansionPct >= 0.1 && (stock.pctChange === undefined || stock.pctChange > 0)) {
+                if (zeroReversalAfterTouch) {
                   hasOrbLowBounce = true;
                   orbLowBounceTime = nextPt.timeStr;
-                  orbBounceType = 'BULLISH_SUPPORT_BOUNCE';
-                  rallyExpansionPct = Math.max(0.5, expansionPct);
+                  orbBounceType = 'BULLISH_SUPPORT_BOUNCE'; // Support bounce is Bullish Signal
+                  rallyExpansionPct = Math.max(0.5, Math.abs(expansionPct));
+                  bouncePowerScore = Math.min(100, Math.round(85 + rallyExpansionPct * 10));
+                  break;
+                }
+              }
+            } else if (hitResistance) {
+              const nextPt = stock.rsiTimeline[i + 1];
+              const cleanReject = nextPt.close < pt.close;
+
+              if (cleanReject) {
+                let zeroReversalAfterTouch = true;
+                for (let k = i + 1; k < stock.rsiTimeline.length; k++) {
+                  if (stock.rsiTimeline[k].close > orbHigh * 1.002) {
+                    zeroReversalAfterTouch = false;
+                    break;
+                  }
+                }
+
+                const endPt = stock.rsiTimeline[stock.rsiTimeline.length - 1];
+                const dropPct = Math.round(((nextPt.close - endPt.close) / nextPt.close) * 100 * 100) / 100;
+
+                if (zeroReversalAfterTouch) {
+                  hasOrbLowBounce = true;
+                  orbLowBounceTime = nextPt.timeStr;
+                  orbBounceType = 'BEARISH_SUPPORT_BOUNCE'; // Resistance rejection is Bearish Signal
+                  rallyExpansionPct = Math.max(0.5, Math.abs(dropPct));
                   bouncePowerScore = Math.min(100, Math.round(85 + rallyExpansionPct * 10));
                   break;
                 }
@@ -1825,7 +1850,15 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 {/* Card Header Top: #1 Crown / Super Break / 25%+ Purple Badge */}
                 <div className="px-4 py-2 flex items-center justify-between border-b bg-slate-950 border-slate-800 text-slate-300">
                   <div className="flex items-center space-x-2">
-                    {isSuper ? (
+                    {activeTab === 'orb_low_bounce' || stock.hasOrbLowBounce ? (
+                      <span className={`text-[10px] px-2.5 py-1 rounded font-black uppercase tracking-wider ${
+                        stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' 
+                          ? 'bg-emerald-500 text-slate-950 flex items-center gap-1 shadow-md animate-pulse' 
+                          : 'bg-rose-500 text-slate-950 flex items-center gap-1 shadow-md animate-pulse'
+                      }`}>
+                        {stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? '🟢 BULLISH SIGNAL (Support Bounce)' : '🔴 BEARISH SIGNAL (Support Bounce)'}
+                      </span>
+                    ) : isSuper ? (
                       <span className="bg-amber-400 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-wider shadow-sm flex items-center gap-1">
                         <Zap className="w-3 h-3 fill-slate-950" /> Super {isBull ? 'Break (50%+)' : 'Breakdown (50%+)'}
                       </span>
@@ -1975,12 +2008,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     <span className="font-black flex items-center gap-1.5 uppercase tracking-wide">
                       <ShieldCheck className={`w-4 h-4 ${stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? 'text-emerald-400' : 'text-rose-400'} shrink-0 animate-pulse`} />
                       <span className={stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? 'text-emerald-200' : 'text-rose-200'}>
-                        {stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? '🟢 ORB Support Bounce & Bullish Rally:' : '🔴 ORB Resistance Rejection & Drop:'}
+                        {stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? '🟢 BULLISH SIGNAL: ORB Low Support Bounce' : '🔴 BEARISH SIGNAL: ORB Low Support Bounce'}
                       </span>
                     </span>
                     <div className="flex items-center gap-2">
                       <strong className={`${stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? 'text-emerald-300 bg-emerald-500/30 border-emerald-400' : 'text-rose-300 bg-rose-500/30 border-rose-400'} font-black border px-2.5 py-1 rounded-xl shadow`}>
-                        {stock.rallyExpansionPct >= 0 ? '+' : ''}{stock.rallyExpansionPct}% {stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? 'Rally 🚀' : 'Drop 📉'}
+                        {stock.orbBounceType === 'BULLISH_SUPPORT_BOUNCE' ? 'BULLISH SIGNAL 🟢' : 'BEARISH SIGNAL 🔴'}
                       </strong>
                       <span className="text-slate-300 font-medium">Power: <strong className="text-amber-300">{stock.bouncePowerScore}/100</strong></span>
                       <span className="text-white font-black bg-slate-900/90 px-2 py-0.5 rounded-lg border border-slate-700">@{stock.orbLowBounceTime}</span>
@@ -2396,7 +2429,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                               <span>{stock.orbLowBounceTime}</span>
                             </div>
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${isBull ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : 'bg-rose-950 text-rose-300 border border-rose-500/40'}`}>
-                              {isBull ? '🟢 LONG' : '🔴 SHORT'}
+                              {isBull ? '🟢 BULLISH SIGNAL' : '🔴 BEARISH SIGNAL'}
                             </span>
                           </div>
                           <div className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded font-black text-[10px]">
