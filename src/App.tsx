@@ -33,7 +33,7 @@ import { Nifty50ParabolicTracker } from './components/Nifty50ParabolicTracker';
 import { EmaDynamicEngineDashboard } from './components/EmaDynamicEngineDashboard';
 import { FollowedStocksDashboard } from './components/FollowedStocksDashboard';
 import { CprScannerModule } from './components/CprScannerModule';
-import { BollingerBandMeanReversalDashboard } from './components/BollingerBandMeanReversalDashboard';
+
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -1592,15 +1592,7 @@ export default function App() {
             onRefreshAll={handleFetchAllDhan}
             isLoading={isBulkLoading}
           />
-        ) : activeDashboardTab === 'bb_mean_reversal' ? (
-          /* Dedicated Bollinger Band Mean Reversal Engine (15-min Only) */
-          <BollingerBandMeanReversalDashboard
-            stocks={stocks}
-            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
-            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
-            onFetchSingleStock={(s) => handleFetchSingleDhan(s)}
-            isLoading={isBulkLoading}
-          />
+
         ) : activeDashboardTab === 'fii_dii_predictor' ? (
           /* Dedicated FII-DII NIFTY Direction Predictor PRO */
           <FiiDiiPredictorHub

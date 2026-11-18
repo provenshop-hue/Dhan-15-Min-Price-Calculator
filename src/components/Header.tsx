@@ -524,23 +524,7 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </button>
 
-            {/* 📈 Bollinger Mean Reversal Tab */}
-            <button
-              onClick={() => onChangeDashboardTab('bb_mean_reversal')}
-              className={`flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeDashboardTab === 'bb_mean_reversal'
-                  ? 'bg-gradient-to-r from-indigo-700 via-purple-700 to-violet-700 text-white shadow-md shadow-indigo-500/30 ring-1 ring-white/30'
-                  : 'text-slate-700 hover:text-slate-950 hover:bg-indigo-50'
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <Activity className={`w-3.5 h-3.5 ${activeDashboardTab === 'bb_mean_reversal' ? 'text-yellow-300 animate-pulse' : 'text-indigo-600'}`} />
-                <span>📈 Bollinger Mean Reversal</span>
-                <span className="bg-gradient-to-r from-indigo-400 to-purple-400 text-white text-[9px] px-1.5 py-0.2 rounded-full font-black uppercase shadow-xs">
-                  15m Only
-                </span>
-              </span>
-            </button>
+
 
             {/* 📊 FII-DII Predictor PRO Tab */}
             <button
