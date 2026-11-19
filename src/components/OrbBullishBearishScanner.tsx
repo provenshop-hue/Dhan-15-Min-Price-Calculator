@@ -88,7 +88,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'lowest_volume_concept' | 'bounce_and_one_direction' | 'recent_discovery'>('recent_discovery');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'lowest_volume_concept' | 'bounce_and_one_direction' | 'failed_stocks' | 'recent_discovery'>('recent_discovery');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
@@ -1053,6 +1053,28 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       const isConfirmedSignal = (isBullishQualified || isBearishQualified) && (isHighQualityBullish || isHighQualityBearish || hasBreakAndContinue || hasOrbLowBounce || hasBounceGreat) && (isBullishQualified ? (rsi >= 55 && close > vwap) : (rsi <= 45 && close < vwap));
       const hasBounceAndOneDirection = hasOrbLowBounce && hasBounceGreat;
 
+      let hasFailedStock = false;
+      let failedFilterType = 'ORB Breakout Setup';
+      let failureReason = '';
+      let failureTime = orbBreakTime;
+
+      if (hqSignalStatus === 'FAILED BREAKOUT') {
+        hasFailedStock = true;
+        failedFilterType = isBullishQualified ? 'ORB Bullish Breakout' : 'ORB Bearish Breakdown';
+        failureReason = 'Price closed back inside the ORB range (Failed Breakout / Fakeout)';
+        failureTime = hqTimestamp || orbBreakTime;
+      } else if (hqFailedConditions && hqFailedConditions.length > 0) {
+        hasFailedStock = true;
+        failedFilterType = isHighQualityBullish || isHighQualityBearish ? 'High Quality Breakout' : 'ORB Breakout Setup';
+        failureReason = hqFailedConditions[0];
+        failureTime = hqTimestamp || orbBreakTime;
+      } else if ((isBullishQualified && close < orbHigh) || (isBearishQualified && close > orbLow)) {
+        hasFailedStock = true;
+        failedFilterType = isBullishQualified ? 'ORB Bullish Breakout' : 'ORB Bearish Breakdown';
+        failureReason = isBullishQualified ? 'Failed to sustain above ORB High (Closed back below resistance)' : 'Failed to sustain below ORB Low (Bounce back above support)';
+        failureTime = orbBreakTime;
+      }
+
       return {
         ...stock,
         orbHigh: Math.round(orbHigh * 100) / 100,
@@ -1123,6 +1145,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         hasLowestVolumeBullish,
         hasLowestVolumeBearish,
         lowestVolumeTime: capTimeAtCurrentClock(lowestVolumeTime),
+        hasFailedStock,
+        failedFilterType,
+        failureReason,
+        failureTime: capTimeAtCurrentClock(failureTime),
         hasRecentDiscovery,
         discoveryLabel,
         discoveryTime: capTimeAtCurrentClock(discoveryTime)
@@ -1168,6 +1194,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'break_and_continue' && !s.hasBreakAndContinue) return false;
       if (activeTab === 'lowest_volume_concept' && !s.hasLowestVolumeConcept) return false;
       if (activeTab === 'bounce_and_one_direction' && !s.hasBounceAndOneDirection) return false;
+      if (activeTab === 'failed_stocks' && !s.hasFailedStock) return false;
       if (activeTab === 'recent_discovery') {
         if (!s.hasRecentDiscovery) return false;
         if (recentSubFilter === 'SUPER_BREAK' && !s.isSuperBreakBullish && !s.isSuperBreakBearish) return false;
@@ -1196,7 +1223,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         return timeB - timeA; // Latest time first
       }
 
-      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified) || (activeTab === 'orb_zero_reversal' && !a.isBullishQualified) || (activeTab === 'bounce_great' && !a.isBullishQualified) || (activeTab === 'lightning_scalp' && !a.isBullishQualified) || (activeTab === 'no_retest' && !a.isBullishQualified) || (activeTab === 'bounce_and_one_direction' && !a.isBullishQualified) || (activeTab === 'recent_discovery' && !a.isBullishQualified);
+      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified) || (activeTab === 'orb_zero_reversal' && !a.isBullishQualified) || (activeTab === 'bounce_great' && !a.isBullishQualified) || (activeTab === 'lightning_scalp' && !a.isBullishQualified) || (activeTab === 'no_retest' && !a.isBullishQualified) || (activeTab === 'bounce_and_one_direction' && !a.isBullishQualified) || (activeTab === 'failed_stocks' && !a.isBullishQualified) || (activeTab === 'recent_discovery' && !a.isBullishQualified);
       const valA = isBear ? a.breakPctBelow : a.breakPctAbove;
       const valB = isBear ? b.breakPctBelow : b.breakPctAbove;
 
@@ -1243,6 +1270,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const orbWithVolumeCount = processedOrbStocks.filter(s => s.hasOrbWithVolume).length;
   const lowestVolumeCount = processedOrbStocks.filter(s => s.hasLowestVolumeConcept).length;
   const bounceAndOneDirectionCount = processedOrbStocks.filter(s => s.hasBounceAndOneDirection).length;
+  const failedStocksCount = processedOrbStocks.filter(s => s.hasFailedStock).length;
   const recentDiscoveryCount = processedOrbStocks.filter(s => s.hasRecentDiscovery).length;
 
   return (
@@ -1360,7 +1388,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         <div className="lg:col-span-1 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3">
           <div className="text-xs font-black text-slate-400 uppercase tracking-wider px-2 pb-1 flex items-center justify-between">
             <span>ORB Sub-Filters</span>
-            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-bold">14 Active</span>
+            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-bold">15 Active</span>
           </div>
           <div className="flex flex-col space-y-1.5 max-h-[720px] overflow-y-auto pr-1">
             {[
@@ -1378,6 +1406,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
               { id: 'no_retest', label: `🚀 Pure Rocket (${noRetestCount})`, icon: ArrowUpRight, color: 'text-purple-300', activeClass: 'bg-purple-600 text-white font-black shadow-lg shadow-purple-600/30 border border-purple-400' },
               { id: 'break_and_continue', label: `⚡ Break & Continue (${breakAndContinueCount})`, icon: Zap, color: 'text-amber-300', activeClass: 'bg-amber-600 text-white font-black shadow-lg shadow-amber-600/30 border border-amber-400' },
               { id: 'orb_with_volume', label: `📊 ORB with Volume (${orbWithVolumeCount})`, icon: Activity, color: 'text-emerald-300', activeClass: 'bg-emerald-600 text-white font-black shadow-lg shadow-emerald-600/30 border border-emerald-400' },
+              { id: 'failed_stocks', label: `❌ Stocks that Failed (${failedStocksCount})`, icon: AlertCircle, color: 'text-rose-400', activeClass: 'bg-rose-600 text-white font-black shadow-lg shadow-rose-600/30 border border-rose-500' },
             ].map((tab) => {
               const IconComp = tab.icon;
               const isActive = activeTab === tab.id;
@@ -1837,6 +1866,24 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     <strong className="text-white font-black text-xs px-2 py-0.5 bg-rose-500/20 border border-rose-400 rounded-lg">
                       @{stock.failTime}
                     </strong>
+                  </div>
+                )}
+
+                {/* ❌ STOCKS THAT FAILED BANNER */}
+                {stock.hasFailedStock && (
+                  <div className="px-4 py-3 bg-gradient-to-r from-rose-950 via-red-950/90 to-rose-950 border-b border-rose-500/60 text-xs font-mono text-rose-200 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black flex items-center gap-1.5 text-rose-300">
+                        <ShieldAlert className="w-4 h-4 text-rose-400 animate-pulse shrink-0" />
+                        <span>❌ FAILED SETUP: {stock.failedFilterType}</span>
+                      </span>
+                      <strong className="text-white font-black text-xs px-2 py-0.5 bg-rose-500/20 border border-rose-400 rounded-lg">
+                        @{stock.failureTime}
+                      </strong>
+                    </div>
+                    <div className="text-[11px] text-rose-100 font-sans pl-5 border-l-2 border-rose-500/60">
+                      <strong>What went wrong:</strong> {stock.failureReason}
+                    </div>
                   </div>
                 )}
 

@@ -77,6 +77,10 @@ export interface StockCalculated {
   hasFailedRetest?: boolean;
   failTime?: string;
   failReason?: string;
+  hasFailedStock?: boolean;
+  failedFilterType?: string;
+  failureReason?: string;
+  failureTime?: string;
   hasImmediateBounce?: boolean;
   immediateRetestTime?: string;
   immediateBounceTime?: string;
