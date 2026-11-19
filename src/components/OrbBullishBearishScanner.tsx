@@ -88,7 +88,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'hq_breakout' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'lowest_volume_concept' | 'recent_discovery'>('hq_breakout');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'lowest_volume_concept' | 'recent_discovery'>('recent_discovery');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
@@ -1150,12 +1150,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'bearish' && !s.isBearishQualified) return false;
       if (activeTab === 'super_break_bull' && !s.isSuperBreakBullish) return false;
       if (activeTab === 'super_break_bear' && !s.isSuperBreakBearish) return false;
-      if (activeTab === 'hq_breakout') {
-        if (!s.isHighQualityBullish && !s.isHighQualityBearish && s.hqSignalStatus !== 'BREAKOUT DETECTED' && s.hqSignalStatus !== 'FAILED BREAKOUT') return false;
-        const bMins = parseTimeToMinutes(s.orbBreakTime || s.hqBreakoutTime);
-        const eMins = parseTimeToMinutes(s.hqEntryTime || s.hqTimestamp);
-        if (Math.abs(eMins - bMins) > 30) return false;
-      }
+
       if (activeTab === 'failed_retest' && !s.hasFailedRetest) return false;
       if (activeTab === 'orb_low_bounce' && !s.hasOrbLowBounce) return false;
       if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
@@ -1233,7 +1228,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const bearishCount = processedOrbStocks.filter(s => s.isBearishQualified).length;
   const superBreakBullCount = processedOrbStocks.filter(s => s.isSuperBreakBullish).length;
   const superBreakBearCount = processedOrbStocks.filter(s => s.isSuperBreakBearish).length;
-  const hqBreakoutCount = processedOrbStocks.filter(s => s.isHighQualityBullish || s.isHighQualityBearish || s.hqSignalStatus === 'BREAKOUT DETECTED' || s.hqSignalStatus === 'FAILED BREAKOUT').length;
+
   const failedRetestCount = processedOrbStocks.filter(s => s.hasFailedRetest).length;
   const orbLowBounceCount = processedOrbStocks.filter(s => s.hasOrbLowBounce).length;
   const bounceCandleCount = processedOrbStocks.filter(s => s.hasBounceCandleStrength).length;
@@ -1355,326 +1350,190 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         </div>
       </div>
 
-      {/* Navigation Tabs & Controls Bar */}
-      <div className="flex flex-col lg:flex-row justify-between items-center gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-lg">
-        {/* Tab Switcher */}
-        <div className="flex items-center space-x-2 w-full lg:w-auto overflow-x-auto pb-1 lg:pb-0">
-          <button
-            onClick={() => setActiveTab('recent_discovery')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'recent_discovery'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/40 border border-amber-300'
-                : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-amber-500/40'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-300 animate-bounce" />
-            <span>✨ Recent Discovery ({recentDiscoveryCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('bullish')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'bullish'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 border border-emerald-500'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <ArrowUpRight className="w-4 h-4 text-emerald-300" />
-            <span>🟢 Bullish ({bullishCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('bearish')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'bearish'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30 border border-rose-500'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <ArrowDownRight className="w-4 h-4 text-rose-300" />
-            <span>🔴 Bearish ({bearishCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('super_break_bull')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'super_break_bull'
-                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30 border border-amber-500'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
-            <span>🚀 Super Break (Bullish 50%+) ({superBreakBullCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('super_break_bear')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'super_break_bear'
-                ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/30 border border-orange-500'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <Zap className="w-4 h-4 text-orange-300 fill-orange-300" />
-            <span>💥 Super Breakdown (Bearish 50%+) ({superBreakBearCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('hq_breakout')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'hq_breakout'
-                ? 'bg-gradient-to-r from-emerald-600 to-cyan-600 text-white shadow-lg shadow-emerald-600/30 border border-emerald-400'
-                : 'bg-slate-800 text-emerald-300 hover:bg-slate-700 border border-emerald-500/40'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse" />
-            <span>✨ ORB High Quality Breakout ({hqBreakoutCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('orb_low_bounce')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'orb_low_bounce'
-                ? 'bg-emerald-700 text-white shadow-lg shadow-emerald-700/30 border border-emerald-500'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4 text-emerald-300" />
-            <span>🛡️ ORB Low Support Bounce ({orbLowBounceCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('bounce_candle_strength')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'bounce_candle_strength'
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 border border-indigo-500'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-indigo-300 animate-pulse" />
-            <span>📈 Bounce Candle Strength ({bounceCandleCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('orb_zero_reversal')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'orb_zero_reversal'
-                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30 border border-amber-500'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4 text-amber-300 animate-pulse" />
-            <span>🚀 ORB Zero Reversal ({zeroReversalCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('bounce_great')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'bounce_great'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30 border border-rose-500'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <Flame className="w-4 h-4 text-rose-300 animate-pulse fill-rose-300" />
-            <span>🔥 Bounce Great ({bounceGreatCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('lightning_scalp')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'lightning_scalp'
-                ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/30 border border-cyan-400'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <Zap className="w-4 h-4 text-cyan-300 fill-cyan-300 animate-bounce" />
-            <span>⚡ ORB Lightning Scalp ({lightningScalpCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('no_retest')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'no_retest'
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30 border border-purple-400'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <ArrowUpRight className="w-4 h-4 text-purple-300 animate-pulse" />
-            <span>🚀 No Retest / Pure Rocket ({noRetestCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('break_and_continue')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'break_and_continue'
-                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30 border border-amber-400'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <Zap className="w-4 h-4 text-amber-300 fill-amber-300 animate-pulse" />
-            <span>⚡ Break &amp; Continue ({breakAndContinueCount})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('orb_with_volume')}
-            className={`px-3 py-2.5 rounded-xl text-xs font-black tracking-wide uppercase transition-all flex items-center space-x-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'orb_with_volume'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 border border-emerald-400'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700'
-            }`}
-          >
-            <Activity className="w-4 h-4 text-emerald-300 animate-pulse" />
-            <span>📊 ORB with Volume ({orbWithVolumeCount})</span>
-          </button>
-
-
-        </div>
-
-        {/* ✨ RECENT DISCOVERY SUB-CATEGORIES SUB-BAR */}
-        {activeTab === 'recent_discovery' && (
-          <div className="bg-slate-950/90 p-3.5 rounded-2xl border border-amber-500/40 flex flex-wrap items-center gap-2 shadow-lg">
-            <span className="text-xs font-black text-amber-300 uppercase tracking-wider mr-1.5 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 animate-bounce" /> Sub-Filters:
-            </span>
+      {/* Main Layout: Vertical Sub-Filters Sidebar on Left, Content & Grid on Right */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        {/* Left Column: Vertical Sub-Filters Sidebar */}
+        <div className="lg:col-span-1 bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-3">
+          <div className="text-xs font-black text-slate-400 uppercase tracking-wider px-2 pb-1 flex items-center justify-between">
+            <span>ORB Sub-Filters</span>
+            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono font-bold">13 Active</span>
+          </div>
+          <div className="flex flex-col space-y-1.5 max-h-[720px] overflow-y-auto pr-1">
             {[
-              { id: 'ALL', label: 'All Recent' },
-              { id: 'SUPER_BREAK', label: '🚀 Super Break' },
-              { id: 'SUPPORT_BOUNCE', label: '🛡️ Support Bounce' },
-              { id: 'LIGHTNING_SCALP', label: '⚡ Lightning Scalp' },
-              { id: 'NO_RETEST', label: '🚀 Pure Rocket' },
-              { id: 'ZERO_REVERSAL', label: '📈 Zero Reversal' },
-              { id: 'BOUNCE_CANDLE', label: '📈 Bounce Candle' },
-              { id: 'IMMEDIATE_BOUNCE', label: '⚡ Immediate Bounce' },
-              { id: 'BOUNCE_GREAT', label: '🔥 Bounce Great' },
-            ].map((sub) => (
-              <button
-                key={sub.id}
-                onClick={() => setRecentSubFilter(sub.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  recentSubFilter === sub.id
-                    ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-300/50'
-                    : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
-                }`}
-              >
-                {sub.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* 🚀 ORB ZERO REVERSAL SUB-FILTERS SUB-BAR */}
-        {activeTab === 'orb_zero_reversal' && (
-          <div className="bg-slate-950/90 p-3.5 rounded-2xl border border-amber-500/40 flex flex-wrap items-center gap-2 shadow-lg">
-            <span className="text-xs font-black text-amber-300 uppercase tracking-wider mr-1.5 flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5 animate-pulse" /> Zero Reversal Sub-Filters:
-            </span>
-            {[
-              { id: 'ALL', label: 'All Zero Reversal' },
-              { id: 'MAINTAINING_9_EMA', label: '📈 Maintaining 9 EMA' },
-              { id: 'MAINTAINING_VWAP', label: '🛡️ Maintaining VWAP' },
-              { id: 'MAINTAINING_BOTH', label: '⚡ Maintaining Both (9 EMA & VWAP)' },
-            ].map((sub) => (
-              <button
-                key={sub.id}
-                onClick={() => setZeroReversalSubFilter(sub.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  zeroReversalSubFilter === sub.id
-                    ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-300/50'
-                    : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
-                }`}
-              >
-                {sub.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Search & Sort */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-          <div className="relative w-full sm:w-56">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search symbol..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 text-sm text-white rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600"
-            />
-          </div>
-
-          <div className="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto">
-            <span className="text-xs font-bold text-slate-400 whitespace-nowrap">Sort:</span>
-            <button
-              onClick={() => setSortBy('BREAK_PCT')}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                sortBy === 'BREAK_PCT'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              🚀 Highest Break % (#1 Top)
-            </button>
-            <button
-              onClick={() => setSortBy('LOWER_BREAK_PCT')}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                sortBy === 'LOWER_BREAK_PCT'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              📉 Lowest Break % in Height
-            </button>
-            <button
-              onClick={() => setSortBy('JUST_HIT')}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                sortBy === 'JUST_HIT'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-              }`}
-            >
-              ⏰ Just Hit ORB
-            </button>
+              { id: 'recent_discovery', label: `✨ Recent Discovery (${recentDiscoveryCount})`, icon: Sparkles, color: 'text-amber-300', activeClass: 'bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/40 border border-amber-300' },
+              { id: 'bullish', label: `🟢 Bullish (${bullishCount})`, icon: ArrowUpRight, color: 'text-emerald-300', activeClass: 'bg-emerald-600 text-white font-black shadow-lg shadow-emerald-600/30 border border-emerald-500' },
+              { id: 'bearish', label: `🔴 Bearish (${bearishCount})`, icon: ArrowDownRight, color: 'text-rose-300', activeClass: 'bg-rose-600 text-white font-black shadow-lg shadow-rose-600/30 border border-rose-500' },
+              { id: 'super_break_bull', label: `🚀 Super Break (50%+) (${superBreakBullCount})`, icon: Zap, color: 'text-amber-300', activeClass: 'bg-amber-600 text-white font-black shadow-lg shadow-amber-600/30 border border-amber-500' },
+              { id: 'super_break_bear', label: `💥 Super Breakdown (50%+) (${superBreakBearCount})`, icon: Zap, color: 'text-orange-300', activeClass: 'bg-orange-600 text-white font-black shadow-lg shadow-orange-600/30 border border-orange-500' },
+              { id: 'orb_low_bounce', label: `🛡️ ORB Low Support (${orbLowBounceCount})`, icon: ShieldCheck, color: 'text-emerald-300', activeClass: 'bg-emerald-700 text-white font-black shadow-lg shadow-emerald-700/30 border border-emerald-500' },
+              { id: 'bounce_candle_strength', label: `📈 Bounce Strength (${bounceCandleCount})`, icon: Sparkles, color: 'text-indigo-300', activeClass: 'bg-indigo-600 text-white font-black shadow-lg shadow-indigo-600/30 border border-indigo-500' },
+              { id: 'orb_zero_reversal', label: `🚀 Zero Reversal (${zeroReversalCount})`, icon: TrendingUp, color: 'text-amber-300', activeClass: 'bg-amber-600 text-white font-black shadow-lg shadow-amber-600/30 border border-amber-500' },
+              { id: 'bounce_great', label: `🔥 Bounce Great (${bounceGreatCount})`, icon: Flame, color: 'text-rose-300', activeClass: 'bg-rose-600 text-white font-black shadow-lg shadow-rose-600/30 border border-rose-500' },
+              { id: 'lightning_scalp', label: `⚡ Lightning Scalp (${lightningScalpCount})`, icon: Zap, color: 'text-cyan-300', activeClass: 'bg-cyan-600 text-white font-black shadow-lg shadow-cyan-600/30 border border-cyan-400' },
+              { id: 'no_retest', label: `🚀 Pure Rocket (${noRetestCount})`, icon: ArrowUpRight, color: 'text-purple-300', activeClass: 'bg-purple-600 text-white font-black shadow-lg shadow-purple-600/30 border border-purple-400' },
+              { id: 'break_and_continue', label: `⚡ Break & Continue (${breakAndContinueCount})`, icon: Zap, color: 'text-amber-300', activeClass: 'bg-amber-600 text-white font-black shadow-lg shadow-amber-600/30 border border-amber-400' },
+              { id: 'orb_with_volume', label: `📊 ORB with Volume (${orbWithVolumeCount})`, icon: Activity, color: 'text-emerald-300', activeClass: 'bg-emerald-600 text-white font-black shadow-lg shadow-emerald-600/30 border border-emerald-400' },
+            ].map((tab) => {
+              const IconComp = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold tracking-wide uppercase transition-all flex items-center justify-between cursor-pointer text-left ${
+                    isActive
+                      ? tab.activeClass
+                      : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60'
+                  }`}
+                >
+                  <span className="flex items-center space-x-2 truncate">
+                    <IconComp className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : tab.color}`} />
+                    <span className="truncate">{tab.label}</span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
-      </div>
 
-      {/* Educational Banner for Fully Bullish / Confirmed Signals */}
-      {activeTab === 'fully_bullish' && (
-        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 p-4 rounded-2xl border border-emerald-500/50 shadow-lg text-emerald-200 text-xs font-mono space-y-1.5 mb-4">
-          <div className="font-black text-emerald-300 flex items-center gap-2 text-sm uppercase tracking-wider">
-            <Zap className="w-4 h-4 fill-emerald-300 animate-pulse" />
-            <span>Why Traders Take Fully Bullish Parabolic Rallies (Zero Pullback Confidence)</span>
+        {/* Right Column: Controls, Banners & Cards Grid */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* Controls Bar: Search & Sort + Sub-bars */}
+          <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-lg flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              {/* Search */}
+              <div className="relative w-full sm:w-64">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search symbol..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 text-sm text-white rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600"
+                />
+              </div>
+
+              {/* Sort */}
+              <div className="flex items-center space-x-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                <span className="text-xs font-bold text-slate-400 whitespace-nowrap">Sort:</span>
+                <button
+                  onClick={() => setSortBy('BREAK_PCT')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    sortBy === 'BREAK_PCT'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  🚀 Highest Break %
+                </button>
+                <button
+                  onClick={() => setSortBy('LOWER_BREAK_PCT')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    sortBy === 'LOWER_BREAK_PCT'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  📉 Lowest Break %
+                </button>
+                <button
+                  onClick={() => setSortBy('JUST_HIT')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    sortBy === 'JUST_HIT'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  ⏰ Just Hit
+                </button>
+              </div>
+            </div>
+
+            {/* ✨ RECENT DISCOVERY SUB-CATEGORIES SUB-BAR */}
+            {activeTab === 'recent_discovery' && (
+              <div className="bg-slate-950/90 p-3 rounded-xl border border-amber-500/40 flex flex-wrap items-center gap-2 shadow-inner">
+                <span className="text-xs font-black text-amber-300 uppercase tracking-wider mr-1 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 animate-bounce" /> Sub-Filters:
+                </span>
+                {[
+                  { id: 'ALL', label: 'All Recent' },
+                  { id: 'SUPER_BREAK', label: '🚀 Super Break' },
+                  { id: 'SUPPORT_BOUNCE', label: '🛡️ Support Bounce' },
+                  { id: 'LIGHTNING_SCALP', label: '⚡ Lightning Scalp' },
+                  { id: 'NO_RETEST', label: '🚀 Pure Rocket' },
+                  { id: 'ZERO_REVERSAL', label: '📈 Zero Reversal' },
+                  { id: 'BOUNCE_CANDLE', label: '📈 Bounce Candle' },
+                  { id: 'IMMEDIATE_BOUNCE', label: '⚡ Immediate Bounce' },
+                  { id: 'BOUNCE_GREAT', label: '🔥 Bounce Great' },
+                ].map((sub) => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setRecentSubFilter(sub.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      recentSubFilter === sub.id
+                        ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-300/50'
+                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                    }`}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 🚀 ORB ZERO REVERSAL SUB-FILTERS SUB-BAR */}
+            {activeTab === 'orb_zero_reversal' && (
+              <div className="bg-slate-950/90 p-3 rounded-xl border border-amber-500/40 flex flex-wrap items-center gap-2 shadow-inner">
+                <span className="text-xs font-black text-amber-300 uppercase tracking-wider mr-1 flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 animate-pulse" /> Zero Reversal Sub-Filters:
+                </span>
+                {[
+                  { id: 'ALL', label: 'All Zero Reversal' },
+                  { id: 'MAINTAINING_9_EMA', label: '📈 Maintaining 9 EMA' },
+                  { id: 'MAINTAINING_VWAP', label: '🛡️ Maintaining VWAP' },
+                  { id: 'MAINTAINING_BOTH', label: '⚡ Maintaining Both' },
+                ].map((sub) => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setZeroReversalSubFilter(sub.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      zeroReversalSubFilter === sub.id
+                        ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-300/50'
+                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
+                    }`}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <p className="text-slate-300 font-sans leading-relaxed">
-            Fully Bullish stocks represent institutional breakout perfection: RSI &ge; 60, trading strictly above VWAP and 9 EMA, day gain &ge; 1.2%, breakout &ge; 1.2% above ORB High, and supported by heavy volume surge. <strong>Why this prevents pullbacks:</strong> These conditions ensure aggressive institutional buying pressure where sellers are overwhelmed, creating a parabolic upward trajectory that sustains momentum without sharp retracements.
-          </p>
-        </div>
-      )}
 
-      {activeTab === 'hq_breakout' && (
-        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-cyan-950 p-4 rounded-2xl border border-emerald-500/50 shadow-lg text-emerald-200 text-xs font-mono space-y-1.5 mb-4">
-          <div className="font-black text-emerald-300 flex items-center gap-2 text-sm uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse" />
-            <span>ORB High Quality Breakout Engine (15-Minute OHLCV Candles Only)</span>
-          </div>
-          <p className="text-slate-300 font-sans leading-relaxed">
-            Identifies high-conviction Opening Range Breakouts using strictly completed 15-minute candles. Requires breakout distance &ge; 0.10 ATR, body &ge; 60%, wicks &le; 20%, volume &ge; 1.5x previous 20 candles, VWAP alignment, and minimum 2:1 reward-to-risk ratio against opposing support/resistance. Rejects false breakouts and fakeouts instantly.
-          </p>
-        </div>
-      )}
+          {/* Educational Banner for Fully Bullish / Confirmed Signals */}
+          {activeTab === 'fully_bullish' && (
+            <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 p-4 rounded-2xl border border-emerald-500/50 shadow-lg text-emerald-200 text-xs font-mono space-y-1.5">
+              <div className="font-black text-emerald-300 flex items-center gap-2 text-sm uppercase tracking-wider">
+                <Zap className="w-4 h-4 fill-emerald-300 animate-pulse" />
+                <span>Why Traders Take Fully Bullish Parabolic Rallies (Zero Pullback Confidence)</span>
+              </div>
+              <p className="text-slate-300 font-sans leading-relaxed">
+                Fully Bullish stocks represent institutional breakout perfection: RSI &ge; 60, trading strictly above VWAP and 9 EMA, day gain &ge; 1.2%, breakout &ge; 1.2% above ORB High, and supported by heavy volume surge. <strong>Why this prevents pullbacks:</strong> These conditions ensure aggressive institutional buying pressure where sellers are overwhelmed, creating a parabolic upward trajectory that sustains momentum without sharp retracements.
+              </p>
+            </div>
+          )}
 
-      {/* Stock Cards Grid */}
-      {filteredStocks.length === 0 ? (
-        <div className="bg-slate-900 rounded-2xl p-12 text-center border border-slate-800 text-slate-400 space-y-3">
-          <AlertCircle className="w-10 h-10 text-slate-600 mx-auto" />
-          <h3 className="text-lg font-bold text-white">No Stocks Found in {activeTab}</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            No F&amp;O stocks currently meet this specific filter criteria.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredStocks.map((stock, idx) => {
+          {/* Stock Cards Grid */}
+          {filteredStocks.length === 0 ? (
+            <div className="bg-slate-900 rounded-2xl p-12 text-center border border-slate-800 text-slate-400 space-y-3">
+              <AlertCircle className="w-10 h-10 text-slate-600 mx-auto" />
+              <h3 className="text-lg font-bold text-white">No Stocks Found in {activeTab}</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                No F&amp;O stocks currently meet this specific filter criteria.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredStocks.map((stock, idx) => {
             if (activeTab === 'hq_breakout') {
               const isStrongBull = stock.hqSignalStatus === 'STRONG BULLISH';
               const isStrongBear = stock.hqSignalStatus === 'STRONG BEARISH';
@@ -2275,6 +2134,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           })}
         </div>
       )}
+        </div>
+      </div>
 
       {/* 🧠 SHALL I TAKE THIS - INSTITUTIONAL TRADE EXPLAINER MODAL */}
       {shallITakeThisStock && (() => {
