@@ -1870,7 +1870,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 )}
 
                 {/* ❌ STOCKS THAT FAILED BANNER */}
-                {stock.hasFailedStock && (
+                {activeTab === 'failed_stocks' && stock.hasFailedStock && (
                   <div className="px-4 py-3 bg-gradient-to-r from-rose-950 via-red-950/90 to-rose-950 border-b border-rose-500/60 text-xs font-mono text-rose-200 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="font-black flex items-center gap-1.5 text-rose-300">
