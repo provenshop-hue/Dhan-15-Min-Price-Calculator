@@ -654,7 +654,15 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
                   const bounceAboveVwap = isBullBreak ? (nextPt.close > vwap) : (nextPt.close < vwap);
                   if (bounceAboveVwap) {
-                    hasOrbLowBounceAboveVwap = true;
+                    const atr = stock.atr !== undefined && stock.atr !== null ? stock.atr : Math.max(0.1, high - low);
+                    const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + (close * 2)) / 4;
+                    const bandDev = atr * 2;
+                    const lowerBand = middleBand - bandDev;
+
+                    const isBbTouchingLow = Math.abs(low - lowerBand) / low <= 0.005 || low <= lowerBand * 1.005;
+                    if (!isBbTouchingLow) {
+                      hasOrbLowBounceAboveVwap = true;
+                    }
                   }
 
                   let noRetestAfterBounce = true;
