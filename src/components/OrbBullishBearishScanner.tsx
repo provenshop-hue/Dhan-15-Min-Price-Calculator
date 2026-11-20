@@ -94,7 +94,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
   const [recentSubFilter, setRecentSubFilter] = useState<string>('ALL');
   const [zeroReversalSubFilter, setZeroReversalSubFilter] = useState<string>('ALL');
-  const [orbLowBounceSubFilter, setOrbLowBounceSubFilter] = useState<string>('ALL');
   const [tickerSpeed, setTickerSpeed] = useState<number>(40);
 
   const [lastFetchTime, setLastFetchTime] = useState<string>(() => {
@@ -570,9 +569,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
 
       let hasOrbLowBounce = false;
-      let hasOrbLowBounceGreat = false;
-      let hasOrbLowBounceAboveVwap = false;
-      let hasOrbLowBounceNoRetest = false;
       let orbLowBounceTime = '-';
       let orbBounceType = 'BULLISH_SUPPORT_BOUNCE';
       let rallyExpansionPct = 0;
@@ -641,66 +637,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   orbBounceType = isBullBreak ? 'BULLISH_SUPPORT_BOUNCE' : 'BEARISH_SUPPORT_BOUNCE';
                   rallyExpansionPct = Math.max(0.5, expansionPct);
                   bouncePowerScore = Math.min(100, Math.round(85 + rallyExpansionPct * 10));
-
-                  const bouncedHigher = isBullBreak ? (nextPt.close > pt.high) : (nextPt.close < pt.low);
-                  const range = Math.max(0.05, nextPt.high - nextPt.low);
-                  const body = Math.abs(nextPt.close - nextPt.open);
-                  const goodBody = (body / range) >= 0.45;
-                  const goodVolume = (nextPt.volume || 1) >= (pt.volume || 1) * 0.95 || (stock.volumeRatio || 1) >= 1.1;
-
-                  let farFromSr = true;
-                  if (isBullBreak) {
-                    const overheadResistance = Math.max(orbHigh * 1.02, stock.high * 1.015);
-                    const runwayPct = (overheadResistance - nextPt.close) / nextPt.close;
-                    if (runwayPct < 0.015) {
-                      farFromSr = false;
-                    }
-                  } else {
-                    const underlyingSupport = Math.min(orbLow * 0.98, stock.low * 0.985);
-                    const runwayPct = (nextPt.close - underlyingSupport) / nextPt.close;
-                    if (runwayPct < 0.015) {
-                      farFromSr = false;
-                    }
-                  }
-
-                  if (bouncedHigher && goodBody && goodVolume && farFromSr) {
-                    hasOrbLowBounceGreat = true;
-                  }
-
-                  const bounceAboveVwap = isBullBreak ? (nextPt.close > vwap) : (nextPt.close < vwap);
-                  if (bounceAboveVwap) {
-                    const atr = stock.atr !== undefined && stock.atr !== null ? stock.atr : Math.max(0.1, high - low);
-                    const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + (close * 2)) / 4;
-                    const bandDev = atr * 2;
-                    const upperBand = middleBand + bandDev;
-                    const lowerBand = middleBand - bandDev;
-
-                    const isBbTouchingLow = Math.abs(low - lowerBand) / low <= 0.005 || low <= lowerBand * 1.005;
-                    const isBbTouchingHighForBull = isBullBreak && (Math.abs(high - upperBand) / high <= 0.005 || high >= upperBand * 0.995);
-
-                    if (!isBbTouchingLow && !isBbTouchingHighForBull) {
-                      hasOrbLowBounceAboveVwap = true;
-                    }
-                  }
-
-                  let noRetestAfterBounce = true;
-                  for (let k = i + 2; k < stock.rsiTimeline.length; k++) {
-                    const checkPt = stock.rsiTimeline[k];
-                    if (isBullBreak) {
-                      if (checkPt.low < testLine || checkPt.close < checkPt.open) {
-                        noRetestAfterBounce = false;
-                        break;
-                      }
-                    } else {
-                      if (checkPt.high > testLine || checkPt.close > checkPt.open) {
-                        noRetestAfterBounce = false;
-                        break;
-                      }
-                    }
-                  }
-                  if (noRetestAfterBounce && stock.rsiTimeline.length > i + 2) {
-                    hasOrbLowBounceNoRetest = true;
-                  }
                   break;
                 }
               }
@@ -712,9 +648,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       // Ensure genuine sequence: bounce time must be strictly after orb break time
       if (hasOrbLowBounce && (orbLowBounceTime === '-' || orbLowBounceTime === orbBreakTime)) {
         hasOrbLowBounce = false;
-        hasOrbLowBounceGreat = false;
-        hasOrbLowBounceAboveVwap = false;
-        hasOrbLowBounceNoRetest = false;
       }
 
       let hasBounceCandleStrength = false;
@@ -1189,9 +1122,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         hqTimestamp: capTimeAtCurrentClock(hqTimestamp),
         hasOrbLowBounce,
         orbLowBounceTime: capTimeAtCurrentClock(orbLowBounceTime),
-        hasOrbLowBounceGreat,
-        hasOrbLowBounceAboveVwap,
-        hasOrbLowBounceNoRetest,
         hasBounceAndOneDirection,
         orbBounceType,
         rallyExpansionPct,
@@ -1250,10 +1180,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'super_break_bear' && !s.isSuperBreakBearish) return false;
 
       if (activeTab === 'failed_retest' && !s.hasFailedRetest) return false;
-      if (activeTab === 'orb_low_bounce') {
-        if (!s.hasOrbLowBounce) return false;
-        if (orbLowBounceSubFilter === 'BOUNCE_GREAT' && !s.hasOrbLowBounceGreat) return false;
-      }
+      if (activeTab === 'orb_low_bounce' && !s.hasOrbLowBounce) return false;
       if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
       if (activeTab === 'orb_zero_reversal') {
         if (!s.hasOrbZeroReversal) return false;
@@ -1579,31 +1506,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       recentSubFilter === sub.id
                         ? 'bg-amber-500 text-slate-950 shadow-md font-black ring-2 ring-amber-300/50'
-                        : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
-                    }`}
-                  >
-                    {sub.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* 🛡️ ORB LOW SUPPORT SUB-FILTERS SUB-BAR */}
-            {activeTab === 'orb_low_bounce' && (
-              <div className="bg-slate-950/90 p-3 rounded-xl border border-emerald-500/40 flex flex-wrap items-center gap-2 shadow-inner">
-                <span className="text-xs font-black text-emerald-300 uppercase tracking-wider mr-1 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 animate-pulse" /> ORB Low Support Sub-Filters:
-                </span>
-                {[
-                  { id: 'ALL', label: 'All Low Support Bounces' },
-                  { id: 'BOUNCE_GREAT', label: '🔥 Bounce Great (Far from S/R & Strong Volume/Body)' },
-                ].map((sub) => (
-                  <button
-                    key={sub.id}
-                    onClick={() => setOrbLowBounceSubFilter(sub.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      orbLowBounceSubFilter === sub.id
-                        ? 'bg-emerald-500 text-slate-950 shadow-md font-black ring-2 ring-emerald-300/50'
                         : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
                     }`}
                   >
