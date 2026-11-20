@@ -648,7 +648,22 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   const goodBody = (body / range) >= 0.45;
                   const goodVolume = (nextPt.volume || 1) >= (pt.volume || 1) * 0.95 || (stock.volumeRatio || 1) >= 1.1;
 
-                  if (bouncedHigher && goodBody && goodVolume) {
+                  let farFromSr = true;
+                  if (isBullBreak) {
+                    const overheadResistance = Math.max(orbHigh * 1.02, stock.high * 1.015);
+                    const runwayPct = (overheadResistance - nextPt.close) / nextPt.close;
+                    if (runwayPct < 0.015) {
+                      farFromSr = false;
+                    }
+                  } else {
+                    const underlyingSupport = Math.min(orbLow * 0.98, stock.low * 0.985);
+                    const runwayPct = (nextPt.close - underlyingSupport) / nextPt.close;
+                    if (runwayPct < 0.015) {
+                      farFromSr = false;
+                    }
+                  }
+
+                  if (bouncedHigher && goodBody && goodVolume && farFromSr) {
                     hasOrbLowBounceGreat = true;
                   }
 
@@ -1238,8 +1253,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'orb_low_bounce') {
         if (!s.hasOrbLowBounce) return false;
         if (orbLowBounceSubFilter === 'BOUNCE_GREAT' && !s.hasOrbLowBounceGreat) return false;
-        if (orbLowBounceSubFilter === 'BOUNCE_ABOVE_VWAP' && !s.hasOrbLowBounceAboveVwap) return false;
-        if (orbLowBounceSubFilter === 'NO_RETEST' && !s.hasOrbLowBounceNoRetest) return false;
       }
       if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
       if (activeTab === 'orb_zero_reversal') {
@@ -1583,9 +1596,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 </span>
                 {[
                   { id: 'ALL', label: 'All Low Support Bounces' },
-                  { id: 'BOUNCE_GREAT', label: '🔥 Bounce Great (Higher & Strong Volume/Body)' },
-                  { id: 'BOUNCE_ABOVE_VWAP', label: '🛡️ VWAP Filter (Bull > VWAP, Bear < VWAP)' },
-                  { id: 'NO_RETEST', label: '🚀 No Retest After Bounce' },
+                  { id: 'BOUNCE_GREAT', label: '🔥 Bounce Great (Far from S/R & Strong Volume/Body)' },
                 ].map((sub) => (
                   <button
                     key={sub.id}
