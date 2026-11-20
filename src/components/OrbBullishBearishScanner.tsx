@@ -572,6 +572,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let hasOrbLowBounce = false;
       let hasOrbLowBounceGreat = false;
       let hasOrbLowBounceAboveVwap = false;
+      let hasOrbLowBounceNoRetest = false;
       let orbLowBounceTime = '-';
       let orbBounceType = 'BULLISH_SUPPORT_BOUNCE';
       let rallyExpansionPct = 0;
@@ -655,6 +656,25 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   if (bounceAboveVwap) {
                     hasOrbLowBounceAboveVwap = true;
                   }
+
+                  let noRetestAfterBounce = true;
+                  for (let k = i + 2; k < stock.rsiTimeline.length; k++) {
+                    const checkPt = stock.rsiTimeline[k];
+                    if (isBullBreak) {
+                      if (checkPt.low < testLine || checkPt.close < checkPt.open) {
+                        noRetestAfterBounce = false;
+                        break;
+                      }
+                    } else {
+                      if (checkPt.high > testLine || checkPt.close > checkPt.open) {
+                        noRetestAfterBounce = false;
+                        break;
+                      }
+                    }
+                  }
+                  if (noRetestAfterBounce && stock.rsiTimeline.length > i + 2) {
+                    hasOrbLowBounceNoRetest = true;
+                  }
                   break;
                 }
               }
@@ -668,6 +688,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         hasOrbLowBounce = false;
         hasOrbLowBounceGreat = false;
         hasOrbLowBounceAboveVwap = false;
+        hasOrbLowBounceNoRetest = false;
       }
 
       let hasBounceCandleStrength = false;
@@ -1144,6 +1165,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         orbLowBounceTime: capTimeAtCurrentClock(orbLowBounceTime),
         hasOrbLowBounceGreat,
         hasOrbLowBounceAboveVwap,
+        hasOrbLowBounceNoRetest,
         hasBounceAndOneDirection,
         orbBounceType,
         rallyExpansionPct,
@@ -1206,6 +1228,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (!s.hasOrbLowBounce) return false;
         if (orbLowBounceSubFilter === 'BOUNCE_GREAT' && !s.hasOrbLowBounceGreat) return false;
         if (orbLowBounceSubFilter === 'BOUNCE_ABOVE_VWAP' && !s.hasOrbLowBounceAboveVwap) return false;
+        if (orbLowBounceSubFilter === 'NO_RETEST' && !s.hasOrbLowBounceNoRetest) return false;
       }
       if (activeTab === 'bounce_candle_strength' && !s.hasBounceCandleStrength) return false;
       if (activeTab === 'orb_zero_reversal') {
@@ -1551,6 +1574,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   { id: 'ALL', label: 'All Low Support Bounces' },
                   { id: 'BOUNCE_GREAT', label: '🔥 Bounce Great (Higher & Strong Volume/Body)' },
                   { id: 'BOUNCE_ABOVE_VWAP', label: '🛡️ Bounce Above VWAP' },
+                  { id: 'NO_RETEST', label: '🚀 No Retest After Bounce' },
                 ].map((sub) => (
                   <button
                     key={sub.id}
