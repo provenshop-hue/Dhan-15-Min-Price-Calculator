@@ -1584,7 +1584,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 {[
                   { id: 'ALL', label: 'All Low Support Bounces' },
                   { id: 'BOUNCE_GREAT', label: '🔥 Bounce Great (Higher & Strong Volume/Body)' },
-                  { id: 'BOUNCE_ABOVE_VWAP', label: '🛡️ Bounce Above VWAP' },
+                  { id: 'BOUNCE_ABOVE_VWAP', label: '🛡️ VWAP Filter (Bull > VWAP, Bear < VWAP)' },
                   { id: 'NO_RETEST', label: '🚀 No Retest After Bounce' },
                 ].map((sub) => (
                   <button
