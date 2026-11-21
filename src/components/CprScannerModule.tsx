@@ -185,12 +185,28 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
       const isNarrowCprBreakoutBullish = cprWidthPct < 0.19 && bias === 'BULLISH' && (hasBreakout || isBullishPro || close > cprTop || close > r1 || close > tc);
 
-      // Unique timing of hit per stock based on symbol hash & timeline
-      const sym = stock.symbol || 'STOCK';
-      let hash = 0;
-      for (let i = 0; i < sym.length; i++) hash += sym.charCodeAt(i);
-      const times = ['09:15 AM', '09:22 AM', '09:30 AM', '09:41 AM', '09:50 AM', '10:05 AM', '10:18 AM', '10:30 AM', '10:45 AM', '11:02 AM', '11:15 AM', '11:30 AM', '11:45 AM', '12:05 PM'];
-      const signalTime = stock.candleTimestamp || times[hash % times.length];
+      // Exact breakout time candle calculation from 15m timeline
+      let signalTime = stock.candleTimestamp || '09:45 AM';
+      if (timeline.length > 0) {
+        let breakoutTimeFound = '';
+        for (let i = 0; i < timeline.length; i++) {
+          const pt = timeline[i];
+          const isBullBreak = pt.close >= cprTop || pt.close >= r1 || pt.close >= prevHigh;
+          const isBearBreak = pt.close <= cprBottom || pt.close <= s1 || pt.close <= prevLow;
+          if (bias === 'BULLISH' && isBullBreak) {
+            breakoutTimeFound = pt.timeStr || `09:${15 + i * 15} AM`;
+            break;
+          } else if (bias === 'BEARISH' && isBearBreak) {
+            breakoutTimeFound = pt.timeStr || `09:${15 + i * 15} AM`;
+            break;
+          }
+        }
+        if (breakoutTimeFound) {
+          signalTime = breakoutTimeFound;
+        } else if (timeline[0]?.timeStr) {
+          signalTime = timeline[0].timeStr;
+        }
+      }
 
       // 100-point Scoring System Calculation (Ensuring unique scores per stock)
       const randomVar = hash % 19; // Unique deterministic offset per stock
