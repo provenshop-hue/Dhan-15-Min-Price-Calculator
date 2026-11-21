@@ -33,6 +33,7 @@ import { Nifty50ParabolicTracker } from './components/Nifty50ParabolicTracker';
 import { EmaDynamicEngineDashboard } from './components/EmaDynamicEngineDashboard';
 import { FollowedStocksDashboard } from './components/FollowedStocksDashboard';
 import { CprScannerModule } from './components/CprScannerModule';
+import { ContinuationEngineDashboard } from './components/ContinuationEngineDashboard';
 
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
@@ -216,7 +217,7 @@ export default function App() {
 
 
   // Active Dashboard View Tab
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'cpr_scanner' | 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks' | 'bb_mean_reversal'>('gann');
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'cpr_scanner' | 'gann' | 'gann_dashboard' | 'rsi_pullback' | 'btst' | 'parabolic_rally' | 'user_tracker' | 'sector_strength' | 'open_high_low' | 'hundred_bullish' | 'hundred_bearish' | 'orb_breakout' | 'timing_quality' | 'fii_dii_predictor' | 'nifty_parabolic' | 'ema_dynamic_engine' | 'followed_stocks' | 'bb_mean_reversal' | 'continuation_engine'>('gann');
 
   // Followed Stocks State & 2-min Polling with Alarms
   const [followedSymbols, setFollowedSymbols] = useState<string[]>(() => {
@@ -1552,6 +1553,13 @@ export default function App() {
             credentials={credentials}
             onFetchAllStocks={handleFetchAllDhan}
             isLoading={isBulkLoading}
+          />
+        ) : activeDashboardTab === 'continuation_engine' ? (
+          /* Dedicated AI Bullish & Bearish 15-Minute Continuation Engine */
+          <ContinuationEngineDashboard
+            stocks={stocks}
+            onSelectStockDetail={(s) => setSelectedDetailStock(s)}
+            onOpenPositionSizer={(s) => handleOpenPositionSizer(s)}
           />
         ) : activeDashboardTab === 'orb_breakout' ? (
           /* Dedicated ORB Bullish & Bearish Breakout Hub */
