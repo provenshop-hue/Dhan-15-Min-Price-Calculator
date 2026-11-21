@@ -228,7 +228,48 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
         }
 
         const breakoutDistancePct = tc > 0 ? Math.round((Math.abs(close - tc) / tc) * 10000) / 100 : 0;
-        const isNarrowCprBreakoutBullish = isNarrowCpr && (hasRetestBounce || close >= tc) && (breakoutDistancePct < 12);
+        
+        // Reworked Narrow CPR Bullish Conditions
+        const m15Open = stock.first15mOpen ?? open;
+        const m15High = stock.first15mHigh ?? high;
+        const m15Low = stock.first15mLow ?? low;
+        const m15Close = stock.first15mClose ?? close;
+        
+        const m15Range = Math.max(0.01, m15High - m15Low);
+        const m15Body = Math.abs(m15Close - m15Open);
+        const upperWick = m15High - Math.max(m15Open, m15Close);
+
+        const closesAboveTc = m15Close >= tc;
+        const bodyAtLeast65 = (m15Body / m15Range) >= 0.65;
+        const closeInUpper20 = ((m15High - m15Close) / m15Range) <= 0.20;
+        
+        const rawStock = stock as any;
+        const atrVal = rawStock.atr || Math.max(0.1, m15Range);
+        const closesAboveTcBuffer = (m15Close >= tc * 1.001) || ((m15Close - tc) >= atrVal * 0.1);
+        
+        const volumeAtLeast1_5 = volumeRatio >= 1.5;
+        const upperWickBelow20 = (upperWick / m15Range) <= 0.20;
+        const priceAboveVwap = m15Close >= vwap;
+        
+        const ema9Val = rawStock.ema9 || m15Close * 0.995;
+        const ema20Val = rawStock.ema20 || m15Close * 0.985;
+        const ema9Above20 = ema9Val >= ema20Val;
+        const ema20Rising = rawStock.isEma20Rising ?? true;
+        const niftyNotBearish = rawStock.niftyBias !== 'BEARISH';
+
+        const isNarrowCprBreakoutBullish = 
+          isNarrowCpr &&
+          closesAboveTc &&
+          bodyAtLeast65 &&
+          closeInUpper20 &&
+          closesAboveTcBuffer &&
+          volumeAtLeast1_5 &&
+          upperWickBelow20 &&
+          priceAboveVwap &&
+          ema9Above20 &&
+          ema20Rising &&
+          niftyNotBearish &&
+          (breakoutDistancePct < 12);
 
         const sym = stock.symbol || 'STOCK';
         let hash = 0;
