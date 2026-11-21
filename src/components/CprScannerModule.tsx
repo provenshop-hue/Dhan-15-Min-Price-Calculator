@@ -182,8 +182,9 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       // Bearish: Narrow CPR + Price opens/closes below BC + Below VWAP + Volume >= 1.5x
       const isCprNarrowTrendingBullish = isNarrowCpr && (close >= tc || open >= tc || close >= pivot) && (close > vwap) && (volumeRatio >= 1.5) && bias === 'BULLISH';
       const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.5) && bias === 'BEARISH';
-      const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
-      const isNarrowCprBreakoutBullish = isVeryNarrow && bias === 'BULLISH' && (hasBreakout || isBullishPro || close > cprTop || close > r1 || close > tc);
+      const isSingleLineCpr = cprWidthPct <= 0.12;
+      const brokeFromBottomToTopCpr = (open <= pivot || low <= bc || open <= cprBottom) && (close >= tc || high >= tc || close >= cprTop);
+      const isNarrowCprBreakoutBullish = isSingleLineCpr && brokeFromBottomToTopCpr && (volumeRatio >= 1.5) && (close > vwap);
 
       // Exact TC (bullish) or BC (bearish) cross time candle calculation from timeline
       let signalTime = '09:30 AM';
