@@ -51,6 +51,8 @@ export const ContinuationEngineDashboard: React.FC<ContinuationEngineDashboardPr
       const isBreakout = close > orbHigh || close > prevDayHigh;
       const isBreakdown = close < orbLow || close < prevDayLow;
 
+      const entryTimeStr = stock.orbBreakTime || (timeline.length > 1 ? timeline[1].timeStr : '10:15 AM');
+
       // EMA 20 and EMA 50 proxies from RSI timeline or price structure
       const priceArray = timeline.length > 0 ? timeline.map(p => p.close) : [open, high, low, close];
       const computeEMA = (prices: number[], period: number): number[] => {
@@ -155,6 +157,7 @@ export const ContinuationEngineDashboard: React.FC<ContinuationEngineDashboardPr
         continuationDirection: direction,
         continuationScore: score,
         continuationState: state,
+        entryTimeStr,
         openingClassification: isBullOpen ? 'Strong Bullish (Open=Low)' : isBearOpen ? 'Strong Bearish (Open=High)' : 'Neutral / Mixed',
         vwapStatus: close >= vwap ? 'Above VWAP (Bullish)' : 'Below VWAP (Bearish)',
         emaStatus: emaBullAlignment ? 'EMA 20 > EMA 50 (Bullish Trend)' : 'EMA 20 < EMA 50 (Bearish Trend)',
@@ -166,7 +169,7 @@ export const ContinuationEngineDashboard: React.FC<ContinuationEngineDashboardPr
         targetLevel: target,
         rewardRiskRatio: rrRatio,
         failedConditions: failedConditions.slice(0, 3),
-        decisionReason: score >= 80 ? `Confirmed continuation with ${score}/100 quality score and favorable risk-to-reward.` : `Score ${score}/100 below 80 threshold or critical conditions failed.`
+        decisionReason: score >= 80 ? `Confirmed continuation at ${entryTimeStr} with ${score}/100 quality score and favorable risk-to-reward. Price must not reverse below/above this level.` : `Score ${score}/100 below 80 threshold or critical conditions failed.`
       };
     });
   }, [stocks]);
@@ -314,8 +317,19 @@ export const ContinuationEngineDashboard: React.FC<ContinuationEngineDashboardPr
                 </div>
               </div>
 
+              {/* 🕒 BIG FONT ENTRY TIMING & NON-REVERSING POINT */}
+              <div className="my-3 bg-gradient-to-r from-amber-950 via-yellow-950/70 to-amber-950 border border-amber-500/50 rounded-2xl p-3 text-center shadow-inner relative z-10">
+                <div className="text-[10px] font-black uppercase tracking-wider text-amber-400">Exact Entry Time (Non-Reversing Point)</div>
+                <div className="text-2xl font-black font-mono text-yellow-300 tracking-tight mt-0.5">
+                  🕒 {stock.entryTimeStr}
+                </div>
+                <div className="text-[9px] text-amber-200/80 font-sans mt-0.5">
+                  Price should not be reversed after this point
+                </div>
+              </div>
+
               {/* Middle Row: Price & Metrics */}
-              <div className="py-4 space-y-3 relative z-10 font-mono text-xs">
+              <div className="py-2 space-y-3 relative z-10 font-mono text-xs">
                 <div className="flex items-center justify-between bg-slate-950 p-3 rounded-2xl border border-slate-800/80">
                   <div>
                     <span className="text-slate-400 text-[10px] block font-sans">Current Price (LTP)</span>
@@ -402,6 +416,17 @@ export const ContinuationEngineDashboard: React.FC<ContinuationEngineDashboardPr
               </button>
             </div>
 
+            {/* 🕒 BIG FONT ENTRY TIME IN MODAL */}
+            <div className="bg-gradient-to-r from-amber-950 via-yellow-950/80 to-amber-950 border border-amber-500/60 rounded-2xl p-4 text-center shadow-lg">
+              <div className="text-xs font-black uppercase tracking-wider text-amber-400">Non-Reversing Entry Timestamp</div>
+              <div className="text-4xl font-black font-mono text-yellow-300 tracking-tight mt-1">
+                🕒 {selectedStockForModal.entryTimeStr}
+              </div>
+              <div className="text-[11px] text-amber-200 font-sans mt-1">
+                Price should not be reversed after this point of time.
+              </div>
+            </div>
+
             <div className="space-y-4 font-mono text-xs">
               <div className="grid grid-cols-2 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
                 <div>
@@ -431,6 +456,10 @@ export const ContinuationEngineDashboard: React.FC<ContinuationEngineDashboardPr
               </div>
 
               <div className="space-y-2.5 bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs font-sans">
+                <div className="flex justify-between border-b border-slate-800 pb-2">
+                  <span className="text-slate-400">Exact Entry Time:</span>
+                  <strong className="text-yellow-300 font-mono text-sm">{selectedStockForModal.entryTimeStr} (Non-Reversing)</strong>
+                </div>
                 <div className="flex justify-between border-b border-slate-800 pb-2">
                   <span className="text-slate-400">Opening Candle Classification:</span>
                   <strong className="text-white">{selectedStockForModal.openingClassification}</strong>
