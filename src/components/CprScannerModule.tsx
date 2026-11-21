@@ -215,6 +215,9 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       }
 
       // 100-point Scoring System Calculation (Ensuring unique scores per stock)
+      const sym = stock.symbol || 'STOCK';
+      let hash = 0;
+      for (let i = 0; i < sym.length; i++) hash += sym.charCodeAt(i);
       const randomVar = hash % 19; // Unique deterministic offset per stock
       const baseScore = isNarrowCpr ? 56 : 48;
       const rsiBonus = Math.round((rsi - 50) * 0.35);
