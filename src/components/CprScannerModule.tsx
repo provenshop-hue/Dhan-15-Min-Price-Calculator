@@ -167,39 +167,43 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
         
         const isSingleLineCpr = cprWidthPct <= 0.25;
 
-        // Breakout candle close -> Subsequent retest -> Bounce candle entry timing detection from timeline
+        // Exact Breakout TC -> Retest (CPR line hit or bearish candle) -> Bounce back candle entry timing detection
         let signalTime = '09:30 AM';
         let hasRetestBounce = false;
         const timeline = stock.rsiTimeline || [];
 
         try {
           if (timeline.length >= 3) {
-            for (let i = 2; i < timeline.length; i++) {
-              const prev2 = timeline[i - 2]; // Breakout candle
-              const prev1 = timeline[i - 1]; // Retest candle
-              const curr = timeline[i];      // Bounce candle
+            let breakoutIndex = -1;
+            // 1. First condition: stock breakouts TC
+            for (let i = 0; i < timeline.length - 2; i++) {
+              const pt = timeline[i];
+              if (pt && typeof pt.close === 'number' && pt.close >= (tc || pivot)) {
+                breakoutIndex = i;
+                break;
+              }
+            }
 
-              if (prev2 && prev1 && curr && typeof prev2.close === 'number' && typeof prev1.low === 'number' && typeof curr.close === 'number') {
-                if (bias === 'BULLISH') {
-                  const brokeOut = prev2.close >= (tc || pivot);
-                  const retested = prev1.low <= (tc || cprTop) * 1.008 && prev1.low >= cprBottom * 0.990;
-                  const bounced = curr.close > curr.open;
+            if (breakoutIndex !== -1) {
+              // 2. Wait for retest candle: either hits CPR line or is a bearish candle
+              for (let j = breakoutIndex + 1; j < timeline.length - 1; j++) {
+                const retestCandle = timeline[j];
+                const isCprHit = typeof retestCandle.low === 'number' && retestCandle.low <= (tc || cprTop) * 1.008 && retestCandle.low >= (cprBottom || bc) * 0.985;
+                const isBearishCandle = typeof retestCandle.close === 'number' && typeof retestCandle.open === 'number' && retestCandle.close < retestCandle.open;
 
-                  if (brokeOut && retested && bounced) {
-                    signalTime = curr.timeStr || `09:${15 + i * 15} AM`;
-                    hasRetestBounce = true;
-                    break;
+                if (isCprHit || isBearishCandle) {
+                  // 3. Next or subsequent bounce back to breakout direction
+                  for (let k = j + 1; k < timeline.length; k++) {
+                    const bounceCandle = timeline[k];
+                    const isBounceBack = typeof bounceCandle.close === 'number' && typeof bounceCandle.open === 'number' && bounceCandle.close > bounceCandle.open && bounceCandle.close >= retestCandle.close;
+
+                    if (isBounceBack) {
+                      signalTime = bounceCandle.timeStr || `09:${15 + k * 15} AM`;
+                      hasRetestBounce = true;
+                      break;
+                    }
                   }
-                } else if (bias === 'BEARISH') {
-                  const brokeOut = prev2.close <= (bc || pivot);
-                  const retested = prev1.high >= (bc || cprBottom) * 0.992 && prev1.high <= cprTop * 1.010;
-                  const bounced = curr.close < curr.open;
-
-                  if (brokeOut && retested && bounced) {
-                    signalTime = curr.timeStr || `09:${15 + i * 15} AM`;
-                    hasRetestBounce = true;
-                    break;
-                  }
+                  if (hasRetestBounce) break;
                 }
               }
             }
@@ -208,16 +212,10 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
           if (!hasRetestBounce && timeline.length > 0) {
             for (let i = 0; i < timeline.length; i++) {
               const pt = timeline[i];
-              if (pt && typeof pt.close === 'number') {
-                if (bias === 'BULLISH' && pt.close >= (tc || pivot)) {
-                  signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
-                  hasRetestBounce = true;
-                  break;
-                } else if (bias === 'BEARISH' && pt.close <= (bc || pivot)) {
-                  signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
-                  hasRetestBounce = true;
-                  break;
-                }
+              if (pt && typeof pt.close === 'number' && pt.close >= (tc || pivot)) {
+                signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
+                hasRetestBounce = true;
+                break;
               }
             }
           }
@@ -229,8 +227,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
           signalTime = '09:30 AM';
         }
 
-        const brokeFromBottomToTopCpr = (open <= pivot || low <= bc || open <= cprBottom) && (close >= tc || high >= tc || close >= cprTop);
-        const isNarrowCprBreakoutBullish = isSingleLineCpr && (brokeFromBottomToTopCpr || hasRetestBounce) && (volumeRatio >= 1.2) && (close > vwap);
+        const isNarrowCprBreakoutBullish = isNarrowCpr && (hasRetestBounce || close >= tc);
 
         const sym = stock.symbol || 'STOCK';
         let hash = 0;
