@@ -186,31 +186,37 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const brokeFromBottomToTopCpr = (open <= pivot || low <= bc || open <= cprBottom) && (close >= tc || high >= tc || close >= cprTop);
       const isNarrowCprBreakoutBullish = isSingleLineCpr && brokeFromBottomToTopCpr && (volumeRatio >= 1.5) && (close > vwap);
 
-      // Exact TC (bullish) or BC (bearish) cross time candle calculation from timeline
+      // Exact TC (bullish) or BC (bearish) cross time candle calculation from timeline with safety guards
       let signalTime = '09:30 AM';
       const timeline = stock.rsiTimeline || [];
 
-      if (timeline.length > 0) {
-        let breakoutFound = false;
-        for (let i = 0; i < timeline.length; i++) {
-          const pt = timeline[i];
-          if (bias === 'BULLISH' && pt.close >= tc) {
-            signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
-            breakoutFound = true;
-            break;
-          } else if (bias === 'BEARISH' && pt.close <= bc) {
-            signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
-            breakoutFound = true;
-            break;
+      try {
+        if (timeline.length > 0) {
+          let breakoutFound = false;
+          for (let i = 0; i < timeline.length; i++) {
+            const pt = timeline[i];
+            if (pt && typeof pt.close === 'number') {
+              if (bias === 'BULLISH' && pt.close >= (tc || 0)) {
+                signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
+                breakoutFound = true;
+                break;
+              } else if (bias === 'BEARISH' && pt.close <= (bc || 0)) {
+                signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
+                breakoutFound = true;
+                break;
+              }
+            }
           }
+          if (!breakoutFound && timeline.length > 1 && timeline[Math.min(1, timeline.length - 1)]) {
+            signalTime = timeline[Math.min(1, timeline.length - 1)].timeStr || '09:30 AM';
+          }
+        } else if (stock.orbBreakTime && stock.orbBreakTime !== '-') {
+          signalTime = stock.orbBreakTime;
+        } else if (stock.candleTimestamp) {
+          signalTime = stock.candleTimestamp;
         }
-        if (!breakoutFound && timeline.length > 1) {
-          signalTime = timeline[Math.min(1, timeline.length - 1)].timeStr;
-        }
-      } else if (stock.orbBreakTime && stock.orbBreakTime !== '-') {
-        signalTime = stock.orbBreakTime;
-      } else if (stock.candleTimestamp) {
-        signalTime = stock.candleTimestamp;
+      } catch (e) {
+        signalTime = '09:30 AM';
       }
 
       // 100-point Scoring System Calculation (Ensuring unique scores per stock)
