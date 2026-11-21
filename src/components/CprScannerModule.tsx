@@ -183,7 +183,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const isCprNarrowTrendingBullish = isNarrowCpr && (close >= tc || open >= tc || close >= pivot) && (close > vwap) && (volumeRatio >= 1.5) && bias === 'BULLISH';
       const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.5) && bias === 'BEARISH';
       const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
-      const isNarrowCprBreakoutBullish = isNarrowCpr && bias === 'BULLISH' && (hasBreakout || isBullishPro || close > cprTop || close > r1 || close > tc);
+      const isNarrowCprBreakoutBullish = isVeryNarrow && bias === 'BULLISH' && (hasBreakout || isBullishPro || close > cprTop || close > r1 || close > tc);
 
       // Exact TC (bullish) or BC (bearish) cross time candle calculation from timeline
       let signalTime = '09:30 AM';
@@ -254,6 +254,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
         cprWidthPct: Math.round(cprWidthPct * 100) / 100,
         cprClassification,
         isNarrowCpr,
+        isVeryNarrow,
         isVeryNarrowNoTrend,
         isCprNarrowTrending,
         isCprNarrowTrendingBullish,
@@ -294,7 +295,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       if (cprTab === 'narrow' && !s.isNarrowCpr) return false;
       if (cprTab === 'narrow_cpr_breakout_bullish' && !s.isNarrowCprBreakoutBullish) return false;
       if (cprTab === 'reversal' && !s.hasReversal) return false;
-      if (cprTab === 'breakout' && !s.hasBreakout) return false;
+      if (cprTab === 'breakout' && (!s.hasBreakout || !s.isVeryNarrow)) return false;
       if (cprTab === 'confirmed' && s.status !== 'CONFIRMED') return false;
       if (cprTab === 'watchlist' && !s.isWatched) return false;
       if (cprTab === 'backtest') {
