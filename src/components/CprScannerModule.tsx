@@ -185,21 +185,19 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
       const isNarrowCprBreakoutBullish = isNarrowCpr && bias === 'BULLISH' && (hasBreakout || isBullishPro || close > cprTop || close > r1 || close > tc);
 
-      // Exact breakout time candle calculation from timeline
+      // Exact TC (bullish) or BC (bearish) cross time candle calculation from timeline
       let signalTime = '09:30 AM';
       const timeline = stock.rsiTimeline || [];
-      const breakoutThreshold = Math.max(cprTop, r1, tc, prevHigh);
-      const breakdownThreshold = Math.min(cprBottom, s1, bc, prevLow);
 
       if (timeline.length > 0) {
         let breakoutFound = false;
         for (let i = 0; i < timeline.length; i++) {
           const pt = timeline[i];
-          if (bias === 'BULLISH' && pt.close >= breakoutThreshold) {
+          if (bias === 'BULLISH' && pt.close >= tc) {
             signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
             breakoutFound = true;
             break;
-          } else if (bias === 'BEARISH' && pt.close <= breakdownThreshold) {
+          } else if (bias === 'BEARISH' && pt.close <= bc) {
             signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
             breakoutFound = true;
             break;
@@ -765,6 +763,19 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
                           {stock.pctChange >= 0 ? '+' : ''}{stock.pctChange?.toFixed(2)}%
                         </span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* 🕒 BIG FONT HIT SIGNAL TIMING (TC / BC CROSS) */}
+                  <div className="bg-gradient-to-r from-purple-950 via-indigo-950/80 to-purple-950 border border-purple-500/50 rounded-2xl p-3 text-center shadow-inner">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-purple-300">
+                      {isBull ? '🟢 TC Cross Hit Signal (Bullish Breakout)' : '🔴 BC Cross Hit Signal (Bearish Breakdown)'}
+                    </div>
+                    <div className="text-2xl font-black font-mono text-yellow-300 tracking-tight mt-0.5">
+                      🕒 {stock.signalTime}
+                    </div>
+                    <div className="text-[9px] text-purple-200/80 font-sans mt-0.5">
+                      {isBull ? 'Price crossed Top Central Pivot (TC)' : 'Price crossed Bottom Central Pivot (BC)'}
                     </div>
                   </div>
 
