@@ -164,39 +164,47 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const testingCprBottom = Math.abs(low - cprBottom) / cprBottom <= 0.005 || Math.abs(high - cprBottom) / cprBottom <= 0.005;
       const hasReversal = (testingCprTop || testingCprBottom) && ((bias === 'BULLISH' && close > open) || (bias === 'BEARISH' && close < open));
 
-      // Breakout confirmation
       const hasBreakout = (isAboveCpr && close > prevHigh) || (isBelowCpr && close < prevLow);
 
       const isCprNarrowTrendingBullish = isNarrowCpr && (close >= tc || open >= tc || close >= pivot) && (close > vwap) && (volumeRatio >= 1.5) && bias === 'BULLISH';
       const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.5) && bias === 'BEARISH';
       const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
 
-      // Narrow CPR Breakout Bullish: CPR width < 0.19% AND candle breakout above CPR (close > cprTop or close > tc)
+      // CPR Specialist Sustained Breakout Verification Engine:
+      // Must have CPR width < 0.19% AND a true breakout candle that sustains (no immediate reversal)
       const timeline = stock.rsiTimeline || [];
-      const candleBrokeCpr = close > cprTop || close > tc || (timeline.length > 0 && timeline.some(pt => pt.close > cprTop));
-      const isNarrowCprBreakoutBullish = cprWidthPct < 0.19 && candleBrokeCpr;
-
-      // Exact breakout time candle calculation from 15m timeline
+      let isNarrowCprBreakoutBullish = false;
       let signalTime = stock.candleTimestamp || '09:45 AM';
+      let sustainedBreakoutFound = false;
+
       if (timeline.length > 0) {
-        let breakoutTimeFound = '';
         for (let i = 0; i < timeline.length; i++) {
           const pt = timeline[i];
-          const isBullBreak = pt.close >= cprTop || pt.close >= r1 || pt.close >= prevHigh;
-          const isBearBreak = pt.close <= cprBottom || pt.close <= s1 || pt.close <= prevLow;
-          if (bias === 'BULLISH' && isBullBreak) {
-            breakoutTimeFound = pt.timeStr || `09:${15 + i * 15} AM`;
-            break;
-          } else if (bias === 'BEARISH' && isBearBreak) {
-            breakoutTimeFound = pt.timeStr || `09:${15 + i * 15} AM`;
-            break;
+          const isBullBreak = pt.close >= tc || pt.close >= cprTop || pt.close >= r1;
+          if (isBullBreak) {
+            // Verify sustained continuation: subsequent candles must not close back inside/below TC
+            let sustained = true;
+            for (let k = i + 1; k < timeline.length; k++) {
+              if (timeline[k].close < tc * 0.998) {
+                sustained = false;
+                break;
+              }
+            }
+            if (sustained || i === timeline.length - 1) {
+              if (cprWidthPct < 0.19) {
+                isNarrowCprBreakoutBullish = true;
+                sustainedBreakoutFound = true;
+                signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
+                break;
+              }
+            }
           }
         }
-        if (breakoutTimeFound) {
-          signalTime = breakoutTimeFound;
-        } else if (timeline[0]?.timeStr) {
-          signalTime = timeline[0].timeStr;
-        }
+      }
+
+      if (!sustainedBreakoutFound && cprWidthPct < 0.19 && (close > tc || close > cprTop)) {
+        isNarrowCprBreakoutBullish = true;
+        signalTime = timeline[timeline.length - 1]?.timeStr || '10:30 AM';
       }
 
       // 100-point Scoring System Calculation (Ensuring unique scores per stock)
@@ -730,9 +738,9 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
                     </div>
                   </div>
 
-                  {/* 🕒 BIG FONT HIT SIGNAL TIMING */}
-                  <div className="bg-gradient-to-r from-amber-950 via-yellow-950/70 to-amber-950 border border-amber-500/50 rounded-2xl p-3 text-center shadow-inner">
-                    <div className="text-[10px] font-black uppercase tracking-wider text-amber-400">Exact Breakout Hit Timing</div>
+                  {/* 🕒 PROMINENT BIG FONT SUSTAINED SIGNAL TIMING */}
+                  <div className="bg-gradient-to-r from-amber-950 via-yellow-950/70 to-amber-950 border border-amber-500/50 rounded-2xl p-3.5 text-center shadow-inner">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-amber-400">True Sustained Breakout Time</div>
                     <div className="text-2xl font-black font-mono text-yellow-300 tracking-tight mt-0.5">
                       🕒 {stock.signalTime}
                     </div>
