@@ -53,8 +53,9 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       const isEndingInZero = isWholeRupee && (Math.round(open) % 10 === 0);
 
       // Bollinger Bands calculation (Period 20, StdDev 2)
-      const atr = s.atr !== undefined && s.atr !== null ? s.atr : Math.max(0.1, high - low);
-      const middleBand = s.ema20 !== undefined && s.ema20 !== null ? s.ema20 : (high + low + (close * 2)) / 4;
+      const rawS = s as any;
+      const atr = rawS.atr !== undefined && rawS.atr !== null ? rawS.atr : Math.max(0.1, high - low);
+      const middleBand = rawS.ema20 !== undefined && rawS.ema20 !== null ? rawS.ema20 : (high + low + (close * 2)) / 4;
       const bandDev = atr * 2;
       const upperBand = middleBand + bandDev;
       const lowerBand = middleBand - bandDev;

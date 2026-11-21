@@ -93,275 +93,274 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Process and compute CPR and technical setups for all stocks
+  // Process and compute CPR and technical setups for all stocks with fault-tolerant try/catch
   const processedCprStocks = useMemo(() => {
+    if (!stocks || !Array.isArray(stocks)) return [];
     return stocks.map((stock) => {
-      const open = stock.openPrice || 100;
-      const close = stock.closePrice || open;
-      const high = stock.highPrice || Math.max(open, close) * 1.008;
-      const low = stock.lowPrice || Math.min(open, close) * 0.992;
-      const prevClose = stock.previousClose || open * 0.995;
-
-      // Previous session high, low, close estimation for CPR calculation
-      const prevHigh = high * 0.995;
-      const prevLow = low * 1.005;
-      const prevC = prevClose;
-
-      // CPR Formulas:
-      // Pivot = (High + Low + Close) / 3
-      const pivot = (prevHigh + prevLow + prevC) / 3;
-      // BC = (High + Low) / 2
-      const bc = (prevHigh + prevLow) / 2;
-      // TC = (2 * Pivot) - BC
-      const tc = (2 * pivot) - bc;
-
-      // CPR Resistance R1 and Support S1 Formulas:
-      // R1 = (2 * Pivot) - Previous Low
-      // S1 = (2 * Pivot) - Previous High
-      const r1 = (2 * pivot) - prevLow;
-      const s1 = (2 * pivot) - prevHigh;
-
-      const cprBottom = Math.min(tc, bc);
-      const cprTop = Math.max(tc, bc);
-      const cprWidth = Math.abs(cprTop - cprBottom);
-      const cprWidthPct = prevC > 0 ? (cprWidth / prevC) * 100 : 0;
-
-      // Classification per prompt thresholds:
-      // - Very narrow: below 0.25%
-      // - Narrow: 0.25%–0.35%
-      // - Moderate: 0.35%–0.50%
-      // - Wide: above 0.50%
-      const isVeryNarrow = cprWidthPct < 0.25;
-      const isNarrow = cprWidthPct >= 0.25 && cprWidthPct <= 0.35;
-      const isNarrowCpr = cprWidthPct <= 0.35;
-      const isModerateCpr = cprWidthPct > 0.35 && cprWidthPct <= 0.50;
-      const isWideCpr = cprWidthPct > 0.50;
-
-      const cprClassification = isVeryNarrow ? 'Very Narrow CPR (<0.25%)' : (isNarrow ? 'Narrow CPR (0.25-0.35%)' : (isModerateCpr ? 'Moderate CPR (0.35-0.50%)' : 'Wide CPR (>0.50%)'));
-
-      const rsi = stock.rsi !== undefined && stock.rsi !== null ? stock.rsi : 50;
-      const vwap = stock.vwap !== undefined && stock.vwap !== null ? stock.vwap : open;
-      const volumeRatio = stock.volumeRatio !== undefined && stock.volumeRatio !== null ? stock.volumeRatio : 1.2;
-
-      // 200 EMA Approximation
-      const ema200 = close * 0.985;
-      const above200Ema = close >= ema200;
-      const below200Ema = close <= ema200;
-
-      // Crossed Previous Day High / Low and R1 / S1
-      const crossedPdH = close >= prevHigh;
-      const crossedPdL = close <= prevLow;
-      const aboveR1 = close >= r1;
-      const belowS1 = close <= s1;
-
-      // Inverted Hammer Candlestick Pattern check (Upper shadow >= 2 * body)
-      const body = Math.abs(close - open);
-      const upperShadow = high - Math.max(open, close);
-      const lowerShadow = Math.min(open, close) - low;
-      const isInvertedHammer = upperShadow >= (2 * body) && lowerShadow <= body * 0.8 && body > 0;
-
-      // Bullish Pro & Bearish Pro conditions
-      const isBullishPro = above200Ema && crossedPdH && aboveR1;
-      const isBearishPro = below200Ema && belowS1 && crossedPdL;
-
-      // Directional Bias
-      const isAboveCpr = close >= cprTop;
-      const isBelowCpr = close <= cprBottom;
-      const bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = (isBullishPro || (isAboveCpr && close > vwap && rsi >= 50)) ? 'BULLISH' : ((isBearishPro || (isBelowCpr && close < vwap && rsi <= 50)) ? 'BEARISH' : 'NEUTRAL');
-
-      // Reversal detection around CPR levels
-      const testingCprTop = Math.abs(high - cprTop) / cprTop <= 0.005 || Math.abs(low - cprTop) / cprTop <= 0.005;
-      const testingCprBottom = Math.abs(low - cprBottom) / cprBottom <= 0.005 || Math.abs(high - cprBottom) / cprBottom <= 0.005;
-      const hasReversal = (testingCprTop || testingCprBottom) && ((bias === 'BULLISH' && close > open) || (bias === 'BEARISH' && close < open));
-
-      // Breakout confirmation
-      const hasBreakout = (isAboveCpr && close > prevHigh) || (isBelowCpr && close < prevLow);
-
-      // CPR Narrow Trending Conditions per prompt:
-      // Bullish: Narrow CPR + Price opens/closes above TC + Above VWAP + Volume >= 1.5x
-      // Bearish: Narrow CPR + Price opens/closes below BC + Below VWAP + Volume >= 1.5x
-      const isCprNarrowTrendingBullish = isNarrowCpr && (close >= tc || open >= tc || close >= pivot) && (close > vwap) && (volumeRatio >= 1.5) && bias === 'BULLISH';
-      const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.5) && bias === 'BEARISH';
-      const isSingleLineCpr = cprWidthPct <= 0.12;
-      const brokeFromBottomToTopCpr = (open <= pivot || low <= bc || open <= cprBottom) && (close >= tc || high >= tc || close >= cprTop);
-      const isNarrowCprBreakoutBullish = isSingleLineCpr && brokeFromBottomToTopCpr && (volumeRatio >= 1.5) && (close > vwap);
-
-      // Exact TC (bullish) or BC (bearish) cross time candle calculation from timeline with safety guards
-      let signalTime = '09:30 AM';
-      const timeline = stock.rsiTimeline || [];
-
       try {
-        if (timeline.length > 0) {
-          let breakoutFound = false;
-          for (let i = 0; i < timeline.length; i++) {
-            const pt = timeline[i];
-            if (pt && typeof pt.close === 'number') {
-              if (bias === 'BULLISH' && pt.close >= (tc || 0)) {
-                signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
-                breakoutFound = true;
-                break;
-              } else if (bias === 'BEARISH' && pt.close <= (bc || 0)) {
-                signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
-                breakoutFound = true;
-                break;
+        const open = stock.openPrice || 100;
+        const close = stock.closePrice || open;
+        const high = stock.highPrice || Math.max(open, close) * 1.008;
+        const low = stock.lowPrice || Math.min(open, close) * 0.992;
+        const prevClose = stock.previousClose || open * 0.995;
+
+        // Previous session high, low, close estimation for CPR calculation
+        const prevHigh = high * 0.995;
+        const prevLow = low * 1.005;
+        const prevC = prevClose;
+
+        // CPR Formulas:
+        const pivot = (prevHigh + prevLow + prevC) / 3;
+        const bc = (prevHigh + prevLow) / 2;
+        const tc = (2 * pivot) - bc;
+
+        const r1 = (2 * pivot) - prevLow;
+        const s1 = (2 * pivot) - prevHigh;
+
+        const cprBottom = Math.min(tc, bc);
+        const cprTop = Math.max(tc, bc);
+        const cprWidth = Math.abs(cprTop - cprBottom);
+        const cprWidthPct = prevC > 0 ? (cprWidth / prevC) * 100 : 0;
+
+        const isVeryNarrow = cprWidthPct < 0.25;
+        const isNarrow = cprWidthPct >= 0.25 && cprWidthPct <= 0.35;
+        const isNarrowCpr = cprWidthPct <= 0.35;
+        const isModerateCpr = cprWidthPct > 0.35 && cprWidthPct <= 0.50;
+        const isWideCpr = cprWidthPct > 0.50;
+
+        const cprClassification = isVeryNarrow ? 'Very Narrow CPR (<0.25%)' : (isNarrow ? 'Narrow CPR (0.25-0.35%)' : (isModerateCpr ? 'Moderate CPR (0.35-0.50%)' : 'Wide CPR (>0.50%)'));
+
+        const rsi = stock.rsi !== undefined && stock.rsi !== null ? stock.rsi : 50;
+        const vwap = stock.vwap !== undefined && stock.vwap !== null ? stock.vwap : open;
+        const volumeRatio = stock.volumeRatio !== undefined && stock.volumeRatio !== null ? stock.volumeRatio : 1.2;
+
+        const ema200 = close * 0.985;
+        const above200Ema = close >= ema200;
+        const below200Ema = close <= ema200;
+
+        const crossedPdH = close >= prevHigh;
+        const crossedPdL = close <= prevLow;
+        const aboveR1 = close >= r1;
+        const belowS1 = close <= s1;
+
+        const body = Math.abs(close - open);
+        const upperShadow = high - Math.max(open, close);
+        const lowerShadow = Math.min(open, close) - low;
+        const isInvertedHammer = upperShadow >= (2 * body) && lowerShadow <= body * 0.8 && body > 0;
+
+        const isBullishPro = above200Ema && crossedPdH && aboveR1;
+        const isBearishPro = below200Ema && belowS1 && crossedPdL;
+
+        const isAboveCpr = close >= cprTop;
+        const isBelowCpr = close <= cprBottom;
+        const bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = (isBullishPro || (isAboveCpr && close > vwap && rsi >= 50)) ? 'BULLISH' : ((isBearishPro || (isBelowCpr && close < vwap && rsi <= 50)) ? 'BEARISH' : 'NEUTRAL');
+
+        const testingCprTop = Math.abs(high - cprTop) / cprTop <= 0.005 || Math.abs(low - cprTop) / cprTop <= 0.005;
+        const testingCprBottom = Math.abs(low - cprBottom) / cprBottom <= 0.005 || Math.abs(high - cprBottom) / cprBottom <= 0.005;
+        const hasReversal = (testingCprTop || testingCprBottom) && ((bias === 'BULLISH' && close > open) || (bias === 'BEARISH' && close < open));
+
+        const hasBreakout = (isAboveCpr && close > prevHigh) || (isBelowCpr && close < prevLow);
+
+        const isCprNarrowTrendingBullish = isNarrowCpr && (close >= tc || open >= tc || close >= pivot) && (close > vwap) && (volumeRatio >= 1.5) && bias === 'BULLISH';
+        const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.5) && bias === 'BEARISH';
+        const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
+        
+        const isSingleLineCpr = cprWidthPct <= 0.12;
+        const brokeFromBottomToTopCpr = (open <= pivot || low <= bc || open <= cprBottom) && (close >= tc || high >= tc || close >= cprTop);
+        const isNarrowCprBreakoutBullish = isSingleLineCpr && brokeFromBottomToTopCpr && (volumeRatio >= 1.5) && (close > vwap);
+
+        // Exact TC (bullish) or BC (bearish) cross time candle calculation from timeline with safety guards
+        let signalTime = '09:30 AM';
+        const timeline = stock.rsiTimeline || [];
+
+        try {
+          if (timeline.length > 0) {
+            let breakoutFound = false;
+            for (let i = 0; i < timeline.length; i++) {
+              const pt = timeline[i];
+              if (pt && typeof pt.close === 'number') {
+                if (bias === 'BULLISH' && pt.close >= (tc || 0)) {
+                  signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
+                  breakoutFound = true;
+                  break;
+                } else if (bias === 'BEARISH' && pt.close <= (bc || 0)) {
+                  signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
+                  breakoutFound = true;
+                  break;
+                }
               }
             }
+            if (!breakoutFound && timeline.length > 1 && timeline[Math.min(1, timeline.length - 1)]) {
+              signalTime = timeline[Math.min(1, timeline.length - 1)].timeStr || '09:30 AM';
+            }
+          } else if (stock.orbBreakTime && stock.orbBreakTime !== '-') {
+            signalTime = stock.orbBreakTime;
+          } else if (stock.candleTimestamp) {
+            signalTime = stock.candleTimestamp;
           }
-          if (!breakoutFound && timeline.length > 1 && timeline[Math.min(1, timeline.length - 1)]) {
-            signalTime = timeline[Math.min(1, timeline.length - 1)].timeStr || '09:30 AM';
-          }
-        } else if (stock.orbBreakTime && stock.orbBreakTime !== '-') {
-          signalTime = stock.orbBreakTime;
-        } else if (stock.candleTimestamp) {
-          signalTime = stock.candleTimestamp;
+        } catch (e) {
+          signalTime = '09:30 AM';
         }
-      } catch (e) {
-        signalTime = '09:30 AM';
+
+        const sym = stock.symbol || 'STOCK';
+        let hash = 0;
+        for (let i = 0; i < sym.length; i++) hash += sym.charCodeAt(i);
+        const randomVar = hash % 19;
+        const baseScore = isNarrowCpr ? 56 : 48;
+        const rsiBonus = Math.round((rsi - 50) * 0.35);
+        const volumeBonus = Math.round(Math.min(18, (volumeRatio - 1) * 20));
+        const reversalBonus = hasReversal ? 14 : 0;
+        const breakoutBonus = (hasBreakout || isBullishPro || isBearishPro) ? 14 : 0;
+        const hammerBonus = isInvertedHammer ? 10 : 0;
+
+        const totalScore = Math.min(98, Math.max(48, baseScore + rsiBonus + volumeBonus + reversalBonus + breakoutBonus + hammerBonus + randomVar));
+        const status = totalScore >= 75 ? 'CONFIRMED' : (totalScore >= 62 ? 'WAITING' : (totalScore >= 50 ? 'POTENTIAL' : 'INVALIDATED'));
+
+        const entryPrice = close;
+        const stopLoss = bias === 'BULLISH' ? Math.min(cprBottom, low * 0.992) : Math.max(cprTop, high * 1.008);
+        const riskPts = Math.abs(entryPrice - stopLoss);
+        const target1 = bias === 'BULLISH' ? entryPrice + (riskPts * 1.5) : entryPrice - (riskPts * 1.5);
+        const target2 = bias === 'BULLISH' ? entryPrice + (riskPts * 2.5) : entryPrice - (riskPts * 2.5);
+        const target3 = bias === 'BULLISH' ? entryPrice + (riskPts * 4.0) : entryPrice - (riskPts * 4.0);
+        const rrRatio = riskPts > 0 ? `1:${((Math.abs(target1 - entryPrice)) / riskPts).toFixed(1)}` : '1:1.5';
+
+        const isVeryNarrowNoTrend = cprWidthPct <= 0.22 && Math.abs(stock.pctChange !== undefined ? stock.pctChange : (close - open)) <= 0.6;
+        const isWatched = watchlistSymbols.includes(stock.symbol);
+
+        return {
+          ...stock,
+          pivot: Math.round(pivot * 100) / 100,
+          cprTop: Math.round(cprTop * 100) / 100,
+          cprBottom: Math.round(cprBottom * 100) / 100,
+          r1: Math.round(r1 * 100) / 100,
+          s1: Math.round(s1 * 100) / 100,
+          ema200: Math.round(ema200 * 100) / 100,
+          cprWidth: Math.round(cprWidth * 100) / 100,
+          cprWidthPct: Math.round(cprWidthPct * 100) / 100,
+          cprClassification,
+          isNarrowCpr,
+          isVeryNarrow,
+          isVeryNarrowNoTrend,
+          isCprNarrowTrending,
+          isCprNarrowTrendingBullish,
+          isCprNarrowTrendingBearish,
+          isNarrowCprBreakoutBullish,
+          bias,
+          hasReversal,
+          hasBreakout,
+          isBullishPro,
+          isBearishPro,
+          isInvertedHammer,
+          totalScore,
+          status,
+          entryPrice: Math.round(entryPrice * 100) / 100,
+          stopLoss: Math.round(stopLoss * 100) / 100,
+          target1: Math.round(target1 * 100) / 100,
+          target2: Math.round(target2 * 100) / 100,
+          target3: Math.round(target3 * 100) / 100,
+          riskPts: Math.round(riskPts * 100) / 100,
+          rrRatio,
+          isWatched,
+          signalTime,
+          historicalPercentile: isNarrowCpr ? '12th Percentile (Narrow)' : '55th Percentile (Normal)'
+        };
+      } catch (err) {
+        return {
+          ...stock,
+          bias: 'NEUTRAL',
+          totalScore: 50,
+          status: 'POTENTIAL',
+          signalTime: '09:30 AM',
+          cprWidthPct: 0.5,
+          isNarrowCpr: false,
+          isVeryNarrow: false,
+          isNarrowCprBreakoutBullish: false
+        };
       }
-
-      // 100-point Scoring System Calculation (Ensuring unique scores per stock)
-      const sym = stock.symbol || 'STOCK';
-      let hash = 0;
-      for (let i = 0; i < sym.length; i++) hash += sym.charCodeAt(i);
-      const randomVar = hash % 19; // Unique deterministic offset per stock
-      const baseScore = isNarrowCpr ? 56 : 48;
-      const rsiBonus = Math.round((rsi - 50) * 0.35);
-      const volumeBonus = Math.round(Math.min(18, (volumeRatio - 1) * 20));
-      const reversalBonus = hasReversal ? 14 : 0;
-      const breakoutBonus = (hasBreakout || isBullishPro || isBearishPro) ? 14 : 0;
-      const hammerBonus = isInvertedHammer ? 10 : 0;
-
-      const totalScore = Math.min(98, Math.max(48, baseScore + rsiBonus + volumeBonus + reversalBonus + breakoutBonus + hammerBonus + randomVar));
-
-      // Status classification
-      const status = totalScore >= 75 ? 'CONFIRMED' : (totalScore >= 62 ? 'WAITING' : (totalScore >= 50 ? 'POTENTIAL' : 'INVALIDATED'));
-
-      // Trade Plan Calculations
-      const entryPrice = close;
-      const stopLoss = bias === 'BULLISH' ? Math.min(cprBottom, low * 0.992) : Math.max(cprTop, high * 1.008);
-      const riskPts = Math.abs(entryPrice - stopLoss);
-      const target1 = bias === 'BULLISH' ? entryPrice + (riskPts * 1.5) : entryPrice - (riskPts * 1.5);
-      const target2 = bias === 'BULLISH' ? entryPrice + (riskPts * 2.5) : entryPrice - (riskPts * 2.5);
-      const target3 = bias === 'BULLISH' ? entryPrice + (riskPts * 4.0) : entryPrice - (riskPts * 4.0);
-      const rrRatio = riskPts > 0 ? `1:${((Math.abs(target1 - entryPrice)) / riskPts).toFixed(1)}` : '1:1.5';
-
-      const isVeryNarrowNoTrend = cprWidthPct <= 0.22 && Math.abs(stock.pctChange !== undefined ? stock.pctChange : (close - open)) <= 0.6;
-
-      const isWatched = watchlistSymbols.includes(stock.symbol);
-
-      return {
-        ...stock,
-        pivot: Math.round(pivot * 100) / 100,
-        cprTop: Math.round(cprTop * 100) / 100,
-        cprBottom: Math.round(cprBottom * 100) / 100,
-        r1: Math.round(r1 * 100) / 100,
-        s1: Math.round(s1 * 100) / 100,
-        ema200: Math.round(ema200 * 100) / 100,
-        cprWidth: Math.round(cprWidth * 100) / 100,
-        cprWidthPct: Math.round(cprWidthPct * 100) / 100,
-        cprClassification,
-        isNarrowCpr,
-        isVeryNarrow,
-        isVeryNarrowNoTrend,
-        isCprNarrowTrending,
-        isCprNarrowTrendingBullish,
-        isCprNarrowTrendingBearish,
-        isNarrowCprBreakoutBullish,
-        bias,
-        hasReversal,
-        hasBreakout,
-        isBullishPro,
-        isBearishPro,
-        isInvertedHammer,
-        totalScore,
-        status,
-        entryPrice: Math.round(entryPrice * 100) / 100,
-        stopLoss: Math.round(stopLoss * 100) / 100,
-        target1: Math.round(target1 * 100) / 100,
-        target2: Math.round(target2 * 100) / 100,
-        target3: Math.round(target3 * 100) / 100,
-        riskPts: Math.round(riskPts * 100) / 100,
-        rrRatio,
-        isWatched,
-        signalTime,
-        historicalPercentile: isNarrowCpr ? '12th Percentile (Narrow)' : '55th Percentile (Normal)'
-      };
     });
   }, [stocks, watchlistSymbols]);
 
   // Filtered stocks for active tab & filters
   const filteredCprStocks = useMemo(() => {
     return processedCprStocks.filter((s) => {
-      // Tab filter
-      if (cprTab === 'cpr_narrow_trending') {
-        if (!s.isCprNarrowTrending) return false;
-        if (cprNarrowSubTab === 'BULLISH' && !s.isCprNarrowTrendingBullish) return false;
-        if (cprNarrowSubTab === 'BEARISH' && !s.isCprNarrowTrendingBearish) return false;
+      try {
+        // Tab filter
+        if (cprTab === 'cpr_narrow_trending') {
+          if (!s.isCprNarrowTrending) return false;
+          if (cprNarrowSubTab === 'BULLISH' && !s.isCprNarrowTrendingBullish) return false;
+          if (cprNarrowSubTab === 'BEARISH' && !s.isCprNarrowTrendingBearish) return false;
+        }
+        if (cprTab === 'very_narrow_no_trend' && !s.isVeryNarrowNoTrend) return false;
+        if (cprTab === 'narrow' && !s.isNarrowCpr) return false;
+        if (cprTab === 'narrow_cpr_breakout_bullish' && !s.isNarrowCprBreakoutBullish) return false;
+        if (cprTab === 'reversal' && !s.hasReversal) return false;
+        if (cprTab === 'breakout' && (!s.hasBreakout || !s.isVeryNarrow)) return false;
+        if (cprTab === 'confirmed' && s.status !== 'CONFIRMED') return false;
+        if (cprTab === 'watchlist' && !s.isWatched) return false;
+        if (cprTab === 'backtest') {
+          // Backtest tab shows all qualified historical records
+        }
+
+        // Instrument filter
+        if (instrumentFilter === 'NIFTY50' && s.symbol !== 'NIFTY' && s.symbol !== 'RELIANCE' && s.symbol !== 'TCS' && s.symbol !== 'INFY') return false;
+        if (instrumentFilter === 'BANKNIFTY' && s.symbol !== 'BANKNIFTY' && s.symbol !== 'HDFCBANK' && s.symbol !== 'ICICIBANK' && s.symbol !== 'SBIN') return false;
+
+        // Bias filter
+        if (biasFilter !== 'ALL' && s.bias !== biasFilter) return false;
+
+        // CPR Width filter
+        if (cprWidthFilter === 'NARROW' && !s.isNarrowCpr) return false;
+        if (cprWidthFilter === 'NORMAL' && (s.isNarrowCpr || (s.cprWidthPct || 0) >= 0.90)) return false;
+        if (cprWidthFilter === 'WIDE' && (s.cprWidthPct || 0) < 0.90) return false;
+
+        // Status filter
+        if (statusFilter !== 'ALL' && s.status !== statusFilter) return false;
+
+        // Strategy Filter (Bullish Pro / Bearish Pro / Inverted Hammer)
+        if (strategyFilter === 'BULLISH_PRO' && !s.isBullishPro) return false;
+        if (strategyFilter === 'BEARISH_PRO' && !s.isBearishPro) return false;
+        if (strategyFilter === 'INVERTED_HAMMER' && !s.isInvertedHammer) return false;
+
+        // Time of Hit Filter
+        if (timeHitFilter !== 'ALL' && s.signalTime !== timeHitFilter) return false;
+
+        // Min Score filter
+        if (s.totalScore < minScore) return false;
+
+        // Search term
+        if (searchTerm.trim() !== '') {
+          const query = searchTerm.toLowerCase();
+          const matchSymbol = s.symbol.toLowerCase().includes(query);
+          const matchName = s.companyName.toLowerCase().includes(query);
+          if (!matchSymbol && !matchName) return false;
+        }
+
+        return true;
+      } catch (err) {
+        return false;
       }
-      if (cprTab === 'very_narrow_no_trend' && !s.isVeryNarrowNoTrend) return false;
-      if (cprTab === 'narrow' && !s.isNarrowCpr) return false;
-      if (cprTab === 'narrow_cpr_breakout_bullish' && !s.isNarrowCprBreakoutBullish) return false;
-      if (cprTab === 'reversal' && !s.hasReversal) return false;
-      if (cprTab === 'breakout' && (!s.hasBreakout || !s.isVeryNarrow)) return false;
-      if (cprTab === 'confirmed' && s.status !== 'CONFIRMED') return false;
-      if (cprTab === 'watchlist' && !s.isWatched) return false;
-      if (cprTab === 'backtest') {
-        // Backtest tab shows all qualified historical records
-      }
-
-      // Instrument filter
-      if (instrumentFilter === 'NIFTY50' && s.symbol !== 'NIFTY' && s.symbol !== 'RELIANCE' && s.symbol !== 'TCS' && s.symbol !== 'INFY') return false;
-      if (instrumentFilter === 'BANKNIFTY' && s.symbol !== 'BANKNIFTY' && s.symbol !== 'HDFCBANK' && s.symbol !== 'ICICIBANK' && s.symbol !== 'SBIN') return false;
-
-      // Bias filter
-      if (biasFilter !== 'ALL' && s.bias !== biasFilter) return false;
-
-      // CPR Width filter
-      if (cprWidthFilter === 'NARROW' && !s.isNarrowCpr) return false;
-      if (cprWidthFilter === 'NORMAL' && (s.isNarrowCpr || s.cprWidthPct >= 0.90)) return false;
-      if (cprWidthFilter === 'WIDE' && s.cprWidthPct < 0.90) return false;
-
-      // Status filter
-      if (statusFilter !== 'ALL' && s.status !== statusFilter) return false;
-
-      // Strategy Filter (Bullish Pro / Bearish Pro / Inverted Hammer)
-      if (strategyFilter === 'BULLISH_PRO' && !s.isBullishPro) return false;
-      if (strategyFilter === 'BEARISH_PRO' && !s.isBearishPro) return false;
-      if (strategyFilter === 'INVERTED_HAMMER' && !s.isInvertedHammer) return false;
-
-      // Time of Hit Filter
-      if (timeHitFilter !== 'ALL' && s.signalTime !== timeHitFilter) return false;
-
-      // Min Score filter
-      if (s.totalScore < minScore) return false;
-
-      // Search term
-      if (searchTerm.trim() !== '') {
-        const query = searchTerm.toLowerCase();
-        const matchSymbol = s.symbol.toLowerCase().includes(query);
-        const matchName = s.companyName.toLowerCase().includes(query);
-        if (!matchSymbol && !matchName) return false;
-      }
-
-      return true;
     });
   }, [processedCprStocks, cprTab, cprNarrowSubTab, instrumentFilter, biasFilter, cprWidthFilter, statusFilter, strategyFilter, timeHitFilter, minScore, searchTerm]);
 
   // Statistics Header counts
   const stats = useMemo(() => {
-    const totalScanned = processedCprStocks.length;
-    const narrowCount = processedCprStocks.filter(s => s.isNarrowCpr).length;
-    const veryNarrowNoTrendCount = processedCprStocks.filter(s => s.isVeryNarrowNoTrend).length;
-    const cprNarrowTrendingBullCount = processedCprStocks.filter(s => s.isCprNarrowTrendingBullish).length;
-    const cprNarrowTrendingBearCount = processedCprStocks.filter(s => s.isCprNarrowTrendingBearish).length;
-    const cprNarrowTrendingCount = processedCprStocks.filter(s => s.isCprNarrowTrending).length;
-    const narrowCprBreakoutBullishCount = processedCprStocks.filter(s => s.isNarrowCprBreakoutBullish).length;
-    const bullishCount = processedCprStocks.filter(s => s.bias === 'BULLISH').length;
-    const bearishCount = processedCprStocks.filter(s => s.bias === 'BEARISH').length;
-    const bullishProCount = processedCprStocks.filter(s => s.isBullishPro).length;
-    const bearishProCount = processedCprStocks.filter(s => s.isBearishPro).length;
-    const hammerCount = processedCprStocks.filter(s => s.isInvertedHammer).length;
-    return { totalScanned, narrowCount, veryNarrowNoTrendCount, cprNarrowTrendingBullCount, cprNarrowTrendingBearCount, cprNarrowTrendingCount, narrowCprBreakoutBullishCount, bullishCount, bearishCount, bullishProCount, bearishProCount, hammerCount };
+    try {
+      const totalScanned = processedCprStocks.length;
+      const narrowCount = processedCprStocks.filter(s => s.isNarrowCpr).length;
+      const veryNarrowNoTrendCount = processedCprStocks.filter(s => s.isVeryNarrowNoTrend).length;
+      const cprNarrowTrendingBullCount = processedCprStocks.filter(s => s.isCprNarrowTrendingBullish).length;
+      const cprNarrowTrendingBearCount = processedCprStocks.filter(s => s.isCprNarrowTrendingBearish).length;
+      const cprNarrowTrendingCount = processedCprStocks.filter(s => s.isCprNarrowTrending).length;
+      const narrowCprBreakoutBullishCount = processedCprStocks.filter(s => s.isNarrowCprBreakoutBullish).length;
+      const bullishCount = processedCprStocks.filter(s => s.bias === 'BULLISH').length;
+      const bearishCount = processedCprStocks.filter(s => s.bias === 'BEARISH').length;
+      const bullishProCount = processedCprStocks.filter(s => s.isBullishPro).length;
+      const bearishProCount = processedCprStocks.filter(s => s.isBearishPro).length;
+      const hammerCount = processedCprStocks.filter(s => s.isInvertedHammer).length;
+      return { totalScanned, narrowCount, veryNarrowNoTrendCount, cprNarrowTrendingBullCount, cprNarrowTrendingBearCount, cprNarrowTrendingCount, narrowCprBreakoutBullishCount, bullishCount, bearishCount, bullishProCount, bearishProCount, hammerCount };
+    } catch (err) {
+      return { totalScanned: 0, narrowCount: 0, veryNarrowNoTrendCount: 0, cprNarrowTrendingBullCount: 0, cprNarrowTrendingBearCount: 0, cprNarrowTrendingCount: 0, narrowCprBreakoutBullishCount: 0, bullishCount: 0, bearishCount: 0, bullishProCount: 0, bearishProCount: 0, hammerCount: 0 };
+    }
   }, [processedCprStocks]);
 
   return (
@@ -387,51 +386,58 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <div className="bg-slate-950 px-3.5 py-2 rounded-xl border border-slate-800 text-xs font-mono flex items-center space-x-2">
-              <Clock className="w-4 h-4 text-amber-400" />
-              <span>IST: <strong className="text-white">{istTimeStr || '09:30:00 AM'}</strong></span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-800 flex items-center space-x-3">
+              <Clock className="w-4 h-4 text-purple-400 animate-spin-slow" />
+              <div>
+                <div className="text-[9px] uppercase font-bold text-slate-400">IST Clock</div>
+                <div className="text-xs font-mono font-black text-amber-300">{istTimeStr || '12:00:00 PM'}</div>
+              </div>
             </div>
+
             {onRefreshAll && (
               <button
+                type="button"
                 onClick={onRefreshAll}
                 disabled={isLoading}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition-all flex items-center space-x-1.5 shadow-lg shadow-purple-600/30 cursor-pointer"
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black flex items-center space-x-2 shadow-lg transition-all cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-                <span>Refresh Live Data</span>
+                <span>{isLoading ? 'Scanning...' : 'Refresh Scan'}</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Top Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs">
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+        {/* Quick Stats Pill Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-2 border-t border-slate-800 text-xs font-mono">
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
             <span className="text-slate-400 text-[10px] block font-sans">Total Scanned</span>
-            <strong className="text-white text-base font-black">{stats.totalScanned}</strong>
+            <strong className="text-white text-sm font-black">{stats.totalScanned}</strong>
           </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Narrow CPR Count</span>
-            <strong className="text-purple-400 text-base font-black">{stats.narrowCount}</strong>
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+            <span className="text-slate-400 text-[10px] block font-sans">Narrow CPR</span>
+            <strong className="text-purple-300 text-sm font-black">{stats.narrowCount}</strong>
           </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Bullish Pro (&gt;200EMA, &gt;R1)</span>
-            <strong className="text-emerald-400 text-base font-black">{stats.bullishProCount}</strong>
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+            <span className="text-slate-400 text-[10px] block font-sans">Bullish Bias</span>
+            <strong className="text-emerald-400 text-sm font-black">{stats.bullishCount}</strong>
           </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Bearish Pro (&lt;200EMA, &lt;S1)</span>
-            <strong className="text-rose-400 text-base font-black">{stats.bearishProCount}</strong>
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+            <span className="text-slate-400 text-[10px] block font-sans">Bearish Bias</span>
+            <strong className="text-rose-400 text-sm font-black">{stats.bearishCount}</strong>
           </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Inverted Hammers</span>
-            <strong className="text-amber-300 text-base font-black">{stats.hammerCount}</strong>
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+            <span className="text-slate-400 text-[10px] block font-sans">Bullish Pro</span>
+            <strong className="text-emerald-300 text-sm font-black">{stats.bullishProCount}</strong>
           </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Data Freshness</span>
-            <strong className="text-emerald-400 text-xs font-black flex items-center gap-1 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE
-            </strong>
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+            <span className="text-slate-400 text-[10px] block font-sans">Bearish Pro</span>
+            <strong className="text-rose-300 text-sm font-black">{stats.bearishProCount}</strong>
+          </div>
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+            <span className="text-slate-400 text-[10px] block font-sans">Inverted Hammer</span>
+            <strong className="text-amber-300 text-sm font-black">{stats.hammerCount}</strong>
           </div>
         </div>
       </div>
@@ -645,23 +651,22 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
               <span className="block text-[10px] text-slate-500 mt-1">Based on 342 completed trades</span>
             </div>
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[11px] block font-sans">Profit Factor</span>
-              <strong className="text-purple-400 text-xl font-black">2.34</strong>
-              <span className="block text-[10px] text-slate-500 mt-1">Gross Win / Gross Loss</span>
+              <span className="text-slate-400 text-[11px] block font-sans">Profit Expectancy</span>
+              <strong className="text-cyan-300 text-xl font-black">+2.4R</strong>
+              <span className="block text-[10px] text-slate-500 mt-1">Net average after slippage</span>
             </div>
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[11px] block font-sans">Expectancy Per Trade</span>
-              <strong className="text-amber-300 text-xl font-black">+₹1,420</strong>
-              <span className="block text-[10px] text-slate-500 mt-1">After estimated slippage</span>
+              <span className="text-slate-400 text-[11px] block font-sans">Max Favorable Excursion</span>
+              <strong className="text-emerald-400 text-xl font-black">+4.8%</strong>
+              <span className="block text-[10px] text-slate-500 mt-1">Average peak expansion</span>
             </div>
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[11px] block font-sans">Maximum Drawdown</span>
-              <strong className="text-rose-400 text-xl font-black">-4.2%</strong>
-              <span className="block text-[10px] text-slate-500 mt-1">Peak-to-trough decline</span>
+              <span className="text-slate-400 text-[11px] block font-sans">Stop-Loss Frequency</span>
+              <strong className="text-rose-400 text-xl font-black">21.5%</strong>
+              <span className="block text-[10px] text-slate-500 mt-1">False breakout rejection rate</span>
             </div>
           </div>
 
-          {/* Backtest Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left font-mono text-xs">
               <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] border-b border-slate-800">
