@@ -122,13 +122,13 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
         const cprWidth = Math.abs(cprTop - cprBottom);
         const cprWidthPct = prevC > 0 ? (cprWidth / prevC) * 100 : 0;
 
-        const isVeryNarrow = cprWidthPct < 0.25;
-        const isNarrow = cprWidthPct >= 0.25 && cprWidthPct <= 0.35;
-        const isNarrowCpr = cprWidthPct <= 0.35;
-        const isModerateCpr = cprWidthPct > 0.35 && cprWidthPct <= 0.50;
+        const isVeryNarrow = cprWidthPct < 0.20;
+        const isNarrow = cprWidthPct >= 0.20 && cprWidthPct <= 0.25;
+        const isNarrowCpr = cprWidthPct <= 0.25;
+        const isModerateCpr = cprWidthPct > 0.25 && cprWidthPct <= 0.50;
         const isWideCpr = cprWidthPct > 0.50;
 
-        const cprClassification = isVeryNarrow ? 'Very Narrow CPR (<0.25%)' : (isNarrow ? 'Narrow CPR (0.25-0.35%)' : (isModerateCpr ? 'Moderate CPR (0.35-0.50%)' : 'Wide CPR (>0.50%)'));
+        const cprClassification = isVeryNarrow ? 'Very Narrow CPR (<0.20%)' : (isNarrow ? 'Narrow CPR (0.20-0.25%)' : (isModerateCpr ? 'Moderate CPR (0.25-0.50%)' : 'Wide CPR (>0.50%)'));
 
         const rsi = stock.rsi !== undefined && stock.rsi !== null ? stock.rsi : 50;
         const vwap = stock.vwap !== undefined && stock.vwap !== null ? stock.vwap : open;
@@ -161,46 +161,76 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
 
         const hasBreakout = (isAboveCpr && close > prevHigh) || (isBelowCpr && close < prevLow);
 
-        const isCprNarrowTrendingBullish = isNarrowCpr && (close >= tc || open >= tc || close >= pivot) && (close > vwap) && (volumeRatio >= 1.5) && bias === 'BULLISH';
-        const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.5) && bias === 'BEARISH';
+        const isCprNarrowTrendingBullish = isNarrowCpr && (close >= tc || open >= tc || close >= pivot) && (close > vwap) && (volumeRatio >= 1.2) && bias === 'BULLISH';
+        const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.2) && bias === 'BEARISH';
         const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
         
-        const isSingleLineCpr = cprWidthPct <= 0.20;
-        const brokeFromBottomToTopCpr = (open <= pivot || low <= bc || open <= cprBottom) && (close >= tc || high >= tc || close >= cprTop);
-        const isNarrowCprBreakoutBullish = isSingleLineCpr && brokeFromBottomToTopCpr && (volumeRatio >= 1.5) && (close > vwap);
+        const isSingleLineCpr = cprWidthPct <= 0.25;
 
-        // Exact TC (bullish) or BC (bearish) cross time candle calculation from timeline with safety guards
+        // Breakout candle close -> Subsequent retest -> Bounce candle entry timing detection from timeline
         let signalTime = '09:30 AM';
+        let hasRetestBounce = false;
         const timeline = stock.rsiTimeline || [];
 
         try {
-          if (timeline.length > 0) {
-            let breakoutFound = false;
+          if (timeline.length >= 3) {
+            for (let i = 2; i < timeline.length; i++) {
+              const prev2 = timeline[i - 2]; // Breakout candle
+              const prev1 = timeline[i - 1]; // Retest candle
+              const curr = timeline[i];      // Bounce candle
+
+              if (prev2 && prev1 && curr && typeof prev2.close === 'number' && typeof prev1.low === 'number' && typeof curr.close === 'number') {
+                if (bias === 'BULLISH') {
+                  const brokeOut = prev2.close >= (tc || pivot);
+                  const retested = prev1.low <= (tc || cprTop) * 1.008 && prev1.low >= cprBottom * 0.990;
+                  const bounced = curr.close > curr.open;
+
+                  if (brokeOut && retested && bounced) {
+                    signalTime = curr.timeStr || `09:${15 + i * 15} AM`;
+                    hasRetestBounce = true;
+                    break;
+                  }
+                } else if (bias === 'BEARISH') {
+                  const brokeOut = prev2.close <= (bc || pivot);
+                  const retested = prev1.high >= (bc || cprBottom) * 0.992 && prev1.high <= cprTop * 1.010;
+                  const bounced = curr.close < curr.open;
+
+                  if (brokeOut && retested && bounced) {
+                    signalTime = curr.timeStr || `09:${15 + i * 15} AM`;
+                    hasRetestBounce = true;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          if (!hasRetestBounce && timeline.length > 0) {
             for (let i = 0; i < timeline.length; i++) {
               const pt = timeline[i];
               if (pt && typeof pt.close === 'number') {
-                if (bias === 'BULLISH' && pt.close >= (tc || 0)) {
+                if (bias === 'BULLISH' && pt.close >= (tc || pivot)) {
                   signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
-                  breakoutFound = true;
+                  hasRetestBounce = true;
                   break;
-                } else if (bias === 'BEARISH' && pt.close <= (bc || 0)) {
+                } else if (bias === 'BEARISH' && pt.close <= (bc || pivot)) {
                   signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
-                  breakoutFound = true;
+                  hasRetestBounce = true;
                   break;
                 }
               }
             }
-            if (!breakoutFound && timeline.length > 1 && timeline[Math.min(1, timeline.length - 1)]) {
-              signalTime = timeline[Math.min(1, timeline.length - 1)].timeStr || '09:30 AM';
-            }
-          } else if (stock.orbBreakTime && stock.orbBreakTime !== '-') {
-            signalTime = stock.orbBreakTime;
-          } else if (stock.candleTimestamp) {
-            signalTime = stock.candleTimestamp;
+          }
+
+          if (!hasRetestBounce && timeline.length > 0) {
+            signalTime = timeline[Math.min(1, timeline.length - 1)].timeStr || '09:30 AM';
           }
         } catch (e) {
           signalTime = '09:30 AM';
         }
+
+        const brokeFromBottomToTopCpr = (open <= pivot || low <= bc || open <= cprBottom) && (close >= tc || high >= tc || close >= cprTop);
+        const isNarrowCprBreakoutBullish = isSingleLineCpr && (brokeFromBottomToTopCpr || hasRetestBounce) && (volumeRatio >= 1.2) && (close > vwap);
 
         const sym = stock.symbol || 'STOCK';
         let hash = 0;
