@@ -227,7 +227,8 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
           signalTime = '09:30 AM';
         }
 
-        const isNarrowCprBreakoutBullish = isNarrowCpr && (hasRetestBounce || close >= tc);
+        const breakoutDistancePct = tc > 0 ? Math.round((Math.abs(close - tc) / tc) * 10000) / 100 : 0;
+        const isNarrowCprBreakoutBullish = isNarrowCpr && (hasRetestBounce || close >= tc) && (breakoutDistancePct < 12);
 
         const sym = stock.symbol || 'STOCK';
         let hash = 0;
@@ -272,6 +273,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
           isCprNarrowTrendingBullish,
           isCprNarrowTrendingBearish,
           isNarrowCprBreakoutBullish,
+          breakoutDistancePct,
           bias,
           hasReversal,
           hasBreakout,
