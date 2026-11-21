@@ -185,12 +185,34 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
       const isNarrowCprBreakoutBullish = isNarrowCpr && bias === 'BULLISH' && (hasBreakout || isBullishPro || close > cprTop || close > r1 || close > tc);
 
-      // Unique timing of hit per stock based on symbol hash & timeline
-      const sym = stock.symbol || 'STOCK';
-      let hash = 0;
-      for (let i = 0; i < sym.length; i++) hash += sym.charCodeAt(i);
-      const times = ['09:15 AM', '09:22 AM', '09:30 AM', '09:41 AM', '09:50 AM', '10:05 AM', '10:18 AM', '10:30 AM', '10:45 AM', '11:02 AM', '11:15 AM', '11:30 AM', '11:45 AM', '12:05 PM'];
-      const signalTime = stock.candleTimestamp || times[hash % times.length];
+      // Exact breakout time candle calculation from timeline
+      let signalTime = '09:30 AM';
+      const timeline = stock.rsiTimeline || [];
+      const breakoutThreshold = Math.max(cprTop, r1, tc, prevHigh);
+      const breakdownThreshold = Math.min(cprBottom, s1, bc, prevLow);
+
+      if (timeline.length > 0) {
+        let breakoutFound = false;
+        for (let i = 0; i < timeline.length; i++) {
+          const pt = timeline[i];
+          if (bias === 'BULLISH' && pt.close >= breakoutThreshold) {
+            signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
+            breakoutFound = true;
+            break;
+          } else if (bias === 'BEARISH' && pt.close <= breakdownThreshold) {
+            signalTime = pt.timeStr || `09:${15 + i * 15} AM`;
+            breakoutFound = true;
+            break;
+          }
+        }
+        if (!breakoutFound && timeline.length > 1) {
+          signalTime = timeline[Math.min(1, timeline.length - 1)].timeStr;
+        }
+      } else if (stock.orbBreakTime && stock.orbBreakTime !== '-') {
+        signalTime = stock.orbBreakTime;
+      } else if (stock.candleTimestamp) {
+        signalTime = stock.candleTimestamp;
+      }
 
       // 100-point Scoring System Calculation (Ensuring unique scores per stock)
       const randomVar = hash % 19; // Unique deterministic offset per stock
