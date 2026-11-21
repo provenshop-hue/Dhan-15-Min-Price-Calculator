@@ -165,7 +165,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
         const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.5) && bias === 'BEARISH';
         const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
         
-        const isSingleLineCpr = cprWidthPct <= 0.12;
+        const isSingleLineCpr = cprWidthPct <= 0.20;
         const brokeFromBottomToTopCpr = (open <= pivot || low <= bc || open <= cprBottom) && (close >= tc || high >= tc || close >= cprTop);
         const isNarrowCprBreakoutBullish = isSingleLineCpr && brokeFromBottomToTopCpr && (volumeRatio >= 1.5) && (close > vwap);
 
