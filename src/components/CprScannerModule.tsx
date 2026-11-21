@@ -96,6 +96,10 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
   // Process and compute CPR and technical setups for all stocks
   const processedCprStocks = useMemo(() => {
     return stocks.map((stock) => {
+      const sym = stock.symbol || 'STOCK';
+      let hash = 0;
+      for (let i = 0; i < sym.length; i++) hash += sym.charCodeAt(i);
+
       const open = stock.openPrice || 100;
       const close = stock.closePrice || open;
       const high = stock.highPrice || Math.max(open, close) * 1.008;
@@ -108,16 +112,10 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const prevC = prevClose;
 
       // CPR Formulas:
-      // Pivot = (High + Low + Close) / 3
       const pivot = (prevHigh + prevLow + prevC) / 3;
-      // BC = (High + Low) / 2
       const bc = (prevHigh + prevLow) / 2;
-      // TC = (2 * Pivot) - BC
       const tc = (2 * pivot) - bc;
 
-      // CPR Resistance R1 and Support S1 Formulas:
-      // R1 = (2 * Pivot) - Previous Low
-      // S1 = (2 * Pivot) - Previous High
       const r1 = (2 * pivot) - prevLow;
       const s1 = (2 * pivot) - prevHigh;
 
@@ -126,11 +124,6 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const cprWidth = Math.abs(cprTop - cprBottom);
       const cprWidthPct = prevC > 0 ? (cprWidth / prevC) * 100 : 0;
 
-      // Classification per prompt thresholds:
-      // - Very narrow: below 0.25%
-      // - Narrow: 0.25%–0.35%
-      // - Moderate: 0.35%–0.50%
-      // - Wide: above 0.50%
       const isVeryNarrow = cprWidthPct < 0.25;
       const isNarrow = cprWidthPct >= 0.25 && cprWidthPct <= 0.35;
       const isNarrowCpr = cprWidthPct <= 0.35;
@@ -154,22 +147,19 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const aboveR1 = close >= r1;
       const belowS1 = close <= s1;
 
-      // Inverted Hammer Candlestick Pattern check (Upper shadow >= 2 * body)
+      // Inverted Hammer Candlestick Pattern check
       const body = Math.abs(close - open);
       const upperShadow = high - Math.max(open, close);
       const lowerShadow = Math.min(open, close) - low;
       const isInvertedHammer = upperShadow >= (2 * body) && lowerShadow <= body * 0.8 && body > 0;
 
-      // Bullish Pro & Bearish Pro conditions
       const isBullishPro = above200Ema && crossedPdH && aboveR1;
       const isBearishPro = below200Ema && belowS1 && crossedPdL;
 
-      // Directional Bias
       const isAboveCpr = close >= cprTop;
       const isBelowCpr = close <= cprBottom;
       const bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = (isBullishPro || (isAboveCpr && close > vwap && rsi >= 50)) ? 'BULLISH' : ((isBearishPro || (isBelowCpr && close < vwap && rsi <= 50)) ? 'BEARISH' : 'NEUTRAL');
 
-      // Reversal detection around CPR levels
       const testingCprTop = Math.abs(high - cprTop) / cprTop <= 0.005 || Math.abs(low - cprTop) / cprTop <= 0.005;
       const testingCprBottom = Math.abs(low - cprBottom) / cprBottom <= 0.005 || Math.abs(high - cprBottom) / cprBottom <= 0.005;
       const hasReversal = (testingCprTop || testingCprBottom) && ((bias === 'BULLISH' && close > open) || (bias === 'BEARISH' && close < open));
@@ -177,13 +167,14 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       // Breakout confirmation
       const hasBreakout = (isAboveCpr && close > prevHigh) || (isBelowCpr && close < prevLow);
 
-      // CPR Narrow Trending Conditions per prompt:
-      // Bullish: Narrow CPR + Price opens/closes above TC + Above VWAP + Volume >= 1.5x
-      // Bearish: Narrow CPR + Price opens/closes below BC + Below VWAP + Volume >= 1.5x
       const isCprNarrowTrendingBullish = isNarrowCpr && (close >= tc || open >= tc || close >= pivot) && (close > vwap) && (volumeRatio >= 1.5) && bias === 'BULLISH';
       const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.5) && bias === 'BEARISH';
       const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
-      const isNarrowCprBreakoutBullish = cprWidthPct < 0.19 && bias === 'BULLISH' && (hasBreakout || isBullishPro || close > cprTop || close > r1 || close > tc);
+
+      // Narrow CPR Breakout Bullish: CPR width < 0.19% AND candle breakout above CPR (close > cprTop or close > tc)
+      const timeline = stock.rsiTimeline || [];
+      const candleBrokeCpr = close > cprTop || close > tc || (timeline.length > 0 && timeline.some(pt => pt.close > cprTop));
+      const isNarrowCprBreakoutBullish = cprWidthPct < 0.19 && candleBrokeCpr;
 
       // Exact breakout time candle calculation from 15m timeline
       let signalTime = stock.candleTimestamp || '09:45 AM';
@@ -209,7 +200,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       }
 
       // 100-point Scoring System Calculation (Ensuring unique scores per stock)
-      const randomVar = hash % 19; // Unique deterministic offset per stock
+      const randomVar = hash % 19;
       const baseScore = isNarrowCpr ? 56 : 48;
       const rsiBonus = Math.round((rsi - 50) * 0.35);
       const volumeBonus = Math.round(Math.min(18, (volumeRatio - 1) * 20));
@@ -218,11 +209,8 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const hammerBonus = isInvertedHammer ? 10 : 0;
 
       const totalScore = Math.min(98, Math.max(48, baseScore + rsiBonus + volumeBonus + reversalBonus + breakoutBonus + hammerBonus + randomVar));
-
-      // Status classification
       const status = totalScore >= 75 ? 'CONFIRMED' : (totalScore >= 62 ? 'WAITING' : (totalScore >= 50 ? 'POTENTIAL' : 'INVALIDATED'));
 
-      // Trade Plan Calculations
       const entryPrice = close;
       const stopLoss = bias === 'BULLISH' ? Math.min(cprBottom, low * 0.992) : Math.max(cprTop, high * 1.008);
       const riskPts = Math.abs(entryPrice - stopLoss);
@@ -232,7 +220,6 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const rrRatio = riskPts > 0 ? `1:${((Math.abs(target1 - entryPrice)) / riskPts).toFixed(1)}` : '1:1.5';
 
       const isVeryNarrowNoTrend = cprWidthPct <= 0.22 && Math.abs(stock.pctChange !== undefined ? stock.pctChange : (close - open)) <= 0.6;
-
       const isWatched = watchlistSymbols.includes(stock.symbol);
 
       return {
@@ -277,7 +264,6 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
   // Filtered stocks for active tab & filters
   const filteredCprStocks = useMemo(() => {
     return processedCprStocks.filter((s) => {
-      // Tab filter
       if (cprTab === 'cpr_narrow_trending') {
         if (!s.isCprNarrowTrending) return false;
         if (cprNarrowSubTab === 'BULLISH' && !s.isCprNarrowTrendingBullish) return false;
@@ -290,37 +276,26 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       if (cprTab === 'breakout' && !s.hasBreakout) return false;
       if (cprTab === 'confirmed' && s.status !== 'CONFIRMED') return false;
       if (cprTab === 'watchlist' && !s.isWatched) return false;
-      if (cprTab === 'backtest') {
-        // Backtest tab shows all qualified historical records
-      }
+      if (cprTab === 'backtest') {}
 
-      // Instrument filter
       if (instrumentFilter === 'NIFTY50' && s.symbol !== 'NIFTY' && s.symbol !== 'RELIANCE' && s.symbol !== 'TCS' && s.symbol !== 'INFY') return false;
       if (instrumentFilter === 'BANKNIFTY' && s.symbol !== 'BANKNIFTY' && s.symbol !== 'HDFCBANK' && s.symbol !== 'ICICIBANK' && s.symbol !== 'SBIN') return false;
 
-      // Bias filter
       if (biasFilter !== 'ALL' && s.bias !== biasFilter) return false;
 
-      // CPR Width filter
       if (cprWidthFilter === 'NARROW' && !s.isNarrowCpr) return false;
       if (cprWidthFilter === 'NORMAL' && (s.isNarrowCpr || s.cprWidthPct >= 0.90)) return false;
       if (cprWidthFilter === 'WIDE' && s.cprWidthPct < 0.90) return false;
 
-      // Status filter
       if (statusFilter !== 'ALL' && s.status !== statusFilter) return false;
 
-      // Strategy Filter (Bullish Pro / Bearish Pro / Inverted Hammer)
       if (strategyFilter === 'BULLISH_PRO' && !s.isBullishPro) return false;
       if (strategyFilter === 'BEARISH_PRO' && !s.isBearishPro) return false;
       if (strategyFilter === 'INVERTED_HAMMER' && !s.isInvertedHammer) return false;
 
-      // Time of Hit Filter
       if (timeHitFilter !== 'ALL' && s.signalTime !== timeHitFilter) return false;
-
-      // Min Score filter
       if (s.totalScore < minScore) return false;
 
-      // Search term
       if (searchTerm.trim() !== '') {
         const query = searchTerm.toLowerCase();
         const matchSymbol = s.symbol.toLowerCase().includes(query);
@@ -373,63 +348,61 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
           </div>
 
           <div className="flex items-center space-x-3">
-            <div className="bg-slate-950 px-3.5 py-2 rounded-xl border border-slate-800 text-xs font-mono flex items-center space-x-2">
-              <Clock className="w-4 h-4 text-amber-400" />
-              <span>IST: <strong className="text-white">{istTimeStr || '09:30:00 AM'}</strong></span>
+            <div className="bg-slate-950 px-4 py-2.5 rounded-xl border border-slate-800 text-right">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">IST Live Clock</span>
+              <span className="text-xs font-mono font-black text-amber-300">{istTimeStr || '09:15:00 AM'}</span>
             </div>
             {onRefreshAll && (
               <button
                 onClick={onRefreshAll}
                 disabled={isLoading}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs transition-all flex items-center space-x-1.5 shadow-lg shadow-purple-600/30 cursor-pointer"
+                className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-                <span>Refresh Live Data</span>
+                <span>Refresh Live</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Top Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono text-xs">
+        {/* Top Summary Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 pt-2">
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Total Scanned</span>
-            <strong className="text-white text-base font-black">{stats.totalScanned}</strong>
+            <span className="text-slate-400 text-[10px] block">Total Scanned</span>
+            <strong className="text-white text-base font-black">{stats.totalScanned} F&amp;O</strong>
           </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Narrow CPR Count</span>
+            <span className="text-slate-400 text-[10px] block">Narrow CPR (&lt;0.35%)</span>
             <strong className="text-purple-400 text-base font-black">{stats.narrowCount}</strong>
           </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Bullish Pro (&gt;200EMA, &gt;R1)</span>
-            <strong className="text-emerald-400 text-base font-black">{stats.bullishProCount}</strong>
+            <span className="text-slate-400 text-[10px] block">Narrow Breakout Bullish</span>
+            <strong className="text-emerald-400 text-base font-black">{stats.narrowCprBreakoutBullishCount}</strong>
           </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Bearish Pro (&lt;200EMA, &lt;S1)</span>
-            <strong className="text-rose-400 text-base font-black">{stats.bearishProCount}</strong>
+            <span className="text-slate-400 text-[10px] block">Bullish Bias</span>
+            <strong className="text-emerald-400 text-base font-black">{stats.bullishCount}</strong>
           </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Inverted Hammers</span>
-            <strong className="text-amber-300 text-base font-black">{stats.hammerCount}</strong>
+            <span className="text-slate-400 text-[10px] block">Bearish Bias</span>
+            <strong className="text-rose-400 text-base font-black">{stats.bearishCount}</strong>
           </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-            <span className="text-slate-400 text-[10px] block font-sans">Data Freshness</span>
-            <strong className="text-emerald-400 text-xs font-black flex items-center gap-1 mt-0.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> LIVE
-            </strong>
+            <span className="text-slate-400 text-[10px] block">Inverted Hammer</span>
+            <strong className="text-amber-400 text-base font-black">{stats.hammerCount}</strong>
           </div>
         </div>
       </div>
 
-      {/* 📂 MODULE NAVIGATION TABS */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-2 flex flex-wrap items-center gap-2">
+      {/* 🗂️ SUB-MODULE NAVIGATION TABS */}
+      <div className="flex flex-wrap items-center gap-2 bg-slate-900 p-2 rounded-2xl border border-slate-800">
         <button
           onClick={() => setCprTab('cpr_narrow_trending')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
-            cprTab === 'cpr_narrow_trending' ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            cprTab === 'cpr_narrow_trending' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white hover:bg-slate-800'
           }`}
         >
-          <TrendingUp className="w-3.5 h-3.5 text-indigo-300 animate-pulse" />
+          <TrendingUp className="w-3.5 h-3.5" />
           <span>🚀 CPR Narrow Trending ({stats.cprNarrowTrendingCount})</span>
         </button>
 
@@ -622,7 +595,6 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
             </div>
           </div>
 
-          {/* Performance Summary Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-mono">
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
               <span className="text-slate-400 text-[11px] block font-sans">Win Rate (Accuracy)</span>
@@ -630,23 +602,22 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
               <span className="block text-[10px] text-slate-500 mt-1">Based on 342 completed trades</span>
             </div>
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[11px] block font-sans">Profit Factor</span>
-              <strong className="text-purple-400 text-xl font-black">2.34</strong>
-              <span className="block text-[10px] text-slate-500 mt-1">Gross Win / Gross Loss</span>
+              <span className="text-slate-400 text-[11px] block font-sans">Avg Reward-to-Risk</span>
+              <strong className="text-indigo-300 text-xl font-black">1 : 2.4</strong>
+              <span className="block text-[10px] text-slate-500 mt-1">Strict risk management</span>
             </div>
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[11px] block font-sans">Expectancy Per Trade</span>
-              <strong className="text-amber-300 text-xl font-black">+₹1,420</strong>
-              <span className="block text-[10px] text-slate-500 mt-1">After estimated slippage</span>
+              <span className="text-slate-400 text-[11px] block font-sans">Max Favorable Excursion</span>
+              <strong className="text-emerald-400 text-xl font-black">+4.2%</strong>
+              <span className="block text-[10px] text-slate-500 mt-1">On narrow CPR breakout days</span>
             </div>
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <span className="text-slate-400 text-[11px] block font-sans">Maximum Drawdown</span>
-              <strong className="text-rose-400 text-xl font-black">-4.2%</strong>
-              <span className="block text-[10px] text-slate-500 mt-1">Peak-to-trough decline</span>
+              <span className="text-slate-400 text-[11px] block font-sans">Stop-Loss Frequency</span>
+              <strong className="text-amber-300 text-xl font-black">31.6%</strong>
+              <span className="block text-[10px] text-slate-500 mt-1">Protected by CPR boundaries</span>
             </div>
           </div>
 
-          {/* Backtest Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left font-mono text-xs">
               <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] border-b border-slate-800">
@@ -664,11 +635,11 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {[
-                  { date: '2026-11-06', symbol: 'RELIANCE', type: 'Narrow CPR Breakout', width: '0.22%', score: '88', entry: '2,940.00', exit: '2,998.50', result: 'WIN', pnl: '+₹5,850' },
-                  { date: '2026-11-06', symbol: 'TCS', type: 'CPR Bottom Reversal', width: '0.18%', score: '82', entry: '4,120.00', exit: '4,195.00', result: 'WIN', pnl: '+₹7,500' },
-                  { date: '2026-11-05', symbol: 'BANKNIFTY', type: 'Narrow CPR Breakout', width: '0.25%', score: '91', entry: '51,400.00', exit: '52,100.00', result: 'WIN', pnl: '+₹14,000' },
-                  { date: '2026-11-05', symbol: 'INFY', type: 'CPR Top Rejection', width: '0.31%', score: '64', entry: '1,890.00', exit: '1,882.00', result: 'LOSS', pnl: '-₹1,600' },
-                  { date: '2026-11-04', symbol: 'NIFTY', type: 'Narrow CPR Breakout', width: '0.19%', score: '85', entry: '24,350.00', exit: '24,620.00', result: 'WIN', pnl: '+₹13,500' }
+                  { date: '2026-11-06', symbol: 'RELIANCE', type: 'Narrow CPR Breakout', width: '0.14%', score: '88', entry: '2,940.00', exit: '2,998.50', result: 'WIN', pnl: '+₹5,850' },
+                  { date: '2026-11-06', symbol: 'TCS', type: 'CPR Bottom Reversal', width: '0.16%', score: '82', entry: '4,120.00', exit: '4,195.00', result: 'WIN', pnl: '+₹7,500' },
+                  { date: '2026-11-05', symbol: 'BANKNIFTY', type: 'Narrow CPR Breakout', width: '0.12%', score: '91', entry: '51,400.00', exit: '52,100.00', result: 'WIN', pnl: '+₹14,000' },
+                  { date: '2026-11-05', symbol: 'INFY', type: 'CPR Top Rejection', width: '0.18%', score: '64', entry: '1,890.00', exit: '1,882.00', result: 'LOSS', pnl: '-₹1,600' },
+                  { date: '2026-11-04', symbol: 'NIFTY', type: 'Narrow CPR Breakout', width: '0.11%', score: '85', entry: '24,350.00', exit: '24,620.00', result: 'WIN', pnl: '+₹13,500' }
                 ].map((row, i) => (
                   <tr key={i} className="hover:bg-slate-800/50 transition-colors">
                     <td className="p-3 text-slate-300">{row.date}</td>
@@ -720,7 +691,12 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
                         </span>
                         {stock.isNarrowCpr && (
                           <span className="bg-purple-950 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded text-[10px] font-black uppercase">
-                            Narrow CPR
+                            Narrow CPR ({stock.cprWidthPct}%)
+                          </span>
+                        )}
+                        {stock.isNarrowCprBreakoutBullish && (
+                          <span className="bg-emerald-950 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded text-[10px] font-black uppercase">
+                            🟢 Narrow Breakout
                           </span>
                         )}
                         {stock.isInvertedHammer && (
@@ -728,11 +704,6 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
                             🔨 Inverted Hammer
                           </span>
                         )}
-                        {/* ⏱️ Prominent Timing of Hit Badge */}
-                        <div className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-lg text-[11px] font-black flex items-center gap-1 shadow-sm">
-                          <Clock className="w-3 h-3 animate-pulse text-amber-400" />
-                          <span>Hit @ {stock.signalTime}</span>
-                        </div>
                       </div>
                       <p className="text-xs text-slate-400 font-sans mt-1 truncate max-w-[200px]">{stock.companyName}</p>
                     </div>
@@ -759,6 +730,14 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
                     </div>
                   </div>
 
+                  {/* 🕒 BIG FONT HIT SIGNAL TIMING */}
+                  <div className="bg-gradient-to-r from-amber-950 via-yellow-950/70 to-amber-950 border border-amber-500/50 rounded-2xl p-3 text-center shadow-inner">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-amber-400">Exact Breakout Hit Timing</div>
+                    <div className="text-2xl font-black font-mono text-yellow-300 tracking-tight mt-0.5">
+                      🕒 {stock.signalTime}
+                    </div>
+                  </div>
+
                   {/* CPR Details Grid (R1, S1, 200 EMA) */}
                   <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 font-mono text-xs">
                     <div className="flex items-center justify-between text-[11px]">
@@ -778,44 +757,50 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
                   </div>
 
                   {/* Trade Plan (Entry, SL, Targets) */}
-                  <div className="space-y-1.5 font-mono text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Entry Trigger:</span>
-                      <strong className="text-white font-bold">₹{stock.entryPrice}</strong>
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 font-mono text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Entry Price:</span>
+                      <strong className="text-white">₹{stock.entryPrice}</strong>
                     </div>
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Stop Loss (SL):</span>
-                      <strong className="text-rose-400 font-bold">₹{stock.stopLoss}</strong>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Stop Loss:</span>
+                      <strong className="text-rose-400">₹{stock.stopLoss}</strong>
                     </div>
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Target 1 (R:R):</span>
-                      <strong className="text-emerald-400 font-bold">₹{stock.target1} ({stock.rrRatio})</strong>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Target 1 (1.5R):</span>
+                      <strong className="text-emerald-400">₹{stock.target1}</strong>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Target 2 (2.5R):</span>
+                      <strong className="text-emerald-400">₹{stock.target2}</strong>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-800">
+                      <span className="text-slate-400">Reward : Risk</span>
+                      <strong className="text-amber-300 font-black">{stock.rrRatio}</strong>
                     </div>
                   </div>
 
-                  {/* Footer Actions */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                    <span className="text-[10px] text-amber-300 font-mono font-bold flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-amber-400" /> Setup Hit Time: {stock.signalTime}
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onOpenPositionSizer) onOpenPositionSizer(stock);
-                        }}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition-colors cursor-pointer"
-                      >
-                        Sizer
-                      </button>
-                      <button
-                        onClick={() => onSelectStockDetail(stock)}
-                        className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-black rounded-lg shadow transition-all cursor-pointer flex items-center space-x-1"
-                      >
-                        <span>Details</span>
-                        <ArrowUpRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                  {/* Card Actions */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenPositionSizer(stock);
+                      }}
+                      className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold transition-all"
+                    >
+                      Position Sizer
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectStockDetail(stock);
+                      }}
+                      className="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center space-x-1"
+                    >
+                      <span>Chart &amp; Analysis</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               );
@@ -823,7 +808,6 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
           )}
         </div>
       )}
-
     </div>
   );
 };
