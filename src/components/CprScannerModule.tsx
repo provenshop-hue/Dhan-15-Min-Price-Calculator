@@ -44,7 +44,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
   isLoading = false
 }) => {
   // Navigation Tabs inside CPR Scanner Module
-  const [cprTab, setCprTab] = useState<'narrow' | 'cpr_narrow_trending' | 'very_narrow_no_trend' | 'reversal' | 'breakout' | 'confirmed' | 'watchlist' | 'backtest'>('cpr_narrow_trending');
+  const [cprTab, setCprTab] = useState<'narrow' | 'cpr_narrow_trending' | 'very_narrow_no_trend' | 'reversal' | 'breakout' | 'confirmed' | 'watchlist' | 'backtest' | 'narrow_cpr_breakout_bullish'>('cpr_narrow_trending');
   const [cprNarrowSubTab, setCprNarrowSubTab] = useState<'ALL' | 'BULLISH' | 'BEARISH'>('ALL');
 
   // Filters
@@ -183,6 +183,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       const isCprNarrowTrendingBullish = isNarrowCpr && (close >= tc || open >= tc || close >= pivot) && (close > vwap) && (volumeRatio >= 1.5) && bias === 'BULLISH';
       const isCprNarrowTrendingBearish = isNarrowCpr && (close <= bc || open <= bc || close <= pivot) && (close < vwap) && (volumeRatio >= 1.5) && bias === 'BEARISH';
       const isCprNarrowTrending = isCprNarrowTrendingBullish || isCprNarrowTrendingBearish;
+      const isNarrowCprBreakoutBullish = isNarrowCpr && bias === 'BULLISH' && (hasBreakout || isBullishPro || close > cprTop || close > r1 || close > tc);
 
       // Unique timing of hit per stock based on symbol hash & timeline
       const sym = stock.symbol || 'STOCK';
@@ -234,6 +235,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
         isCprNarrowTrending,
         isCprNarrowTrendingBullish,
         isCprNarrowTrendingBearish,
+        isNarrowCprBreakoutBullish,
         bias,
         hasReversal,
         hasBreakout,
@@ -267,6 +269,7 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
       }
       if (cprTab === 'very_narrow_no_trend' && !s.isVeryNarrowNoTrend) return false;
       if (cprTab === 'narrow' && !s.isNarrowCpr) return false;
+      if (cprTab === 'narrow_cpr_breakout_bullish' && !s.isNarrowCprBreakoutBullish) return false;
       if (cprTab === 'reversal' && !s.hasReversal) return false;
       if (cprTab === 'breakout' && !s.hasBreakout) return false;
       if (cprTab === 'confirmed' && s.status !== 'CONFIRMED') return false;
@@ -321,12 +324,13 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
     const cprNarrowTrendingBullCount = processedCprStocks.filter(s => s.isCprNarrowTrendingBullish).length;
     const cprNarrowTrendingBearCount = processedCprStocks.filter(s => s.isCprNarrowTrendingBearish).length;
     const cprNarrowTrendingCount = processedCprStocks.filter(s => s.isCprNarrowTrending).length;
+    const narrowCprBreakoutBullishCount = processedCprStocks.filter(s => s.isNarrowCprBreakoutBullish).length;
     const bullishCount = processedCprStocks.filter(s => s.bias === 'BULLISH').length;
     const bearishCount = processedCprStocks.filter(s => s.bias === 'BEARISH').length;
     const bullishProCount = processedCprStocks.filter(s => s.isBullishPro).length;
     const bearishProCount = processedCprStocks.filter(s => s.isBearishPro).length;
     const hammerCount = processedCprStocks.filter(s => s.isInvertedHammer).length;
-    return { totalScanned, narrowCount, veryNarrowNoTrendCount, cprNarrowTrendingBullCount, cprNarrowTrendingBearCount, cprNarrowTrendingCount, bullishCount, bearishCount, bullishProCount, bearishProCount, hammerCount };
+    return { totalScanned, narrowCount, veryNarrowNoTrendCount, cprNarrowTrendingBullCount, cprNarrowTrendingBearCount, cprNarrowTrendingCount, narrowCprBreakoutBullishCount, bullishCount, bearishCount, bullishProCount, bearishProCount, hammerCount };
   }, [processedCprStocks]);
 
   return (
@@ -431,6 +435,16 @@ export const CprScannerModule: React.FC<CprScannerModuleProps> = ({
         >
           <Target className="w-3.5 h-3.5" />
           <span>Narrow CPR Scanner ({stats.narrowCount})</span>
+        </button>
+
+        <button
+          onClick={() => setCprTab('narrow_cpr_breakout_bullish')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${
+            cprTab === 'narrow_cpr_breakout_bullish' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+        >
+          <TrendingUp className="w-3.5 h-3.5 text-emerald-300" />
+          <span>🟢 Narrow CPR Breakout Bullish ({stats.narrowCprBreakoutBullishCount})</span>
         </button>
 
         <button
