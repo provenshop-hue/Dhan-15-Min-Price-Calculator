@@ -40,31 +40,43 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
       const diffLow = Math.abs(open - low);
       const diffHigh = Math.abs(open - high);
       
-      // Open = Low criterion (within 0.3% or 0.30 points)
       const isOpenLow = diffLow <= 0.30 || (diffLow / open) * 100 <= 0.30;
-      // Open = High criterion (within 0.3% or 0.30 points)
       const isOpenHigh = diffHigh <= 0.30 || (diffHigh / open) * 100 <= 0.30;
 
-      // Bullish condition for Open=Low: must be bullish (close >= open * 0.998)
-      // Bearish condition for Open=High: must be bearish (close <= open * 1.002)
       const isBullishOpenLow = isOpenLow && (close >= open * 0.998);
       const isBearishOpenHigh = isOpenHigh && (close <= open * 1.002);
 
-      if (!isBullishOpenLow && !isBearishOpenHigh) return null;
+      const isExactOpenLow = Math.abs(open - low) < 1e-4;
+      const isExactOpenHigh = Math.abs(open - high) < 1e-4;
 
-      const isExactOpenLow = diffLow < 0.05;
-      const isExactOpenHigh = diffHigh < 0.05;
-
-      const strategyType = isBullishOpenLow
-        ? (isExactOpenLow ? 'PERFECT_BULLISH' : 'OPEN_LOW')
-        : (isExactOpenHigh ? 'PERFECT_BEARISH' : 'OPEN_HIGH');
-
-      const difference = isBullishOpenLow ? diffLow : diffHigh;
+      const isWholeRupee = Math.abs(open - Math.round(open)) < 1e-4;
+      const isEndingInZero = isWholeRupee && (Math.round(open) % 10 === 0);
 
       const rawS = s as any;
       const middleBand = rawS.ema20 !== undefined && rawS.ema20 !== null ? rawS.ema20 : (high + low + (close * 2)) / 4;
       const isLowerHalfBb = open <= middleBand;
       const isHigherHalfBb = open >= middleBand;
+
+      const isPerfectBullishZero = isExactOpenLow && isEndingInZero && high > open && close > open && isLowerHalfBb;
+      const isPerfectBearishZero = isExactOpenHigh && isEndingInZero && low < open && close < open && isHigherHalfBb;
+      const isPerfectBullish = isExactOpenLow && isWholeRupee && high > open && close > open && isLowerHalfBb;
+      const isPerfectBearish = isExactOpenHigh && isWholeRupee && low < open && close < open && isHigherHalfBb;
+
+      if (!isBullishOpenLow && !isBearishOpenHigh && !isPerfectBullish && !isPerfectBearish && !isPerfectBullishZero && !isPerfectBearishZero) return null;
+
+      const strategyType = isPerfectBullishZero 
+        ? 'PERFECT_BULLISH_ZERO' 
+        : isPerfectBearishZero 
+          ? 'PERFECT_BEARISH_ZERO' 
+          : isPerfectBullish 
+            ? 'PERFECT_BULLISH' 
+            : isPerfectBearish 
+              ? 'PERFECT_BEARISH' 
+              : isBullishOpenLow 
+                ? 'OPEN_LOW' 
+                : 'OPEN_HIGH';
+
+      const difference = (strategyType === 'PERFECT_BULLISH_ZERO' || strategyType === 'PERFECT_BULLISH' || strategyType === 'OPEN_LOW') ? diffLow : diffHigh;
 
       return {
         ...s,
@@ -77,13 +89,19 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
         isHigherHalfBb,
         strategyType,
         difference,
-        isPerfectBullish: isExactOpenLow && close > open,
-        isPerfectBearish: isExactOpenHigh && close < open,
+        isWholeRupee,
+        isEndingInZero,
+        isPerfectBullish,
+        isPerfectBearish,
+        isPerfectBullishZero,
+        isPerfectBearishZero,
         isTopPriorityOpenLow: isBullishOpenLow
       };
     }).filter(Boolean) as any[];
-    
+
     return list.sort((a, b) => {
+      if (a.strategyType === 'PERFECT_BULLISH_ZERO' && b.strategyType !== 'PERFECT_BULLISH_ZERO') return -1;
+      if (a.strategyType !== 'PERFECT_BULLISH_ZERO' && b.strategyType === 'PERFECT_BULLISH_ZERO') return 1;
       if (a.strategyType === 'PERFECT_BULLISH' && b.strategyType !== 'PERFECT_BULLISH') return -1;
       if (a.strategyType !== 'PERFECT_BULLISH' && b.strategyType === 'PERFECT_BULLISH') return 1;
       return a.difference - b.difference;
@@ -106,13 +124,16 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
     });
   }, [scannedStocks, filterType, searchTerm, priceAbove1000]);
 
+  const perfectBullishZeroCount = scannedStocks.filter(s => s.strategyType === 'PERFECT_BULLISH_ZERO').length;
+  const perfectBearishZeroCount = scannedStocks.filter(s => s.strategyType === 'PERFECT_BEARISH_ZERO').length;
   const perfectBullishCount = scannedStocks.filter(s => s.strategyType === 'PERFECT_BULLISH').length;
   const perfectBearishCount = scannedStocks.filter(s => s.strategyType === 'PERFECT_BEARISH').length;
   const openLowCount = scannedStocks.filter(s => s.strategyType === 'OPEN_LOW').length;
   const openHighCount = scannedStocks.filter(s => s.strategyType === 'OPEN_HIGH').length;
 
-  // AI Recommendation Logic
-  const topRecommendation = scannedStocks.filter(s => s.strategyType === 'PERFECT_BULLISH' || s.strategyType === 'OPEN_LOW').sort((a, b) => {
+  const topRecommendation = scannedStocks.filter(s => s.strategyType === 'PERFECT_BULLISH_ZERO' || s.strategyType === 'PERFECT_BULLISH' || s.strategyType === 'OPEN_LOW').sort((a, b) => {
+    if (a.strategyType === 'PERFECT_BULLISH_ZERO' && b.strategyType !== 'PERFECT_BULLISH_ZERO') return -1;
+    if (a.strategyType !== 'PERFECT_BULLISH_ZERO' && b.strategyType === 'PERFECT_BULLISH_ZERO') return 1;
     if (a.strategyType === 'PERFECT_BULLISH' && b.strategyType !== 'PERFECT_BULLISH') return -1;
     if (a.strategyType !== 'PERFECT_BULLISH' && b.strategyType === 'PERFECT_BULLISH') return 1;
     return a.difference - b.difference || (b.volumeRatio || 0) - (a.volumeRatio || 0);
@@ -203,6 +224,28 @@ export function OpenHighLowScanner({ stocks, onSelectStockDetail, onOpenPosition
           <span>All Scans ({scannedStocks.length})</span>
         </button>
 
+        <button
+          onClick={() => setFilterType('PERFECT_BULLISH_ZERO')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm flex items-center space-x-2 ${
+            filterType === 'PERFECT_BULLISH_ZERO'
+              ? 'bg-emerald-600 text-white border-emerald-400 shadow-md ring-2 ring-emerald-500/20' 
+              : 'bg-emerald-950/40 text-emerald-300 border border-emerald-700/70 hover:bg-emerald-900/40'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <span>PERFECT BULLISH (Ending in 0) ({perfectBullishZeroCount})</span>
+        </button>
+        <button
+          onClick={() => setFilterType('PERFECT_BEARISH_ZERO')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm flex items-center space-x-2 ${
+            filterType === 'PERFECT_BEARISH_ZERO'
+              ? 'bg-rose-600 text-white border-rose-400 shadow-md ring-2 ring-rose-500/20' 
+              : 'bg-rose-950/40 text-rose-300 border border-rose-700/70 hover:bg-rose-900/40'
+          }`}
+        >
+          <TrendingDown className="w-4 h-4 text-rose-400" />
+          <span>PERFECT BEARISH (Ending in 0) ({perfectBearishZeroCount})</span>
+        </button>
         <button
           onClick={() => setFilterType('PERFECT_BULLISH')}
           className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all shadow-sm flex items-center space-x-2 ${
