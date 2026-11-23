@@ -88,6 +88,8 @@ export interface StockCalculated {
   orbLowBounceTime?: string;
   hasBounceAfterDip?: boolean;
   bounceAfterDipTime?: string;
+  hasBounceAfterDown?: boolean;
+  bounceAfterDownTime?: string;
   hasBounceAndOneDirection?: boolean;
   bounceStrengthPct?: number;
   isHighQualityBullish?: boolean;

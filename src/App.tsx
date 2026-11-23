@@ -29,13 +29,12 @@ import { FiiDiiPredictorHub } from './components/FiiDiiPredictorHub';
 import { DhanTimingQualityScanner } from './components/DhanTimingQualityScanner';
 import { BullishRallyPopup } from './components/BullishRallyPopup';
 import { DhanMarketfeedModal } from './components/DhanMarketfeedModal';
+import { CprScannerModule } from './components/CprScannerModule';
 import { Nifty50ParabolicTracker } from './components/Nifty50ParabolicTracker';
 import { EmaDynamicEngineDashboard } from './components/EmaDynamicEngineDashboard';
 import { FollowedStocksDashboard } from './components/FollowedStocksDashboard';
-import { CprScannerModule } from './components/CprScannerModule';
-
-import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
+import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
 import { calculateGann15Min } from './utils/gann';
 import { is100PercentBullishMove, is100PercentBearishMove, get100PercentBullishFadeReason, get100PercentBearishFadeReason, detectHistorical100Fades } from './utils/rsiPullback';
@@ -1592,6 +1591,7 @@ export default function App() {
             onRefreshAll={handleFetchAllDhan}
             isLoading={isBulkLoading}
           />
+
 
         ) : activeDashboardTab === 'fii_dii_predictor' ? (
           /* Dedicated FII-DII NIFTY Direction Predictor PRO */
