@@ -90,6 +90,8 @@ export interface StockCalculated {
   bounceAfterDipTime?: string;
   hasBounceAfterDown?: boolean;
   bounceAfterDownTime?: string;
+  hasBounceLowerBb?: boolean;
+  bounceLowerBbTime?: string;
   hasBounceAndOneDirection?: boolean;
   bounceStrengthPct?: number;
   isHighQualityBullish?: boolean;
