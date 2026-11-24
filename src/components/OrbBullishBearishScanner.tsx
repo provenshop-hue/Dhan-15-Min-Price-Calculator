@@ -722,7 +722,13 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           }
 
           if (validNoReversal) {
-            hasOrbBreakNoReversal = true;
+            // Institutional Confluence Check: VWAP and RSI
+            const rsiOk = isBull ? (rsi >= 48) : (rsi <= 52);
+            const vwapOk = isBull ? (close >= vwap * 0.997) : (close <= vwap * 1.003);
+
+            if (rsiOk && vwapOk) {
+              hasOrbBreakNoReversal = true;
+            }
           }
         }
       }
