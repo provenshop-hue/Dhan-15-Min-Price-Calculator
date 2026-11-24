@@ -1927,6 +1927,19 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   </div>
                 )}
 
+                {/* 🚀 ORB BREAK NO REVERSAL TIMING BANNER */}
+                {stock.hasOrbBreakNoReversal && (
+                  <div className="px-4 py-2.5 bg-gradient-to-r from-emerald-950/90 via-slate-950 to-emerald-950/90 border-b border-emerald-500/50 text-xs font-mono text-emerald-200 flex items-center justify-between">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <Target className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      <span>ORB Break No Reversal Time:</span>
+                    </span>
+                    <strong className="text-white font-black text-sm px-2.5 py-0.5 bg-emerald-500/20 border border-emerald-400 rounded-lg">
+                      {stock.orbBreakNoReversalTime}
+                    </strong>
+                  </div>
+                )}
+
                 {/* ✨ RECENT DISCOVERY TOP LABEL & TIMING */}
                 {stock.hasRecentDiscovery && (
                   <div className="px-4 py-2 bg-gradient-to-r from-amber-950 via-yellow-950/80 to-amber-950 border-b border-amber-500/60 text-xs font-mono text-amber-200 flex items-center justify-between shadow-inner">
