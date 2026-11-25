@@ -746,7 +746,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           }
         }
 
-        if (breakoutIdx !== -1) {
+        if (breakoutIdx !== -1 && isBullishQualified) {
           const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + (close * 2)) / 4;
           const stdDev = Math.abs(high - low) / 3.5 || (close * 0.015);
           const lowerBand = middleBand - (2 * stdDev);
