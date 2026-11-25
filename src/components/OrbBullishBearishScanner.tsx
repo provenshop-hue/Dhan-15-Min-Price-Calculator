@@ -770,10 +770,10 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         const lowerBand = middleBand - (2 * stdDev);
         const upperBand = middleBand + (2 * stdDev);
 
-        // Condition 1: First 15m candle must stay below the lower half of Bollinger Band (high <= middleBand)
-        const staysLowerHalfBb = firstCandle.high <= middleBand && firstCandle.close <= middleBand;
+        // Condition 1: First 15m candle must start from or touch the lower Bollinger Band level
+        const touchesLowerBb = firstCandle.low <= lowerBand * 1.025 || firstCandle.open <= lowerBand * 1.025 || (firstCandle.low <= lowerBand * 1.05 && firstCandle.high <= middleBand);
 
-        if (staysLowerHalfBb) {
+        if (touchesLowerBb) {
           // Condition 2: ORB breaks before bollinger band high
           let breakIdx = -1;
           for (let i = 0; i < stock.rsiTimeline.length; i++) {
