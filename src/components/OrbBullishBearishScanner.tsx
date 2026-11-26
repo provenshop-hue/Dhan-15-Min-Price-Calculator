@@ -674,14 +674,15 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let hasBounceLowerBb = false;
       let bounceLowerBbTime = '-';
 
-      if (hasOrbLowBounce && orbBounceType === 'BULLISH_SUPPORT_BOUNCE') {
+      if (isBullishQualified) {
         const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + (close * 2)) / 4;
         const stdDev = Math.abs(high - low) / 3.5 || (close * 0.015);
         const lowerBand = middleBand - (2 * stdDev);
-        const isNearLowerBb = (close <= middleBand) || (low <= lowerBand * 1.015) || (close <= lowerBand * 1.025);
-        if (isNearLowerBb) {
+        // Wick or body must touch or go below the lower Bollinger Band line (low <= lowerBand * 1.005 or open/close near lowerBand)
+        const touchesLowerBbLine = low <= lowerBand * 1.008 || Math.min(open, close) <= lowerBand * 1.015;
+        if (touchesLowerBbLine) {
           hasBounceLowerBb = true;
-          bounceLowerBbTime = orbLowBounceTime;
+          bounceLowerBbTime = orbBreakTime;
         }
       }
 
