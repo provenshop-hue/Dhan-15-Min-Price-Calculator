@@ -674,15 +674,28 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let hasBounceLowerBb = false;
       let bounceLowerBbTime = '-';
 
-      if (isBullishQualified) {
-        const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + (close * 2)) / 4;
-        const stdDev = Math.abs(high - low) / 3.5 || (close * 0.015);
-        const lowerBand = middleBand - (2 * stdDev);
-        // Wick or body must touch or go below the lower Bollinger Band line (low <= lowerBand * 1.005 or open/close near lowerBand)
-        const touchesLowerBbLine = low <= lowerBand * 1.008 || Math.min(open, close) <= lowerBand * 1.015;
-        if (touchesLowerBbLine) {
-          hasBounceLowerBb = true;
-          bounceLowerBbTime = orbBreakTime;
+      if (isBullishQualified && stock.rsiTimeline && stock.rsiTimeline.length > 0) {
+        let breakoutIdx = -1;
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          if (stock.rsiTimeline[i].close >= orbHigh) {
+            breakoutIdx = i;
+            break;
+          }
+        }
+
+        if (breakoutIdx !== -1) {
+          const breakoutCandle = stock.rsiTimeline[breakoutIdx];
+          const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (breakoutCandle.high + breakoutCandle.low + (breakoutCandle.close * 2)) / 4;
+          const stdDev = Math.abs(breakoutCandle.high - breakoutCandle.low) / 3.5 || (breakoutCandle.close * 0.015);
+          const lowerBand = middleBand - (2 * stdDev);
+
+          // The breakout candle's wick (low) or body (min of open/close) must touch or go below the Bollinger Band lower line
+          const wickOrBodyTouchesBbLower = breakoutCandle.low <= lowerBand * 1.008 || Math.min(breakoutCandle.open, breakoutCandle.close) <= lowerBand * 1.015;
+
+          if (wickOrBodyTouchesBbLower) {
+            hasBounceLowerBb = true;
+            bounceLowerBbTime = breakoutCandle.timeStr;
+          }
         }
       }
 
