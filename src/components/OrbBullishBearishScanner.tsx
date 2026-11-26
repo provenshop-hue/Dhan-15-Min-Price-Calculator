@@ -88,7 +88,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'lowest_volume_concept' | 'bounce_and_one_direction' | 'failed_stocks' | 'bounce_after_dip' | 'bounce_after_down' | 'bounce_lower_bb' | 'orb_break_no_reversal' | 'lower_bb_orb_break' | 'priority_bb_break' | 'recent_discovery'>('recent_discovery');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'lowest_volume_concept' | 'bounce_and_one_direction' | 'failed_stocks' | 'bounce_after_dip' | 'bounce_after_down' | 'bounce_lower_bb' | 'orb_break_no_reversal' | 'lower_bb_orb_break' | 'priority_bb_break' | 'orb_rocket_bounce' | 'recent_discovery'>('recent_discovery');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
@@ -793,6 +793,34 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         }
       }
 
+      let hasOrbRocketBounce = false;
+      let orbRocketBounceTime = '-';
+
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+        let breakoutIdx = -1;
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          if (stock.rsiTimeline[i].close >= orbHigh) {
+            breakoutIdx = i;
+            break;
+          }
+        }
+
+        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 1) {
+          for (let k = breakoutIdx + 1; k < stock.rsiTimeline.length; k++) {
+            const pt = stock.rsiTimeline[k];
+            const isRetest = pt.low <= orbHigh * 1.008 && pt.low >= orbHigh * 0.985;
+            if (isRetest && k + 1 < stock.rsiTimeline.length) {
+              const bouncePt = stock.rsiTimeline[k + 1];
+              if (bouncePt.close > pt.close && bouncePt.close >= orbHigh * 1.002) {
+                hasOrbRocketBounce = true;
+                orbRocketBounceTime = bouncePt.timeStr;
+                break;
+              }
+            }
+          }
+        }
+      }
+
       let hasBounceCandleStrength = false;
       let bounceCandleTime = '-';
       let bounceCandleScore = 0;
@@ -1300,6 +1328,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         lowerBbOrbBreakTime: capTimeAtCurrentClock(lowerBbOrbBreakTime),
         hasPriorityBbBreak,
         priorityBbBreakTime: capTimeAtCurrentClock(priorityBbBreakTime),
+        hasOrbRocketBounce,
+        orbRocketBounceTime: capTimeAtCurrentClock(orbRocketBounceTime),
         hasFailedStock,
         failedFilterType,
         failureReason,
@@ -1356,6 +1386,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'orb_break_no_reversal' && !s.hasOrbBreakNoReversal) return false;
       if (activeTab === 'lower_bb_orb_break' && !s.hasLowerBbOrbBreak) return false;
       if (activeTab === 'priority_bb_break' && !s.hasPriorityBbBreak) return false;
+      if (activeTab === 'orb_rocket_bounce' && !s.hasOrbRocketBounce) return false;
       if (activeTab === 'recent_discovery') {
         if (!s.hasRecentDiscovery) return false;
         if (recentSubFilter === 'SUPER_BREAK' && !s.isSuperBreakBullish && !s.isSuperBreakBearish) return false;
@@ -1384,7 +1415,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         return timeB - timeA; // Latest time first
       }
 
-      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified) || (activeTab === 'orb_zero_reversal' && !a.isBullishQualified) || (activeTab === 'bounce_great' && !a.isBullishQualified) || (activeTab === 'lightning_scalp' && !a.isBullishQualified) || (activeTab === 'no_retest' && !a.isBullishQualified) || (activeTab === 'bounce_and_one_direction' && !a.isBullishQualified) || (activeTab === 'failed_stocks' && !a.isBullishQualified) || (activeTab === 'bounce_after_dip' && !a.isBullishQualified) || (activeTab === 'bounce_after_down' && !a.isBullishQualified) || (activeTab === 'bounce_lower_bb' && !a.isBullishQualified) || (activeTab === 'orb_break_no_reversal' && !a.isBullishQualified) || (activeTab === 'lower_bb_orb_break' && !a.isBullishQualified) || (activeTab === 'recent_discovery' && !a.isBullishQualified);
+      const isBear = activeTab === 'bearish' || activeTab === 'super_break_bear' || (activeTab === 'retested_bounced' && !a.isBullishQualified) || (activeTab === 'failed_retest' && !a.isBullishQualified) || (activeTab === 'immediate_bounce' && !a.isBullishQualified) || (activeTab === 'orb_low_bounce' && !a.isBullishQualified) || (activeTab === 'bounce_candle_strength' && !a.isBullishQualified) || (activeTab === 'orb_zero_reversal' && !a.isBullishQualified) || (activeTab === 'bounce_great' && !a.isBullishQualified) || (activeTab === 'lightning_scalp' && !a.isBullishQualified) || (activeTab === 'no_retest' && !a.isBullishQualified) || (activeTab === 'bounce_and_one_direction' && !a.isBullishQualified) || (activeTab === 'failed_stocks' && !a.isBullishQualified) || (activeTab === 'bounce_after_dip' && !a.isBullishQualified) || (activeTab === 'bounce_after_down' && !a.isBullishQualified) || (activeTab === 'bounce_lower_bb' && !a.isBullishQualified) || (activeTab === 'orb_break_no_reversal' && !a.isBullishQualified) || (activeTab === 'lower_bb_orb_break' && !a.isBullishQualified) || (activeTab === 'priority_bb_break' && !a.isBullishQualified) || (activeTab === 'orb_rocket_bounce' && !a.isBullishQualified) || (activeTab === 'recent_discovery' && !a.isBullishQualified);
       const valA = isBear ? a.breakPctBelow : a.breakPctAbove;
       const valB = isBear ? b.breakPctBelow : b.breakPctAbove;
 
@@ -1438,6 +1469,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const orbBreakNoReversalCount = processedOrbStocks.filter(s => s.hasOrbBreakNoReversal).length;
   const lowerBbOrbBreakCount = processedOrbStocks.filter(s => s.hasLowerBbOrbBreak).length;
   const priorityBbBreakCount = processedOrbStocks.filter(s => s.hasPriorityBbBreak).length;
+  const orbRocketBounceCount = processedOrbStocks.filter(s => s.hasOrbRocketBounce).length;
   const recentDiscoveryCount = processedOrbStocks.filter(s => s.hasRecentDiscovery).length;
 
   return (
@@ -1570,6 +1602,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
               { id: 'bounce_lower_bb', label: `📉 Lower BB Level (${bounceLowerBbCount})`, icon: ShieldCheck, color: 'text-cyan-300', activeClass: 'bg-cyan-600 text-white font-black shadow-lg shadow-cyan-600/30 border border-cyan-400' },
               { id: 'lower_bb_orb_break', label: `📉 Lower BB ORB Break (${lowerBbOrbBreakCount})`, icon: TrendingDown, color: 'text-emerald-300', activeClass: 'bg-emerald-600 text-white font-black shadow-lg shadow-emerald-600/30 border border-emerald-500' },
               { id: 'priority_bb_break', label: `⭐ Priority BB Break (${priorityBbBreakCount})`, icon: Zap, color: 'text-amber-300', activeClass: 'bg-amber-600 text-slate-950 font-black shadow-lg shadow-amber-500/40 border border-amber-300' },
+              { id: 'orb_rocket_bounce', label: `🚀 ORB Rocket Bounce (${orbRocketBounceCount})`, icon: Sparkles, color: 'text-purple-300', activeClass: 'bg-purple-600 text-white font-black shadow-lg shadow-purple-600/30 border border-purple-500' },
               { id: 'orb_break_no_reversal', label: `🚀 ORB Break No Reversal (${orbBreakNoReversalCount})`, icon: Target, color: 'text-amber-300', activeClass: 'bg-amber-600 text-white font-black shadow-lg shadow-amber-600/30 border border-amber-400' },
               { id: 'bounce_and_one_direction', label: `⚡ Bounce & One Direction (${bounceAndOneDirectionCount})`, icon: Flame, color: 'text-amber-300', activeClass: 'bg-amber-600 text-white font-black shadow-lg shadow-amber-600/30 border border-amber-400' },
               { id: 'bounce_candle_strength', label: `📈 Bounce Strength (${bounceCandleCount})`, icon: Sparkles, color: 'text-indigo-300', activeClass: 'bg-indigo-600 text-white font-black shadow-lg shadow-indigo-600/30 border border-indigo-500' },
