@@ -796,39 +796,25 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let hasOrbRocketBounce = false;
       let orbRocketBounceTime = '-';
 
-      if (stock.rsiTimeline && stock.rsiTimeline.length >= 3) {
-        // Condition 1: Second candle (index 1, corresponding to 9:30 - 9:45 AM) breaks the ORB
-        const secondCandle = stock.rsiTimeline[1];
-        const breaksOrb = secondCandle && secondCandle.close >= orbHigh;
+      if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+        let breakoutIdx = -1;
+        for (let i = 0; i < stock.rsiTimeline.length; i++) {
+          if (stock.rsiTimeline[i].close >= orbHigh) {
+            breakoutIdx = i;
+            break;
+          }
+        }
 
-        if (breaksOrb) {
-          // Condition 2: Volume of 9:30 - 9:45 AM candle is >= 1.3x average / previous
-          const prevVol = stock.rsiTimeline[0].volume || 10000;
-          const secondVol = secondCandle.volume || prevVol;
-          const volumeOk = secondVol >= prevVol * 1.3;
-
-          // Condition 3: RSI is above 59 to 70 (59 <= rsi <= 70)
-          const currentRsi = rsi;
-          const rsiOk = currentRsi >= 59 && currentRsi <= 70;
-
-          if (volumeOk && rsiOk) {
-            // Condition 4: Retest comes down (touching near orbHigh without going below ORB line) and bounces back with good volume
-            for (let k = 2; k < stock.rsiTimeline.length; k++) {
-              const pt = stock.rsiTimeline[k];
-              // Retest: low dips near orbHigh but does not go below ORB line (pt.low >= orbHigh * 0.995)
-              const isRetestDip = pt.low <= orbHigh * 1.008 && pt.low >= orbHigh * 0.995;
-
-              if (isRetestDip && k + 1 < stock.rsiTimeline.length) {
-                const bounceCandle = stock.rsiTimeline[k + 1];
-                const avgVolCheck = (stock.rsiTimeline[k - 1]?.volume || prevVol);
-                const bounceVolOk = (bounceCandle.volume || avgVolCheck) >= avgVolCheck * 1.2;
-                const isBounceValid = bounceCandle.close > pt.close && bounceCandle.close >= orbHigh * 1.003;
-
-                if (bounceVolOk && isBounceValid) {
-                  hasOrbRocketBounce = true;
-                  orbRocketBounceTime = bounceCandle.timeStr;
-                  break;
-                }
+        if (breakoutIdx !== -1 && breakoutIdx < stock.rsiTimeline.length - 1) {
+          for (let k = breakoutIdx + 1; k < stock.rsiTimeline.length; k++) {
+            const pt = stock.rsiTimeline[k];
+            const isRetest = pt.low <= orbHigh * 1.008 && pt.low >= orbHigh * 0.985;
+            if (isRetest && k + 1 < stock.rsiTimeline.length) {
+              const bouncePt = stock.rsiTimeline[k + 1];
+              if (bouncePt.close > pt.close && bouncePt.close >= orbHigh * 1.002) {
+                hasOrbRocketBounce = true;
+                orbRocketBounceTime = bouncePt.timeStr;
+                break;
               }
             }
           }
@@ -2059,19 +2045,6 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     </span>
                     <strong className="text-white font-black text-sm px-2.5 py-0.5 bg-emerald-500/20 border border-emerald-400 rounded-lg">
                       {stock.orbBreakNoReversalTime}
-                    </strong>
-                  </div>
-                )}
-
-                {/* 🚀 ORB ROCKET BOUNCE TIMING BANNER */}
-                {stock.hasOrbRocketBounce && (
-                  <div className="px-4 py-2.5 bg-gradient-to-r from-purple-950/90 via-slate-950 to-purple-950/90 border-b border-purple-500/50 text-xs font-mono text-purple-200 flex items-center justify-between">
-                    <span className="font-bold flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
-                      <span>ORB Rocket Bounce Time:</span>
-                    </span>
-                    <strong className="text-white font-black text-sm px-2.5 py-0.5 bg-purple-500/20 border border-purple-400 rounded-lg">
-                      {stock.orbRocketBounceTime}
                     </strong>
                   </div>
                 )}
