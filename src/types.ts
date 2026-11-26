@@ -100,6 +100,23 @@ export interface StockCalculated {
   priorityBbBreakTime?: string;
   hasOrbRocketBounce?: boolean;
   orbRocketBounceTime?: string;
+  isExtremeBullishOrbRocket?: boolean;
+  isExtremeBearishOrbRocket?: boolean;
+  extremeOrbRocketStatus?: 'EXTREME BULLISH' | 'EXTREME BEARISH' | 'NO TRADE';
+  extremeOrbRocketDetails?: {
+    bodyPct: number;
+    wickPct: number;
+    volumeRatio: number;
+    rsi: number;
+    adx: number;
+    isBullishSlope: boolean;
+    hasRetest: boolean;
+    hasConfirmation: boolean;
+    stopLoss: number;
+    target: number;
+    rrRatio: string;
+    timestamp: string;
+  };
   hasBounceAndOneDirection?: boolean;
   bounceStrengthPct?: number;
   isHighQualityBullish?: boolean;
