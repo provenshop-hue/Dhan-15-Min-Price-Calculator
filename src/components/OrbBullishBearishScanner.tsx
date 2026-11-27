@@ -651,10 +651,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let strongBounceTime = '-';
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
-        // Calculate quality score based on volume ratio, RSI position, candle body strength, and VWAP alignment
         const avgVol = stock.rsiTimeline.reduce((acc, p) => acc + (p.volume || 10000), 0) / stock.rsiTimeline.length;
 
-        // Bullish Strong Bounce Check: 1) ORB Breakout, 2) Retest wick/low does not go below ORB High, 3) Bounce candle closes slightly above retest high/close
+        // Bullish Strong Bounce Check: score >= 70 AND bounce close is 3% to 7% higher than retest candle close
         let bullBreakIdx = -1;
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
           if (stock.rsiTimeline[i].close >= orbHigh) {
@@ -669,8 +668,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             const respectedOrbHigh = retestPt.low >= orbHigh * 0.992;
             if (respectedOrbHigh) {
               const bouncePt = stock.rsiTimeline[k + 1];
-              if (bouncePt.close > retestPt.high || (bouncePt.close > retestPt.close && bouncePt.close >= orbHigh)) {
-                // Compute score (70 to 98)
+              // Distance check: bounce close must be between 3% and 7% higher than retest close
+              const distancePct = ((bouncePt.close - retestPt.close) / retestPt.close) * 100;
+              if (distancePct >= 3.0 && distancePct <= 7.0) {
                 const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
                 const rsiScore = (rsi >= 55 && rsi <= 75) ? 30 : 15;
                 const vwapScore = close > vwap ? 25 : 10;
@@ -689,7 +689,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           }
         }
 
-        // Bearish Strong Bounce Check: 1) ORB Breakdown, 2) Retest wick/high does not go above ORB Low, 3) Bounce candle closes slightly below retest low/close
+        // Bearish Strong Bounce Check: score >= 70 AND bounce close is 3% to 7% lower than retest candle close
         let bearBreakIdx = -1;
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
           if (stock.rsiTimeline[i].close <= orbLow) {
@@ -704,7 +704,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             const respectedOrbLow = retestPt.high <= orbLow * 1.008;
             if (respectedOrbLow) {
               const bouncePt = stock.rsiTimeline[k + 1];
-              if (bouncePt.close < retestPt.low || (bouncePt.close < retestPt.close && bouncePt.close <= orbLow)) {
+              const distancePct = ((retestPt.close - bouncePt.close) / retestPt.close) * 100;
+              if (distancePct >= 3.0 && distancePct <= 7.0) {
                 const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
                 const rsiScore = (rsi <= 45 && rsi >= 25) ? 30 : 15;
                 const vwapScore = close < vwap ? 25 : 10;
