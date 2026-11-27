@@ -104,6 +104,7 @@ export interface StockCalculated {
   isExtremeBearishOrbRocket?: boolean;
   hasStrongBullishBounce?: boolean;
   hasStrongBearishBounce?: boolean;
+  strongBounceScore?: number;
   strongBounceTime?: string;
   extremeOrbRocketStatus?: 'EXTREME BULLISH' | 'EXTREME BEARISH' | 'NO TRADE';
   extremeOrbRocketDetails?: {

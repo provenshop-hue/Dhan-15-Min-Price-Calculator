@@ -647,9 +647,13 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
       let hasStrongBullishBounce = false;
       let hasStrongBearishBounce = false;
+      let strongBounceScore = 0;
       let strongBounceTime = '-';
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
+        // Calculate quality score based on volume ratio, RSI position, candle body strength, and VWAP alignment
+        const avgVol = stock.rsiTimeline.reduce((acc, p) => acc + (p.volume || 10000), 0) / stock.rsiTimeline.length;
+
         // Bullish Strong Bounce Check: 1) ORB Breakout, 2) Retest wick/low does not go below ORB High, 3) Bounce candle closes slightly above retest high/close
         let bullBreakIdx = -1;
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
@@ -662,15 +666,24 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (bullBreakIdx !== -1 && bullBreakIdx < stock.rsiTimeline.length - 2) {
           for (let k = bullBreakIdx + 1; k < stock.rsiTimeline.length - 1; k++) {
             const retestPt = stock.rsiTimeline[k];
-            // Retest should respect ORB Line (low should not decisively go below orbHigh)
             const respectedOrbHigh = retestPt.low >= orbHigh * 0.992;
             if (respectedOrbHigh) {
               const bouncePt = stock.rsiTimeline[k + 1];
-              // Bounce candle closes slightly above retest high or close
               if (bouncePt.close > retestPt.high || (bouncePt.close > retestPt.close && bouncePt.close >= orbHigh)) {
-                hasStrongBullishBounce = true;
-                strongBounceTime = bouncePt.timeStr;
-                break;
+                // Compute score (70 to 98)
+                const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
+                const rsiScore = (rsi >= 55 && rsi <= 75) ? 30 : 15;
+                const vwapScore = close > vwap ? 25 : 10;
+                const bodyScore = Math.min(20, (Math.abs(bouncePt.close - bouncePt.open) / Math.max(0.01, bouncePt.high - bouncePt.low)) * 20);
+                
+                const calculatedScore = Math.round(volScore + rsiScore + vwapScore + bodyScore);
+                strongBounceScore = Math.max(50, Math.min(98, calculatedScore));
+
+                if (strongBounceScore >= 70) {
+                  hasStrongBullishBounce = true;
+                  strongBounceTime = bouncePt.timeStr;
+                  break;
+                }
               }
             }
           }
@@ -692,9 +705,19 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             if (respectedOrbLow) {
               const bouncePt = stock.rsiTimeline[k + 1];
               if (bouncePt.close < retestPt.low || (bouncePt.close < retestPt.close && bouncePt.close <= orbLow)) {
-                hasStrongBearishBounce = true;
-                strongBounceTime = bouncePt.timeStr;
-                break;
+                const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
+                const rsiScore = (rsi <= 45 && rsi >= 25) ? 30 : 15;
+                const vwapScore = close < vwap ? 25 : 10;
+                const bodyScore = Math.min(20, (Math.abs(bouncePt.close - bouncePt.open) / Math.max(0.01, bouncePt.high - bouncePt.low)) * 20);
+                
+                const calculatedScore = Math.round(volScore + rsiScore + vwapScore + bodyScore);
+                strongBounceScore = Math.max(50, Math.min(98, calculatedScore));
+
+                if (strongBounceScore >= 70) {
+                  hasStrongBearishBounce = true;
+                  strongBounceTime = bouncePt.timeStr;
+                  break;
+                }
               }
             }
           }
