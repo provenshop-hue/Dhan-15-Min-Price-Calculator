@@ -670,7 +670,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
               const bouncePt = stock.rsiTimeline[k + 1];
               // Distance check: bounce close must be between 3% and 7% higher than retest close
               const distancePct = ((bouncePt.close - retestPt.close) / retestPt.close) * 100;
-              if (distancePct >= 3.0 && distancePct <= 7.0) {
+              if (distancePct >= 0.0 && distancePct <= 10.0) {
                 const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
                 const rsiScore = (rsi >= 55 && rsi <= 75) ? 30 : 15;
                 const vwapScore = close > vwap ? 25 : 10;
@@ -689,7 +689,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
           }
         }
 
-        // Bearish Strong Bounce Check: score >= 70 AND bounce close is 3% to 7% lower than retest candle close
+        // Bearish Strong Bounce Check: score >= 70 AND bounce close is 0% to 10% lower than retest candle close
         let bearBreakIdx = -1;
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
           if (stock.rsiTimeline[i].close <= orbLow) {
@@ -705,7 +705,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
             if (respectedOrbLow) {
               const bouncePt = stock.rsiTimeline[k + 1];
               const distancePct = ((retestPt.close - bouncePt.close) / retestPt.close) * 100;
-              if (distancePct >= 3.0 && distancePct <= 7.0) {
+              if (distancePct >= 0.0 && distancePct <= 10.0) {
                 const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
                 const rsiScore = (rsi <= 45 && rsi >= 25) ? 30 : 15;
                 const vwapScore = close < vwap ? 25 : 10;
