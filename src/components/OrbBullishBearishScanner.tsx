@@ -685,12 +685,20 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
 
         if (breakoutIdx !== -1) {
           const breakoutCandle = stock.rsiTimeline[breakoutIdx];
-          const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (breakoutCandle.high + breakoutCandle.low + (breakoutCandle.close * 2)) / 4;
-          const stdDev = Math.abs(breakoutCandle.high - breakoutCandle.low) / 3.5 || (breakoutCandle.close * 0.015);
-          const lowerBand = middleBand - (2 * stdDev);
+          // Use stock.bollingerLower if provided by backend, otherwise compute accurate 20-period BB lower band from timeline prices
+          let lowerBandVal = stock.bollingerLower;
+          if (lowerBandVal === undefined || lowerBandVal === null) {
+            const closes = stock.rsiTimeline.map(p => p.close);
+            const period = Math.min(20, closes.length);
+            const slice = closes.slice(0, Math.max(0, closes.length - period));
+            const sma = slice.reduce((a, b) => a + b, 0) / period;
+            const variance = slice.reduce((a, b) => a + Math.pow(b - sma, 2), 0) / period;
+            const sd = Math.sqrt(variance) || (breakoutCandle.close * 0.015);
+            lowerBandVal = sma - (2 * sd);
+          }
 
-          // The breakout candle's wick (low) or body (min of open/close) must touch or go below the Bollinger Band lower line
-          const wickOrBodyTouchesBbLower = breakoutCandle.low <= lowerBand * 1.008 || Math.min(breakoutCandle.open, breakoutCandle.close) <= lowerBand * 1.015;
+          // The breakout candle's wick (low) or body must touch or go below the true Bollinger Band lower level
+          const wickOrBodyTouchesBbLower = breakoutCandle.low <= lowerBandVal * 1.002 || Math.min(breakoutCandle.open, breakoutCandle.close) <= lowerBandVal * 1.005;
 
           if (wickOrBodyTouchesBbLower) {
             hasBounceLowerBb = true;

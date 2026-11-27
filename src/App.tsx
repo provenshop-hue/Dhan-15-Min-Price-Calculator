@@ -33,6 +33,7 @@ import { CprScannerModule } from './components/CprScannerModule';
 import { Nifty50ParabolicTracker } from './components/Nifty50ParabolicTracker';
 import { EmaDynamicEngineDashboard } from './components/EmaDynamicEngineDashboard';
 import { FollowedStocksDashboard } from './components/FollowedStocksDashboard';
+import { LabsAnalyzer } from './components/LabsAnalyzer';
 import { getDhanSecurityId, isIndexSymbol } from './data/dhanSecurityMap';
 import { INITIAL_STOCKS, StockItem } from './data/stocks';
 import { StockCalculated, DhanApiCredentials, TrendFilterType, FadedStockRecord, StockTradeJourney, IdealOptionTrade } from './types';
@@ -1593,6 +1594,11 @@ export default function App() {
           />
 
 
+        ) : activeDashboardTab === 'labs' ? (
+          /* Dedicated AI Labs Intraday Deep Decoder Module */
+          <LabsAnalyzer
+            stocks={stocks}
+          />
         ) : activeDashboardTab === 'fii_dii_predictor' ? (
           /* Dedicated FII-DII NIFTY Direction Predictor PRO */
           <FiiDiiPredictorHub
