@@ -102,6 +102,9 @@ export interface StockCalculated {
   orbRocketBounceTime?: string;
   isExtremeBullishOrbRocket?: boolean;
   isExtremeBearishOrbRocket?: boolean;
+  hasStrongBullishBounce?: boolean;
+  hasStrongBearishBounce?: boolean;
+  strongBounceTime?: string;
   extremeOrbRocketStatus?: 'EXTREME BULLISH' | 'EXTREME BEARISH' | 'NO TRADE';
   extremeOrbRocketDetails?: {
     bodyPct: number;
