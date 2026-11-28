@@ -2446,17 +2446,19 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                   </div>
                 )}
 
-                {/* 🔥 STRONG BOUNCE VOLUME BIG FONT BANNER */}
+                {/* 🔥 STRONG BOUNCE SIGNAL CANDLE VOLUME BIG FONT BANNER */}
                 {(stock.hasStrongBullishBounce || stock.hasStrongBearishBounce) && (
-                  <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-cyan-950/80 to-slate-950 border-b border-cyan-500/50 flex items-center justify-between font-mono">
+                  <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-cyan-950/90 to-slate-950 border-b border-cyan-500/50 flex items-center justify-between font-mono shadow-inner">
                     <div>
-                      <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-sans font-bold">Bounce Candle Volume</span>
-                      <span className="text-3xl font-black text-cyan-300 tracking-tight drop-shadow">
-                        {(stock.strongBounceVolume || 13000).toLocaleString()} <span className="text-xs font-sans text-cyan-400">shares</span>
+                      <span className="text-[10px] text-cyan-400 uppercase tracking-widest block font-sans font-black">
+                        {stock.hasStrongBullishBounce ? '🟢 Bullish Signal Candle Volume' : '🔴 Bearish Signal Candle Volume'}
+                      </span>
+                      <span className="text-3xl font-black text-cyan-200 tracking-tight drop-shadow">
+                        {(stock.strongBounceVolume || 13000).toLocaleString()} <span className="text-xs font-sans text-cyan-300">shares</span>
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-sans font-bold">Bounce Time &amp; Score</span>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-sans font-bold">Signal Time &amp; Score</span>
                       <span className="text-lg font-black text-amber-300 block">
                         @{stock.strongBounceTime}
                       </span>
