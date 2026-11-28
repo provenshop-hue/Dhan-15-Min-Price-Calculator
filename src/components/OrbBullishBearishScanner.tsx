@@ -740,7 +740,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       }
 
       // Middle Bollinger Band ORB Breakout Filter Logic:
-      // Break with good volume in the middle of Bollinger Band and have clear space before resistance or support.
+      // Break with good volume very near to the center signal line (middle band) and have clear space before resistance.
       let hasMiddleBbBreak = false;
       let middleBbBreakTime = '-';
 
@@ -748,15 +748,14 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + (close * 2)) / 4;
         const stdDev = Math.abs(high - low) / 3.5 || (close * 0.015);
         const upperBand = middleBand + (2 * stdDev);
-        const lowerBand = middleBand - (2 * stdDev);
 
-        // Price is in the middle of Bollinger Band (between lowerBand + 15% and upperBand - 15%)
-        const bandSpan = upperBand - lowerBand;
-        const isInMiddleBand = close >= lowerBand + bandSpan * 0.2 && close <= upperBand - bandSpan * 0.2;
+        // Price must be very near the center signal line (within 0.8% of middleBand)
+        const distanceToMiddleBandPct = Math.abs((close - middleBand) / middleBand) * 100;
+        const isNearCenterLine = distanceToMiddleBandPct <= 0.8;
         const goodVolume = (stock.volumeRatio || 1.2) >= 1.3 || (stock.volume || 200000) >= 200000;
         const hasSpaceToResistance = (upperBand - close) / close >= 0.015; // At least 1.5% space before upper band resistance
 
-        if (isInMiddleBand && goodVolume && hasSpaceToResistance) {
+        if (isNearCenterLine && goodVolume && hasSpaceToResistance) {
           hasMiddleBbBreak = true;
           middleBbBreakTime = orbBreakTime;
         }
