@@ -88,7 +88,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   activeTimingFilter,
   onClearTimingFilter
 }) => {
-  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'lowest_volume_concept' | 'bounce_and_one_direction' | 'failed_stocks' | 'bounce_after_dip' | 'bounce_after_down' | 'bounce_lower_bb' | 'orb_break_no_reversal' | 'lower_bb_orb_break' | 'priority_bb_break' | 'orb_rocket_bounce' | 'extreme_orb_rocket' | 'recent_discovery'>('recent_discovery');
+  const [activeTab, setActiveTab] = useState<'bullish' | 'bearish' | 'super_break_bull' | 'super_break_bear' | 'failed_retest' | 'orb_low_bounce' | 'bounce_candle_strength' | 'orb_zero_reversal' | 'bounce_great' | 'lightning_scalp' | 'no_retest' | 'break_and_continue' | 'orb_with_volume' | 'lowest_volume_concept' | 'bounce_and_one_direction' | 'failed_stocks' | 'bounce_after_dip' | 'bounce_after_down' | 'bounce_lower_bb' | 'orb_break_no_reversal' | 'lower_bb_orb_break' | 'priority_bb_break' | 'orb_rocket_bounce' | 'strong_bullish_bounce' | 'strong_bearish_bounce' | 'middle_bb_break' | 'extreme_orb_rocket' | 'recent_discovery'>('recent_discovery');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'BREAK_PCT' | 'LOWER_BREAK_PCT' | 'JUST_HIT' | 'HEIGHT_PCT' | 'SYMBOL'>('BREAK_PCT');
   const [shallITakeThisStock, setShallITakeThisStock] = useState<StockCalculated | null>(null);
@@ -649,11 +649,12 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       let hasStrongBearishBounce = false;
       let strongBounceScore = 0;
       let strongBounceTime = '-';
+      let bounceCandleVolForSignal = 13000;
 
       if (stock.rsiTimeline && stock.rsiTimeline.length > 2) {
         const avgVol = stock.rsiTimeline.reduce((acc, p) => acc + (p.volume || 10000), 0) / stock.rsiTimeline.length;
 
-        // Bullish Strong Bounce Check: score >= 70 AND bounce candle volume >= 13,000
+        // Bullish Strong Bounce Check: Ensure retest candle is distinct and bounce candle is genuinely subsequent
         let bullBreakIdx = -1;
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
           if (stock.rsiTimeline[i].close >= orbHigh) {
@@ -665,32 +666,38 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (bullBreakIdx !== -1 && bullBreakIdx < stock.rsiTimeline.length - 2) {
           for (let k = bullBreakIdx + 1; k < stock.rsiTimeline.length - 1; k++) {
             const retestPt = stock.rsiTimeline[k];
-            const respectedOrbHigh = retestPt.low >= orbHigh * 0.992;
+            // Retest low should test near ORB high but not decisively violate it downwards
+            const respectedOrbHigh = retestPt.low >= orbHigh * 0.990 && retestPt.low <= orbHigh * 1.015;
             if (respectedOrbHigh) {
-              const bouncePt = stock.rsiTimeline[k + 1];
-              const bounceVol = bouncePt.volume || 10000;
-              if (bounceVol >= 13000) {
-                const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
-                const rsiScore = (rsi >= 55 && rsi <= 75) ? 30 : 15;
-                const vwapScore = close > vwap ? 25 : 10;
-                const bodyScore = Math.min(20, (Math.abs(bouncePt.close - bouncePt.open) / Math.max(0.01, bouncePt.high - bouncePt.low)) * 20);
-                
-                const calculatedScore = Math.round(volScore + rsiScore + vwapScore + bodyScore);
-                strongBounceScore = Math.max(50, Math.min(98, calculatedScore));
+              for (let m = k + 1; m < stock.rsiTimeline.length; m++) {
+                const bouncePt = stock.rsiTimeline[m];
+                const bounceVol = bouncePt.volume || 10000;
+                // Bounce candle must close higher than retest candle close and meet volume >= 13k
+                if (bouncePt.close > retestPt.close && bounceVol >= 13000) {
+                  const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
+                  const rsiScore = (rsi >= 55 && rsi <= 75) ? 30 : 15;
+                  const vwapScore = close > vwap ? 25 : 10;
+                  const bodyScore = Math.min(20, (Math.abs(bouncePt.close - bouncePt.open) / Math.max(0.01, bouncePt.high - bouncePt.low)) * 20);
+                  
+                  const calculatedScore = Math.round(volScore + rsiScore + vwapScore + bodyScore);
+                  strongBounceScore = Math.max(50, Math.min(98, calculatedScore));
 
-                if (strongBounceScore >= 70) {
-                  hasStrongBullishBounce = true;
-                  strongBounceTime = bouncePt.timeStr;
-                  // @ts-ignore
-                  stock.strongBounceVolume = bounceVol;
-                  break;
+                  if (strongBounceScore >= 70) {
+                    hasStrongBullishBounce = true;
+                    strongBounceTime = bouncePt.timeStr;
+                    bounceCandleVolForSignal = bounceVol;
+                    // @ts-ignore
+                    stock.strongBounceVolume = bounceVol;
+                    break;
+                  }
                 }
               }
+              if (hasStrongBullishBounce) break;
             }
           }
         }
 
-        // Bearish Strong Bounce Check: score >= 70 AND bounce candle volume >= 13,000
+        // Bearish Strong Bounce Check
         let bearBreakIdx = -1;
         for (let i = 0; i < stock.rsiTimeline.length; i++) {
           if (stock.rsiTimeline[i].close <= orbLow) {
@@ -702,29 +709,56 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         if (bearBreakIdx !== -1 && bearBreakIdx < stock.rsiTimeline.length - 2 && !hasStrongBullishBounce) {
           for (let k = bearBreakIdx + 1; k < stock.rsiTimeline.length - 1; k++) {
             const retestPt = stock.rsiTimeline[k];
-            const respectedOrbLow = retestPt.high <= orbLow * 1.008;
+            const respectedOrbLow = retestPt.high <= orbLow * 1.010 && retestPt.high >= orbLow * 0.985;
             if (respectedOrbLow) {
-              const bouncePt = stock.rsiTimeline[k + 1];
-              const bounceVol = bouncePt.volume || 10000;
-              if (bounceVol >= 13000) {
-                const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
-                const rsiScore = (rsi <= 45 && rsi >= 25) ? 30 : 15;
-                const vwapScore = close < vwap ? 25 : 10;
-                const bodyScore = Math.min(20, (Math.abs(bouncePt.close - bouncePt.open) / Math.max(0.01, bouncePt.high - bouncePt.low)) * 20);
-                
-                const calculatedScore = Math.round(volScore + rsiScore + vwapScore + bodyScore);
-                strongBounceScore = Math.max(50, Math.min(98, calculatedScore));
+              for (let m = k + 1; m < stock.rsiTimeline.length; m++) {
+                const bouncePt = stock.rsiTimeline[m];
+                const bounceVol = bouncePt.volume || 10000;
+                if (bouncePt.close < retestPt.close && bounceVol >= 13000) {
+                  const volScore = Math.min(25, (((bouncePt.volume || 10000) / (avgVol || 10000)) * 15));
+                  const rsiScore = (rsi <= 45 && rsi >= 25) ? 30 : 15;
+                  const vwapScore = close < vwap ? 25 : 10;
+                  const bodyScore = Math.min(20, (Math.abs(bouncePt.close - bouncePt.open) / Math.max(0.01, bouncePt.high - bouncePt.low)) * 20);
+                  
+                  const calculatedScore = Math.round(volScore + rsiScore + vwapScore + bodyScore);
+                  strongBounceScore = Math.max(50, Math.min(98, calculatedScore));
 
-                if (strongBounceScore >= 70) {
-                  hasStrongBearishBounce = true;
-                  strongBounceTime = bouncePt.timeStr;
-                  // @ts-ignore
-                  stock.strongBounceVolume = bounceVol;
-                  break;
+                  if (strongBounceScore >= 70) {
+                    hasStrongBearishBounce = true;
+                    strongBounceTime = bouncePt.timeStr;
+                    bounceCandleVolForSignal = bounceVol;
+                    // @ts-ignore
+                    stock.strongBounceVolume = bounceVol;
+                    break;
+                  }
                 }
               }
+              if (hasStrongBearishBounce) break;
             }
           }
+        }
+      }
+
+      // Middle Bollinger Band ORB Breakout Filter Logic:
+      // Break with good volume in the middle of Bollinger Band and have clear space before resistance or support.
+      let hasMiddleBbBreak = false;
+      let middleBbBreakTime = '-';
+
+      if (isBullishQualified && stock.rsiTimeline && stock.rsiTimeline.length > 0) {
+        const middleBand = stock.ema20 !== undefined && stock.ema20 !== null ? stock.ema20 : (high + low + (close * 2)) / 4;
+        const stdDev = Math.abs(high - low) / 3.5 || (close * 0.015);
+        const upperBand = middleBand + (2 * stdDev);
+        const lowerBand = middleBand - (2 * stdDev);
+
+        // Price is in the middle of Bollinger Band (between lowerBand + 15% and upperBand - 15%)
+        const bandSpan = upperBand - lowerBand;
+        const isInMiddleBand = close >= lowerBand + bandSpan * 0.2 && close <= upperBand - bandSpan * 0.2;
+        const goodVolume = (stock.volumeRatio || 1.2) >= 1.3 || (stock.volume || 200000) >= 200000;
+        const hasSpaceToResistance = (upperBand - close) / close >= 0.015; // At least 1.5% space before upper band resistance
+
+        if (isInMiddleBand && goodVolume && hasSpaceToResistance) {
+          hasMiddleBbBreak = true;
+          middleBbBreakTime = orbBreakTime;
         }
       }
 
@@ -1581,6 +1615,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         // @ts-ignore
         strongBounceVolume: stock.strongBounceVolume || 13000,
         strongBounceTime: capTimeAtCurrentClock(strongBounceTime),
+        hasMiddleBbBreak,
+        middleBbBreakTime: capTimeAtCurrentClock(middleBbBreakTime),
         extremeOrbRocketStatus,
         extremeOrbRocketDetails,
         hasFailedStock,
@@ -1640,6 +1676,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
       if (activeTab === 'lower_bb_orb_break' && !s.hasLowerBbOrbBreak) return false;
       if (activeTab === 'strong_bullish_bounce' && !s.hasStrongBullishBounce) return false;
       if (activeTab === 'strong_bearish_bounce' && !s.hasStrongBearishBounce) return false;
+      if (activeTab === 'middle_bb_break' && !s.hasMiddleBbBreak) return false;
       if (activeTab === 'orb_rocket_bounce' && !s.hasOrbRocketBounce) return false;
       if (activeTab === 'extreme_orb_rocket' && !s.extremeOrbRocketStatus || activeTab === 'extreme_orb_rocket' && s?.extremeOrbRocketStatus === 'NO TRADE') return false;
       if (activeTab === 'recent_discovery') {
@@ -1727,6 +1764,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
   const orbRocketBounceCount = processedOrbStocks.filter(s => s.hasOrbRocketBounce).length;
   const strongBullishBounceCount = processedOrbStocks.filter(s => s.hasStrongBullishBounce).length;
   const strongBearishBounceCount = processedOrbStocks.filter(s => s.hasStrongBearishBounce).length;
+  const middleBbBreakCount = processedOrbStocks.filter(s => s.hasMiddleBbBreak).length;
   const extremeOrbRocketCount = processedOrbStocks.filter(s => s?.extremeOrbRocketStatus && s.extremeOrbRocketStatus !== 'NO TRADE').length;
   const recentDiscoveryCount = processedOrbStocks.filter(s => s.hasRecentDiscovery).length;
 
@@ -1863,6 +1901,7 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
               { id: 'orb_rocket_bounce', label: `🚀 ORB Rocket Bounce (${orbRocketBounceCount})`, icon: Sparkles, color: 'text-purple-300', activeClass: 'bg-purple-600 text-white font-black shadow-lg shadow-purple-600/30 border border-purple-500' },
               { id: 'strong_bullish_bounce', label: `🟢 Strong Bullish Bounce (${strongBullishBounceCount})`, icon: ArrowUpRight, color: 'text-emerald-300', activeClass: 'bg-emerald-600 text-white font-black shadow-lg shadow-emerald-600/30 border border-emerald-500' },
               { id: 'strong_bearish_bounce', label: `🔴 Strong Bearish Bounce (${strongBearishBounceCount})`, icon: ArrowDownRight, color: 'text-rose-300', activeClass: 'bg-rose-600 text-white font-black shadow-lg shadow-rose-600/30 border border-rose-500' },
+              { id: 'middle_bb_break', label: `🎯 ORB Break Middle BB (${middleBbBreakCount})`, icon: Target, color: 'text-cyan-300', activeClass: 'bg-cyan-600 text-white font-black shadow-lg shadow-cyan-600/30 border border-cyan-400' },
               { id: 'extreme_orb_rocket', label: `🚀 Extreme ORB Rocket (${extremeOrbRocketCount})`, icon: Zap, color: 'text-amber-300', activeClass: 'bg-gradient-to-r from-amber-600 to-yellow-600 text-slate-950 font-black shadow-lg shadow-amber-500/40 border border-amber-300' },
               { id: 'orb_break_no_reversal', label: `🚀 ORB Break No Reversal (${orbBreakNoReversalCount})`, icon: Target, color: 'text-amber-300', activeClass: 'bg-amber-600 text-white font-black shadow-lg shadow-amber-600/30 border border-amber-400' },
               { id: 'bounce_and_one_direction', label: `⚡ Bounce & One Direction (${bounceAndOneDirectionCount})`, icon: Flame, color: 'text-amber-300', activeClass: 'bg-amber-600 text-white font-black shadow-lg shadow-amber-600/30 border border-amber-400' },

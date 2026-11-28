@@ -107,6 +107,8 @@ export interface StockCalculated {
   strongBounceScore?: number;
   strongBounceVolume?: number;
   strongBounceTime?: string;
+  hasMiddleBbBreak?: boolean;
+  middleBbBreakTime?: string;
   extremeOrbRocketStatus?: 'EXTREME BULLISH' | 'EXTREME BEARISH' | 'NO TRADE';
   extremeOrbRocketDetails?: {
     bodyPct: number;
