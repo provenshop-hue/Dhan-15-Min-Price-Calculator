@@ -317,7 +317,9 @@ export const LabsAnalyzer: React.FC<LabsAnalyzerProps> = ({ stocks }) => {
                         <div>High: <strong className="text-emerald-400">₹{c.high}</strong></div>
                         <div>Low: <strong className="text-rose-400">₹{c.low}</strong></div>
                         <div>Close: <strong className="text-amber-300">₹{c.close}</strong></div>
-                        <div>Vol: <strong className="text-cyan-300">{(c.volume / 100000).toFixed(2)}L</strong></div>
+                        <div className="bg-cyan-950/80 border border-cyan-500/50 px-2 py-0.5 rounded-lg text-cyan-300 font-black shadow-2xs">
+                          📊 Vol: {(c.volume / 100000).toFixed(2)}L ({c.volume.toLocaleString()})
+                        </div>
                       </div>
                     </div>
 
