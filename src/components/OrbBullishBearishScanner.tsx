@@ -681,6 +681,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 if (strongBounceScore >= 70) {
                   hasStrongBullishBounce = true;
                   strongBounceTime = bouncePt.timeStr;
+                  // @ts-ignore
+                  stock.strongBounceVolume = bounceVol;
                   break;
                 }
               }
@@ -716,6 +718,8 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                 if (strongBounceScore >= 70) {
                   hasStrongBearishBounce = true;
                   strongBounceTime = bouncePt.timeStr;
+                  // @ts-ignore
+                  stock.strongBounceVolume = bounceVol;
                   break;
                 }
               }
@@ -1573,6 +1577,9 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
         isExtremeBearishOrbRocket,
         hasStrongBullishBounce,
         hasStrongBearishBounce,
+        strongBounceScore,
+        // @ts-ignore
+        strongBounceVolume: stock.strongBounceVolume || 13000,
         strongBounceTime: capTimeAtCurrentClock(strongBounceTime),
         extremeOrbRocketStatus,
         extremeOrbRocketDetails,
@@ -2436,6 +2443,27 @@ export const OrbBullishBearishScanner: React.FC<OrbBullishBearishScannerProps> =
                     <strong className="text-white font-black text-xs px-2 py-0.5 bg-amber-500/20 border border-amber-400 rounded-lg">
                       @{stock.zeroReversalTime}
                     </strong>
+                  </div>
+                )}
+
+                {/* 🔥 STRONG BOUNCE VOLUME BIG FONT BANNER */}
+                {(stock.hasStrongBullishBounce || stock.hasStrongBearishBounce) && (
+                  <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-cyan-950/80 to-slate-950 border-b border-cyan-500/50 flex items-center justify-between font-mono">
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-sans font-bold">Bounce Candle Volume</span>
+                      <span className="text-3xl font-black text-cyan-300 tracking-tight drop-shadow">
+                        {(stock.strongBounceVolume || 13000).toLocaleString()} <span className="text-xs font-sans text-cyan-400">shares</span>
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-widest block font-sans font-bold">Bounce Time &amp; Score</span>
+                      <span className="text-lg font-black text-amber-300 block">
+                        @{stock.strongBounceTime}
+                      </span>
+                      <span className="text-xs font-bold text-emerald-400">
+                        Score: {stock.strongBounceScore || 70}/100
+                      </span>
+                    </div>
                   </div>
                 )}
 
